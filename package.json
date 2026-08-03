@@ -1,0 +1,16 @@
+{
+  "name": "f1-analytics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Formula 1 analytics — driver, team, race and cross-era analysis.",
+  "scripts": {
+    "dev": "echo \"Configured in F0 (feat/foundation)\" && exit 1",
+    "build": "echo \"Configured in F0 (feat/foundation)\" && exit 1",
+    "test": "echo \"Configured in F0 (feat/foundation)\" && exit 1",
+    "db:sql": "sqlite3 data/f1.db"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1"
+  }
+}

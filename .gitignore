@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+
+# local database + raw seed artefacts (never committed)
+data/
+
+# local-only data pipeline and provenance notes (never committed)
+private/
+
+# env
+.env
+.env.*
+!.env.example
+
+# build output
+dist/
+build/
+.vite/
+
+# test artefacts
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# misc
+*.log
+.DS_Store
+coverage/
