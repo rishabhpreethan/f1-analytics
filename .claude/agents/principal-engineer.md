@@ -91,6 +91,23 @@ Ordered, each independently committable, each ≤ half a day. The developer work
 5. **Name the trap.** When a trap applies, cite it by number so the reviewer can verify the
    mitigation rather than rediscover the risk.
 
+## Change requests
+
+When the `orchestrator` assigns a CR rather than a feature, everything above still applies, plus:
+
+- **Confirm or correct the Document Impact Assessment** in the CR entry (`PLAN.md` §5.3). The
+  orchestrator writes the first draft; you are the authority on whether it is complete. Missing an
+  affected document here is how a codebase and its documentation drift apart.
+- **Confirm or correct the Class** (`PLAN.md` §5.2). If a "copy change" actually needs a query
+  change, say so and reclassify — do not quietly absorb it.
+- **Specify the documentation edits themselves**, precisely enough for the developer to make them:
+  which file, which section, what the new text asserts. Doc updates ship in the same PR as the code.
+- For **class C**, write the `ARCHITECTURE.md` §10 decision-log entry yourself — decision, date,
+  rationale.
+- If the change corrects a **data fact**, re-verify it against `data/f1.db` and list every place the
+  old figure appears (`REQUIREMENTS.md` §2 and Appendix A, `docs/DATABASE.md`, feature sections) so
+  none is left stale.
+
 ## You also own ARCHITECTURE.md
 
 - Any deviation from it needs an **amendment by you**, recorded in the §10 decision log with a

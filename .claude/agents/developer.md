@@ -95,6 +95,18 @@ Driver photos and team logos are **Rishabh's**. Never fabricate, generate, or ho
 Implement against the specified placeholder and the specified path/naming convention so real assets
 drop in without a code change.
 
+## Change requests
+
+A CR follows the same gates as a feature, on branch `change/CR-<id>-<slug>`.
+
+**The documentation edits named in the CR's Document Impact Assessment are part of your
+deliverable.** Commit them alongside the code, in the same PR. A behaviour change with a stale
+document is a blocking review finding — and it is your finding to avoid, not the reviewer's to catch.
+
+If, while implementing, you discover a document is wrong in a way the assessment missed, stop and
+report it to the orchestrator rather than fixing it silently — the assessment needs correcting so the
+change is traceable.
+
 ## Unit tests
 
 Write the tests named in the spec. Priority order:

@@ -66,6 +66,40 @@ For **every** feature branch:
 - If an agent claims completion without evidence (file paths, test output, screenshots), reject it
   and send it back. **Assertions are not evidence.**
 
+## Change requests from Rishabh — your entry point
+
+**Every change Rishabh asks for is a CR and travels the full agent order.** There is no fast path
+and no "it's just a small one". See `PLAN.md` §5 for the full process; your obligations:
+
+1. **Open a CR entry** in `PLAN.md` §5.5 — ID (`CR-001`…), the request verbatim, the date.
+2. **Triage** — which features, routes, endpoints and components are affected.
+3. **Assign a Class** (`PLAN.md` §5.2). Class sets how *deep* each gate goes; it never removes a
+   gate. Under-classifying is a failure — when in doubt, classify up.
+
+   | Class | Nature |
+   |---|---|
+   | A | copy / token / styling |
+   | B | behaviour — new chart, changed metric, new filter |
+   | C | structural — new route, endpoint, schema/query change, new dependency |
+
+4. **Write the Document Impact Assessment** (`PLAN.md` §5.3) **before implementation starts**. Give
+   an explicit verdict for every canonical document — `No change` is a valid answer, silence is not:
+
+   `REQUIREMENTS.md` · `docs/ARCHITECTURE.md` · `docs/DATABASE.md` · `docs/DESIGN_SYSTEM.md` ·
+   `PLAN.md` · `.claude/agents/*.md`
+
+   For class C, also require an `ARCHITECTURE.md` §10 decision-log entry. For any colour change,
+   require a fresh palette validation recorded in `DESIGN_SYSTEM.md` §9.
+
+5. **Tell Rishabh the doc impact when you acknowledge the request.** He asked to be told which
+   documents a change touches — state it up front, not after the work.
+6. **Assign down the CR gate order** (`PLAN.md` §5.4) on branch `change/CR-<id>-<slug>`.
+7. **At approval, verify the documentation actually changed** — not merely that the assessment was
+   written. A behaviour change with a stale document is a blocking finding.
+
+If a change makes a document and the code disagree, that is a **defect to resolve**, not a
+difference of opinion. Decide which is wrong and fix it within the CR.
+
 ## Assigning work
 
 Every assignment you issue must contain all six of these. Vague assignments produce rework.

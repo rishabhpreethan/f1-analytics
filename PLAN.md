@@ -585,7 +585,94 @@ obvious rather than configured — and must never quietly lie across eras.
 
 ---
 
-## 5. Risks
+## 5. Change requests
+
+**Any change Rishabh requests — however small — enters here and travels the full agent order.**
+There is no side door. A change that skips gates is how a documented system quietly stops matching
+reality.
+
+### 5.1 How a change enters
+
+1. Rishabh states the change to the **`orchestrator`**.
+2. The `orchestrator` opens a **CR entry** in §5.5 with an ID (`CR-001`, `CR-002`, …), the request
+   verbatim, and the date.
+3. The `orchestrator` performs **triage** and records:
+   - **What surfaces are affected** — which features, routes, endpoints, components
+   - **Document Impact Assessment** (§5.3) — mandatory, and stated before work begins
+   - **Class** (§5.2) — which sets the *depth* of each gate, never whether a gate runs
+4. Work is assigned. The gate order below is identical to a feature's.
+
+### 5.2 Class — depth, not shortcuts
+
+Every class passes through **every** agent. The class tells each agent how deep to go, so a copy
+tweak does not receive a full architectural audit while a data-model change does.
+
+| Class | Examples | Gate depth |
+|---|---|---|
+| **A — Copy / token** | wording, spacing, a colour step, an easing value | Each agent confirms *no wider impact*: spec confirms no data/API change; designer verifies visually; reviewer confirms no new surface; QA smoke-tests the affected route |
+| **B — Behaviour** | a new chart, a changed metric, a new filter, altered interaction | Full spec, full design spec, full review, full security audit, full E2E for the affected feature |
+| **C — Structural** | new route, new endpoint, schema/query change, new dependency, new data source | Everything in B **plus** an `ARCHITECTURE.md` §10 decision-log entry, and a re-verification pass on any affected `DATABASE.md` claim |
+
+The `orchestrator` assigns the class and records it. If an agent believes the class is wrong, it says
+so — under-classifying is a review failure.
+
+### 5.3 Document Impact Assessment — mandatory
+
+**Before implementation starts**, the `orchestrator` (with the `principal-engineer` for class B/C)
+records which canonical documents the change alters. Every row gets an explicit verdict — `No change`
+is a valid answer, silence is not.
+
+| Document | Change it when |
+|---|---|
+| `REQUIREMENTS.md` | Product behaviour, scope, a requirement ID, a data-coverage claim, or something moving in/out of §6 (out of scope) |
+| `docs/ARCHITECTURE.md` | Stack, layering, API surface, routing/URL contract, security posture, performance budget. **Class C also requires a §10 decision-log entry.** |
+| `docs/DATABASE.md` | Query patterns, a new canonical view, a newly discovered trap, a corrected coverage figure, an enum decode |
+| `docs/DESIGN_SYSTEM.md` | Tokens, typography, motion presets, chart conventions, component inventory. **A colour change requires a fresh palette validation recorded in §9.** |
+| `PLAN.md` | Feature scope, acceptance criteria, the tracker, a new asset task for Rishabh |
+| `.claude/agents/*.md` | An agent's responsibilities, gates, or constraints change |
+
+**Rules that make this real:**
+
+- **Documentation changes ship in the same PR as the code.** A PR that changes behaviour without
+  updating the affected document is a blocking review finding.
+- **If the docs and the code disagree, that is a defect** — not a matter of taste. Either the code is
+  wrong or the document is stale; the CR must resolve which.
+- A **new requirement gets a new requirement ID** so QA can trace a test to it.
+- A **corrected data fact** must be re-verified against the database, and the old figure replaced
+  everywhere it appears — including `REQUIREMENTS.md` Appendix A.
+- The `reviewer` verifies the Document Impact Assessment was **honoured**, not merely written.
+
+### 5.4 Gate order for a change request
+
+Identical to a feature. Branch: `change/CR-<id>-<slug>`.
+
+```
+1.  orchestrator        → CR entry, triage, class, Document Impact Assessment
+2.  principal-engineer  → technical spec + confirms/corrects the doc impact
+3.  designer            → design spec (skip only if the CR touches no UI — recorded explicitly)
+4.  developer           → implement on change/CR-<id>-<slug>, including doc updates
+5.  designer            → visual verification via Playwright MCP
+6.  developer           → fix design findings                       (loop 5–6)
+7.  reviewer            → code review + verifies doc updates landed
+8.  reviewer            → security audit, S-1 … S-14
+9.  developer           → fix blocking findings                     (loop 7–9)
+10. qa                  → E2E for affected surfaces + regression on neighbours
+11. developer           → fix QA findings                           (loop 10–11)
+12. orchestrator        → verify every gate → approve → merge
+```
+
+Step 3 may be skipped **only** when the CR provably touches no UI, and the `orchestrator` records
+that decision and its reason in the CR entry.
+
+### 5.5 Change request log
+
+| ID | Date | Request | Class | Docs affected | Branch | Status | Approved |
+|---|---|---|---|---|---|---|---|
+| CR-001 | 2026-08-04 | Every requested change must traverse the full agent order, with document impact stated | C | `PLAN.md` §5 (new), `.claude/agents/*` (all six) | `main` (pre-F0 setup) | ✅ Done | 2026-08-04 |
+
+---
+
+## 6. Risks
 
 | Risk | Mitigation |
 |---|---|
@@ -600,7 +687,7 @@ obvious rather than configured — and must never quietly lie across eras.
 
 ---
 
-## 6. Change log
+## 7. Document change log
 
 | Date | Change | By |
 |---|---|---|

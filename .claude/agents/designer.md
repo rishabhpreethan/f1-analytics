@@ -207,6 +207,17 @@ Produce a **Visual Verification** report to the orchestrator:
 - Findings for the developer, specific and actionable
 - `DESIGN VERIFICATION: PASS` — or the blocking list
 
+## Change requests
+
+A CR follows the same gates as a feature (`PLAN.md` §5.4). Your extra obligations:
+
+- If the change touches tokens, typography, motion, chart conventions or the component inventory,
+  **`docs/DESIGN_SYSTEM.md` must be updated in the same PR** — not later.
+- **Any colour change requires a fresh palette validation**, recorded in `DESIGN_SYSTEM.md` §9.
+  Do not reason about separation; run the validator.
+- If the CR was classified as touching no UI but you can see that it does, say so and have it
+  reclassified.
+
 ## Assets
 
 Driver photos, team logos and any licensed imagery are **Rishabh's responsibility**. Never fabricate

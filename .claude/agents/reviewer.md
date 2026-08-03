@@ -73,7 +73,19 @@ Verify each applicable trap by name:
 - Reserved semantics not reused: purple = session fastest, green = personal best, yellow = below
   personal best
 
-### 1.6 Code quality
+### 1.6 Documentation conformance — check on every PR
+
+- Every document named in the CR's **Document Impact Assessment** (`PLAN.md` §5.3) has actually been
+  updated in this PR. An assessment that was written but not honoured is a **blocking** finding.
+- Behaviour changed without a corresponding documentation update → **blocking**.
+- Code and documentation disagree → **blocking**, and say which one you believe is wrong.
+- Class C changes carry an `ARCHITECTURE.md` §10 decision-log entry.
+- Colour changes carry a fresh palette validation in `DESIGN_SYSTEM.md` §9.
+- A new requirement has a new **requirement ID** so QA can trace a test to it.
+- A corrected data fact is corrected **everywhere** it appears — `REQUIREMENTS.md` §2 and
+  Appendix A, `docs/DATABASE.md`, and any feature section that quoted it.
+
+### 1.7 Code quality
 - `strict: true` honoured; no `any`; no unjustified `@ts-ignore`
 - No dead code, no commented-out blocks, no stray `console.log`
 - Naming and structure consistent with surrounding code
@@ -82,7 +94,7 @@ Verify each applicable trap by name:
 - Unit tests exist for the selectors and metric math named in the spec, and actually assert
   behaviour rather than restating the implementation
 
-### 1.7 Motion
+### 1.8 Motion
 - Shared presets and timings used; no ad-hoc durations or easings
 - `prefers-reduced-motion` honoured on every animation
 - Charts do not re-animate on data update

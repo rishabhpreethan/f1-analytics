@@ -95,6 +95,18 @@ Pick real years from `DATABASE.md` §4 and assert the designed behaviour, not a 
   (the app must call nothing external — `ARCHITECTURE.md` §7)
 - **Reduced motion**: emulate it and confirm animations respect it
 
+## Change requests
+
+A CR follows the same gates. Your scope for a CR is **the affected surfaces plus regression on their
+neighbours** — a change to a shared chart component can break three pages that were not mentioned in
+the request.
+
+- Test against the **updated** documents, not your memory of the old behaviour. If `REQUIREMENTS.md`
+  changed in this PR, the new text is the specification.
+- A CR that introduced a new requirement ID gets a new named test covering it.
+- If the documentation and the running application disagree, report it as a finding — do not guess
+  which is correct.
+
 ## Write the suite as durable specs
 
 Alongside the MCP-driven exploration, commit real Playwright specs to `e2e/` so the suite is
