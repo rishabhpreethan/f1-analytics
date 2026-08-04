@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+data
+private
+package-lock.json
+
+# Vendored binaries — never rewritten.
+public/fonts
+
+# Markdown in this repository is hand-formatted (tables, aligned columns) and is
+# authored by agents who own the documents; reflowing it would obscure real diffs.
+*.md
