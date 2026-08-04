@@ -168,6 +168,131 @@
     z-index: 50;
   }
 
+  /* ------------------------------------------------------------------ Button §7.1
+   * Height, radius and the hue-free interactive expression of §3.5.2. `scale(0.985)`
+   * on press is M-6 and is applied by Framer Motion, not here.
+   */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 2);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    background-color: transparent;
+    transition:
+      background-color var(--dur-instant) var(--ease-move),
+      color var(--dur-instant) var(--ease-move),
+      border-color var(--dur-instant) var(--ease-move);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .btn {
+      transition: none;
+    }
+  }
+
+  .btn-sm {
+    height: var(--size-control-sm);
+    padding-inline: calc(var(--spacing) * 2);
+  }
+
+  .btn-md {
+    height: var(--size-control-md);
+    padding-inline: calc(var(--spacing) * 3);
+  }
+
+  .btn-lg {
+    height: var(--size-control-lg);
+    padding-inline: calc(var(--spacing) * 4);
+  }
+
+  .btn-primary {
+    background-color: var(--ink-primary);
+    color: var(--ink-inverse);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--ink-secondary);
+  }
+
+  .btn-secondary {
+    background-color: var(--surface-raised);
+    border-color: var(--border-control);
+    color: var(--ink-primary);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--surface-overlay);
+  }
+
+  .btn-ghost {
+    color: var(--ink-secondary);
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--surface-overlay);
+    color: var(--ink-primary);
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled='true'] {
+    background-color: var(--surface-sunken);
+    border-color: var(--border-subtle);
+    color: var(--ink-tertiary);
+    cursor: not-allowed;
+    /* Never faded: a disabled control must stay readable so its explanation can be
+     * read too (§3.5.2). */
+    opacity: 1;
+  }
+
+  /* ------------------------------------------------------- Badge / chip §7.2
+   * F0 needs only `neutral` and the mono value form.
+   */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--border-subtle);
+    color: var(--ink-secondary);
+    padding-inline: calc(var(--spacing) * 1.5);
+    padding-block: calc(var(--spacing) * 0.5);
+  }
+
+  /* ----------------------------------------------------------- StateCard §7.4
+   * One anatomy for all five states, so they read as one family rather than five
+   * one-offs. Padding is 24, 16 on mobile.
+   */
+  .state-card {
+    max-width: var(--size-state-card);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--elev-1-shadow);
+    text-align: start;
+  }
+
+  .state-card-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--size-icon-tile);
+    height: var(--size-icon-tile);
+    border-radius: var(--radius-md);
+    background-color: var(--status-critical-wash);
+    color: var(--status-critical-ink);
+  }
+
+  /* A missing-coverage boundary is not a fault, so its tile is neutral (§3.4.3). The
+   * same class is used by `empty`. */
+  .state-card-tile-neutral {
+    background-color: var(--surface-sunken);
+    color: var(--ink-tertiary);
+  }
+
   /* Offsets are multiples of Tailwind's own `--spacing` step (§5.1's 4px scale), so
    * no length literal appears here either. */
   .skip-link:focus-visible {

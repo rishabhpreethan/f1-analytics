@@ -62,6 +62,18 @@ export const routeEnter: Variants = {
   visible: { opacity: 1, y: 0, transition: enterTransition },
 };
 
+/**
+ * M-2 reduced variant: opacity only at `dur.fast`.
+ *
+ * `MotionConfig reducedMotion="user"` already drops the `y`, but it keeps the *duration*
+ * — and §4.4 specifies `dur.fast`, not `dur.base`, for the reduced form. The explicit
+ * variant is the difference between honouring the specification and approximating it.
+ */
+export const routeEnterReduced: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: fastEnterTransition },
+};
+
 /** M-5 — popover / menu open. `transform-origin` is set by the component. */
 export const popover: Variants = {
   hidden: { opacity: 0, scale: 0.98 },

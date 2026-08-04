@@ -184,6 +184,41 @@
   --elev-2-border: var(--border-subtle);
 }
 
+/*
+ * Component geometry that is **not** on the 4px spacing scale.
+ *
+ * §5.1 restricts the spacing steps a component may use, and it names 7 / 9 / 11 / 14
+ * as review failures — which rules out `h-14` for a 56px header. Everything below is a
+ * fixed dimension named by the Design Spec (shell anatomy §2.1, `ThemeToggle` §5.2,
+ * `DataVintage` §5.1, `DESIGN_SYSTEM.md` §7.1 / §7.4). It lives here, with the rest of
+ * the tokens, and is consumed by the classes in `index.css` — never written inline.
+ *
+ * Theme-independent, so it is declared once and not repeated under [data-theme].
+ */
+:root {
+  --size-shell-max: 90rem; /* 1440 — §5.3 container */
+  --size-header: 3.5rem; /* 56 — header height at every breakpoint */
+  --size-rule: 2px; /* the nav active rule and the sheet's leading rule */
+
+  --size-control-sm: 1.75rem; /* 28 — DataVintage trigger, Button sm */
+  --size-control-md: 2.25rem; /* 36 — Button md, theme popover row */
+  --size-control-lg: 2.75rem; /* 44 — Button lg */
+  --size-touch: 2.75rem; /* 44 — minimum touch target (§8) */
+  --size-toggle: 2rem; /* 32 — ThemeToggle trigger */
+
+  --size-sheet-row: 3rem; /* 48 — mobile nav sheet row */
+  --size-icon-tile: 2.5rem; /* 40 — StateCard icon tile (§7.4) */
+  --size-dot: 0.5rem; /* 8 — DataVintage coverage dot */
+
+  --size-popover-theme: 12.5rem; /* 200 — ThemeToggle popover (§5.2) */
+  --size-popover-coverage: 20rem; /* 320 — DataVintage popover (§5.1) */
+  --size-state-card: 35rem; /* 560 — StateCard standalone max-width (§7.4) */
+  --size-state-block: 60vh; /* the DataUnavailableState block in `main` (§7) */
+
+  --size-skeleton-vintage-w: 5.75rem; /* 92 — same width as the resolved chip */
+  --size-skeleton-vintage-h: 1.25rem; /* 20 */
+}
+
 [data-theme='dark'] {
   color-scheme: dark;
 
