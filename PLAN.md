@@ -112,10 +112,10 @@ Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` �
 
 | ID | Feature | Branch | Depends on | Status | Approved |
 |---|---|---|---|---|---|
-| R0 | Supply `data/f1.db` | — | — | Not started | — |
+| R0 | Supply `data/f1.db` | — | — | ✅ Done | 2026-08-04 |
 | R1 | Driver images | — | — | Not started | — |
 | R2 | Team logos | — | — | Not started | — |
-| F0 | Foundation & scaffold | `feat/foundation` | R0 | Not started | — |
+| F0 | Foundation & scaffold | `feat/foundation` | R0 | Spec in progress | — |
 | F1 | Design system | `feat/design-system` | F0 | Not started | — |
 | F2 | Season hub | `feat/season-hub` | F1 | Not started | — |
 | F3 | Race deep dive | `feat/race-deep-dive` | F1 | Not started | — |
@@ -692,3 +692,6 @@ that decision and its reason in the CR entry.
 | Date | Change | By |
 |---|---|---|
 | 2026-08-04 | Initial plan, architecture, database and agent definitions created | — |
+| 2026-08-04 | CR-001: change-request workflow + document impact assessment added (§5) | orchestrator |
+| 2026-08-04 | R0 satisfied — database verified present (19 tables, 717,764 laps, through 2026 R10) | orchestrator |
+| 2026-08-04 | F0 started on `feat/foundation`; gates 1–2 dispatched in parallel | orchestrator |
