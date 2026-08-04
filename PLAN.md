@@ -3134,7 +3134,8 @@ the raw grep over-reports, because several matches are incidental prose rather t
 | `REQUIREMENTS.md` | **CHANGE — routed to the `principal-engineer`, who owns it.** One forward obligation, **§7.2 line 495**. The other three bullets in §7.2 stay: never commit the database or a raw seed file; a fresh clone has no database; schema changes are mirrored in `db/schema.sql`. No requirement ID is added, removed or renumbered; no coverage figure moves; §6 (out of scope) is untouched. |
 | `docs/ARCHITECTURE.md` | **CHANGE — routed to the `principal-engineer`.** Two edits: **§7 `S-12` removed from the security-posture table** (this is the security-audit item list, so the audit becomes S-1…S-11 + S-13…S-14 — renumbering is **not** wanted, the identifiers are load-bearing in review history), and a **§10 decision-log entry, required by Class C**. No stack, layering, API-surface, routing, or performance-budget change. |
 | `docs/DATABASE.md` | **No change.** Re-read at CR open: §1–§9 describe schema, canonical queries, traps, coverage and maintenance only, and carry no reference to the rule. F0 **T14** still adds trap 15 and the §9 checklist items, unaffected. |
-| `docs/DESIGN_SYSTEM.md` | **CHANGE — one line, routed to the `designer`, who owns it.** **§7.3 line 654** states the constraint as a release blocker binding on copy. The `DataVintage` **copy itself does not change**: coverage phrasing was chosen on independent grounds (it is the more honest phrasing, and `REQUIREMENTS.md` §2.2 forbids assuming today's calendar position), so it survives the constraint's removal on its own merits. **No token, colour, typography, motion or component change → no fresh §9 palette validation run required.** |
+| `docs/DESIGN_SYSTEM.md` | **CHANGE — ✅ landed `713b760`** by the `designer`. **My assessment said "one line, §7.3 line 654" and was wrong — the obligation was carried in three places and the `designer` removed all three. Expansion reviewed and ACCEPTED** (ruling below). The `DataVintage` **copy is byte-identical**: coverage phrasing survives on independent grounds, confirmed in writing by the `designer` with a third ground I had not listed. **No token, colour, typography, motion or component change → no §9 palette validation run required, and none was run.** |
+| `.gitignore` | **No change.** This row was **missing from my first assessment** — an omission, since §5.3 says silence is not a verdict, and both the `principal-engineer` and the `designer` independently reported the gap. Verdict on the merits: line 7 is a **comment describing what `private/` holds**, not an obligation about what may be committed. It names nothing and gates nothing. The `private/` and `data/` entries themselves are explicitly in CR-005's **Kept** column. Editing a comment here would be scrubbing the local picture for no gain. **No change, deliberately.** |
 | `CLAUDE.md` | **CHANGE REQUIRED — ⛔ BLOCKED, needs Rishabh's own instruction.** Six hits, including §4.1 (the rule) and its appearances in §3, §5 and §8. See the escalation note below. |
 | `.claude/agents/*.md` | **CHANGE REQUIRED — ⛔ BLOCKED, needs Rishabh's own instruction.** `reviewer.md` (7 hits, incl. the `S-12` duty), `orchestrator.md` (4), `developer.md` (3), `principal-engineer.md` (1), `designer.md` (1). `qa.md` carries none. See the escalation note below. |
 
@@ -3174,8 +3175,8 @@ precedent** — it rests on gate 3 being open at the moment the instruction land
 | 4 | Implement | | |
 | 4a | `PLAN.md` removals | `orchestrator` | ✅ 2026-08-04 |
 | 4b | `CLAUDE.md` + `.claude/agents/*.md` | **Rishabh** | ⛔ **BLOCKED — needs his own instruction.** See the escalation above |
-| 4c | `REQUIREMENTS.md` §7.2, `docs/ARCHITECTURE.md` §7 `S-12` + §10 entry | `principal-engineer` | Dispatched 2026-08-04 |
-| 4d | `docs/DESIGN_SYSTEM.md` §7.3 | `designer` | Dispatched 2026-08-04 |
+| 4c | `REQUIREMENTS.md` §7.2, `docs/ARCHITECTURE.md` §7 `S-12` + §10 entry | `principal-engineer` | ✅ **Landed `4a28b99`** 2026-08-04 · **verified by the `orchestrator`, not taken on report**: §7.2's other three bullets and lead-in byte-identical; `S-12` absent with `S-13`/`S-14` **unrenumbered and unchanged**; §10 entry 20 present; two files, 4 insertions / 3 deletions, nothing else swept in. **One amendment in flight** — see the attribution ruling below |
+| 4d | `docs/DESIGN_SYSTEM.md` §7.3 | `designer` | ✅ **Landed `713b760`** 2026-08-04 · **verified**: one file, 9 insertions / 10 deletions, all prose inside §7.3 plus a §11 log row; **every `DataVintage` copy string byte-identical**; §9 untouched. **Scope expanded beyond my assessment — accepted, see ruling** |
 | 5 | Visual verification | — | **Not applicable — no UI change.** Folded into F0's own gate 4, which runs regardless |
 | 6 | Fix design findings | — | n/a |
 | 7 | Code review + verifies doc updates landed | `reviewer` | Runs as part of F0 gate 6. **Must verify this assessment was honoured, not merely written** (§5.3) |
@@ -3184,6 +3185,56 @@ precedent** — it rests on gate 3 being open at the moment the instruction land
 | 10 | E2E | `qa` | **Not applicable — no behaviour change.** F0's own gate 9 covers the branch |
 | 11 | Fix QA findings | `developer` | n/a |
 | 12 | Verify every gate → approve → merge | `orchestrator` | Pending — **cannot approve while 4b is blocked**, since a merge would ship documents that disagree with each other |
+
+##### CR-005 rulings — `orchestrator`, 2026-08-04
+
+**Ruling 1 — the `designer`'s expanded scope in §7.3 is ACCEPTED, and my assessment was the thing at
+fault.** I scoped 4d from a grep hit ("one line, line 654"). The `designer` read the section instead
+and found the obligation carried in three places. It is right and I was wrong:
+
+| Carrier | Why removing only line 654 would have been the wrong outcome |
+|---|---|
+| Line 653 — a bolded "hard constraint" sentence | This **is** the obligation; line 654 was only its enforcement citation. Deleting the citation alone would have left a live bolded constraint with its enforcement stripped — **the gate removed and the rule left standing**, which inverts the CR's intent |
+| Line 658 — a subordinate rationale clause | Its only ground was the removed rule; left in place it re-asserts the obligation as design rationale |
+| Lines 679–680 — "**Banned from this component and its tests, fixtures and comments…**" | The most operative carrier in the file. A `reviewer` or the `developer` would read it as binding |
+
+**The lesson is procedural and worth keeping:** a Document Impact Assessment built from grep line
+numbers under-reports, because a rule is often stated in one sentence and cited in another. The owning
+agent reading its own section is the check that catches it. This is the second time in this CR that a
+document owner corrected my assessment — the `.gitignore` row is the other.
+
+**Ruling 2 — the lines 679–680 rewrite is ACCEPTED as a rewrite, not a deletion.** That sentence
+banned two different things: origin language (removed) and refresh/update-mechanism language (**not
+removed**). The `designer` kept the second and re-grounded it on `REQUIREMENTS.md` §2.2. That is
+correct — deleting the whole sentence would have silently dropped a still-valid ban, and §2.2 makes
+elapsed-time phrasing a **defect** rather than a preference, because it asserts a relationship between
+the data and *now* that can be false on the day it renders. No restoration of the original wording is
+wanted.
+
+**Ruling 3 — the `DataVintage` copy stands, confirmed on three independent grounds.** Both mine (it
+states a calendar fact; §2.2 forbids assuming today's calendar position) plus one the `designer` added
+that neither of us had listed: the indicator shares **one coverage vocabulary** with §7.4's
+no-coverage states, so switching it to freshness language would fork that vocabulary and leave the
+indicator saying "recently updated" beside a chart saying "no lap data before 1996". Coherence, not
+compliance. No copy string changed.
+
+**Ruling 4 — the `principal-engineer`'s `S-12` gap note is ACCEPTED as necessary, not decorative.**
+§7's table is the `reviewer`'s work list, read top to bottom; an unexplained numeric gap in a dense
+sequence reads as a truncation bug. The note states only *that* the row was removed.
+
+**Ruling 5 — attribution in `ARCHITECTURE.md` §10 entry 20 must be corrected.** The entry reads
+"Decided by Rishabh." flatly. CR-005 reached the team **relayed through the coordinating agent**,
+attributed to Rishabh but not received first-hand — the same route as the CR-002 authorisation, which
+this file records precisely for that reason. A decision log's value rests on its attribution being
+trustworthy, so it must not be the one place that reads as a first-hand countersignature. Amendment
+dispatched to the `principal-engineer`; the rest of entry 20 stands, including its `S-5`/`.gitignore`
+clause.
+
+**Ruling 6 — the `designer`'s proposed follow-up is NOT folded into CR-005, and is NOT an agent's
+call.** With the compliance rule gone, coverage-over-freshness survives only as *rationale inside one
+component spec*. The `designer` proposes re-seating it as a design-system non-negotiable (§6.2 or
+§7.0) and, correctly, did not write it. **That would be a new design-system rule — a scope addition,
+which is Rishabh's to approve.** Logged as a proposed follow-up in §6.1 **A-7**; not actioned.
 
 ---
 
@@ -3211,6 +3262,7 @@ the mitigation available.
 | **A-3** | **Product name.** "F1" is a registered trade mark and Formula 1's published guidelines forbid using their typefaces and warn against using Titillium in any manner that implies association with the Championship. The repository is public. The design system deliberately leans on none of F1's visual identity (`DESIGN_SYSTEM.md` §2.1), but the literal string "F1 Analytics" is a naming and legal decision, not a design one. | **Working name kept. Decision deferred to F11.** Not an agent's call. A rename is a token change, so deferring costs little. |
 | **A-4** | **Playwright MCP registration needed a restart to reach the tool list.** | ✅ **CLOSED 2026-08-04.** The restart has happened; `mcp__playwright__*` tools are present. Gates 4 and 9 are unblocked (G.6). The standing rule survives: each agent still checks its **own** tool list at run time and stops if the tools are absent. |
 | **A-5** | **Node 22 was not installed** — the machine had only v20.18.2, and `/opt/homebrew/opt/node@22` is a **mislabelled keg containing v23.7.0**. | ✅ **CLOSED 2026-08-04 — Rishabh installed it.** `node -v` → **v22.23.2**, npm 10.9.8, `default -> 22.23.2`; `better-sqlite3@12.11.1` builds and loads; `npm audit` clean. **Residual, not a risk but a footgun:** an agent shell started before the install still resolves v20.18.2, so `CLAUDE.md` §7's `nvm use 22.23.2` step and **T1's own `node -v` assertion** both remain mandatory. The mislabelled keg must still never be used. |
+| **A-7** | **Proposed follow-up, needs Rishabh: re-seat "coverage, never freshness" as a design-system non-negotiable.** CR-005 removed the compliance rule that backed the `DataVintage` copy, so the principle now survives only as **rationale inside one component spec** (`DESIGN_SYSTEM.md` §7.3) rather than as a rule. It rests on two independent grounds that have nothing to do with the removed constraint — `REQUIREMENTS.md` §2.2 makes elapsed-time phrasing a **defect**, and the coverage vocabulary is shared with §7.4's no-coverage states — so the principle is sound; only its *standing* dropped. The `designer` proposes a two-line entry in §6.2 or §7.0 and correctly did not write it. | **⛔ Open — on Rishabh.** A **new** design-system rule is a scope addition, not an agent's call. Deliberately **not** folded into CR-005, which is a removal. Cheap to do as a separate change if he wants it; the risk of skipping it is that a later feature reintroduces freshness phrasing with nothing binding to stop it. |
 | **A-6** | **R2 becomes a blocking dependency if CR-004 is implemented** — team logos would gate F5, F7 and any two-team identity surface, and 202 of 214 teams will never have one. | Open — CR-004 is scheduled for F1; the fallback ramp remains mandatory regardless, so the risk is to *scope*, not to correctness. |
 
 ---
