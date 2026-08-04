@@ -650,14 +650,11 @@ width does not change. Motion: M-6.
 
 ### 7.3 Data-currency indicator (NV-9)
 
-**The hard constraint: it conveys freshness without naming or hinting at where data comes from.**
-`CLAUDE.md` §4.1 makes any provenance reference a release blocker, in copy as much as in code.
-
-The design decision that satisfies this cleanly: **express currency as coverage, never as a fetch
-event.** "Complete through Round 10 of 24" is a fact about the sport's calendar. "Updated 12 days
-ago" is a fact about a process, and it invites the question the product must not answer. Coverage
-phrasing is also more honest — `REQUIREMENTS.md` §2.2 warns the newest round may lag reality, and
-coverage phrasing states exactly that without pretending to know today's calendar.
+The design decision: **express currency as coverage, never as a fetch event.** "Complete through
+Round 10 of 24" is a fact about the sport's calendar. "Updated 12 days ago" is a fact about a
+process. Coverage phrasing is also the more honest of the two — `REQUIREMENTS.md` §2.2 warns the
+newest round may lag reality, and coverage phrasing states exactly that without pretending to know
+today's calendar position.
 
 | Element | Spec |
 |---|---|
@@ -676,8 +673,9 @@ Copy — every value comes from `GET /api/meta`, nothing hardcoded:
 - Line 3: **"Seasons available: {minYear}–{maxYear}."**
 - Footer echo: **"Complete results through {year} Round {n} · Seasons {minYear}–{maxYear}"**
 
-Banned from this component and its tests, fixtures and comments: any word describing where the data
-came from or how it got here, and any word for a refresh mechanism.
+Banned from this component and its tests, fixtures and comments: any word for a refresh or update
+mechanism. The component states coverage of the sport's calendar, never an update event
+(`REQUIREMENTS.md` §2.2).
 
 ### 7.4 The five states, designed
 
@@ -842,3 +840,4 @@ thresholds (§3.3 rule 4).
 | 2026-08-04 | Handover created with the measured §3 / §4 constraints | principal-engineer |
 | 2026-08-04 | F0: §1 intent, §2 typography (Archivo / Inter / Chivo Mono, verified), §3.4 exact semantic steps + status set reduced to four with evidence, §3.5 surfaces / ink / borders / focus for both themes, §4 motion token set + 11 named motions with Framer Motion references, §5 spacing / radii / breakpoints / elevation, §7.0–§7.6 shell components and the five states, §8 accessibility, §9 validator method + 9 recorded runs, §10 theming mechanics | designer |
 | 2026-08-04 | D-1 fix: §10 pre-paint theme script corrected from an inline `index.html` block to external `public/theme-init.js`, with the CSP (`script-src 'self'`, S-9) reason recorded. No token, colour, type, motion or component change; no re-validation required | designer |
+| 2026-08-04 | **CR-005** (`PLAN.md` §5.5): the upstream-attribution constraint is removed from §7.3 as a forward obligation — both the release-blocker framing and the derived clause in the ban list. The §7.3 ban on refresh/update language is **retained on independent grounds** (`REQUIREMENTS.md` §2.2 — a currency surface must not assume today's calendar position). **No copy string changed**: the coverage phrasing survives on its own merits. No token, colour, typography, motion or component change → no §9 validation run | designer |
