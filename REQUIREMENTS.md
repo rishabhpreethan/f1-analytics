@@ -492,8 +492,6 @@ See `docs/ARCHITECTURE.md` for the full picture. Constraints that bind the appli
 repository. Consequences the whole team must respect:
 
 - **Never commit the database, or any raw seed file.**
-- **Never commit provenance details** — how the dataset was assembled is out of scope for this
-  repository, including in code comments, documentation, commit messages, and branch names.
 - A fresh clone has **no database**. Setup instructions must say the file is supplied separately.
 - Schema changes are documented in `docs/DATABASE.md` and mirrored in `db/schema.sql`.
 
