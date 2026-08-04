@@ -69,8 +69,15 @@ export function toErrorResponse(err: unknown): ErrorResponse {
 }
 
 export function onError(err: unknown, c: Context): Response {
-  // The one place detail is allowed to exist.
-  console.error('[api] request failed:', err);
+  // The one place detail is allowed to exist. An unavailable database is already
+  // explained once at startup, so it logs a single line rather than repeating a stack
+  // trace on every request — a fresh clone would otherwise drown the actionable
+  // message in noise.
+  if (err instanceof DatabaseUnavailableError) {
+    console.error(`[api] request refused: the data is not available (${err.reason}).`);
+  } else {
+    console.error('[api] request failed:', err);
+  }
   const { status, body, headers } = toErrorResponse(err);
   for (const [name, value] of Object.entries(headers)) c.header(name, value);
   return c.json(body, status);
