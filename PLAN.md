@@ -137,9 +137,10 @@ Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` �
 
 **✅ F0 gate 3 is running — all three preconditions cleared, re-verified by the `orchestrator`
 2026-08-04** (§G.5): **P-1** Node **v22.23.2** installed; **P-2** `DESIGN_SYSTEM.md` §10 corrected to
-the external `public/theme-init.js`; **P-3** all four stale task cross-references corrected. The
-`developer` is implementing T1–T14 on `feat/foundation`. Gates 4–11 follow; nothing is Done until the
-`orchestrator` records approval.
+the external `public/theme-init.js`; **P-3** all four stale task cross-references corrected.
+**T1–T9 are committed** on `feat/foundation`; the first gate-3 run was interrupted at T9 and **T10–T14
+are re-dispatched** (§G.8). Gates 4–11 follow; nothing is Done until the `orchestrator` records
+approval.
 
 **R1 / R2 are not on F0's critical path.** F0 renders no driver, team or race content, so no
 headshot, logo or placeholder-avatar surface exists in it. They first bind at F4 (R1) and F5 (R2).
@@ -152,7 +153,7 @@ Filled in by the `orchestrator` as gates complete.
 
 | ID | Spec | Design | Dev | Design verify | Review | Security | QA | Approved |
 |---|---|---|---|---|---|---|---|---|
-| F0 | ✅ 2026-08-04 · `PLAN.md` F0 → Technical Spec (14 tasks, T1–T14) · verified by orchestrator | ✅ 2026-08-04 · `PLAN.md` F0 → Design Spec + `docs/DESIGN_SYSTEM.md` §1–§10 · verified by orchestrator | ⏳ 2026-08-04 · dispatched, T1–T14 on `feat/foundation` · brief §G.7 | | | | | |
+| F0 | ✅ 2026-08-04 · `PLAN.md` F0 → Technical Spec (14 tasks, T1–T14) · verified by orchestrator | ✅ 2026-08-04 · `PLAN.md` F0 → Design Spec + `docs/DESIGN_SYSTEM.md` §1–§10 · verified by orchestrator | ⏳ 2026-08-04 · **T1–T9 landed** (`cb82c62`…`b860c38`); run interrupted; **T10–T14 re-dispatched** · briefs §G.7 + §G.8 | | | | | |
 | F1 | | | | | | | | |
 | F2 | | | | | | | | |
 | F3 | | | | | | | | |
@@ -2412,8 +2413,40 @@ free of any upstream source name. Two task acceptance cells (**T2**, **T14**) we
 match; no other F0 scope, task or acceptance criterion changed.
 | Explicitly **not** the developer's to do | mark anything Done · approve a merge · edit `ARCHITECTURE.md` (Tech §9.1) · run gate 4 or 9 · act on CR-002/003/004 |
 
-**Outcome: pending.** The `orchestrator` records the result here and updates the tracker on report-back.
-Gate 3 completing does **not** make F0 Done — gates 4–11 follow.
+**Outcome: partial — T1–T9 landed, then the run was interrupted.** See §G.8.
+
+##### G.8 Gate 3 — interrupted at T9, re-dispatched for T10–T14 · 2026-08-04
+
+The gate-3 run of §G.7 was **stopped mid-flight** (accidental interruption of the `orchestrator`
+session, not a defect and not a rejection). Nothing it produced is reverted: **T1–T9 are committed and
+stand as delivered.** A second `orchestrator` took over and re-dispatched the remainder. Recorded
+rather than rewritten, because the tracker's value depends on the interruption being visible.
+
+**State verified by the incoming `orchestrator` before re-dispatch** — not taken from any agent's
+report:
+
+| What I checked | How | Result |
+|---|---|---|
+| Branch and tree | `git rev-parse`, `git status --porcelain` | `feat/foundation` at `b860c38`, working tree **clean**, nothing pushed to the remote |
+| T1–T9 actually on disk | `git ls-files` over `server/`, `src/`, `public/`, config | ✅ Present, including the six vendored `woff2`, `public/theme-init.js`, `db/schema.sql` and 9 test files |
+| Toolchain | `node -v` | `v22.23.2` — T1's floor holds |
+| Typecheck | `npm run typecheck` | ✅ exit 0, no output |
+| Lint | `npm run lint` | ✅ exit 0, no output |
+| Unit tests | `npm test` | ✅ **58 passed / 9 files**, 498 ms — the T1–T9 baseline the remaining tasks must not regress |
+
+| Term | Value |
+|---|---|
+| Scope | **T10, T11, T12, T13, T14** of Technical Spec §8, in order, on `feat/foundation`. T1–T9 are **not** to be redone or refactored beyond what T10–T14 genuinely require |
+| Commits landed by the interrupted run | `cb82c62` T1 · `a8b1fc1` T2 · `c082cf2` T3 · `d42b439` T4 · `603810b` T5 · `4148131` T6+T7 · `4758f26` T8 · `b860c38` T9 |
+| Binding rulings restated | R-1 the Framer Motion shell/route subset **does** land in F0 (M-1…M-8, M-11, `MotionConfig`); R-2 `ThemeToggle` is a **3-option radiogroup popover**, not a cycle; R-3 achromatic chrome; R-5 typographic favicon placeholder only |
+| Hard constraints restated | read-only connection, no write path ever · no auth, no mutation, no third-party request on any path · initial JS **< 250 KB gzipped** · **no hand-written duration/easing/spring/colour/size literal** — tokens only (`src/styles/tokens.css`, `src/lib/motion.ts`) · slugs never integer ids (DL-3) · F0 renders no driver/team/race content |
+| Evidence demanded | file paths · real output for `typecheck`, `lint`, `format:check`, `test`, `build` · **the measured gzipped initial-chunk figure against the 250 KB budget, and `framer-motion`'s share** · the **literal** missing-database console text (§2.7) and its `503` · `curl -i` for the T13 production-preview origin · the numbered tests 49–55 and 63–69 accounted for, with the final total reconciled against the spec's 69 · `git status` / `git log` showing no database, `.env` or seed artefact staged |
+| Explicitly **not** the developer's to do | mark anything Done · approve, open, push or merge a PR · edit `ARCHITECTURE.md` (Tech §9.1) · run gate 4 or 9 · reopen CR-002 / CR-005 · act on CR-003 / CR-004 |
+
+**CR-005 is closed** (§5.5) and the removed upstream-attribution constraint is not a gate at any
+step of this dispatch. `S-12` stays retired and unreused.
+
+**Outcome: pending.** Gate 3 completing does **not** make F0 Done — gates 4–11 follow.
 
 ---
 
