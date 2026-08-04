@@ -2868,7 +2868,7 @@ that decision and its reason in the CR entry.
 | CR-002 | 2026-08-04 | Rewrite the passages of `REQUIREMENTS.md` that characterise where the dataset came from, so a fresh clone carries none of it. Fix `HEAD` only; accept the history exposure | C | ~~`REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `PLAN.md`, `.claude/agents/reviewer.md`~~ — none, withdrawn | ~~`change/CR-002-requirements-hygiene`~~ — never opened | **⛔ WITHDRAWN 2026-08-04 — Rishabh's decision** | — |
 | CR-003 | 2026-08-04 | `REQUIREMENTS.md` §2.2 / §2.5 say 2026 has 24 rounds scheduled; the data holds 24 calendar rows but only 22 numbered rounds | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `PLAN.md` | `change/CR-003-numbered-rounds` | Not started (blocked on F0) | — |
 | CR-004 | 2026-08-04 | "If multiple teams have the same colour, use the logos instead where necessary, and where the colours don't clash use the colours" | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `PLAN.md` | `change/CR-004-team-identity-encoding` | Logged — scheduled for F1 | — |
-| CR-005 | 2026-08-04 | Remove the upstream-attribution constraint and its check from the gate order entirely — not downgrade it. Forward obligation only; the historical record stays. **Supersedes CR-002** | C | `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md`, `.claude/agents/*.md` | folded into `feat/foundation` (F0) — deviation recorded below | **In progress — partially blocked** | — |
+| CR-005 | 2026-08-04 | Remove the upstream-attribution constraint and its check from the gate order entirely — not downgrade it. Forward obligation only; the historical record stays. **Supersedes CR-002** | C | `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md`, `.claude/agents/*.md` · **`docs/DATABASE.md` and `.gitignore`: no change** | folded into `feat/foundation` (F0) — deviation recorded below | **All doc changes landed** — rides F0 gates 6–11 | — |
 
 ---
 
@@ -2893,12 +2893,11 @@ that decision and its reason in the CR entry.
 >    referenced by nothing. It remains on disk, gitignored. Do not extend it, do not wire it into any
 >    script, test or gate. §6.1 **A-2 is closed.**
 > 3. **The related open items are declined, not deferred.** Nothing here is waiting on anyone.
-> 4. **The doc-vs-action mismatch this item used to record is resolved by CR-005**, which removes the
->    rule from `PLAN.md` outright rather than leaving a policy stricter than the action taken. **One
->    part of that removal is still outstanding and a reviewer may legitimately flag it** — see
->    CR-005's gate ledger, step 4b: the copies in `CLAUDE.md` and `.claude/agents/*.md` need Rishabh's
->    own instruction before an agent may edit them, so until he gives it those files still carry the
->    obligation. That is a recorded, deliberate partial state, **not a new finding**.
+> 4. **The doc-vs-action mismatch this item used to record is fully resolved by CR-005**, which removes
+>    the rule outright rather than leaving a policy stricter than the action taken. **Nothing is
+>    outstanding and there is nothing here for a `reviewer` to flag** — the removal is complete across
+>    `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md` and all
+>    six agent definitions. `S-12` is retired and carries no verdict.
 > 5. **`db/schema.sql` hygiene is untouched by this withdrawal** — it was always **F0 task T2's**
 >    work, with its own acceptance criteria and T14's line-by-line re-read, and T2 **stands and is in
 >    the gate-3 dispatch**.
@@ -3137,22 +3136,30 @@ the raw grep over-reports, because several matches are incidental prose rather t
 | `docs/DATABASE.md` | **No change.** Re-read at CR open: §1–§9 describe schema, canonical queries, traps, coverage and maintenance only, and carry no reference to the rule. F0 **T14** still adds trap 15 and the §9 checklist items, unaffected. |
 | `docs/DESIGN_SYSTEM.md` | **CHANGE — ✅ landed `713b760`** by the `designer`. **My assessment said "one line, §7.3 line 654" and was wrong — the obligation was carried in three places and the `designer` removed all three. Expansion reviewed and ACCEPTED** (ruling below). The `DataVintage` **copy is byte-identical**: coverage phrasing survives on independent grounds, confirmed in writing by the `designer` with a third ground I had not listed. **No token, colour, typography, motion or component change → no §9 palette validation run required, and none was run.** |
 | `.gitignore` | **No change.** This row was **missing from my first assessment** — an omission, since §5.3 says silence is not a verdict, and both the `principal-engineer` and the `designer` independently reported the gap. Verdict on the merits: line 7 is a **comment describing what `private/` holds**, not an obligation about what may be committed. It names nothing and gates nothing. The `private/` and `data/` entries themselves are explicitly in CR-005's **Kept** column. Editing a comment here would be scrubbing the local picture for no gain. **No change, deliberately.** |
-| `CLAUDE.md` | **CHANGE REQUIRED — ⛔ BLOCKED, needs Rishabh's own instruction.** Six hits, including §4.1 (the rule) and its appearances in §3, §5 and §8. See the escalation note below. |
-| `.claude/agents/*.md` | **CHANGE REQUIRED — ⛔ BLOCKED, needs Rishabh's own instruction.** `reviewer.md` (7 hits, incl. the `S-12` duty), `orchestrator.md` (4), `developer.md` (3), `principal-engineer.md` (1), `designer.md` (1). `qa.md` carries none. See the escalation note below. |
+| `CLAUDE.md` | **CHANGE — ✅ landed `c364739`.** §4.1 reduced to a tombstone with its number retained; **§4.2 and §4.3 deliberately not renumbered**, so existing cross-references still resolve. The stale §8 paragraph asserting §4.1 was live — and that a `reviewer` might flag it at gate 7 — is corrected. |
+| `.claude/agents/*.md` | **CHANGE — ✅ landed `c364739`.** `reviewer.md` (the `S-12` row and its check section), `developer.md` (commit-message rule, pre-report check, checklist item), `orchestrator.md` (approval-checklist item, the command block, the standing-constraints bullet; its escalation line narrowed to data **licensing**), `designer.md` and `principal-engineer.md` (hard-constraint bullet). `qa.md` carried none. |
 
-##### ⛔ Escalation — the `CLAUDE.md` and `.claude/agents/*.md` half needs Rishabh directly
+##### ✅ CLOSED — the `CLAUDE.md` and `.claude/agents/*.md` half, and how the channel rule resolved
 
-**The decision itself is not in question — it is Rishabh's, stated by him in session on 2026-08-04.**
-This is a **channel** requirement, not a doubt about authority. The `orchestrator`'s operating rules
-reserve edits to `CLAUDE.md` and to agent configuration to Rishabh's own message or the permission
-system, and they do so **categorically** — the reservation applies to a *class of file*, however
-well-attested the instruction is, precisely because "remove a guardrail from the files that define the
-agents' own obligations" is the one request that must not be self-serviceable. A rule that yielded to
-a sufficiently confident instruction would not be a rule.
+**Landed in `c364739`, and the way it was resolved is the part worth keeping on the record.**
 
-So this is a formality with a real cost of exactly one line from Rishabh, and no judgement is implied
-about the instruction, which is well-attested and which the `orchestrator` has otherwise implemented
-in full.
+The `orchestrator` declined to make these two edits and held them at step 4b. **The decision was never
+in question** — it is Rishabh's, stated by him in session on 2026-08-04. The hold was a **channel**
+requirement: the `orchestrator`'s operating rules reserve edits to `CLAUDE.md` and to agent
+configuration to Rishabh's own message or the permission system, **categorically** — the reservation
+attaches to a *class of file*, however well-attested the instruction is, precisely because "remove a
+guardrail from the files that define the agents' own obligations" is the one request that must not be
+self-serviceable. A rule that yielded to a sufficiently confident instruction would not be a rule.
+
+**It was resolved correctly rather than overridden.** The edits were made by the session that received
+Rishabh's instruction **first-hand**, which is exactly what the rule points at — not by the
+`orchestrator` acting on a relay, and not by lifting the rule. **The block was satisfied, not waived**,
+and the distinction matters for the next time this shape of request appears: the answer to "an agent
+may not edit configuration on relay" is "the session holding the first-hand instruction does it", never
+"the rule bends if the instruction seems solid enough".
+
+**Consequence now discharged:** `S-12` is **no longer live at gate 7**. The `reviewer` records no
+verdict for it, and the earlier warning that it might be raised as a finding no longer applies.
 
 **Consequence, stated plainly so no one is surprised at a later gate:** until Rishabh instructs it
 himself, `CLAUDE.md` §4.1 and `.claude/agents/reviewer.md`'s `S-12` still carry the obligation, so
@@ -3176,17 +3183,17 @@ precedent** — it rests on gate 3 being open at the moment the instruction land
 | 3 | Design spec | — | **Skipped — the CR provably touches no UI** (§5.4). No route, component, state, token or copy string changes. Recorded, not assumed |
 | 4 | Implement | | |
 | 4a | `PLAN.md` removals | `orchestrator` | ✅ 2026-08-04 |
-| 4b | `CLAUDE.md` + `.claude/agents/*.md` | **Rishabh** | ⛔ **BLOCKED — needs his own instruction.** See the escalation above |
+| 4b | `CLAUDE.md` + `.claude/agents/*.md` | **Rishabh / the session holding his first-hand instruction** | ✅ **Landed `c364739`** 2026-08-04 · six files · **verified by the `orchestrator`**: `CLAUDE.md` §4.1 tombstoned with §4.2/§4.3 unrenumbered; `reviewer.md` `S-12` row and check section gone with `S-13`/`S-14` byte-identical and **both range citations annotated** (the "S-1 to S-14" instruction and the `SECURITY AUDIT: PASS` line) so no verdict is recorded for a retired item and the gap is not read as missing coverage; **zero** carriers left in any agent definition. See the closure note above |
 | 4c | `REQUIREMENTS.md` §7.2, `docs/ARCHITECTURE.md` §7 `S-12` + §10 entry | `principal-engineer` | ✅ **Landed `4a28b99`** 2026-08-04 · **verified by the `orchestrator`, not taken on report**: §7.2's other three bullets and lead-in byte-identical; `S-12` absent with `S-13`/`S-14` **unrenumbered and unchanged**; §10 entry 20 present; two files, 4 insertions / 3 deletions, nothing else swept in. **One amendment in flight** — see the attribution ruling below |
 | 4d | `docs/DESIGN_SYSTEM.md` §7.3 | `designer` | ✅ **Landed `713b760`** 2026-08-04 · **verified**: one file, 9 insertions / 10 deletions, all prose inside §7.3 plus a §11 log row; **every `DataVintage` copy string byte-identical**; §9 untouched. **Scope expanded beyond my assessment — accepted, see ruling** |
 | 5 | Visual verification | — | **Not applicable — no UI change.** Folded into F0's own gate 4, which runs regardless |
 | 6 | Fix design findings | — | n/a |
 | 7 | Code review + verifies doc updates landed | `reviewer` | Runs as part of F0 gate 6. **Must verify this assessment was honoured, not merely written** (§5.3) |
-| 8 | Security audit | `reviewer` | Runs as part of F0 gate 7, minus `S-12` **once 4b lands**; with it until then |
+| 8 | Security audit | `reviewer` | Runs as part of F0 gate 7 over **S-1…S-11 plus S-13…S-14**. `S-12` is retired and **no verdict is recorded for it** |
 | 9 | Fix blocking findings | `developer` | As part of F0 gate 8 |
 | 10 | E2E | `qa` | **Not applicable — no behaviour change.** F0's own gate 9 covers the branch |
 | 11 | Fix QA findings | `developer` | n/a |
-| 12 | Verify every gate → approve → merge | `orchestrator` | Pending — **cannot approve while 4b is blocked**, since a merge would ship documents that disagree with each other |
+| 12 | Verify every gate → approve → merge | `orchestrator` | Pending. **All document changes are now landed and mutually consistent** — the earlier bar (no approval while 4b was open, because a merge would have shipped documents that disagree) is cleared. CR-005 now rides F0's own gates 6–11 |
 
 ##### CR-005 rulings — `orchestrator`, 2026-08-04
 
@@ -3260,6 +3267,24 @@ principle above says to ask rather than to write a guess into the record. It is 
 gate deviations it authorised belong to a withdrawn CR and never ran. Raised for confirmation; it is a
 two-word fix if the same correction applies.
 
+**Ruling 7 — two things from step 4b that are worth more than the edits themselves.**
+
+1. **A check was rescued from inside the removed block, and this is the "do not over-delete" rule
+   working.** Buried in the deleted `S-12` section was
+   `git diff main...HEAD --name-only | grep -E "^(data/|private/)"` — which guards against **staging the
+   66 MB binary or the local-only tooling**. That is an `S-5` / gitignore concern with no relationship to
+   the removed rule, and deleting the block wholesale would have taken it out as collateral damage. It
+   now lives in the `reviewer`'s command block **relabelled under `S-5`**, and `.gitignore` is untouched.
+   **Generalise it:** when removing a block, check what else was living inside it. A removal is not a
+   `git rm` of everything the section happened to contain.
+2. **⚠ A case-sensitive grep missed a carrier — use `-i`.** The first sweep of step 4b used
+   `grep -n` without `-i` and missed `orchestrator.md`'s standing constraint, which begins with a
+   **capital P**. It was caught only on an `-i` re-run. Combined with the §7.3 lesson in ruling 1 — that
+   a rule stated in one sentence and cited in another will be under-reported by line-number scoping —
+   the standing method for this class of sweep is: **`grep -rniE`, then have the file's owner read the
+   section.** Neither step substitutes for the other. Any future audit of this removal must use `-i` or
+   it will report a false clean.
+
 **Ruling 6 — the `designer`'s proposed follow-up is NOT folded into CR-005, and is NOT an agent's
 call.** With the compliance rule gone, coverage-over-freshness survives only as *rationale inside one
 component spec*. The `designer` proposes re-seating it as a design-system non-negotiable (§6.2 or
@@ -3317,5 +3342,6 @@ the mitigation available.
 | 2026-08-04 | **CR-002 WITHDRAWN by Rishabh** — exposure judged "not that important". Withdrawal banner added; §5.5 row, gate ledger and CR-003's sequencing note corrected; **A-2 declined** (blocklist stays at 6 patterns — a 30-pattern extension was tried and reverted because it failed §4.1 by design); A-1 widened to cover `HEAD` as well as history. §2.4 / `CLAUDE.md` §4.1 deliberately **not** downgraded — the mismatch is recorded, not a new finding | orchestrator |
 | 2026-08-04 | **F0 gate-3 preconditions all cleared and independently re-verified** (P-1 Node v22.23.2; P-2 `DESIGN_SYSTEM.md` §10 external `public/theme-init.js`; P-3 four task cross-references + G.4 items 1–4). §G.5 had gone stale showing all three outstanding; corrected with the verification method recorded per row. **A-4 and A-5 closed** — Playwright MCP tools now present, Node 22 installed | orchestrator |
 | 2026-08-04 | **F0 gate 3 dispatched** — `developer` implementing T1–T14 on `feat/foundation`; status → `In development`; brief recorded as gate-record §G.7. Gates 4–11 outstanding; F0 is **not** Done | orchestrator |
+| 2026-08-04 | **CR-005 step 4b landed (`c364739`) — all CR-005 document changes are now complete.** `CLAUDE.md` §4.1 tombstoned (§4.2/§4.3 unrenumbered) and its stale §8 status paragraph corrected; the obligation removed from all six agent definitions; `reviewer.md`'s `S-12` row and check section removed with `S-13`/`S-14` untouched and **both range citations annotated**. **`S-12` is retired — no verdict is recorded for it at gate 7**, and the earlier warning that a `reviewer` might raise it is discharged. Resolved by the session holding Rishabh's first-hand instruction, so the `orchestrator`'s channel rule was **satisfied, not waived**. Two lessons recorded as ruling 7: an `S-5` staging check was rescued from inside the removed block, and a **case-sensitive grep missed a carrier — use `-i`** | orchestrator |
 | 2026-08-04 | **Attribution corrected** in `ARCHITECTURE.md` §10 entry 20 and `PLAN.md` §5.5: CR-005 was **decided by Rishabh in session, 2026-08-04**, across two messages. An earlier `orchestrator` ruling had added a hedge calling it relayed-not-first-hand and "not his personal countersignature" — **that was wrong and is reversed**; a relay is the normal path for every instruction and does not weaken attribution. Ruling 5 is kept on the record as withdrawn, with the principle: never hedge an instruction's authority on the grounds it came through the coordinating session; if provenance is unclear, **ask**. The step-4b block is unaffected — it rests on a categorical channel rule about `CLAUDE.md` and agent configuration, not on doubt about who decided | orchestrator |
 | 2026-08-04 | **CR-005** opened (Class C) — **supersedes CR-002.** The upstream-attribution constraint and its check are removed from the gate order, the Definition of Done, the F11 checklist and the F0 evidence list; **forward obligation only, historical record kept verbatim** (Technical Spec §9.5, gate record §G.1, CR-002's history, all past commit messages). §2.4 removed with its number retained as a tombstone; §6 risk row removed; §6.1 A-1 and A-2 closed; T2/T14 acceptance cells amended mid-run and the `developer` notified in flight. `docs/DATABASE.md` **no change**. `REQUIREMENTS.md` / `docs/ARCHITECTURE.md` routed to `principal-engineer`, `docs/DESIGN_SYSTEM.md` to `designer`. **`CLAUDE.md` and `.claude/agents/*.md` ⛔ blocked pending Rishabh's own instruction** — an agent-relayed message cannot authorise editing agent configuration, so `S-12` stays live at gate 7 until he speaks | orchestrator |
