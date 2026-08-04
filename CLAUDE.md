@@ -150,24 +150,47 @@ Also binding:
 
 | | |
 |---|---|
-| Node | v20.18.2 (`node:sqlite` unavailable — hence `better-sqlite3`) |
+| Node | ✅ **22 LTS installed — `v22.23.2`** (Latest LTS Jod), npm 10.9.8, `nvm alias default 22.23.2` set. Floor is `>=22.22.0` (`ARCHITECTURE.md` §2.1). `better-sqlite3@12.11.1` builds and loads on it; `npm audit` → **0 vulnerabilities**. Ignore `/opt/homebrew/opt/node@22` — that keg is **mislabelled and contains v23.7.0**. **`better-sqlite3` remains the specced driver**; `node:sqlite` is a recorded future consideration only, deliberately not acted on in F0 (§10 #16) |
+| ⚠️ **Node in agent shells — CHECK, don't assume** | **Run `node -v` first.** If it reports `v22.x`, you are fine. If it reports `v20.18.2`, this session inherited a PATH pinning `~/.nvm/versions/node/v20.18.2/bin` from before the install, and **every agent touching `node`/`npm` must first run:** `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22.23.2`. Never conclude from a bare `node -v` that Node 22 is missing — it is installed (verified 2026-08-04). A Claude Code restart normally fixes this, since it re-inherits PATH from an interactive shell, where `default -> 22.23.2` applies. The `.nvmrc` that F0 T1 commits helps humans but does **not** auto-switch a non-interactive shell — which is why T1 asserting `node -v ≥ v22.22.0` and **stopping** is load-bearing, not ceremonial |
 | Database | ✅ `data/f1.db` present — 19 tables, 717,764 laps, results through **2026 R10** |
 | Git remote | `github.com/rishabhpreethan/f1-analytics` — **public** |
 | GitHub auth | must be active as `rishabhpreethan`; the `rishabh-zupple` account has read-only access here |
-| **Playwright MCP** | ⚠️ **check if registered.** Required by `designer` (gate 4) and `qa` (gate 9). Add with: `claude mcp add playwright -- npx -y @playwright/mcp@latest` |
+| **Playwright MCP** | ✅ **registered** 2026-08-04 (local project scope). It only appears in the tool list after a Claude Code restart, so **check for `mcp__playwright__*` tools before gate 4 (`designer`) or gate 9 (`qa`)**. If absent, verify with `claude mcp list` — do not re-add it blindly, and do not work around its absence |
 
-If Playwright MCP is missing, `designer` and `qa` must **stop and report** — never work around it.
+If Playwright MCP is not in the tool list, `designer` and `qa` must **stop and report** — never work
+around it. Registration having happened does not waive this.
 
 ---
 
 ## 8. Where we are right now
 
 - `main` — foundation docs + agent definitions, pushed
-- **`feat/foundation` — current branch.** F0 is started; tracker says `Spec in progress`
-- **Next action: the `orchestrator` dispatches F0 gates 1 and 2 in parallel** — the assignment
-  briefs are already written in `PLAN.md`, F0 section, under **Assignment Briefs**
-- R0 (database) ✅ done. **R1 (driver images) and R2 (team logos) are Rishabh's** — never fabricate,
-  generate, or hotlink images
+- **`feat/foundation` — current branch.** **F0 gates 1 and 2 are complete and verified.** Tracker says
+  `Ready for dev ⛔`. Technical Spec (14 tasks, T1–T14) and Design Spec both live in `PLAN.md` §4 F0;
+  `docs/DESIGN_SYSTEM.md` is authored through §10
+- **Gate 3 preconditions — ALL CLEARED.** `PLAN.md` F0 → **Orchestrator Gate Record** §G.5. **P-1
+  Node 22 ✅** (`v22.23.2`, `better-sqlite3` builds, temp-view decision and `/api/meta` values
+  re-probed on the target runtime). **P-2 ✅** — `DESIGN_SYSTEM.md` §10 now specifies the external
+  `public/theme-init.js`. **P-3 ✅** — all four stale task cross-references corrected; verified by
+  grep, the only surviving `T12`/`T13` mentions are the legitimate task rows and §G.3's record of
+  what was fixed. **Read §G.2 before building — five rulings are binding**, including that the Framer
+  Motion shell/route subset **does** land in F0
+- ➡️ **NEXT ACTION: dispatch gate 3 (`developer`) to implement T1–T14** on `feat/foundation`. Nothing
+  blocks it. T1 must still assert `node -v ≥ v22.22.0` and stop if not.
+- **CR-002 (provenance hygiene) is WITHDRAWN — Rishabh's decision, 2026-08-04.** He judged the
+  exposure "not that important". `private/provenance-blocklist.txt` stays at its original 6 patterns
+  (an extension to 30 was tried and reverted, because it made the §4.1 check fail by design). The
+  related open items are **declined, not outstanding** — do not reopen them, re-extend the blocklist,
+  or re-raise this as a release blocker unless Rishabh asks. §4.1 and `PLAN.md` §2.4 still describe it
+  as a blocker and have **not** been downgraded, so a reviewer may flag it at gate 7; that is a known
+  mismatch, not a new finding. **CR-003** (2026 has 22 numbered rounds, not 24) is blocked on F0.
+  **CR-004** (Rishabh's proposal: team logos where brand colours collide, colours where they don't) is
+  scheduled for F1
+- If the orchestrator's `PLAN.md` §5.5 still shows CR-002 as open and highest-priority, that is stale
+  — the agent recording the withdrawal was stopped before it wrote. Correct it, don't act on it
+- R0 (database) ✅ done. **R1 (driver images), R2 (team logos) and R3 (app icons) are Rishabh's** —
+  never fabricate, generate, or hotlink images. **None of the three blocks F0**, which renders no
+  driver, team or race content and ships a typographic favicon placeholder
 
 ---
 

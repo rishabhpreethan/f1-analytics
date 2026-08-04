@@ -80,6 +80,15 @@ claude mcp add playwright -- npx -y @playwright/mcp@latest
 Design verification precedes code review deliberately: the reviewer should read code that is
 visually settled, not code about to change.
 
+**Standing rule — file ownership restricts who *edits*, never who *reports*.** Added 2026-08-04 after
+an agent correctly declined to edit a file it did not own and then **also** withheld what it had
+found there. Those are different obligations. If any agent notices a defect, a leak, a contradiction
+or a stale fact in material it may not touch, it **reports it to the `orchestrator`** — file and line,
+and what is wrong — and the `orchestrator` routes it to the owner. Silence about a finding is never
+the correct response to not owning a file, and for a provenance finding it is a release-blocker-class
+failure. This is the mechanism by which the §2.4 grep's blind spots get caught by people rather than
+by patterns.
+
 ### 2.4 Provenance silence — release blocker
 
 Nothing about how the dataset was assembled may appear in code, comments, documentation, test names,
@@ -115,7 +124,8 @@ Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` �
 | R0 | Supply `data/f1.db` | — | — | ✅ Done | 2026-08-04 |
 | R1 | Driver images | — | — | Not started | — |
 | R2 | Team logos | — | — | Not started | — |
-| F0 | Foundation & scaffold | `feat/foundation` | R0 | Spec in progress | — |
+| R3 | App icons (favicon, touch, maskable) | — | — | Not started | — |
+| F0 | Foundation & scaffold | `feat/foundation` | R0 | Ready for dev ⛔ | — |
 | F1 | Design system | `feat/design-system` | F0 | Not started | — |
 | F2 | Season hub | `feat/season-hub` | F1 | Not started | — |
 | F3 | Race deep dive | `feat/race-deep-dive` | F1 | Not started | — |
@@ -128,13 +138,24 @@ Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` �
 | F10 | Accessibility & performance | `feat/polish` | F2–F9 | Not started | — |
 | F11 | Release hardening | `feat/release-hardening` | F10 | Not started | — |
 
+**⛔ F0 is `Ready for dev` but gate 3 cannot start.** Three preconditions, all recorded in the F0
+section under **Orchestrator Gate Record** §G.5: **P-1** Node 22 is not installed (T1's first
+acceptance criterion, Rishabh's to run); **P-2** and **P-3** are two document defects found at gate
+verification — one in `DESIGN_SYSTEM.md`, one in the Technical Spec — each a one-line-class correction
+in the document its author owns (§G.3).
+
+**R1 / R2 are not on F0's critical path.** F0 renders no driver, team or race content, so no
+headshot, logo or placeholder-avatar surface exists in it. They first bind at F4 (R1) and F5 (R2).
+**R3 does not block F0 either** — F0 ships the `designer`'s typographic `public/favicon.svg`
+placeholder, built from a font the project is licensed to use and carrying no third-party mark.
+
 ### Per-feature agent log
 
 Filled in by the `orchestrator` as gates complete.
 
 | ID | Spec | Design | Dev | Design verify | Review | Security | QA | Approved |
 |---|---|---|---|---|---|---|---|---|
-| F0 | | | | | | | | |
+| F0 | ✅ 2026-08-04 · `PLAN.md` F0 → Technical Spec (14 tasks, T1–T14) · verified by orchestrator | ✅ 2026-08-04 · `PLAN.md` F0 → Design Spec + `docs/DESIGN_SYSTEM.md` §1–§10 · verified by orchestrator | | | | | | |
 | F1 | | | | | | | | |
 | F2 | | | | | | | | |
 | F3 | | | | | | | | |
@@ -233,7 +254,7 @@ client → API → SQLite works, and all quality gates enforced from commit one.
 `better-sqlite3` opened `readonly: true` · the canonical views `v_entry` / `v_race` (DDL in
 `docs/DATABASE.md` §6.1) — **decide and justify where/how they are created**, given the database is
 read-only at runtime and not committed · `GET /api/meta` as the proving path (data vintage, latest
-completed round, season range) · TanStack Query provider · React Router v7 with the route table from
+completed round, season range) · TanStack Query provider · React Router v8 with the route table from
 `docs/ARCHITECTURE.md` §5 (placeholder components fine) · Zod pattern with types via `z.infer` ·
 security headers, non-leaking error handler (S-6, S-9), per-IP rate limit (S-13) · ESLint, Prettier,
 Vitest · `npm run dev` runs client + API together · app shell (header, nav, theme toggle, outlet) ·
@@ -248,7 +269,9 @@ data-vintage indicator (NV-9).
 actionable error, never a stack trace · `better-sqlite3` is synchronous by design · DL-1 never write ·
 DL-2 no third-party calls on a request path · DL-3 no internal integer ids in URLs · S-4 Zod-validate
 every param · S-6 no stack traces/SQL/paths in responses · trap 1: `has_time_data` unreliable — test
-for `lap` rows · Node v20.18.2 (`node:sqlite` unavailable) · **provenance silence**.
+for `lap` rows · **Node 22 LTS, floor `>=22.22.0`** — `better-sqlite3` remains the specced driver;
+`node:sqlite` is available on Node 22 but is a recorded future consideration only and is deliberately
+not acted on in F0 (`ARCHITECTURE.md` §10 #16) · **provenance silence**.
 
 **Verify, don't assume:** query `data/f1.db` directly to confirm the real values `/api/meta` returns
 and how "data vintage" is computed from the data itself.
@@ -303,9 +326,2057 @@ examples referenced by name · assets assigned to Rishabh · open questions for 
 
 </details>
 
-**Technical Spec** — _pending `principal-engineer`_
+#### **Technical Spec** — `principal-engineer`, 2026-08-04
 
-**Design Spec** — _pending `designer`_
+> Everything asserted below was either read from a canonical document or **verified by executing a
+> query / resolving the dependency tree** on this machine. Values marked ✅ were counted from
+> `data/f1.db`; the producing query is given. The `developer` implements this without making design
+> decisions — where a choice exists it has been made here.
+
+---
+
+##### 0. Verified facts this feature is built on
+
+**0.1 Runtime: Node 22 LTS — approved by Rishabh 2026-08-04.** The first draft of this spec was
+written against the machine's Node v20.18.2 and had to pin Vite 6 / ESLint 9 / React Router 7, and
+to carry a documented `npm audit` exception. Rishabh approved raising the runtime specifically so
+that exception could be **deleted rather than managed**. This section is the re-verification.
+
+**Required floor: `node >= 22.22.0`.** That figure is not chosen for tidiness — it is the highest
+floor any direct dependency declares (`react-router@8.3.0`), and it simultaneously satisfies
+`eslint@10`'s `^22.13.0`. Recommended install: **v22.23.2** (Latest LTS "Jod").
+
+**✅ Machine state: Node 22 is installed — gate-3 precondition P-1 is cleared.** Rishabh ran the
+§9.3 command. ✅ Re-confirmed here: `node -v` → **v22.23.2**, `npm -v` → **10.9.8**, and
+`nvm alias default` → `default -> 22.23.2`. The Homebrew keg at `/opt/homebrew/opt/node@22` remains
+**mislabelled (it contains v23.7.0)** and must still not be used.
+
+**⚠ A shell started before the install still resolves v20.18.2**, because `nvm alias default` cannot
+change the PATH of an already-running process. Any agent needing Node must first run
+`export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22.23.2` — **a bare `node -v` in an
+inherited shell is not evidence that Node 22 is absent.** T1's version assertion stands regardless,
+because it must hold for a contributor's shell too, not only for ours.
+
+**What was verified, and how, given Node 22 is not runnable here:**
+
+1. **Resolution and audit — executed for real.** The §1.1 set was installed in a scratch directory:
+   **320 packages**, and `npm audit` → **`found 0 vulnerabilities`**. Audit is a registry query over
+   the resolved tree, so this result is independent of which Node executes it. The React Router
+   advisory is **gone**, not suppressed.
+2. **Engine compatibility — evaluated deterministically over the whole tree**, not inferred from the
+   warnings of a single install. A script walked all 320 resolved `package.json` files and tested
+   each `engines.node` range with `semver.satisfies`:
+
+   ```
+   packages inspected: 320
+   Node 22.22.0: 0 package(s) whose engines.node excludes it
+   Node 22.23.2: 0 package(s) whose engines.node excludes it
+   ```
+
+   This is stronger evidence than `EBADENGINE` output, because it covers every transitive package
+   rather than only those npm chose to warn about.
+3. **React Router 8's import surface — checked at runtime**, since the v7→v8 breaking change was the
+   removal of `react-router-dom`. Every declarative API this spec uses is exported from
+   `react-router` itself: ✅ `BrowserRouter`, `Routes`, `Route`, `Outlet`, `Link`, `NavLink`,
+   `useParams`, `useSearchParams`, `useNavigate`, `useLocation`, `Navigate`. `react-router/dom`
+   contains only framework/RSC APIs (`HydratedRouter`, `RouterProvider`, `unstable_RSC*`) which this
+   product does not use. **§3.5 therefore needs no change** — the spec never imported from
+   `react-router-dom`.
+
+**✅ What was previously unverifiable is now partly discharged — on the target runtime.** This section
+was originally written from a Node 20 machine, so it could prove resolution, audit and engine ranges
+but not *execution*. Since then, reported by the `orchestrator` from a Node 22 shell: **`node -v`
+v22.23.2, `better-sqlite3@12.11.1` builds and loads, and `npm audit` → `found 0 vulnerabilities`.**
+That clears the **native-ABI** risk, which was the only item on this list that a resolution check
+could not reach — a prebuilt or locally compiled native module either loads on a given ABI or does
+not. Attribution matters: I did not run the native build myself, so it is recorded here as the
+orchestrator's measurement, not mine.
+
+**What is still the developer's to demonstrate:** a real `npm install && npm run build` of the whole
+§1.1 set on Node 22 — **T1's first acceptance criterion**. A native module loading proves the ABI; it
+does not prove that Vite 8, ESLint 10 and Vitest 4 all execute cleanly together.
+
+**✅ The §10 #7 temp-view decision was re-probed on Node 22 / SQLite 3.53.2 and all four behaviours
+hold** (orchestrator, 2026-08-04): `CREATE TEMP VIEW` succeeds under `readonly: true`; permanent
+`CREATE VIEW` refuses with `SQLITE_READONLY`; reads through the temp view survive the
+`PRAGMA query_only = 1` latch; and `CREATE TEMP VIEW` after the latch is refused. **§1.2 and
+`ARCHITECTURE.md` §10 #7 stand unchanged**, now with evidence on the runtime that will actually run
+them rather than on Node 20 alone.
+
+**⚠ One correction to the approved list: TypeScript 7 cannot be used.** Requested, but it fails —
+this is not a warning, it is a hard resolution error:
+
+```
+npm error ERESOLVE unable to resolve dependency tree
+npm error Found: typescript@7.0.2
+npm error Could not resolve dependency:
+npm error peer typescript@">=4.8.4 <6.1.0" from typescript-eslint@8.66.0
+```
+
+`typescript-eslint@8.66.0` is the **latest published** version — `dist-tags` show no v9, and even the
+`canary` (`8.66.1-alpha.4`) still caps at `<6.1.0`. Dropping `typescript-eslint` is not an option:
+`ARCHITECTURE.md` §2 makes `any` a review failure, which requires type-aware lint rules. So
+**`typescript` stays `~5.9.3`**, and is the one item in §1.1 that is not the current major. Revisit
+when `typescript-eslint` publishes TypeScript 7 support.
+
+Everything else on the approved list checks out: Vite 8, ESLint 10, `@vitejs/plugin-react` 6,
+`typescript-eslint` 8.66, `concurrently` 10, React Router 8.3.0.
+
+**0.2 The `/api/meta` values — ✅ verified, with the producing queries.**
+
+| Field | Verified value | Query |
+|---|---|---|
+| `seasons.firstYear` / `latestYear` / `count` | **1950 / 2026 / 77** | `SELECT min(year), max(year), count(*) FROM season` |
+| `latestCompletedRound` | **2026, round 10, "Belgian Grand Prix", 2026-07-19, `spa`, "Circuit de Spa-Francorchamps"** | `Q_LATEST_COMPLETED_ROUND` (§1.3) |
+| `latestSeason.scheduledRounds` | **22** | `Q_LATEST_SEASON_PROGRESS` (§1.4) |
+| `latestSeason.completedRounds` | **10** | ditto |
+| `latestSeason.cancelledRounds` | **2** | ditto |
+| `nextScheduledRound` | **2026, round 11, "Hungarian Grand Prix", 2026-07-26, `hungaroring`** | `Q_NEXT_SCHEDULED_ROUND` (§1.5) |
+
+All four prepared statements together: **0.937 ms** warm. Budget is 50 ms (`ARCHITECTURE.md` §8).
+
+**0.3 ⚠ NEW TRAP — cancelled rounds have `round.number IS NULL`.** ✅ Verified:
+
+```
+sqlite> SELECT count(*) FROM round WHERE number IS NULL;                        -- 2
+sqlite> SELECT count(*) FROM round WHERE number IS NULL AND is_cancelled=1;     -- 2
+sqlite> SELECT count(*) FROM round WHERE is_cancelled=1 AND number IS NOT NULL; -- 0
+sqlite> SELECT count(*) FROM round WHERE is_cancelled=0 AND number IS NULL;     -- 0
+sqlite> SELECT count(*) FROM round WHERE is_cancelled IS NULL;                  -- 0
+sqlite> SELECT count(*) FROM round;                                            -- 1173
+```
+
+Both are 2026: Bahrain (2026-04-12) and Saudi Arabian (2026-04-19). Consequences, all binding:
+
+- 2026 holds **24 `round` rows but only 22 numbered rounds** (`max(number)=22`).
+- SQLite sorts `NULL` **first**, so any bare `ORDER BY r.number` puts cancelled rounds at the top.
+- A cancelled round is **not addressable** by `/seasons/:year/races/:round` — it has no number.
+- Every `round`-number query in this codebase must carry `AND r.number IS NOT NULL`.
+
+**✅ The equivalence holds in both directions, and that is what makes the filter sufficient.** The
+last three counts are the ones that license the rule above. `cancelled_but_numbered = 0` says every
+cancelled round is unnumbered; `numbered_gap = 0` says every unnumbered round is cancelled; and
+`is_cancelled IS NULL = 0` over all **1,173** rows says the two predicates *partition* the table, so
+the second count is a real proof and not an artefact of `= 0` skipping NULLs. Therefore
+**`AND r.number IS NOT NULL` excludes exactly the cancelled rounds and nothing else** — it is a
+complete filter, not a partial one, and a query does **not** need a redundant `AND r.is_cancelled = 0`
+alongside it.
+
+**This is a property of the data as it stands, not a schema guarantee.** No constraint enforces it, so
+a refreshed database could introduce a numbered cancelled round and quietly turn the number filter
+from sufficient into merely necessary. That is why the §9.1 post-refresh check must test **both**
+directions — a bare `count(*) WHERE number IS NULL` would not notice.
+
+This is not in `DATABASE.md` §7. Task **T14** adds it as **trap 15**.
+
+**0.4 Coverage windows — ✅ re-verified from the data**, agreeing with `DATABASE.md` §4:
+
+| Window | First year with entries/rows | Query basis |
+|---|---|---|
+| Race results | **1950** (→2026) | `session.type='R'` joined to `session_entry` |
+| Qualifying (any) | **1994** | `type IN ('QB','QA','QO','Q1','Q2','Q3')` — 392 entries in 1994, **0 before** |
+| Q1/Q2/Q3 segments | **2006** (→2026), 18,839 entries | `type IN ('Q1','Q2','Q3')` |
+| **Lap times / positions** | **1996** (→2026), **578** race sessions with `lap` rows | `lap → session_entry → session(type='R') → round → season` |
+| **Pit stops** | **2011** (→2026), 12,700 rows | `pit_stop → session_entry → …` |
+| Sprint race | **2021** (→2026), 568 entries | `type='SR'` |
+| Sprint qualifying | **2023** (→2026), 953 entries | `type IN ('SQ1','SQ2','SQ3')` |
+| Practice | **never usable** | 1,678 entries total, all 2025–2026, `time_ms` NULL — trap 2 |
+
+**0.5 The only rounds in all history with no race entries are 2026 R11–R22 plus the two cancelled
+rounds.** ✅ Verified — 1950–2025 is completely populated. This is what makes the
+"latest completed" / "next scheduled" pair in §1.3–§1.5 sound rather than heuristic.
+
+**0.6 `better-sqlite3` readonly behaviour — ✅ probed on this machine** (v12.11.1, SQLite 3.53.2):
+
+| Probe | Result |
+|---|---|
+| `new Database(path, { readonly: true })` then `CREATE TEMP VIEW` | **✅ succeeds** |
+| …then `CREATE VIEW` (permanent) | throws `SQLITE_READONLY` |
+| …then `UPDATE` | throws `SQLITE_READONLY` |
+| `PRAGMA query_only = 1` after temp views exist | reads still work; **all further DDL blocked** incl. temp |
+| Missing file (`readonly` and `readonly + fileMustExist`) | `SQLITE_CANTOPEN` — `unable to open database file` |
+| Non-SQLite file | `SQLITE_NOTADB` — `file is not a database` |
+| Valid SQLite, wrong schema | `SQLITE_ERROR` — `no such table: season` |
+| **WAL database in a non-writable directory** | **`SQLITE_READONLY_DIRECTORY`** — SQLite must create the `-shm`/`-wal` sidecars even to read |
+| `file:…?immutable=1` | `SQLITE_CANTOPEN` — `better-sqlite3` does not enable `SQLITE_OPEN_URI` |
+
+The last two rows are a **deployment constraint, not a bug**: the directory containing the database
+must be writable by the server process. Recorded as `ARCHITECTURE.md` §10 decision 12.
+
+**0.7 The application-facing model is the 18 tables documented in `DATABASE.md` §2.** The file
+contains one further table that is internal bookkeeping. **The application must never query it or
+name it**, and `db/schema.sql` must not describe it (T2). `DATABASE.md`'s "18 tables" is correct as
+the application contract.
+
+---
+
+##### 1. Data contract
+
+###### 1.1 Dependency set — ✅ resolved and audited on 2026-08-04
+
+Every range below is what actually resolved, not what was hoped for. **320 packages ·
+`npm audit` → `found 0 vulnerabilities` · 0 packages excluding Node 22.22.0.**
+
+`"engines": { "node": ">=22.22.0" }` — enforced mechanically (T1), so a contributor on the wrong
+Node is told by `npm`, not by a reviewer.
+
+`dependencies`
+
+| Package | Range | Resolved | Note |
+|---|---|---|---|
+| `better-sqlite3` | `^12.11.1` | 12.11.1 | ships **no** types → `@types/better-sqlite3` required |
+| `hono` | `^4.13.0` | 4.13.0 | `hono/secure-headers` is built in — ✅ confirmed present |
+| `@hono/node-server` | `^2.1.0` | 2.1.0 | **approved by Rishabh 2026-08-04** (`ARCHITECTURE.md` §2, §10 #8) |
+| `zod` | `^4.4.3` | 4.4.3 | |
+| `react` / `react-dom` | `^19.2.8` | 19.2.8 | satisfies `react-router@8`'s `>=19.2.7` peer |
+| `react-router` | `^8.3.0` | **8.3.0** | audit-clean. Declarative mode; all APIs used come from `react-router` (§0.1) |
+| `@tanstack/react-query` | `^5.101.4` | 5.101.4 | |
+| `framer-motion` | `^12.43.0` | 12.43.0 | **F0 lands the shell/route motion subset** — see below |
+
+**⚠ `framer-motion` in F0 — this supersedes the first draft of this row.** An earlier version of this
+table read *"F1 uses it; F0 installs it and adds no animation."* That is **withdrawn** by ruling R-1
+(Orchestrator Gate Record §G.2), and the ruling is correct: gate 4 is visual verification, and there
+is nothing to verify in an inert shell. **F0 lands the subset the Design Spec §6 specifies, and only
+that subset:**
+
+| In F0 | Where | Task |
+|---|---|---|
+| `<MotionConfig reducedMotion="user">` wrapping the app | `src/main.tsx` | T8 |
+| **M-1** shell mount | `AppShell` | T11 |
+| **M-2** route content enter, keyed on `location.pathname`, **no exit variant** | `RootLayout` | T10 |
+| **M-3** nav active rule (`layoutId`) | `PrimaryNav` | T11 |
+| **M-4** mobile nav sheet + scrim | `PrimaryNav` | T11 |
+| **M-5** theme popover | `ThemeToggle` | T11 |
+| **M-6** hover / tap / focus on buttons, nav items, popover rows | shell components | T11 |
+| **M-7** skeleton pulse — needs `useReducedMotion()` explicitly, because `MotionConfig` does not stop an opacity loop | `LoadingState` | T12 |
+| **M-8** skeleton → content crossfade | `DataVintage` | T12 |
+| **M-11** theme colour transition — **CSS, not Motion** | `src/styles/index.css` | T11 |
+
+**Deferred, and not to be anticipated in F0:** M-9 (list/grid stagger, F2), M-10 (scroll reveal,
+F3/F4).
+
+Two consequences the developer must not miss:
+
+1. **No duration, easing or spring literal is written by hand.** F0 lands a **minimal
+   `src/lib/motion.ts`** holding exactly the tokens the ten motions above consume, copied from
+   `DESIGN_SYSTEM.md` §4.3 — F1 completes the set (it is an F1 scope bullet). A numeric literal in a
+   component is the same class of failure as an off-scale font size (`DESIGN_SYSTEM.md` §2.3).
+   Easings are Motion's own string presets; springs use `visualDuration` + `bounce`. **No
+   cubic-bézier literal exists anywhere in this product.**
+2. **`framer-motion` is in the initial chunk** and is the largest single contributor to the F0 bundle
+   baseline T13 records (§6.4). That baseline is *with* Motion, not without it.
+
+`devDependencies` — resolved versions in brackets
+
+| Package | Range | Resolved |
+|---|---|---|
+| `typescript` | `~5.9.3` | 5.9.3 — **not 7**, see §0.1 |
+| `vite` | `^8.2.0` | 8.2.0 |
+| `@vitejs/plugin-react` | `^6.0.5` | 6.0.5 — peer `vite ^8.0.0` |
+| `tailwindcss` / `@tailwindcss/vite` | `^4.3.3` | 4.3.3 — peer accepts Vite 8 |
+| `vitest` / `@vitest/coverage-v8` | `^4.1.10` | 4.1.10 — peer `vite ^6 \|\| ^7 \|\| ^8` |
+| `eslint` | `^10.8.0` | 10.8.0 |
+| `@eslint/js` | `^10.0.1` | 10.0.1 |
+| `typescript-eslint` | `^8.66.0` | 8.66.0 — peer `eslint ^10` ✅ |
+| `eslint-plugin-react-hooks` | `^7.1.1` | 7.1.1 — peer `eslint ^10` ✅ |
+| `eslint-plugin-react-refresh` | `^0.5.3` | 0.5.3 — peer `eslint ^9 \|\| ^10` ✅ |
+| `concurrently` | `^10.0.4` | 10.0.4 |
+| `globals` | `^17.9.0` | 17.9.0 |
+| `prettier` | `^3.9.6` | 3.9.6 |
+| `tsx` | `^4.23.5` | 4.23.5 |
+| `jsdom` | `^26.1.0` | 26.1.0 |
+| `@testing-library/react` | `^16.3.2` | 16.3.2 |
+| `@testing-library/user-event` | `^14.6.1` | 14.6.3 |
+| `@types/node` | `^22.20.1` | 22.20.1 — tracks the runtime major |
+| `@types/react` / `@types/react-dom` | `^19.2.18` / `^19.2.4` | 19.2.18 / 19.2.4 |
+| `@types/better-sqlite3` | `^9.6.0` | 9.6.0 |
+
+**Do not add anything else** — new deps go through the `principal-engineer` and are recorded in
+`ARCHITECTURE.md` §10. Two are deliberately **absent**: `hono-rate-limiter` (§2.6 implements it in
+~30 lines) and `@testing-library/jest-dom` (Vitest's `expect` suffices). Both rejections stand.
+
+###### 1.2 Where `v_entry` / `v_race` live — the F0 architectural decision
+
+The DDL in `DATABASE.md` §6.1 says `CREATE VIEW IF NOT EXISTS`. The connection is `readonly: true`
+(DL-1) and the database is not committed, so four options exist. Reasoning, then the decision:
+
+| Option | Verdict |
+|---|---|
+| **A. Bake the views into the shipped `.db`** | ❌ Rejected. The database is an *input supplied separately*. The app would silently depend on objects it cannot guarantee, and a refreshed file could arrive without them — a runtime `no such table: v_race` on a fresh machine. It also puts application concerns into the file rather than the repo, so the view definition would live outside version control. |
+| **B. `CREATE TEMP VIEW` at connection bootstrap** | ✅ **Chosen.** ✅ Probed working on a `readonly: true` connection (§0.6). Temp objects live in SQLite's separate `temp` schema; `main` stays untouched. The DDL is a versioned constant in the repo, reviewable and diffable. Views are inlined by the planner — ✅ verified the plan stays index-driven (§1.6). Cost: ~2.7 ms once per process. |
+| C. Inline the join path as a SQL string composed into each query | ❌ Rejected. Concatenating SQL fragments — even constant ones — into every statement is exactly the shape S-1 forbids, and every reviewer would have to re-establish that the fragment is constant. |
+| D. Open read-write to create the views | ❌ Rejected outright — flat DL-1 / S-3 violation. |
+
+**Decision: B.** Recorded as `ARCHITECTURE.md` §10 decision 7. Hardening that makes it airtight:
+after the temp views are created, latch **`PRAGMA query_only = 1`** — ✅ probed to block *all*
+subsequent DDL including temp objects, while leaving reads working. So the process can create
+exactly the two views defined in the repo and nothing else, ever.
+
+`server/views.ts`
+
+```ts
+/** Canonical flattened entry view. Mirrors docs/DATABASE.md §6.1 verbatim.
+ *  Created as a TEMP view at connection bootstrap — see ARCHITECTURE.md §10 #7. */
+export const V_ENTRY_DDL = `CREATE TEMP VIEW v_entry AS …`;   // §6.1 text, unmodified
+export const V_RACE_DDL  = `CREATE TEMP VIEW v_race AS SELECT * FROM v_entry WHERE session_type = 'R'`;
+export const CANONICAL_VIEWS = [V_ENTRY_DDL, V_RACE_DDL] as const;
+```
+
+✅ Verified: the §6.1 DDL compiles unmodified against the real schema; `v_race` returns **20 rows**
+for 2024 R1 in 3.5 ms, and the lap-trace pattern (§6.3) returns **1,129 rows** in 2.8 ms.
+
+`server/db.ts`
+
+```ts
+export class DatabaseUnavailableError extends Error {
+  constructor(readonly reason: 'missing' | 'unreadable' | 'schema', cause?: unknown) { … }
+}
+/** Lazily opens the single readonly connection. Idempotent. */
+export function getDb(): Database.Database;
+/** Startup readiness probe. Returns null when ready, else the reason. Never throws. */
+export function probeDatabase(): DatabaseUnavailableError | null;
+/** Test-only: drop the cached handle. */
+export function __resetDb(): void;
+```
+
+`getDb()` behaviour, in order:
+1. Resolve `DB_PATH` **once, at module load** (§2.5). Never from a request (S-2).
+2. `new Database(DB_PATH, { readonly: true, fileMustExist: true })`.
+3. Map open failures: `SQLITE_CANTOPEN` → `'missing'`; `SQLITE_NOTADB` /
+   `SQLITE_READONLY_DIRECTORY` → `'unreadable'`.
+4. `for (const ddl of CANONICAL_VIEWS) db.exec(ddl)`.
+5. Sentinel check `SELECT 1 FROM v_race LIMIT 1` — an `SQLITE_ERROR` here → `'schema'`.
+6. `db.pragma('query_only = 1')`.
+7. Cache and return the handle. On any failure, throw `DatabaseUnavailableError` — **never** let a
+   raw `better-sqlite3` error escape, because its message carries the absolute path (S-6).
+
+###### 1.3 `Q_LATEST_COMPLETED_ROUND` — `server/queries/meta.ts`
+
+```sql
+SELECT s.year        AS year,
+       r.number      AS roundNumber,
+       r.name        AS roundName,
+       r.date        AS roundDate,
+       c.reference   AS circuitRef,
+       c.name        AS circuitName
+FROM round r
+JOIN season  s   ON s.id  = r.season_id
+JOIN session ses ON ses.round_id = r.id AND ses.type = 'R'
+LEFT JOIN circuit c ON c.id = r.circuit_id
+WHERE r.is_cancelled = 0
+  AND r.number IS NOT NULL
+  AND EXISTS (SELECT 1 FROM session_entry se WHERE se.session_id = ses.id)
+ORDER BY s.year DESC, r.number DESC
+LIMIT 1;
+```
+
+- **Canonical view used: none.** Deliberate. `v_entry` fans out to one row *per car per session*
+  (50,842 rows) purely to answer a round-level question. `EXISTS` over `session_entry` answers it
+  without materialising entries. `v_race` is for entry-level features.
+- **Traps handled:** **12** (`is_cancelled = 0`) · **0.3/new-15** (`r.number IS NOT NULL`) ·
+  **13** (existence of entries, not a date-vs-today comparison — `REQUIREMENTS.md` §2.2 forbids
+  assuming today's calendar position) · **1** (this asks about *results*, so it correctly tests for
+  `session_entry` rows and never reads `has_time_data`) · **11** (returns `circuit.reference`, no ids).
+- **Rows: exactly 1** (`LIMIT 1`), or 0 on an empty database.
+- ✅ Returns `2026 / 10 / Belgian Grand Prix / 2026-07-19 / spa / Circuit de Spa-Francorchamps`.
+- Ordering note: ✅ verified that `round.number` order never disagrees with `round.date` order in
+  any season, and no `round.date` is NULL — so `ORDER BY (year, number)` is safe.
+
+###### 1.4 `Q_LATEST_SEASON_PROGRESS`
+
+```sql
+SELECT s.year AS year,
+  sum(CASE WHEN r.is_cancelled = 0 THEN 1 ELSE 0 END) AS scheduledRounds,
+  sum(CASE WHEN r.is_cancelled = 1 THEN 1 ELSE 0 END) AS cancelledRounds,
+  sum(CASE WHEN r.is_cancelled = 0 AND EXISTS (
+        SELECT 1 FROM session ses
+        JOIN session_entry se ON se.session_id = ses.id
+        WHERE ses.round_id = r.id AND ses.type = 'R'
+      ) THEN 1 ELSE 0 END) AS completedRounds
+FROM round r
+JOIN season s ON s.id = r.season_id
+WHERE s.year = (SELECT max(year) FROM season)
+GROUP BY s.year;
+```
+
+`sum(CASE …)` not `count(…) FILTER (…)`, so the SQL carries no assumption about the SQLite version
+bundled with `better-sqlite3`. **Rows: 1.** Scan bounded to one season (≤24 `round` rows).
+✅ Returns `2026 / 22 / 2 / 10`. Traps: **12**, **13**.
+
+###### 1.5 `Q_NEXT_SCHEDULED_ROUND`
+
+Identical shape to §1.3 with `NOT EXISTS` and ascending order. **Rows ≤ 1.** ✅ Returns
+`2026 / 11 / Hungarian Grand Prix / 2026-07-26 / hungaroring`. Sound because of §0.5 — the only
+entry-less rounds in the whole file are 2026 futures and the two cancelled rounds, and the latter
+are excluded by `is_cancelled = 0 AND number IS NOT NULL`.
+
+###### 1.6 `Q_SEASON_RANGE`
+
+```sql
+SELECT min(year) AS firstYear, max(year) AS latestYear, count(*) AS seasonCount FROM season;
+```
+
+Covering index `idx_season_year`; 77 rows. ✅ `1950 / 2026 / 77`. ✅ Verified the year sequence is
+contiguous — no gap years to explain in the UI.
+
+✅ **Query-plan evidence that the temp views do not defeat the planner** — `EXPLAIN QUERY PLAN` for
+the §6.3 lap-trace pattern through `v_race`:
+
+```
+SEARCH s   USING COVERING INDEX idx_season_year (year=?)
+SEARCH ses USING INDEX idx_session_type (type=?)
+SEARCH r   USING INTEGER PRIMARY KEY (rowid=?)
+SEARCH se  USING INDEX idx_se_session (session_id=?)
+… re / td / d / t all USING INTEGER PRIMARY KEY …
+SEARCH l   USING INDEX idx_lap_entry (session_entry_id=?)
+```
+
+Every access is an indexed `SEARCH`; no `SCAN`. Trap **7** is satisfied structurally for later
+features, not just by convention.
+
+###### 1.7 Coverage windows are constants, not queries — `server/coverage.ts`
+
+Deriving §0.4 at request time would mean scanning `lap` (717,764 rows) — a trap-7 violation on the
+cheapest endpoint in the app. Instead:
+
+```ts
+/** Data coverage windows. Mirrors docs/DATABASE.md §4, re-verified 2026-08-04.
+ *  `to: null` means "open — through the latest season present". */
+export const COVERAGE = {
+  results:            { from: 1950, to: null },
+  qualifying:         { from: 1994, to: null },
+  qualifyingSegments: { from: 2006, to: null },
+  laps:               { from: 1996, to: null },
+  pitStops:           { from: 2011, to: null },
+  sprint:             { from: 2021, to: null },
+  sprintQualifying:   { from: 2023, to: null },
+} as const;
+```
+
+`DATABASE.md` §9 already requires re-verifying §4 after a refresh; T14 adds "and
+`server/coverage.ts`" to that checklist so the constant cannot drift unnoticed.
+
+###### 1.8 What the UI does outside the window
+
+F0 renders no data surface, so there is nothing to gate. F0's obligation is to **ship the window to
+the client** so every later feature reads one authority instead of hard-coding years. NV-8's
+disable-and-explain behaviour is F1+ scope.
+
+---
+
+##### 2. API contract
+
+###### 2.1 `GET /api/meta`
+
+- **Params:** none. Any query string is ignored (not an error).
+- **Method:** `GET` only. The router registers `GET` alone; anything else falls to the 404 handler.
+- **Success:** `200`, `application/json`, body per §2.2.
+- **`Cache-Control: public, max-age=300`**, plus in-process memoisation, TTL 300,000 ms (§6.2).
+- **Errors:** `503 DATABASE_UNAVAILABLE` · `429 RATE_LIMITED` · `500 INTERNAL`.
+
+###### 2.2 Response schema — `server/schemas/meta.ts`
+
+```ts
+import { z } from 'zod';
+
+export const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const seasonYearSchema = z.number().int().min(1950).max(2100);
+
+export const seasonRangeSchema = z.object({
+  firstYear:  seasonYearSchema,          // 1950
+  latestYear: seasonYearSchema,          // 2026
+  count:      z.number().int().positive(),// 77
+});
+
+export const roundRefSchema = z.object({
+  year:        seasonYearSchema,
+  round:       z.number().int().positive(),  // never 0, never null — §0.3
+  roundName:   z.string().min(1),
+  date:        isoDateSchema,
+  circuitRef:  z.string().min(1).nullable(), // LEFT JOIN; null tolerated
+  circuitName: z.string().min(1).nullable(),
+});
+
+export const coverageWindowSchema = z.object({
+  from: seasonYearSchema,
+  to:   seasonYearSchema.nullable(),     // null = open-ended
+});
+
+export const coverageSchema = z.object({
+  results: coverageWindowSchema,            qualifying: coverageWindowSchema,
+  qualifyingSegments: coverageWindowSchema, laps: coverageWindowSchema,
+  pitStops: coverageWindowSchema,           sprint: coverageWindowSchema,
+  sprintQualifying: coverageWindowSchema,
+});
+
+export const latestSeasonSchema = z.object({
+  year:            seasonYearSchema,
+  scheduledRounds: z.number().int().nonnegative(),  // excludes cancelled — §0.3
+  completedRounds: z.number().int().nonnegative(),
+  cancelledRounds: z.number().int().nonnegative(),
+  isComplete:      z.boolean(),                     // completedRounds === scheduledRounds
+});
+
+export const metaSchema = z.object({
+  seasons:              seasonRangeSchema,
+  latestSeason:         latestSeasonSchema,
+  latestCompletedRound: roundRefSchema.nullable(),
+  nextScheduledRound:   roundRefSchema.nullable(),
+  coverage:             coverageSchema,
+});
+export type Meta = z.infer<typeof metaSchema>;
+```
+
+**There is no `dataVintage` field.** The vintage *is* `latestCompletedRound`; a second
+representation of the same fact would be a second thing to keep honest. The display string is
+produced by the pure selector `selectDataVintage` (§3.4) — which is where it can be unit-tested.
+There is also no field naming or describing where anything came from (§4.1 of `CLAUDE.md`).
+
+The verified body:
+
+```json
+{ "seasons": { "firstYear": 1950, "latestYear": 2026, "count": 77 },
+  "latestSeason": { "year": 2026, "scheduledRounds": 22, "completedRounds": 10,
+                    "cancelledRounds": 2, "isComplete": false },
+  "latestCompletedRound": { "year": 2026, "round": 10, "roundName": "Belgian Grand Prix",
+                            "date": "2026-07-19", "circuitRef": "spa",
+                            "circuitName": "Circuit de Spa-Francorchamps" },
+  "nextScheduledRound": { "year": 2026, "round": 11, "roundName": "Hungarian Grand Prix",
+                          "date": "2026-07-26", "circuitRef": "hungaroring",
+                          "circuitName": "Hungaroring" },
+  "coverage": { "results": { "from": 1950, "to": null }, … } }
+```
+
+**Zod is the outbound gate.** `metaSchema.parse(payload)` runs in the route handler before
+responding. A parse failure is a `500 INTERNAL` with the Zod issue list logged server-side only —
+never in the body (S-6). Establishing this now means every later endpoint inherits it.
+
+**Schema modules are shared and must stay bundle-safe:** `server/schemas/*` may import **only**
+`zod`. No `node:*`, no `better-sqlite3`, no query modules. The client imports them via the
+`@schemas/*` alias. Added to `ARCHITECTURE.md` §3 as a layering rule.
+
+###### 2.3 Error envelope — `server/errors.ts`
+
+```ts
+export const ERROR_CODES = ['INVALID_PARAM','NOT_FOUND','RATE_LIMITED',
+                            'DATABASE_UNAVAILABLE','INTERNAL'] as const;
+export type ErrorCode = (typeof ERROR_CODES)[number];
+export const apiErrorSchema = z.object({
+  error: z.object({ code: z.enum(ERROR_CODES), message: z.string().min(1) }),
+});
+export class ApiError extends Error {
+  constructor(readonly code: ErrorCode, readonly status: ContentfulStatusCode, message: string) { … }
+}
+```
+
+| Code | Status | Client-visible message (fixed strings — no interpolation) |
+|---|---|---|
+| `INVALID_PARAM` | 400 | `"One or more parameters were invalid."` |
+| `NOT_FOUND` | 404 | `"Not found."` |
+| `RATE_LIMITED` | 429 | `"Too many requests. Please slow down."` |
+| `DATABASE_UNAVAILABLE` | 503 | `"The data is not available."` |
+| `INTERNAL` | 500 | `"Something went wrong."` |
+
+`app.onError` (S-6, S-9): `ApiError` → its code/status. `DatabaseUnavailableError` →
+`503 DATABASE_UNAVAILABLE`. **Anything else → `500 INTERNAL` with the fixed message.** Detail
+(`err.stack`, SQLite codes) goes to `console.error` only. `app.notFound` → `404 NOT_FOUND`.
+No branch may put a path, a SQL string, a stack frame, or a `SQLITE_*` code into a response body.
+
+The client-visible copy for `DATABASE_UNAVAILABLE` is deliberately about *availability* and says
+nothing about a file, a location, or an origin.
+
+###### 2.4 Security middleware — order is load-bearing
+
+`server/app.ts`, applied in this order on the way in:
+
+1. **`secureHeaders()`** (`hono/secure-headers`, ✅ confirmed present in `hono@4.13.0`) — applied to
+   `*` so error and 404 responses carry headers too. Explicit options:
+
+   ```ts
+   secureHeaders({
+     contentSecurityPolicy: {
+       defaultSrc: ["'self'"], baseUri: ["'self'"],
+       scriptSrc: ["'self'"],                 // S-9: no 'unsafe-inline' for scripts
+       styleSrc:  ["'self'"], styleSrcAttr: ["'unsafe-inline'"],
+       imgSrc: ["'self'", 'data:'], fontSrc: ["'self'"],
+       connectSrc: ["'self'"],                // DL-2/S-1 enforced by the browser
+       objectSrc: ["'none'"], frameAncestors: ["'none'"], formAction: ["'none'"],
+       upgradeInsecureRequests: [],
+     },
+     xFrameOptions: 'DENY', xContentTypeOptions: true,
+     referrerPolicy: 'no-referrer', crossOriginOpenerPolicy: true, removePoweredBy: true,
+   })
+   ```
+
+   `connect-src 'self'` is the real prize: a future accidental third-party fetch fails **loudly** in
+   the browser instead of silently violating DL-2.
+
+   `styleSrcAttr: 'unsafe-inline'` is a **provisional** allowance. React and Framer Motion mutate
+   styles through the CSSOM, which CSP does not govern, so it may well be unnecessary. **T13
+   requires verifying zero CSP violations in the production preview console and removing the
+   allowance if none appear.** Verify; do not reason about it.
+
+   **The CSP is verified twice, in two different consoles, and neither discharges the other.**
+   T11 and T13 both say "zero CSP violations"; they are not the same check:
+
+   | Task | Console | What it proves | What it cannot prove |
+   |---|---|---|---|
+   | **T11** | **Vite dev server** (`npm run dev`, `localhost:5173`) | The shell, `public/theme-init.js` and the theme/nav/popover interactions raise no violation under the §2.4 policy | Nothing about the **built** app. In dev, Vite injects its HMR client and serves styles as `<style>` blocks the production build does not emit, so a dev-only violation can be a Vite artefact and a dev-only *pass* can hide a build-only failure |
+   | **T13** | **Production preview** (`npm run build && npm run start`, single origin, `NODE_ENV=production`) | The **real** artefact — hashed asset URLs, extracted CSS, minified Framer Motion — raises no violation, and settles whether `styleSrcAttr` is needed at all | Nothing about dev ergonomics; a policy that only works in the build is still a broken `npm run dev` |
+
+   Practical consequence for the developer: **the `styleSrcAttr` allowance may only be removed on
+   T13's evidence**, and if removing it breaks the dev console, the dev server — not the policy — is
+   what gets adjusted. Record both observations; a single screenshot of one console does not close
+   the pair.
+
+2. **No CORS middleware.** Omitting it means no `Access-Control-Allow-Origin` is ever sent, so
+   browsers refuse cross-origin reads — that *is* same-origin-only (S-11). **Do not add
+   `hono/cors`.** State this in a comment so a later reader does not "fix" it.
+
+3. **`rateLimit()`** on `/api/*` — `server/middleware/rateLimit.ts` (§2.6).
+
+4. **Route handlers.** They validate, call one named query, return. No logic (`ARCHITECTURE.md` §3).
+
+###### 2.5 Configuration — `server/config.ts`
+
+```ts
+export const PORT = Number(process.env.PORT ?? 8787);
+export const DB_PATH = path.resolve(process.env.F1_DB_PATH ?? path.join(REPO_ROOT, 'data/f1.db'));
+export const RATE_LIMIT = { windowMs: 60_000, max: 120, maxTrackedClients: 10_000 };
+export const META_CACHE_TTL_MS = 300_000;
+export const IS_TEST = process.env.NODE_ENV === 'test';
+```
+
+Read from `process.env` **at module load only**, never per request (S-2). `F1_DB_PATH` is operator
+configuration; it can never originate in an HTTP request. `.env.example` documents `PORT` and
+`F1_DB_PATH` and contains **no secrets** (there are none — S-5).
+
+###### 2.6 Rate limiting (S-13) — no new dependency
+
+Fixed-window per-IP counter in one module. `hono-rate-limiter` would add a dependency and a
+transitive surface for ~30 lines of logic; the threat model here is protecting a single-process
+server, not adversarial abuse. Recorded as `ARCHITECTURE.md` §10 decision 9.
+
+```ts
+export function rateLimit(opts = RATE_LIMIT): MiddlewareHandler;
+```
+
+- Key: `getConnInfo(c).remote.address` (`@hono/node-server/conninfo`, ✅ confirmed exported).
+  Falls back to the literal `'unknown'` when absent. **`X-Forwarded-For` is never trusted** — it is
+  client-supplied and would let anyone mint unlimited buckets. If this is ever deployed behind a
+  proxy, that needs a new decision-log entry.
+- State: `Map<string, { count: number; resetAt: number }>`. Expired buckets are dropped lazily on
+  touch, plus a sweep every 60 s. **When the map exceeds `maxTrackedClients` the oldest bucket is
+  evicted** — an unbounded map is itself a DoS vector.
+- Over limit → `429` via `ApiError('RATE_LIMITED', …)` with `Retry-After` in whole seconds.
+- Always sets `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`.
+- Disabled when `IS_TEST`, so tests are not order-dependent. There is an exported
+  `__resetRateLimit()` for the one test that exercises the limiter directly.
+
+###### 2.7 Missing-database behaviour (an F0 acceptance criterion)
+
+Two channels, and both matter:
+
+- **Server console, once at startup.** `probeDatabase()` runs before `serve()`; the server **still
+  starts** — it must, or the client would get an opaque proxy failure instead of a designed state.
+  On `'missing'`, print to `stderr` (no stack trace, and nothing about how the file is produced):
+
+  ```
+  [api] The database was not found.
+
+        Expected at: /abs/path/data/f1.db
+
+        data/f1.db is not part of this repository and is supplied separately.
+        Place the file at the path above and restart:  npm run dev
+
+        To use a different location, set F1_DB_PATH.
+  ```
+
+  `'unreadable'` → `"The database could not be opened. Check that <dir> is readable and writable by
+  this process, then restart."` (this is the ✅ verified `SQLITE_READONLY_DIRECTORY` case — WAL needs
+  to create its sidecar files). `'schema'` → `"The database is present but does not contain the
+  expected tables."`
+
+  The absolute path appears **only** in this console output. S-6 governs responses.
+
+- **HTTP.** Every `/api/*` call returns `503 { "error": { "code": "DATABASE_UNAVAILABLE",
+  "message": "The data is not available." } }`. The client maps this code to the designer's
+  "database not available" state (T11).
+
+---
+
+##### 3. Client structure
+
+###### 3.1 File layout — extends `ARCHITECTURE.md` §9, no invention
+
+```
+package.json  tsconfig.json  tsconfig.app.json  tsconfig.node.json
+vite.config.ts  eslint.config.js  .prettierrc.json  .prettierignore
+index.html  .env.example  README.md
+
+server/
+  index.ts               entry: probeDatabase() → serve()
+  app.ts                 the Hono app, exported without listening (testable)
+  config.ts  db.ts  views.ts  coverage.ts  errors.ts
+  middleware/rateLimit.ts
+  routes/meta.ts
+  queries/meta.ts        ALL SQL for this feature
+  schemas/meta.ts  schemas/error.ts
+  cache/memo.ts
+
+src/
+  main.tsx  App.tsx
+  routes/
+    RootLayout.tsx  SeasonHub.tsx  RaceDeepDive.tsx
+    DriverIndex.tsx  DriverProfile.tsx  TeamIndex.tsx  TeamProfile.tsx
+    CircuitIndex.tsx  CircuitProfile.tsx  Compare.tsx  Records.tsx  NotFound.tsx
+  features/meta/
+    useMeta.ts  selectors.ts
+  components/
+    layout/AppShell.tsx  layout/Header.tsx  layout/PrimaryNav.tsx
+    ui/ThemeToggle.tsx  ui/DataVintage.tsx
+    ui/LoadingState.tsx  ui/ErrorState.tsx  ui/DataUnavailableState.tsx
+    ui/icons.tsx           the eleven inline SVG icons — see §3.10
+  lib/
+    api.ts  queryClient.ts  theme.ts  format.ts
+    motion.ts              minimal F0 motion tokens — see §1.1; F1 completes it
+  styles/index.css  styles/fonts.css
+
+public/
+  theme-init.js          pre-paint theme application — see §3.6
+  fonts/                 six vendored woff2 + OFL.txt — see §3.9
+e2e/                     QA-owned, empty in F0
+```
+
+Path aliases in `tsconfig.*.json` **and** `vite.config.ts` `resolve.alias` (kept in sync manually —
+no extra plugin): `@/*` → `src/*`, `@server/*` → `server/*`, `@schemas/*` → `server/schemas/*`.
+Vitest inherits them by extending the Vite config (single `vite.config.ts` with a `test` block).
+
+TypeScript: `strict: true`, `noUncheckedIndexedAccess: true`,
+`exactOptionalPropertyTypes: true`, `noUnusedLocals`, `noUnusedParameters`,
+`verbatimModuleSyntax: true`. ESLint bans `any`
+(`@typescript-eslint/no-explicit-any: error`) and non-null assertions
+(`no-non-null-assertion: error`). `any` is a review failure (`ARCHITECTURE.md` §2).
+
+###### 3.2 `src/lib/api.ts`
+
+```ts
+export async function apiGet<T>(path: `/api/${string}`, schema: z.ZodType<T>): Promise<T>;
+export class ApiRequestError extends Error {
+  constructor(readonly code: ErrorCode | 'NETWORK' | 'MALFORMED', readonly status: number | null,
+              message: string) { … }
+}
+```
+
+- `fetch(path, { headers: { Accept: 'application/json' } })` — same-origin relative URL only. The
+  signature's template-literal type makes an absolute URL a **compile error**, so DL-2 is enforced
+  by the type system rather than by review.
+- `!res.ok` → parse the body with `apiErrorSchema`; on success throw `ApiRequestError(code, status,
+  message)`; on failure throw `ApiRequestError('MALFORMED', status, …)`.
+- `res.ok` → `schema.safeParse`; failure → `ApiRequestError('MALFORMED', …)`. **A server response
+  that does not match its schema is an error, not something to render.**
+- No retry logic here — TanStack Query owns retries.
+
+###### 3.3 `src/features/meta/useMeta.ts`
+
+```ts
+export const metaQueryKey = ['meta'] as const;
+export function useMeta(): UseQueryResult<Meta, ApiRequestError>;
+// queryFn: () => apiGet('/api/meta', metaSchema)
+// staleTime 5 min, gcTime 30 min, retry: (n, e) => e.code !== 'DATABASE_UNAVAILABLE' && n < 1
+```
+
+Never retry `DATABASE_UNAVAILABLE` — on a fresh clone it will not resolve, and retrying only delays
+the designed state. `queryClient.ts` defaults: `refetchOnWindowFocus: false`,
+`staleTime: 5 * 60_000`, `retry: 1`. Server data lives in TanStack Query and is **never** mirrored
+into React state (`ARCHITECTURE.md` §3).
+
+###### 3.4 Pure selectors — `src/features/meta/selectors.ts`
+
+Where F0's logic lives. Every one is pure, synchronous, React-free, and unit-tested.
+
+```ts
+export interface DataVintage {
+  /** e.g. "2026-07-19" */         isoDate: string;
+  /** e.g. "Belgian Grand Prix" */ roundName: string;
+  /** e.g. 2026 */                 year: number;
+  /** e.g. 10 */                   round: number;
+  /** e.g. "Results through 2026 round 10 — Belgian Grand Prix, 19 Jul 2026" */ label: string;
+  /** e.g. "10 of 22 rounds complete" */ progressLabel: string;
+}
+/** null when the data holds no completed round at all. */
+export function selectDataVintage(meta: Meta): DataVintage | null;
+
+export function selectSeasonOptions(meta: Meta): number[];        // [2026, 2025, …, 1950], desc
+export function selectDefaultSeason(meta: Meta): number;          // latestCompletedRound.year ?? seasons.latestYear
+export function isSeasonInCoverage(meta: Meta, key: keyof Meta['coverage'], year: number): boolean;
+export function selectCoverageNotice(meta: Meta, key: keyof Meta['coverage'], year: number): string | null;
+export function selectSeasonProgress(meta: Meta): { completed: number; scheduled: number; ratio: number };
+```
+
+- `selectSeasonOptions` derives from `firstYear`/`latestYear` — ✅ safe because the year sequence was
+  verified contiguous (§1.6).
+- `isSeasonInCoverage` treats `to: null` as open-ended. This is the single function every later
+  feature calls for NV-8; nobody hard-codes `1996`.
+- `selectCoverageNotice` returns copy like `"Lap data is available from 1996 onwards."` — final
+  wording is the designer's; the function signature is fixed here.
+- `selectSeasonProgress` returns `ratio: 0` when `scheduled === 0` — **never `NaN`**.
+- Date formatting goes through `lib/format.ts` (`formatIsoDate`, locale-stable, UTC — no
+  `toLocaleDateString` without an explicit locale, or tests differ per machine).
+
+###### 3.5 Component tree
+
+```
+<QueryClientProvider>
+  <BrowserRouter>
+    <Routes>
+      <Route element={<RootLayout/>}>            ← AppShell + <Outlet/>
+        "/"                       <SeasonHub/>
+        "/seasons/:year"          <SeasonHub/>
+        "/seasons/:year/races/:round"  <RaceDeepDive/>
+        "/drivers"  "/drivers/:driverRef"
+        "/teams"    "/teams/:teamRef"
+        "/circuits" "/circuits/:circuitRef"
+        "/compare"  "/records"
+        "*"                       <NotFound/>
+```
+
+Route table is `ARCHITECTURE.md` §5 verbatim — 11 routes plus the catch-all. Every route component
+in F0 is a placeholder that renders its name and its resolved params; **none fetches anything.**
+
+| Component | Props |
+|---|---|
+| `AppShell` | `{ children: ReactNode }` |
+| `Header` | `{}` — composes `PrimaryNav`, `ThemeToggle`, `DataVintage` |
+| `PrimaryNav` | `{ items: ReadonlyArray<{ to: string; label: string }> }` |
+| `ThemeToggle` | `{}` — owns theme via `lib/theme.ts` |
+| `DataVintage` | `{ vintage: DataVintage \| null; state: 'loading' \| 'ready' \| 'unavailable' }` — **pure and presentational; it does not call `useMeta`.** `Header` calls `useMeta`, runs `selectDataVintage`, and passes the result down (`ARCHITECTURE.md` §3: components never fetch) |
+| `LoadingState` | `{ label?: string }` |
+| `ErrorState` | `{ title: string; detail?: string; onRetry?: () => void }` |
+| `DataUnavailableState` | `{}` — the "database not available" state; fixed provenance-silent copy from the Design Spec |
+
+Route-level code splitting is **not** introduced in F0 (nothing to split — no charts, no visx). The
+boundary is specified in §6.4 so F1/F3 land it.
+
+###### 3.6 Theme — `src/lib/theme.ts`
+
+```ts
+export type ThemePreference = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
+export const THEME_STORAGE_KEY = 'f1a.theme';
+export function readThemePreference(): ThemePreference;        // invalid/absent → 'system'
+export function resolveTheme(p: ThemePreference): ResolvedTheme;
+export function applyTheme(t: ResolvedTheme): void;            // <html data-theme="…">
+export function setThemePreference(p: ThemePreference): void;  // persist + apply
+export function subscribeToSystemTheme(cb: (t: ResolvedTheme) => void): () => void;
+```
+
+- Applied as `document.documentElement.dataset.theme`. Tailwind v4 needs an explicit custom variant
+  (✅ verified against the Tailwind v4 docs) — in `src/styles/index.css`:
+
+  ```css
+  @import "tailwindcss";
+  @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+  ```
+
+- **First load respects `prefers-color-scheme`** because the default preference is `'system'`.
+- `subscribeToSystemTheme` keeps `'system'` live while the tab is open; it is a no-op once the user
+  picks explicitly.
+- `localStorage` access is wrapped in `try/catch` (Safari private mode throws) and degrades to
+  `'system'`. Corrupt stored values fall back to `'system'`, never crash.
+- **Pre-paint application without violating CSP.** An inline `<script>` in `index.html` would be the
+  usual trick, but `script-src 'self'` forbids it (S-9). So: `public/theme-init.js`, a few lines,
+  loaded **synchronously** in `<head>` before the stylesheet — external, `'self'`, no FOUC, no CSP
+  exception. It duplicates only the read-and-apply step; the storage key and attribute name are
+  asserted identical by a unit test.
+
+###### 3.7 URL params owned by F0
+
+**None.** F0 introduces no query parameters. `:year`, `:round` and the `:*Ref` slugs belong to
+F2–F6; F0's placeholders display them unvalidated. Slugs, never integer ids (DL-3, trap 11).
+
+###### 3.8 Running client + API together
+
+```json
+"dev":        "concurrently -n api,web -c magenta,cyan \"npm:dev:api\" \"npm:dev:web\"",
+"dev:api":    "tsx watch server/index.ts",
+"dev:web":    "vite",
+"build":      "tsc -b && vite build",
+"start":      "NODE_ENV=production tsx server/index.ts",
+"typecheck":  "tsc -b --noEmit",
+"lint":       "eslint .",
+"format":     "prettier --write .",
+"format:check":"prettier --check .",
+"test":       "vitest run",
+"test:watch": "vitest"
+```
+
+Vite dev server proxies `/api` → `http://localhost:8787` (`server.proxy`), so the browser sees one
+origin in dev and same-origin holds in production too. **No `--kill-others`**: if the API exits, the
+client keeps serving and shows its designed state.
+
+In production `server/index.ts` serves `dist/` via `@hono/node-server/serve-static` with an
+SPA fallback to `index.html` for non-`/api` paths — from a **fixed** root, never a user-supplied
+path (S-2).
+
+###### 3.9 Fonts — ✅ DECIDED: vendored `woff2`, **no dependency**
+
+**Verdict (routed to me as G.4 item 3 / ruling R-6): vendor the files. The three
+`@fontsource-variable/*` packages are NOT added.** `ARCHITECTURE.md` §10 decision **#17**.
+
+Three reasons, in order of weight:
+
+1. **Stable, literal asset URLs.** Files in `public/` are served verbatim, so
+   `<link rel="preload" href="/fonts/inter-latin.woff2">` is a fixed string in `index.html`. Imported
+   from `node_modules`, Vite content-hashes the filename, and preloading it then requires reading the
+   build manifest or adding a plugin. Avoiding a font flash on first paint is an F0 concern
+   (`DataVintage` and the nav are text), so this is not a stylistic preference.
+2. **The `@font-face` family names match the design tokens exactly.** `DESIGN_SYSTEM.md` §2.2 fixes
+   `--font-display: Archivo, …`. Fontsource's CSS declares `'Archivo Variable'` / `'Inter Variable'`,
+   which would force either a token change or a second alias. We author the `@font-face` block, so
+   the family name is simply `Archivo`.
+3. **No dependency at all** — S-7/S-14, and the orchestrator's stated preference. Worth being honest
+   about how much this one is worth: all three packages carry **no `dependencies` and no install
+   scripts** (✅ verified via `npm view`), so the supply-chain delta was small either way. Reasons 1
+   and 2 are the decisive ones; this one confirms rather than drives.
+
+**Acquisition — exact, re-runnable, and integrity-checked.** "Get them from upstream" is not
+implementable, so this is the procedure. It uses `npm pack`, which fetches a **published, immutable
+tarball whose integrity npm verifies**, and it adds nothing to `package.json`:
+
+```bash
+mkdir -p public/fonts && cd "$(mktemp -d)"
+for p in archivo inter chivo-mono; do
+  npm pack "@fontsource-variable/$p@5.3.0"
+  tar xzf "fontsource-variable-$p-5.3.0.tgz"
+  mv package "$p"
+done
+```
+
+Then copy **exactly these six files**, renaming as shown, and verify:
+
+| From the extracted package | → `public/fonts/` | Size | `sha256` |
+|---|---|---|---|
+| `archivo/files/archivo-latin-wdth-normal.woff2` | `archivo-latin.woff2` | 90.1 kB | `e3a28eade21a900c7155a247757f4b2834c07bb7ef07ad7efa55cebaac1e8f5e` |
+| `archivo/files/archivo-latin-ext-wdth-normal.woff2` | `archivo-latin-ext.woff2` | 86.2 kB | `5717f37059660ca5c899bad6c48ee22c3ac55cb3c484055241689d0f905a1a86` |
+| `inter/files/inter-latin-opsz-normal.woff2` | `inter-latin.woff2` | 72.9 kB | `2c295d99e26dcf357d4d01bcf270fd6924b600c9a13dd8c363ef114f4c6976fa` |
+| `inter/files/inter-latin-ext-opsz-normal.woff2` | `inter-latin-ext.woff2` | 133.3 kB | `5e6d4fe9d9f4bff8b2a2469d25ab19576bb85331e22c6ed51398e16f95d56a9c` |
+| `chivo-mono/files/chivo-mono-latin-wght-normal.woff2` | `chivo-mono-latin.woff2` | 26.3 kB | `c00775f8ecb034b6c193c7b253d698cfe882a1d6c0df67299a3d5382c2e82216` |
+| `chivo-mono/files/chivo-mono-latin-ext-wght-normal.woff2` | `chivo-mono-latin-ext.woff2` | 22.9 kB | `479a6414d1d35c272018d9a6effde625afbac888bf75c48868652284cbb8b7d6` |
+
+`shasum -a 256 public/fonts/*.woff2` must reproduce the six values above (T8). The hashes are the
+point: they are what makes a vendored binary reviewable, and they let the `reviewer` re-derive the
+files independently instead of trusting a copy step.
+
+**Why those axis variants, and not the smaller ones.** Fontsource's suffix names the axis set it
+ships, and the design needs more than `wght`:
+
+- **Archivo `wdth`** (wdth + wght), not `wght`. `DESIGN_SYSTEM.md` §2.3 sets every display token at
+  **`wdth 82`**; the `wght`-only file is instanced at `wdth 100` and cannot express it. Cost of the
+  axis: 90.1 kB vs 34.9 kB for `latin`.
+- **Inter `opsz`** (opsz + wght), not `wght`. §2.1 specifies `opsz 14–20`. Cost: 72.9 kB vs 48.3 kB.
+- **Chivo Mono `wght`** — the family has only that axis, so this is the full variable font.
+
+**No axis instancing or re-subsetting is performed, and the developer must not attempt it.** Pinning
+Archivo to `wdth 82` in the *binary* would need `fonttools varLib.instancer` — a Python toolchain that
+is not part of this project and would be an unreviewable build step. The axis stays in the file and is
+selected in CSS, which is the supported mechanism.
+
+**`src/styles/fonts.css`** — imported from `src/styles/index.css`. Six `@font-face` blocks, one per
+file. The `unicode-range` values are **copied verbatim** from the source packages' CSS (✅ read from
+all three; the `latin` and `latin-ext` ranges are byte-identical across the three families) and must
+not be retyped from memory — a wrong range silently falls back to a system font:
+
+```css
+/* latin */     unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
+                               U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
+                               U+2212,U+2215,U+FEFF,U+FFFD;
+/* latin-ext */ unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,
+                               U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
+                               U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+```
+
+Per-face descriptors:
+
+| `font-family` | Files | Descriptors |
+|---|---|---|
+| `Archivo` | `archivo-latin*.woff2` | `font-weight: 100 900; font-stretch: 62% 125%; font-style: normal; font-display: swap` |
+| `Inter` | `inter-latin*.woff2` | `font-weight: 100 900; font-style: normal; font-display: swap` |
+| `Chivo Mono` | `chivo-mono-latin*.woff2` | `font-weight: 100 900; font-style: normal; font-display: swap` |
+
+- `src: url("/fonts/….woff2") format("woff2-variations")` — **root-relative, same-origin**. An
+  absolute URL here is a DL-2/S-9 violation and the CSP (`font-src 'self'`) will block it.
+- **The declared descriptor ranges are the file's real ranges, not the design's.** Narrowing
+  `font-weight` to `600 700` would make the browser *synthesize* weights outside it. The design
+  restricts usage; the `@font-face` describes the file.
+- **`wdth 82` is applied at the use site**, in the display tokens: `font-stretch: 82%`. Never
+  `font-variation-settings`, which bypasses the cascade for other axes.
+- **`opsz` needs no declaration.** `font-optical-sizing: auto` is the default, and Inter is only used
+  at 11–18px (§2.3), so the axis is exercised across roughly 14–18 with the axis minimum clamping the
+  rest — which is what §2.1's "`opsz 14–20`" asks for. Do not add `font-variation-settings: "opsz" …`.
+- **No `zero` feature anywhere** (§2.4) — Chivo Mono's plain zero is the default; enabling `zero`
+  would break it.
+
+**Preload exactly two faces** in `index.html`, both `latin`:
+`<link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>` and
+the same for `/fonts/archivo-latin.woff2`. `crossorigin` is **required even same-origin** for font
+preload; without it the browser fetches the file twice. **Chivo Mono is not preloaded** — figures
+appear only once `/api/meta` resolves, so it is not on the first-paint path.
+
+**Coverage note — `latin-ext` is real but almost never fetched.** ✅ Checked against the data: across
+`driver`, `team`, `circuit` and `round` names, **exactly one** string in the whole dataset contains a
+codepoint outside `latin` — one driver's forename (a Czech caron). Circuit, team and round names are
+all within `latin`. So the three `latin-ext` faces (242.4 kB) exist so that **one driver's name is
+spelled correctly**, and `unicode-range` means they are downloaded only on the pages that render it.
+Shipping them is right, preloading them would be wrong, and dropping them would be a visible
+misspelling — the fallback would substitute a system glyph mid-word.
+
+**Licence — `public/fonts/OFL.txt` is mandatory, not a nicety.** The SIL OFL 1.1 requires the licence
+and copyright notices to accompany the fonts in any distribution, and this repository is public. The
+file contains the **full OFL 1.1 text once**, preceded by the three copyright lines exactly as they
+appear in each source package's `LICENSE` (✅ read from all three):
+
+```
+Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
+Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+Copyright 2018 The Chivo Project Authors (https://github.com/Omnibus-Type/Chivo)
+```
+
+A reserved-font-name clause applies: **do not rename the families.** `Archivo`, `Inter` and
+`Chivo Mono` are used unmodified, which keeps us clear of it.
+
+**A font CDN remains forbidden outright** (DL-2, S-9) — including `fonts.googleapis.com`,
+`fonts.gstatic.com`, jsDelivr and unpkg **at runtime**. The `npm pack` above is a one-off developer
+action on a workstation, not a request path; nothing in the shipped application fetches a font from
+anywhere but this origin, and `font-src 'self'` enforces it in the browser.
+
+###### 3.10 Icons — ✅ DECIDED: eleven inline SVGs, **no dependency**
+
+**Verdict (G.4 item 3 / ruling R-7): `lucide-react` is NOT added.** `ARCHITECTURE.md` §10 decision
+**#18**.
+
+- **No dependency** (S-7/S-14) for eleven glyphs.
+- **`lucide-react` is a barrel export over ~1,600 icon modules.** In Vite dev, a barrel import forces
+  the dev server to resolve and transform the whole set on first request — a well-known cold-start
+  cost. The production build tree-shakes it, so this is a developer-experience cost rather than a
+  shipped one, but it is a real cost for zero benefit at this size.
+- **`DESIGN_SYSTEM.md` §2.5's "one set: Lucide" is preserved**, because the geometry *is* Lucide's —
+  we copy the path data rather than redraw it. §2.5's ban on a second icon set is unaffected: new
+  glyphs are added to this same file from this same source. **Never hand-draw an icon.**
+
+**Acquisition — same mechanism as the fonts, no dependency:**
+
+```bash
+cd "$(mktemp -d)" && npm pack lucide-static@1.28.0 && tar xzf lucide-static-1.28.0.tgz
+# glyph geometry is then in package/icons/<kebab-name>.svg
+```
+
+✅ All eleven verified present in `lucide-static@1.28.0` (ISC):
+
+| Design Spec name | Source file |
+|---|---|
+| `Menu` | `icons/menu.svg` |
+| `X` | `icons/x.svg` |
+| `Sun` | `icons/sun.svg` |
+| `Moon` | `icons/moon.svg` |
+| `Monitor` | `icons/monitor.svg` |
+| `Check` | `icons/check.svg` |
+| `ChevronDown` | `icons/chevron-down.svg` |
+| `Database` | `icons/database.svg` |
+| `AlertTriangle` | `icons/alert-triangle.svg` |
+| `RefreshCw` | `icons/refresh-cw.svg` |
+| `ArrowRight` | `icons/arrow-right.svg` |
+
+**`src/components/ui/icons.tsx`** — one shared wrapper, eleven bodies. Copy each source file's child
+elements **verbatim**; change nothing about the geometry.
+
+```tsx
+// Icon geometry from Lucide (lucide-static@1.28.0) — ISC License.
+// Copyright (c) 2026 Lucide Icons and Contributors. Full text: see the notice below.
+export type IconProps = { size?: 16 | 20; className?: string; };
+// <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}
+//      strokeLinecap="round" strokeLinejoin="round" width={size} height={size}
+//      aria-hidden="true" focusable="false"> … </svg>
+```
+
+- **`viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, `strokeLinecap`/`strokeLinejoin`
+  `"round"`** — ✅ read from the source files, which are authored on that 24px grid.
+- **`strokeWidth={1.5}`, overriding Lucide's source `2`.** `DESIGN_SYSTEM.md` §2.5 fixes 1.5px. This
+  is the one intentional deviation from the source file and the only one permitted.
+- **`size` is `16 | 20` only** — a union, not `number`, so an off-scale icon is a **compile error**
+  (§2.5 allows exactly those two sizes).
+- **`aria-hidden="true"` and `focusable="false"` on every icon, always.** Icons never carry meaning
+  alone (§2.5); the accessible name lives on the parent control. An icon-only button therefore needs
+  `aria-label` on the *button* — `ThemeToggle`'s name is specified in Design Spec §5.2.
+- **The full ISC licence text goes in the file header comment**, not in a separate file: ISC requires
+  the notice to accompany the copies, and eleven path strings inside one module are one file's worth
+  of copying. Do not strip it in a "tidy-up" pass.
+- **No `<title>`, no `id`, no `class` from the source files.** Lucide's static SVGs carry a
+  `class="lucide lucide-<name>"` that must be dropped; styling comes from `className`.
+
+---
+
+##### 4. Derived metric definitions
+
+F0 computes no F1 metric — no points, no positions, no pace. `REQUIREMENTS.md` §5.1 and §5.2 are
+therefore not engaged, and **cross-era normalization cannot be got wrong here because nothing is
+aggregated across seasons.** F0's job is to make later normalization possible by shipping
+`coverage` and `latestSeason` from one authority.
+
+Four definitions are nonetheless fixed here because later features inherit them:
+
+| Term | Definition |
+|---|---|
+| **Completed round** | A non-cancelled round with `number IS NOT NULL` whose `type='R'` session has ≥1 `session_entry` row. **Never** "date is in the past" — `REQUIREMENTS.md` §2.2. |
+| **Scheduled rounds** (a season) | `round` rows for that season with `is_cancelled = 0`. Cancelled rounds are counted separately and are never presented as missing results (trap 12). For 2026 this is **22**, not 24. |
+| **Data vintage** | The `date` of the latest completed round — 2026-07-19 today. A property of the data, expressed only in terms of the sport's own calendar. |
+| **Coverage window** | The inclusive `[from, to]` season range in which a data class exists; `to: null` = open through `seasons.latestYear`. Values in §1.7, mirroring `DATABASE.md` §4. |
+
+---
+
+##### 5. Edge cases — decided, not deferred
+
+| # | Case | Required behaviour |
+|---|---|---|
+| E1 | **Database file absent** (fresh clone) | Server starts; console prints §2.7; every `/api/*` → `503 DATABASE_UNAVAILABLE`; client renders `DataUnavailableState`. No stack trace anywhere. |
+| E2 | **Database present but directory not writable** | ✅ `SQLITE_READONLY_DIRECTORY`. Reason `'unreadable'`; console explains the directory must be readable **and writable**; HTTP `503`. |
+| E3 | **File present but not a database** | ✅ `SQLITE_NOTADB` → `'unreadable'` → `503`. Never leak the SQLite message. |
+| E4 | **Valid SQLite, missing tables** | ✅ `no such table: season` → `'schema'` → `503` with the schema-specific console line. |
+| E5 | **Empty `season` table** | `Q_SEASON_RANGE` returns all-NULL → treat as `'schema'` → `503`. `metaSchema` must not be handed nulls. |
+| E6 | **No completed round anywhere** | `latestCompletedRound: null`, `nextScheduledRound` = earliest scheduled. `selectDataVintage` → `null`; `DataVintage` renders its unavailable variant. Cannot occur with today's data; must not crash. |
+| E7 | **Season fully complete** (e.g. 2025) | `isComplete: true`, `nextScheduledRound` points at the next season's R1 if present, else `null`. |
+| E8 | **Partially complete current season** | ✅ The live case: 10 of 22. `isComplete: false`. Future rounds are *scheduled*, never *missing* (trap 13). |
+| E9 | **Cancelled rounds** | ✅ `round.number IS NULL` (§0.3). Excluded from `scheduledRounds`/`completedRounds`, surfaced as `cancelledRounds: 2`, and never selectable as a "latest"/"next" round. Trap 12 + new trap 15. |
+| E10 | **Pre-1996 / pre-2011 / pre-1994 season** | F0 ships the windows; it renders no gated surface. `isSeasonInCoverage(meta,'laps',1975)` must return `false` and is unit-tested. |
+| E11 | **Practice** | Out of scope permanently (trap 2). No `coverage.practice` key exists — the schema makes the feature unrepresentable. |
+| E12 | **`session.has_time_data`** | Never read. Not in any query, not in any schema. Trap 1. |
+| E13 | **Unknown route** (`/nonsense`) | `<NotFound/>` inside the shell — header and nav still work. |
+| E14 | **Unknown API path** | `404 { error: { code: 'NOT_FOUND', … } }` as JSON, not HTML. |
+| E15 | **Non-GET on `/api/meta`** | Falls through to the 404 handler. No mutation route exists anywhere (DL-1). |
+| E16 | **Rate limit exceeded** | `429` + `Retry-After`. Client surfaces `ErrorState` with a retry; TanStack Query does not hammer. |
+| E17 | **Malformed response** (schema drift) | `apiGet` throws `MALFORMED`; `ErrorState`, never a half-rendered view. |
+| E18 | **`localStorage` unavailable / corrupt theme value** | Falls back to `'system'`; toggle still works for the session. |
+| E19 | **`prefers-color-scheme` unsupported** | `resolveTheme('system')` → `'light'`. |
+| E20 | **Teams with no `primary_color`, 1/4-entity comparison, duplicate selection** | N/A to F0 — no entity selection, no charts, no colour resolution. F1 (`teamColor.ts`) and F7 own these. Listed so the omission is explicit, not accidental. |
+| E21 | **Mid-season team change** (two `team_driver` rows) | N/A to F0 — no driver surface. F4/F5. |
+| E22 | **Empty result set from a meta query** | Every meta query has a defined zero-row behaviour: E5, E6, E7. No `undefined` reaches Zod. |
+
+---
+
+##### 6. Performance plan
+
+###### 6.1 Applicable budget
+
+`ARCHITECTURE.md` §8: **API p95 < 50 ms for a non-lap endpoint** and **initial JS bundle
+< 250 KB gzipped**. FCP budgets attach to F2/F3 surfaces, not to F0's shell — but the shell is on
+the critical path of both, so the bundle number is the one that binds F0.
+
+✅ Measured: all four meta queries together **0.937 ms** warm — ~2% of the budget. No risk.
+
+**Two figures exist and they measure different things — do not treat either as a correction of the
+other.**
+
+| Figure | What it includes | Source |
+|---|---|---|
+| **0.937 ms** | The four **prepared** statements executing, warm — i.e. the steady state of every request after the first | mine, §0.2 |
+| **18.01 ms** | **Cold start**: opening the connection, creating the two temp views, *preparing* the four statements, and executing them once | orchestrator, Node 22 |
+
+Both are inside the 50 ms budget, and the second is the one a reader should have in mind for the
+**first** request after a process start; it is paid once per process, not per request. The warm figure
+is the one the p95 budget is measured against, because p95 over any realistic request volume is a warm
+number. **The memo in §6.2 makes even the cold path a once-per-five-minutes event.** Neither figure
+needs re-measuring for F0; T13's job is the bundle, not these.
+
+###### 6.2 Cache strategy
+
+Three layers, cheapest first:
+
+1. **In-process memo** — `server/cache/memo.ts`:
+   ```ts
+   export function memoize<T>(key: string, ttlMs: number, produce: () => T): T;
+   export function invalidateMemo(key?: string): void;   // test-only
+   ```
+   `/api/meta` memoised under `'meta'` for 300,000 ms. This is the DL-4 pattern every later
+   aggregate endpoint reuses, established now on a trivial case.
+2. **HTTP** — `Cache-Control: public, max-age=300`.
+3. **Client** — TanStack Query `staleTime` 5 min, `gcTime` 30 min.
+
+TTL rather than "cache forever": the database is immutable *between* refreshes, and a refresh
+changes exactly what this endpoint reports. Five minutes keeps the vintage indicator honest at no
+measurable cost.
+
+###### 6.3 Downsampling
+
+N/A — F0 touches no lap-scale data. The precedent it must **not** set is an unbounded `lap` query;
+§1.6's query-plan evidence shows the canonical views keep `idx_lap_entry` in play for F3.
+
+###### 6.4 Code-splitting boundary
+
+F0 introduces none, and that is deliberate — splitting an app with two rendered components adds
+waterfall for no gain. The boundary is fixed here so F1/F3 do not invent one:
+
+- **Always in the initial chunk:** `AppShell`, `PrimaryNav`, `ThemeToggle`, `DataVintage`,
+  `lib/*`, `features/meta/*`, router, TanStack Query, **and `framer-motion`** — the F0 motion subset
+  (§1.1, ruling R-1) is in the shell and on the critical path of every route, so it cannot be split
+  out. It is the single largest item in the baseline and the reason the baseline is worth measuring.
+- **`React.lazy` per route from F1 onward**, one chunk per route module.
+- **`recharts` must not appear in the initial chunk**; **`visx` must load only on the race deep
+  dive** (`ARCHITECTURE.md` §8).
+- T13 records the actual gzipped initial-chunk size in this section so F10 has a real baseline
+  rather than an estimate. Record **`framer-motion`'s own share** of it separately (Vite's build
+  output attributes it), because F1 adds the rest of the motion set against this number.
+- **Fonts are not JS and sit outside the 250 KB budget, but they are on the same critical path.**
+  T13 records the first-paint font weight too: **189.3 KB** across the three `latin` faces (§3.9),
+  with the three `latin-ext` faces (242.4 KB) excluded from first paint by `unicode-range` and, on
+  today's data, fetched by exactly one page in the product. Both figures are already known from the
+  vendored files; T13's job is to confirm the built app requests only the `latin` three.
+
+---
+
+##### 7. Unit test list
+
+Vitest. Server and pure-logic tests in the `node` environment; the three component tests in
+`jsdom`. Named exactly as the developer must create them.
+
+**`server/db.test.ts`** — needs `data/f1.db`; skip with a clear message via
+`describe.skipIf(!existsSync(DB_PATH))` so the suite still passes on a machine without it.
+1. opens read-only and answers `SELECT 1`
+2. `getDb()` twice returns the identical handle
+3. `v_entry` and `v_race` exist in `sqlite_temp_master` after bootstrap
+4. `v_race` returns 20 rows for 2024 round 1
+5. `INSERT`/`UPDATE` throws `SQLITE_READONLY`
+6. `CREATE TEMP VIEW` after bootstrap throws (proves `query_only` latched)
+7. a nonexistent path throws `DatabaseUnavailableError` with `reason === 'missing'`
+8. **the thrown error's message contains no absolute path** (S-6 at the source)
+
+**`server/queries/meta.test.ts`** — same skip guard; asserts the ✅ §0.2 values exactly.
+9. season range is `1950 / 2026 / 77`
+10. latest completed round is 2026 R10, `spa`, `2026-07-19`
+11. latest season progress is `22 / 2 / 10`
+12. next scheduled round is 2026 R11 `hungaroring`
+13. **no returned row exposes an integer id** (DL-3) — assert the key sets
+14. **cancelled rounds never appear** as latest or next
+15. `metaSchema.parse` succeeds on the real payload — the outbound contract holds against real data
+
+**`server/schemas/meta.test.ts`** — pure, no database.
+16. accepts the §2.2 fixture
+17. rejects `round: 0` and `round: null` inside `roundRefSchema`
+18. rejects a non-`YYYY-MM-DD` date
+19. accepts `latestCompletedRound: null`
+20. accepts `coverage.*.to === null`
+21. rejects an unknown `coverage` key / missing key
+22. `apiErrorSchema` rejects an unknown error code
+
+**`server/errors.test.ts`**
+23. `ApiError` maps each code to the right status
+24. the error handler turns an arbitrary `Error` into `500 INTERNAL` with the fixed message
+25. **no handler output contains `'/'`-prefixed paths, `SQLITE_`, or the word `select`** — a
+    mechanical S-6 guard over every branch
+26. `DatabaseUnavailableError` → `503 DATABASE_UNAVAILABLE`
+
+**`server/middleware/rateLimit.test.ts`** (fake timers)
+27. allows exactly `max` requests in a window
+28. request `max + 1` returns 429 with `Retry-After`
+29. the window resets after `windowMs`
+30. two different IPs get independent buckets
+31. the map never exceeds `maxTrackedClients`
+
+**`server/cache/memo.test.ts`**
+32. `produce` runs once within the TTL
+33. `produce` re-runs after the TTL
+34. `invalidateMemo` forces a re-run
+
+**`src/features/meta/selectors.test.ts`** — the correctness core. Fixtures: the real payload,
+a complete season, an empty-data payload, a no-completed-round payload.
+35. `selectDataVintage` returns round 10 / `2026-07-19` / "Belgian Grand Prix"
+36. `selectDataVintage` label contains the round name and the formatted date
+37. `selectDataVintage` returns `null` when `latestCompletedRound` is `null`
+38. `selectSeasonOptions` returns 77 years, descending, `[0] === 2026`, last `=== 1950`
+39. `selectDefaultSeason` is 2026 for the real payload
+40. `selectDefaultSeason` falls back to `seasons.latestYear` when no round is completed
+41. `isSeasonInCoverage('laps', 1995)` is `false`; `1996` is `true`; `2026` is `true`
+42. `isSeasonInCoverage('pitStops', 2010)` `false`, `2011` `true`
+43. `isSeasonInCoverage('qualifying', 1993)` `false`, `1994` `true`
+44. `isSeasonInCoverage` honours a closed `to` window
+45. `selectCoverageNotice` returns `null` inside the window and a string outside it
+46. `selectSeasonProgress` is `{10, 22, 10/22}`
+47. `selectSeasonProgress` returns `ratio: 0` — **not `NaN`** — when `scheduled === 0`
+48. every selector is a no-op on repeated calls (no mutation of the input) — deep-freeze the fixture
+
+**`src/lib/theme.test.ts`** — the model is **three-valued** (`light | dark | system`), and every test
+below exercises it as three values, not as a binary with a modifier (ruling R-2).
+49. absent storage → `'system'`, which is what makes a first-time visitor follow
+    `prefers-color-scheme` (an F0 acceptance criterion)
+50. an unknown or corrupt stored value → `'system'` — assert at least `'auto'`, `'Dark'`, `'{}'` and
+    `''`, so a near-miss string is not silently honoured
+51. `resolveTheme` maps **all three** preferences: `'light'` → `'light'`, `'dark'` → `'dark'`, and
+    `'system'` → whatever the `matchMedia` mock reports, verified in **both** directions
+52. `applyTheme` sets `data-theme` on `<html>` to the **resolved** theme — assert it is never set to
+    the literal `'system'`, because the CSS has no such state
+53. `setThemePreference` round-trips **each of the three values** through storage and applies the
+    correct resolved theme for each
+54. a throwing `localStorage` does not throw out of `readThemePreference` **or**
+    `setThemePreference` — the control must still work when persistence cannot
+55. **`public/theme-init.js` uses the same storage key and attribute as `lib/theme.ts`** — read the
+    file and assert, so the two cannot drift
+
+**`src/lib/api.test.ts`** (mocked `fetch`)
+56. valid response → parsed, typed value
+57. `503` with a valid error envelope → `ApiRequestError` with `code: 'DATABASE_UNAVAILABLE'`
+58. `500` with an HTML body → `code: 'MALFORMED'`
+59. a `200` that fails the schema → `code: 'MALFORMED'`
+60. a network rejection → `code: 'NETWORK'`
+
+**`src/lib/format.test.ts`**
+61. `formatIsoDate('2026-07-19')` is stable and locale-independent
+62. an invalid date string returns the input unchanged, never `"Invalid Date"`
+
+**Component tests (jsdom) — seven, still deliberately few.** Rendering is the designer's gate (4)
+and QA's (9); these cover branch logic and **ARIA semantics** that only exist in a tree. Four of the
+seven are `ThemeToggle` keyboard tests, and they exist because ruling R-2 makes it a **composite
+widget** rather than a button: a screenshot cannot show that `↑` moves within a radiogroup or that
+focus returns to the trigger, and those are exactly the things that break silently.
+63. `DataVintage` renders the label for `state='ready'`, a skeleton for `'loading'`, and the
+    unavailable variant for `'unavailable'`
+64. `ThemeToggle` is a **3-option radiogroup popover, not a cycle** (Design Spec §5.2): the trigger
+    exposes `aria-expanded`, activating it renders an element with `role="radiogroup"` and
+    `aria-label="Theme"` containing exactly **three** `role="radio"` options labelled "System",
+    "Light", "Dark", with `aria-checked` true on **exactly one** — the current preference. Assert
+    that repeated activation of the trigger **opens and closes** the popover and never mutates the
+    preference; a click on the trigger must change nothing.
+65. `NotFound` renders inside `AppShell` (nav still present) for an unknown path
+66. `ThemeToggle` **selection**: with the popover open, `↑`/`↓` move `aria-checked`/focus within the
+    group without committing, and `Enter` **and** `Space` each commit the focused option, close the
+    popover and set `document.documentElement.dataset.theme` to the **resolved** theme — assert
+    selecting "System" resolves through the `matchMedia` mock rather than writing `'system'` to the
+    attribute
+67. `ThemeToggle` **dismissal**: `Esc` closes the popover, leaves the preference **unchanged**, and
+    returns focus to the trigger (`document.activeElement` is the trigger element)
+68. `ThemeToggle` **trigger icon reflects the preference, not the resolved theme** — monitor for
+    `system`, sun for `light`, moon for `dark`; assert across all three, with the `matchMedia` mock
+    set to dark, so a test that confuses preference with resolution fails
+69. `ThemeToggle` **accessible name reports both**, per Design Spec §5.2: the trigger's computed name
+    contains the preference *and* the resolved theme (e.g. preference `system` + dark system setting
+    → a name mentioning both "System" and "dark"). Assert on the accessible name, not on inner text.
+
+**Total: 69 tests** (was 65; +4, all `ThemeToggle` keyboard/ARIA, added under ruling R-2 — recorded
+explicitly rather than absorbed).
+
+**Not unit-tested, by design:** chart rendering (none exists), visual appearance, **motion timing and
+easing** — the F0 motion subset (§1.1) is verified at gate 4 by the `designer`, not asserted here,
+because a jsdom assertion on a Motion transition tests the mock and not the product — plus
+`npm run dev` orchestration and real HTTP round-trips. Those are gates 4 and 9. **One motion-adjacent
+exception:** `MotionConfig reducedMotion="user"` and M-7's explicit `useReducedMotion()` are a
+**correctness** requirement, not an aesthetic one, and QA asserts them at gate 9 with
+`prefers-reduced-motion: reduce` emulation.
+
+---
+
+##### 8. Task breakdown
+
+Ordered. Each is independently committable and sized ≤ half a day. Work down the list.
+
+| # | Task | Acceptance |
+|---|---|---|
+| **T1** | **Toolchain baseline on Node 22.** `package.json` with the exact §1.1 ranges plus `"engines": { "node": ">=22.22.0" }`; `.nvmrc` containing `22.23.2`; `tsconfig.json` / `.app.json` / `.node.json` with §3.1 strictness and aliases; `eslint.config.js` (flat config, `typescript-eslint` recommended-type-checked, `no-explicit-any: error`, `no-non-null-assertion: error`); `.prettierrc.json`; `.prettierignore`; `.env.example`; all §3.8 scripts. | **`node -v` reports ≥ v22.22.0 before starting** — if not, stop and ask Rishabh to run the §9.3 command rather than working around it. `npm install` completes with **zero `EBADENGINE` warnings**; `npm audit` reports **`found 0 vulnerabilities`** — there is no permitted exception, so *any* high/critical finding blocks (S-7); `npm run typecheck`, `lint`, `format:check` and `test` all exit 0 on the empty project; lockfile committed. |
+| **T2** | **Schema-reference hygiene.** `db/schema.sql` is committed and public, and currently overreaches its purpose. Reduce it to the **18 application tables of `DATABASE.md` §2 and nothing else**: remove the one table block that is not part of that contract, and remove every comment that describes anything other than the shape and meaning of a column. Correct the header note claiming the public identifier is `api_id` — the application uses **`reference` slugs**, never `api_id` or `id` (DL-3, trap 11, `ARCHITECTURE.md` §10 #13). Fix the `status` cross-reference to point at `docs/DATABASE.md` §3. | The file defines exactly the 18 tables in `DATABASE.md` §2 — no more, no fewer — verified with `sqlite3 :memory: < db/schema.sql` then `.tables`; the extended provenance check in T14 passes; the `CLAUDE.md` §4.1 blocklist grep is clean. |
+| **T3** | **`server/db.ts`, `server/views.ts`, `server/config.ts`.** Readonly connection, `CREATE TEMP VIEW` bootstrap of the §6.1 DDL, sentinel check, `PRAGMA query_only = 1`, `DatabaseUnavailableError` mapping, `probeDatabase()`. | Tests 1–8 pass; `v_race` returns 20 rows for 2024 R1; a write throws; a `CREATE TEMP VIEW` after bootstrap throws; the thrown error message contains no absolute path. |
+| **T4** | **`server/schemas/*` + `server/coverage.ts` + `server/errors.ts`.** The §2.2 Zod schemas with `z.infer` types, the §1.7 constants, the §2.3 error envelope and codes. | Tests 16–26 pass. `server/schemas/*` imports **only** `zod` — verify with `grep -n "^import" server/schemas/*.ts`. |
+| **T5** | **`server/queries/meta.ts` + `server/cache/memo.ts`.** The four §1.3–§1.6 statements as named exports of prepared statements, plus the memo helper. | Tests 9–15 and 32–34 pass; the returned values equal §0.2 exactly. |
+| **T6** | **`server/app.ts` + `server/routes/meta.ts` + `server/middleware/rateLimit.ts`.** `secureHeaders` per §2.4, no CORS middleware (with the explanatory comment), rate limiter, `onError`, `notFound`, the `GET /api/meta` handler with outbound `metaSchema.parse` and `Cache-Control`. | `curl -i localhost:8787/api/meta` returns the §2.2 JSON with `content-security-policy`, `x-content-type-options: nosniff`, `x-frame-options: DENY`, `referrer-policy: no-referrer`, `cache-control: public, max-age=300` and **no** `access-control-allow-origin`; `curl /api/nope` → JSON 404; `curl -X POST /api/meta` → JSON 404; tests 27–31 pass. |
+| **T7** | **`server/index.ts` + `npm run dev`.** Startup probe with the §2.7 console output, `serve()` on `PORT`, `concurrently` wiring, Vite `/api` proxy. | One `npm run dev` starts both; `/api/meta` is reachable from the client origin; with `F1_DB_PATH=/tmp/nope.db` the console prints the §2.7 block (no stack trace) and `/api/meta` returns `503 DATABASE_UNAVAILABLE`. |
+| **T8** | **Vite + React 19 + Tailwind v4 shell boot, fonts, and the motion root.** `vite.config.ts` (React plugin, `@tailwindcss/vite`, aliases mirroring tsconfig, `/api` proxy, `test` block), `index.html`, `src/main.tsx` wrapping the tree in **`<MotionConfig reducedMotion="user">`**, `src/styles/index.css` with the §3.6 `@custom-variant`, plus **the six vendored `woff2` files, `public/fonts/OFL.txt` and `src/styles/fonts.css` exactly per §3.9**, and the minimal `src/lib/motion.ts` token set (§1.1). | `npm run dev:web` serves a page; a Tailwind utility class visibly applies; `@/`, `@server/`, `@schemas/` resolve in both `tsc` and Vite; `npm run build` succeeds. **Fonts:** the six `sha256` values in §3.9 match the committed files (`shasum -a 256 public/fonts/*.woff2`); `public/fonts/OFL.txt` is present with all three copyright lines; the network panel shows the **three `latin` faces only** on a page of ASCII text, all served from **this origin**; **no request to any font host appears in a hard-reloaded network panel filtered to `Font`** — that is the check, not a reading of the code. |
+| **T9** | **Client data layer.** `lib/queryClient.ts`, `lib/api.ts`, `lib/format.ts`, `features/meta/useMeta.ts`, `features/meta/selectors.ts`. | Tests 35–48 and 56–62 pass; `apiGet` rejects an absolute URL **at compile time** (add a `// @ts-expect-error` case in the test file to prove it). |
+| **T10** | **Router + placeholder routes.** `App.tsx` with all 11 `ARCHITECTURE.md` §5 routes plus `*`, `RootLayout` including **M-2** route-content enter keyed on `location.pathname` with **no exit variant**, and the placeholder route components echoing their params. | Every route in §5 renders on **direct entry** (not just client navigation); `/nonsense` renders `NotFound`; no placeholder issues a network request (verify: empty network tab beyond `/api/meta`); navigating between two routes plays M-2 once and **does not** hold the outgoing view (no exit variant means no `AnimatePresence` exit — a route change must never delay content). |
+| **T11** | **App shell + theme + icons + shell motion.** `AppShell`, `Header`, `PrimaryNav`, `ThemeToggle`, `lib/theme.ts`, `public/theme-init.js`, **`src/components/ui/icons.tsx` exactly per §3.10**, and motions **M-1, M-3, M-4, M-5, M-6** plus **M-11** (CSS). `ThemeToggle` is a **3-option radiogroup popover** (Design Spec §5.2) — **not** a cycle. Visual treatment strictly per the Design Spec. | Toggle persists across reload; with no stored preference the OS setting is honoured **on first paint** (no flash) — and the `public/theme-init.js` tag in `<head>` carries **no `defer`, no `async` and no `type="module"`**, since a module script is deferred by specification and would still flash (`DESIGN_SYSTEM.md` §10); tests 49–55, 64 and 66–69 pass; **zero CSP violations in the Vite dev-server console** (`npm run dev`) — this is the **dev** half of the pair in §2.4, and it does **not** discharge T13; the eleven icons render at 16/20px in `currentColor` with a 1.5px stroke and `src/components/ui/icons.tsx` carries the ISC notice. |
+| **T12** | **Data-vintage indicator (NV-9) + shell states.** `DataVintage`, `LoadingState`, `ErrorState`, `DataUnavailableState`, wired through `Header` → `useMeta` → `selectDataVintage`, with **M-7** (skeleton pulse, gated on an explicit `useReducedMotion()` — `MotionConfig` does not stop an opacity loop) and **M-8** (skeleton → content crossfade). | The indicator shows the ✅ verified vintage (2026 R10, Belgian Grand Prix, 19 Jul 2026); its copy names **no source of any kind**; pointing `F1_DB_PATH` at a missing file renders `DataUnavailableState` with a `503` in the network tab and no stack trace on screen; tests 63 and 65 pass; with `prefers-reduced-motion: reduce` emulated the skeleton pulse **stops** rather than merely slowing. |
+| **T13** | **Production serving + measurement.** `serve-static` for `dist/` with SPA fallback from a fixed root, `NODE_ENV=production` path, CSP verified against the real build. | `npm run build && npm run start` serves the app on one origin; **zero CSP violations in the production-preview console** — the **build** half of the §2.4 pair, and the only evidence on which the `styleSrcAttr` allowance may be removed (remove it, re-verify both consoles, and if removal breaks **dev** only, adjust the dev server, not the policy); the gzipped initial-chunk size **and `framer-motion`'s share of it** are measured and written into §6.4; the network panel confirms the built app requests only the three `latin` font faces from this origin. |
+| **T14** | **Documentation edits (ship in this PR).** `docs/DATABASE.md`: add **trap 15**, annotate §6.1 with how the views are created, extend §9 to cover `server/coverage.ts` **and the two-direction trap-15 check** (a NULL count alone cannot detect a numbered cancelled round). `README.md`: setup, the Node requirement, the scripts, and the fact that `data/f1.db` is supplied separately — stated in exactly that much detail and no more. Exact text in §9.1. | `docs/` and code agree; the `CLAUDE.md` §4.1 blocklist grep is clean; **and** a line-by-line read of every file this PR touches confirms none of them describes anything beyond the shape and meaning of the data — the grep is a floor, not the standard (`PLAN.md` §2.4). A reader can go from a fresh clone to a running app from the README alone. |
+
+**14 tasks.** T1–T7 are server-side and unblock nothing visual; T8–T13 need the Design Spec (gate 2)
+in place. T2 and T14 are doc hygiene and can be done at any point — T2 early, since it removes a
+live provenance exposure in a committed file.
+
+---
+
+##### 9. Document impact, escalations, open questions
+
+###### 9.1 Documentation edits the developer must make
+
+**`docs/DATABASE.md` §7 — append trap 15:**
+
+> | 15 | Cancelled rounds have `round.number IS NULL` | All `is_cancelled = 1` rounds (2 rows, both 2026) carry a NULL `number`, so `ORDER BY r.number` sorts them **first** and they are not addressable by round number. Every round-number query needs `AND r.number IS NOT NULL`. A season's numbered-round count is `max(number)`, not `count(*)` — 2026 has 24 `round` rows but 22 numbered rounds. **On the data as it stands the equivalence is exact in both directions** — 0 rounds are cancelled-and-numbered, 0 are uncancelled-and-unnumbered, and `is_cancelled` is non-NULL on all 1,173 rows — so `AND r.number IS NOT NULL` excludes **exactly** the cancelled rounds and a redundant `AND r.is_cancelled = 0` is unnecessary. **Nothing in the schema enforces this**, so verify it after every refresh (§9) before relying on the number filter alone. |
+
+**`docs/DATABASE.md` §6.1 — replace "Create as SQL views (or as the single source-of-truth query
+builders):" with:**
+
+> Created as **`CREATE TEMP VIEW`** at connection bootstrap (`server/views.ts`), because the
+> connection is opened read-only. The DDL below is the authority; the code mirrors it verbatim.
+> After the views are created the connection latches `PRAGMA query_only = 1`. See
+> `ARCHITECTURE.md` §10 #7.
+
+**`docs/DATABASE.md` §9 — add to the post-refresh checklist:**
+
+> 5. Re-verify `server/coverage.ts` against §4.
+> 6. Re-verify **trap 15 in both directions** — a NULL count alone is not enough, because it cannot
+>    detect a *numbered* cancelled round appearing, which would silently downgrade
+>    `AND r.number IS NOT NULL` from a complete filter to a partial one:
+>
+>    ```sql
+>    SELECT (SELECT count(*) FROM round WHERE is_cancelled = 1 AND number IS NOT NULL) AS cancelled_but_numbered,
+>           (SELECT count(*) FROM round WHERE is_cancelled = 0 AND number IS NULL)      AS numbered_gap,
+>           (SELECT count(*) FROM round WHERE is_cancelled IS NULL)                     AS cancelled_unknown;
+>    ```
+>
+>    **All three must be 0.** The third is not optional: if `is_cancelled` were ever NULL, the second
+>    count would skip those rows and appear to pass. If any is non-zero, every round-number query
+>    must add `AND r.is_cancelled = 0` and trap 15's text must be corrected before shipping.
+
+**`ARCHITECTURE.md`** — **I have already made these edits** (§2 stack table, §2.1 Node floor, §3 new
+layering rules, §7 CORS/CSP notes, §9 layout, §10 decisions 7–16). The developer must not re-edit
+them; the `reviewer` should check code against them.
+
+###### 9.2 Dependencies — all resolved
+
+| Package | Status |
+|---|---|
+| **`@hono/node-server` `^2.1.0`** | ✅ **Approved by Rishabh, 2026-08-04.** Now listed in `ARCHITECTURE.md` §2 as a first-class stack choice. Hono is runtime-agnostic and ships no Node adapter, so decision 2 ("Hono on Node") is unimplementable without it; it also supplies `conninfo` (the S-13 per-IP key) and `serve-static`. §10 #8. |
+| `tsx` | Dev only — runs the TypeScript server in watch mode without a build step. |
+| `concurrently@^10` | Dev only — `npm run dev` must start client + API together (an F0 acceptance criterion). |
+| `@vitejs/plugin-react`, `@tailwindcss/vite`, `@types/*`, `@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `globals`, `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@vitest/coverage-v8` | First-party companions to choices already in §2. Listed for completeness. |
+| ~~`hono-rate-limiter`~~ | **Rejected — stands.** ~30 lines in-process instead. §10 #9. |
+| ~~`@testing-library/jest-dom`~~ | **Rejected — stands.** Vitest's `expect` covers F0's component tests. (The Node ≥22 engine objection no longer applies, but the dependency is still unnecessary, and S-7/S-14 favour the smaller tree.) |
+| ~~`@fontsource-variable/{archivo,inter,chivo-mono}`~~ | **Rejected 2026-08-04 — decided, not deferred.** The three `woff2` pairs are **vendored** into `public/fonts/` instead, with the exact acquisition procedure and `sha256` values in **§3.9**. §10 #17. Decisive reasons were stable preload URLs and family names matching the design tokens, not tree size — the packages carry no dependencies and no install scripts. |
+| ~~`lucide-react`~~ | **Rejected 2026-08-04.** Eleven inline SVGs in `src/components/ui/icons.tsx`, geometry copied from `lucide-static@1.28.0` under ISC with the notice retained — **§3.10**. §10 #18. `DESIGN_SYSTEM.md` §2.5's "one set, and never a second" is preserved because the geometry is still Lucide's. |
+
+No dependency in this spec is now unapproved, **and F0 adds no dependency for fonts or icons.** Both
+of the `designer`'s flagged items (Design Spec open question 6) are resolved as *no new dependency*,
+so §1.1 is the complete and final F0 dependency set.
+
+###### 9.3 ✅ RESOLVED — Node 22 LTS approved; the security exception is deleted, not managed
+
+The React Router advisory `GHSA-qwww-vcr4-c8h2` was the reason to escalate. Rishabh approved raising
+the runtime to fix it at the root. Evidence across all three configurations tested:
+
+| Runtime | `react-router` | `npm audit` |
+|---|---|---|
+| Node 20.18.2 | `≤ 7.17.0` | **14 high** (range `6.0.0 – 7.17.0`) |
+| Node 20.18.2 | `7.18.2` (latest v7) | **1 high** — `GHSA-qwww-vcr4-c8h2` |
+| **Node ≥ 22.22.0** | **`8.3.0`** | ✅ **`found 0 vulnerabilities`** |
+
+The dated S-7 exception previously drafted into `ARCHITECTURE.md` §7.1 has been **removed**, along
+with the `7.18.2` pin. There is no security exception in this codebase, and S-7 now reads plainly:
+`npm audit` must be clean of high/critical, full stop. That is a materially better position than
+carrying a justified-but-live advisory — an exception is a thing future contributors must keep
+re-reasoning about.
+
+**The runtime floor is `>= 22.22.0`**, set by `react-router@8.3.0`'s own `engines`. It also satisfies
+`eslint@10`'s `^22.13.0`. Verification of the whole tree against it is in §0.1.
+
+**✅ Node 22 is now installed — Rishabh ran this, and precondition P-1 is cleared.**
+
+```bash
+nvm install 22.23.2 && nvm alias default 22.23.2 && node -v   # → v22.23.2 ✅
+```
+
+✅ Confirmed: **v22.23.2**, npm **10.9.8**, `default -> 22.23.2`. `/opt/homebrew/opt/node@22` is still
+a mislabelled keg containing v23.7.0 and is still not to be used. **A shell started before the install
+keeps v20.18.2** — see the warning in §0.1 before concluding Node 22 is missing.
+
+A repo-local `.nvmrc` containing `22.23.2` is added by **T1** so the version is discoverable rather
+than tribal, alongside `"engines": { "node": ">=22.22.0" }` so `npm` enforces it mechanically.
+
+**One correction to the approved list — `typescript` stays `~5.9.3`, not 7.** TypeScript 7 is a hard
+`ERESOLVE` failure against `typescript-eslint@8.66.0`, whose peer range is `>=4.8.4 <6.1.0`; there is
+no published v9 and the canary caps identically. Full evidence in §0.1. Dropping `typescript-eslint`
+is not an option because `ARCHITECTURE.md` §2 makes `any` a review failure, which needs type-aware
+rules. Everything else on the approved list verified good: Vite 8, ESLint 10,
+`@vitejs/plugin-react` 6, `typescript-eslint` 8.66, `concurrently` 10, React Router 8.3.0.
+
+**`better-sqlite3` remains the driver.** `node:sqlite` becomes available on Node 22 and is now a
+legitimate future option, but switching is **out of scope for F0** and is recorded as a future
+consideration only — `ARCHITECTURE.md` §10 #16. Nothing in this spec acts on it.
+
+###### 9.4 Open items
+
+1. ✅ **Node version — CLOSED.** Approved, specced (§9.3) and **installed**: v22.23.2 / npm 10.9.8,
+   `better-sqlite3` builds and loads on it, `npm audit` clean, and the §10 #7 temp-view behaviours
+   re-probed on the target runtime (§0.1). Gate-3 precondition P-1 is cleared.
+2. ✅ **`@hono/node-server`** — approved; now in `ARCHITECTURE.md` §2 (§9.2).
+3. **`private/provenance-blocklist.txt` is too narrow — Rishabh is extending it himself.** It returns
+   `clean` on `db/schema.sql` as committed today, even though that file says more than its purpose
+   requires; that is why T2 exists as a hand-written task rather than being caught by the gate. Per
+   instruction I have supplied the offending vocabulary **to the `orchestrator` in conversation only**
+   and have written it into **no file, tracked or untracked**. T2 is unchanged.
+4. **`REQUIREMENTS.md` §2.2 / §2.5 "24 rounds scheduled" for 2026** — a numbered **CR is being
+   opened** for this; it is not mine to edit. ✅ The data holds 24 `round` rows but **22 numbered
+   rounds**, 2 cancelled with NULL numbers (§0.3). §2.5's "results through R10" is correct. T14
+   (trap 15) stays as specced and the CR will reference it.
+5. **Deployment.** The database's directory must be **writable** by the server process (§0.6, E2) —
+   SQLite needs to create its WAL sidecars even to read. Not an issue in dev; it will be on a
+   read-only container filesystem. Recorded in §10 #12; no action until there is somewhere to deploy.
+
+###### 9.5 Confirmed clean
+
+Provenance grep (`CLAUDE.md` §4.1) run against the working tree with this spec in place:
+
+```
+$ grep -rniE -f private/provenance-blocklist.txt . \
+    --exclude-dir=node_modules --exclude-dir=private --exclude-dir=data --exclude-dir=.git
+clean
+```
+
+###### 9.6 Specified for **F1**, not F0 — `scripts/validate-palette.mjs`
+
+**Verdict (G.4 item 4): accepted, and it belongs in F1.** `ARCHITECTURE.md` §10 decision **#19**.
+The `orchestrator` has already added the F1 scope bullet and acceptance criterion; **this subsection
+is the technical shape only** and F0 implements none of it. It lives here because it is a
+`principal-engineer` decision and there is no F1 Technical Spec yet to hold it — **F1's
+`principal-engineer` gate must lift it into that spec rather than rediscover it.**
+
+**Why it is an architectural commitment and not a convenience script.** `DESIGN_SYSTEM.md` §9.1
+requires a re-run whenever a colour moves, and every figure in §9.2 — including the four measured
+brand-colour FAILs that `ARCHITECTURE.md` §10 #6 rests on — was produced by a validator that exists
+only in the `designer`'s working directory. Until it is in the repository, **the `reviewer` cannot
+falsify a colour claim**, which makes §9.1's requirement unenforceable and §10 #6 unauditable. That
+is a governance gap, not a missing tool.
+
+| Property | Specification |
+|---|---|
+| **Path** | `scripts/validate-palette.mjs` — plain ESM, run directly by Node ≥22 |
+| **Dependencies** | **Zero.** §9.1 is pure arithmetic: matrix multiplies, a cube root, and CIEDE2000's piecewise formula. No `culori`, no `chroma-js`, no `colorjs.io` — a dependency here would mean the validator and the product disagree about which implementation is authoritative |
+| **Network / writes** | None of either. It reads files and writes stdout. It must not write a report file, because a checked-in report drifts from the code that produced it |
+| **Input — colours** | `src/styles/tokens.css`, parsed with a regex over `--name: <value>;` custom-property declarations. **No CSS parser**: the token file is a flat list by construction, and that constraint is cheaper to keep than a parser is to add. **One source of truth** — the validator must never carry its own copy of a hex value, or it will pass while the product is wrong |
+| **Input — runs** | `scripts/palette-runs.json` — a declarative manifest, one entry per §9.2 run: `{ id, description, mode: 'light'\|'dark'\|'both', tokens: string[], gates: string[], expect: { … } }`. Adding a run is a data edit, not a code edit |
+| **Args** | `--run=<id>` (default: all) · `--mode=light\|dark\|both` · `--json` · `--list` |
+| **Output** | Human-readable table to stdout: per run, per pair — CIEDE2000 (normal + protan/deutan/tritan, **worse of the two models**), OkLCh L and C, WCAG ratio, and PASS/WARN/FAIL against the §9.1 floors. `--json` emits the same data machine-readably for the `reviewer` to diff |
+| **Exit codes** | **`0`** every run matches its recorded `expect` · **`1`** a regression — a gate now fails that previously passed, **or** a recorded FAIL silently became a PASS (an unexplained improvement is also a drift and must be looked at, not swallowed) · **`2`** usage or input error: unknown run id, a token named in the manifest but absent from the CSS, an unparsable colour value |
+| **Reproduction floor** | Must reproduce every §9.2 figure to **±0.01**. `DESIGN_SYSTEM.md` §9.2's calibration run **V-1** is the regression test for the validator itself, and it must stay in the manifest permanently |
+| **Script** | `"validate:palette": "node scripts/validate-palette.mjs"`. **Not** wired into `npm test` — it asserts against design decisions, not code, and a token change should fail with a colour report, not a test stack trace. F1 decides whether CI runs it separately |
+
+**Two correctness requirements F1 must not skip**, because a validator that is confidently wrong is
+worse than none:
+
+1. **Known-answer tests for the colour maths**, against published reference data rather than against
+   itself: the **Sharma, Wu & Dalal CIEDE2000 test dataset** (34 pairs with published ΔE values) for
+   CIEDE2000, and the trivial WCAG anchors (`#FFF`/`#000` = 21:1, identical colours = 1:1). Reproducing
+   §9.2 proves consistency with the `designer`'s implementation; it does **not** prove either is right.
+2. **The two CVD models must be separately assertable**, and the script must report which model
+   produced the reported figure. §9.1 mandates "the worse of the two", and V-1 already records that
+   Viénot and Machado disagree materially on tritanopia (4.62 vs 3.49 on one pair). A script that
+   silently blends them, or reports the mean, breaks the recorded method.
+
+**Not in scope for the script:** deciding tokens, generating palettes, or proposing fixes. It measures
+and it exits non-zero. The `designer` owns what to do about a FAIL.
+
+#### **Design Spec** — `designer`, 2026-08-04
+
+> Every colour, contrast and CVD figure quoted here was **computed** with the validator described in
+> `docs/DESIGN_SYSTEM.md` §9.1 and recorded run-by-run in §9.2 — including a calibration run that
+> reproduces the original §3.2 measurements. Every font claim was read out of the shipped font
+> binary. Every motion pattern names the Framer Motion documentation page and example it derives
+> from. Nothing here is from memory.
+
+**Companion:** `docs/DESIGN_SYSTEM.md` is now complete for everything F0 touches — §1 intent, §2
+typography, §3.4 exact semantic steps, §3.5 surfaces/ink/borders/focus, §4 motion, §5
+spacing/radii/breakpoints/elevation, §7.0–§7.6 shell components and states, §8 accessibility, §9
+validation record, §10 theming mechanics. **This spec does not restate token values** — it says which
+token goes where. If the two disagree, `DESIGN_SYSTEM.md` wins and this section is the defect.
+
+---
+
+##### 1. What F0 looks like, in one paragraph
+
+Neutral, dense, quiet chrome — a 56px header rule, an achromatic nav, mono figures — so that when
+team colour arrives in F2 it is the loudest thing on the screen. Display type is condensed Archivo;
+body is Inter at 13–14px; every figure is Chivo Mono and tabular. Dark mode is the one that will get
+screenshotted. Nothing in the shell is coloured except the four status washes, and the only one F0
+uses is `critical`.
+
+---
+
+##### 2. Layout
+
+###### 2.1 Shell anatomy
+
+```
+┌─ header ── 56px · --surface-raised · 1px --border-subtle bottom · --elev-1 ────────────┐
+│ [skip link]  F1 ANALYTICS      Season Drivers Teams Circuits Compare Records   ● R10  ☾│
+│                                ────────                                                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ main#main ── --surface-canvas ── max-width 1440, centred ─────────────────────────────┐
+│  <Outlet/>                                                                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ footer ── --surface-canvas · 1px --border-subtle top ─────────────────────────────────┐
+│  Complete results through 2026 Round 10 · Seasons 1950–2026                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Element | Spec |
+|---|---|
+| Header | height **56px at every breakpoint**; `--surface-raised`; 1px `--border-subtle` bottom border; **no shadow in either theme** (`--elev-1`); `position: sticky; top: 0; z-index: 30` |
+| Header inner | max-width 1440, centred, padding-x `4`/`6`/`8` (16 / 24 / 32) at base / `md` / `xl` |
+| Wordmark | `--display-xs`, Archivo 700 `wdth 82`, `--ink-primary`, tracking +0.02em, links to `/` |
+| Nav | `--text-sm` at `md`, `--text-base` at `lg`+; Inter 500; inactive `--ink-tertiary`, active `--ink-primary`; each item is 56px tall (full header height) so the hit area is generous; gap `3` at `md`, `6` at `lg`+ |
+| Active rule | 2px `--ink-primary`, flush to the header's bottom edge, width = label width, moved by `layoutId` (M-3) |
+| Right cluster | `DataVintage` then `ThemeToggle`, gap `2` |
+| Main | `--surface-canvas`; max-width 1440, centred; padding-x as header; padding-y `6`/`8`/`12` |
+| Footer | `--text-xs`, `--ink-tertiary`, padding-y `6`, 1px `--border-subtle` top, same max-width and padding-x |
+
+###### 2.2 Responsive behaviour
+
+| Breakpoint | Header | Nav | `DataVintage` | Main |
+|---|---|---|---|---|
+| **390 (base)** | wordmark · vintage dot · theme · menu button (all 44×44 hit areas) | **in a sheet** (M-4), full-width, drops from under the header, one item per row at `--text-md`, 48px rows, active item gets a 2px leading rule instead of an underline | dot + `R10` only; tapping opens the same popover, anchored to the trigger, `max-width: calc(100vw - 32px)` | single column, padding-x 16 |
+| **768 (md)** | wordmark · full nav · vintage · theme | inline, `--text-sm`, gap `3` | dot + `2026 · R10` | padding-x 24 |
+| **1440 (xl)** | as above, roomier | inline, `--text-base`, gap `6` | dot + `2026 · R10` | max-width 1440, padding-x 32 |
+
+Nav order is the route order: **Season · Drivers · Teams · Circuits · Compare · Records** (`/`,
+`/drivers`, `/teams`, `/circuits`, `/compare`, `/records`). No nav entry for `/seasons/:year` or
+`/seasons/:year/races/:round` — those are reached from Season. No dead controls: the global search
+and the app-wide season selector are **F9** and are simply absent in F0, not present-and-disabled.
+
+###### 2.3 F0 route placeholders
+
+Every route resolves to a designed placeholder, because QA and the design verification pass will
+screenshot all eleven. Anatomy, left-aligned in `main`:
+
+```
+SEASON HUB                                   ← --text-2xs, uppercase, --ink-tertiary
+2026 Season                                  ← --display-lg, --ink-primary
+This surface ships in F2.                    ← --text-md, --ink-secondary
+year 2026                                    ← mono chips: --surface-sunken, --radius-sm,
+                                               --font-mono --text-xs, resolved params
+```
+
+`NotFound` uses the `404` StateCard from `DESIGN_SYSTEM.md` §7.4 rather than the placeholder shape.
+
+---
+
+##### 3. Component inventory
+
+Names match the `principal-engineer`'s §3.5 component tree exactly.
+
+| Component | New / reused | Design source | Notes |
+|---|---|---|---|
+| `AppShell` | new | §2.1 above | header + `main#main` + footer + skip link |
+| `Header` | new | §2.1 | sticky, composes the three below |
+| `PrimaryNav` | new | §2.1–2.2, motion M-3/M-4 | inline at `md`+, sheet at base |
+| `ThemeToggle` | new | §4.2 below | **an icon button that opens a 3-option radio popover**, not a 2-state flip — `lib/theme.ts` already models `light \| dark \| system`, and a binary control cannot express `system` |
+| `DataVintage` | new | §4.1 below, `DESIGN_SYSTEM.md` §7.3 | three variants, one per `state` prop |
+| `LoadingState` | new | `DESIGN_SYSTEM.md` §7.4, §7.5 | skeleton geometry, never a bare spinner |
+| `ErrorState` | new | `DESIGN_SYSTEM.md` §7.4 | `critical` icon tile, retry, mono code chip |
+| `DataUnavailableState` | new | `DESIGN_SYSTEM.md` §7.4 | full copy in §5.3 below |
+| `Button` | new | `DESIGN_SYSTEM.md` §7.1 | F0 needs `primary`, `secondary`, `ghost` only; `danger` may wait for F1 |
+| `Badge` | new | `DESIGN_SYSTEM.md` §7.2 | F0 needs `neutral` and the mono value form only |
+| `SkipLink` | new | §6 below | visually hidden until focused |
+| `RoutePlaceholder` | new (F0-only) | §2.3 | deleted feature by feature as real surfaces land |
+
+**Reused: nothing** — F0 is the first UI. **Deferred to F1 by design:** `EmptyState`,
+`NoCoverageState`, `Select`, `Tabs`, `Card`, `Table`, `Tooltip`, driver/team avatars, chart
+primitives. Their visual design is already written in `DESIGN_SYSTEM.md` §7 so F1 implements rather
+than invents.
+
+**Files the developer creates for tokens and motion:**
+
+| File | Contents |
+|---|---|
+| `src/styles/tokens.css` | Tailwind v4 `@theme` block for the type scale, spacing subset, radii and durations; then `:root { … }` and `[data-theme="dark"] { … }` blocks for the semantic colour layer. Imported by `src/styles/index.css` after `@import "tailwindcss"`. |
+| `src/lib/motion.ts` | `dur`, `ease`, `spring`, `stagger` exactly as `DESIGN_SYSTEM.md` §4.3, plus the F0 variants (`shellMount`, `routeEnter`, `popover`, `sheet`, `control`, `skeletonPulse`). Complete set lands in F1. |
+| `public/fonts/*.woff2` + `public/fonts/OFL.txt` | §8 below |
+
+**No hard-coded colour, duration, font-size or spacing value may appear outside these two files.**
+That is a review criterion from F0 onward, not from F1.
+
+---
+
+##### 4. Charts
+
+**None.** F0 ships no chart and no chart primitive. Any chart appearing in an F0 PR is out of scope.
+Recharts and visx are not imported in F0.
+
+---
+
+##### 5. The two bespoke shell components
+
+###### 5.1 `DataVintage` — the data-currency indicator (NV-9)
+
+Full design in `docs/DESIGN_SYSTEM.md` §7.3. The binding decision, restated because it is a release
+blocker if got wrong:
+
+> **Currency is expressed as coverage, never as a fetch event.** "Complete results through Round 10
+> of 22" is a fact about the sport's calendar. "Updated 12 days ago" is a fact about a process, and it
+> invites exactly the question this repository must never answer (`CLAUDE.md` §4.1). Coverage phrasing
+> is also the more honest one: `REQUIREMENTS.md` §2.2 warns the newest round may lag reality, and
+> coverage phrasing states what is true without claiming to know today's calendar position.
+
+| `state` | Rendering |
+|---|---|
+| `loading` | a 92×20 skeleton block (`--surface-sunken`, `--radius-sm`, M-7). The header must not reflow when it resolves, so the skeleton is the same width as the resolved chip. |
+| `ready` | `ghost` trigger, 28px tall, `--radius-md`: an 8px `--radius-full` dot in `--ink-tertiary` — **static, never pulsing** (`DESIGN_SYSTEM.md` §4.5) — then `--font-mono` `--text-xs` `--ink-secondary`: `2026 · R10` |
+| `unavailable` | the dot only, in `--border-control`, with `aria-label="Data coverage unavailable"`. No error colour: at header scale a red dot reads as a site-wide fault when the actual failure is already stated in `main`. |
+
+Popover: `--elev-2`, `--surface-overlay`, `--radius-xl`, max-width 320, padding `4`, M-5, anchored to
+the trigger's right edge, `Esc` and outside-click dismiss, focus returns to the trigger.
+
+**Copy — every value from `GET /api/meta`, nothing hardcoded.** Verified values in parentheses.
+
+| Slot | String |
+|---|---|
+| Trigger | `{year} · R{round}` → **"2026 · R10"** |
+| Trigger accessible name | "Data coverage: {year} season, {completedRounds} of {scheduledRounds} rounds complete. Show detail." |
+| Popover heading (`--text-2xs`, uppercase, `--ink-tertiary`) | "DATA COVERAGE" |
+| Line 1 (`--text-sm`, `--ink-primary`) | "Complete results through Round {round} of {scheduledRounds} — {roundName}, {date}." → **"Complete results through Round 10 of 22 — Belgian Grand Prix, 19 Jul 2026."** |
+| Line 2 (`--text-sm`, `--ink-secondary`) — omit when `isComplete` | "Rounds {round+1}–{scheduledRounds} are scheduled and have no results yet." → **"Rounds 11–22 are scheduled and have no results yet."** |
+| Line 3 (`--text-sm`, `--ink-secondary`) — omit when `cancelledRounds === 0` | "{cancelledRounds} rounds on the {year} calendar were cancelled." → **"2 rounds on the 2026 calendar were cancelled."** _(trap 12, surfaced rather than hidden)_ |
+| Line 4 (`--text-xs`, `--ink-tertiary`) | "Seasons available: {firstYear}–{latestYear}." → **"Seasons available: 1950–2026."** |
+| Footer echo (plain text, no interaction) | "Complete results through {year} Round {round} · Seasons {firstYear}–{latestYear}" |
+
+The selector strings in the technical spec §3.4 are adopted with final wording:
+
+- `DataVintage.label` → **"Complete results through 2026 Round 10 — Belgian Grand Prix, 19 Jul 2026"**
+- `DataVintage.progressLabel` → **"10 of 22 rounds complete"**
+
+Dates render as `D MMM YYYY` (`19 Jul 2026`) through `lib/format.ts` — never a locale-dependent call.
+
+**Banned from this component, its props, its tests, its fixtures and its comments:** any word naming
+or describing where data came from, and any word for a refresh/import mechanism. "Coverage",
+"complete", "scheduled", "available" are the vocabulary.
+
+###### 5.2 `ThemeToggle`
+
+| Part | Spec |
+|---|---|
+| Trigger | 32×32 icon button (`ghost`), 44×44 hit area on touch, `--radius-md`. Icon reflects the **preference**: monitor = `system`, sun = `light`, moon = `dark` |
+| Accessible name | "Theme: {preference} (currently {resolved}). Change theme." → "Theme: System (currently dark). Change theme." |
+| Popover | `--elev-2`, `--radius-xl`, width 200, padding `1.5`, M-5, `role="radiogroup"`, `aria-label="Theme"` |
+| Options | three rows, 36px tall, `--radius-md`, `--text-base`: leading 16px icon, label, trailing 16px check on the selected one. Selected row = `--ink-primary` label + `--surface-sunken` fill (never a hue) |
+| Labels | "System" · "Light" · "Dark" |
+| Keyboard | `Enter`/`Space` opens; `↑`/`↓` move within the group; `Enter`/`Space` selects and closes; `Esc` closes; focus returns to the trigger |
+| Theme change | M-11 only — a `dur.base`/`ease.move` transition on `background-color` and `color`. Nothing moves, nothing scales, no custom-property transition |
+
+---
+
+##### 6. Motion
+
+The token set and all eleven named motions live in `docs/DESIGN_SYSTEM.md` §4.3–§4.5, each with the
+Framer Motion page and example it derives from and its reduced-motion variant. F0 lands this subset:
+
+| ID | Where | Framer Motion reference |
+|---|---|---|
+| — | `<MotionConfig reducedMotion="user">` wrapping the app at `main.tsx` | Motion → **Accessibility** (`reducedMotion` prop; docs: *"automatically disable transform and layout animations, while preserving the animation of other values like `opacity` and `backgroundColor`"*) |
+| **M-1** | shell mount | Motion → Animation → **"Enter animation"** |
+| **M-2** | route content enter, keyed on `location.pathname`, **no exit variant** | Motion → **AnimatePresence** → **"Exit animation"**, **"AnimatePresence modes"** (`mode="sync"`) |
+| **M-3** | nav active rule | Motion → **Layout animations** → **"`layoutId` for shared element transitions"** |
+| **M-4** | mobile nav sheet + scrim | Motion → **AnimatePresence** → **"Exit animation"** |
+| **M-5** | theme popover, data-coverage popover | Motion → **AnimatePresence** → **"Exit animation"** + Motion → **Gestures** → **`whileTap`** |
+| **M-6** | buttons, nav items, popover rows | Motion → **Gestures** → **`whileHover`**, **`whileTap`**, **`whileFocus`** |
+| **M-7** | skeleton pulse — needs `useReducedMotion()` explicitly, because `MotionConfig` does not stop an opacity loop | Motion → Animation → **"Keyframes"**; Motion → **Accessibility** → `useReducedMotion` |
+| **M-8** | skeleton → content crossfade | Motion → **AnimatePresence** → **"AnimatePresence modes"** |
+| **M-11** | theme colour transition (CSS, not Motion) | — |
+
+Deferred with the surfaces that need them: **M-9** (list/grid stagger, F2) and **M-10** (scroll
+reveal, F3/F4). Both are fully specified now so neither gets invented later.
+
+Easings are Motion's own string presets (`"easeOut"`, `"easeIn"`, `"easeInOut"`, `"circOut"`).
+Springs use Motion's documented `visualDuration` + `bounce` API. **No cubic-bézier literal exists
+anywhere in this product.**
+
+> **⚠ Scope conflict to settle, `orchestrator`.** The gate-2 brief (this section, line ~269) puts
+> "route transition motion and shell entry motion" in F0, while the technical spec's dependency table
+> says of `framer-motion`: *"F1 uses it; F0 installs it and adds **no** animation."* My
+> recommendation: **land the subset above in F0.** It is roughly thirty lines (a `MotionConfig`, two
+> variant objects, one `layoutId`), it is what makes the design verification at gate 4 meaningful, and
+> the alternative is shipping an inert shell and retrofitting motion into finished markup in F1. If the
+> decision goes the other way, nothing in this spec changes except which feature lands it — M-11 (CSS)
+> and the `:focus-visible` ring are not Framer Motion and land in F0 regardless.
+
+---
+
+##### 7. States
+
+| State | Where it appears in F0 | Design |
+|---|---|---|
+| **loading** | `DataVintage` while `/api/meta` is in flight; route placeholders never load | skeleton at the resolved width, M-7, `aria-busy` on the container, `aria-hidden` on the skeleton |
+| **error** (`/api/meta` failed, 500) | `main`, replacing the placeholder | `ErrorState`: "Something went wrong" / "This view couldn't be loaded." / "Try again" (`primary`) + mono `INTERNAL` chip |
+| **rate-limited** (429) | `main` | `ErrorState`: "Too many requests" / "Wait a moment and try again." / "Try again" + mono `RATE_LIMITED` chip |
+| **database unavailable** (503) | `main`, full width, `max-width: 560`, vertically centred with `min-height: 60vh` | `DataUnavailableState` — copy in §7.1 |
+| **404** | `NotFound` route | `StateCard`: "No page at this address" / "The link may be wrong, or the season, driver or team may not exist." / "Go to the current season" (`primary`) |
+| **empty** | not reachable in F0 | designed in `DESIGN_SYSTEM.md` §7.4, built in F1 |
+| **no-coverage** | not reachable in F0 | designed in `DESIGN_SYSTEM.md` §7.4 with final copy for all six boundaries, built in F1. `selectCoverageNotice`'s return strings are those sentences. |
+
+All five StateCard variants share one anatomy (40px icon tile, title at `--display-xs`, body at
+`--text-base` `--ink-secondary`, action row, optional mono code chip, `--elev-1`, `--radius-lg`,
+padding `6` / `4` on mobile) so they read as one family rather than five one-offs.
+
+###### 7.1 "Database not available" — the state a developer meets on a fresh clone
+
+This one gets real design attention because it is the first thing a new contributor sees, and because
+it must instruct without leaking a filesystem path (S-6 — the path below is **static UI copy**, never
+echoed from the server response).
+
+| Slot | Content |
+|---|---|
+| Icon tile | 40px, `--radius-md`, `--status-critical-wash` field, `--status-critical-ink` database icon |
+| Title (`--display-xs`) | **No database found** |
+| Body (`--text-base`, `--ink-secondary`) | **This application reads a local SQLite database at `data/f1.db`. That file is supplied separately and is not part of the repository.** |
+| Steps (`<ol>`, `--text-sm`, `--ink-secondary`, mono chips for code) | 1. **Put the database file at `data/f1.db`, relative to the project root.** 2. **Restart the dev server: `npm run dev`** |
+| Footnote (`--text-xs`, `--ink-tertiary`) | **Seasons 1950–2026 are available once the database is in place.** |
+| Code chip (`--font-mono` `--text-xs`, `--surface-sunken`) | `DATABASE_UNAVAILABLE` |
+| Action | **Try again** (`primary`) — refetches `/api/meta`; honest, because it succeeds once the file is in place |
+
+The header still renders (with `DataVintage` in its `unavailable` variant) so the theme control and
+nav keep working — a broken data layer is not a reason to lose the chrome.
+
+---
+
+##### 8. Accessibility
+
+| Concern | Spec |
+|---|---|
+| Skip link | first focusable element: "Skip to main content" → `#main`. Visually hidden until `:focus-visible`, then a `--surface-overlay` chip at top-left, `--elev-2` |
+| Landmarks | `header` → `nav[aria-label="Primary"]` → `main#main` → `footer`. One `h1` per route (the placeholder title) |
+| Focus order (≥768) | skip link → wordmark → nav 1–6 → `DataVintage` trigger → `ThemeToggle` → main content → footer |
+| Focus order (<768) | skip link → wordmark → `DataVintage` trigger → `ThemeToggle` → menu button → (sheet, when open, traps focus and returns it to the menu button) → main → footer |
+| Focus indicator | the single achromatic double ring, `DESIGN_SYSTEM.md` §3.5.1. Measured worst case against every neutral token **and** all eleven brand colours: **4.28:1 light / 4.14:1 dark**, floor 3.0 — PASS (§9.2 V-9). Never removed, never per-component, never replaced by motion |
+| Current page | `aria-current="page"` on the active nav item — the 2px rule is not the only signal |
+| Popovers | `aria-expanded` on the trigger, `Esc` closes, focus returns to the trigger, outside click closes |
+| Contrast | every text token pair clears 4.5:1 in both themes and every `--border-control` pair clears 3:1 — measured, §9.2 V-2. Lowest text figure in the system: `--ink-tertiary` on `--surface-sunken`, **4.58:1 light / 5.68:1 dark** |
+| Touch targets | ≥44×44 for every control at base breakpoint |
+| Reduced motion | `MotionConfig reducedMotion="user"` plus the explicit variants in §6; the skeleton pulse needs `useReducedMotion()` because an opacity loop is not covered by `MotionConfig` |
+| Colour scheme | `prefers-color-scheme` honoured on first paint and live while the preference is `system`; `<html>` carries `color-scheme` so scrollbars and form controls follow |
+| Theme flash | pre-paint application via `public/theme-init.js` (already in the technical spec §3.6). A flash of the wrong theme is a defect |
+| Table view | no chart in F0, so nothing to provide one for |
+
+---
+
+##### 9. Assets required
+
+###### 9.1 Fonts — openly licensed, developer-vendored, **not** Rishabh's
+
+Three variable `woff2` files, self-hosted. **A font CDN is forbidden** — S-1/DL-2 (no third-party
+request on any path) and S-9 (the CSP must not whitelist a font host).
+
+| File | Family | Upstream (SIL OFL 1.1) |
+|---|---|---|
+| `public/fonts/archivo-var.woff2` | Archivo, `wght 600–700` `wdth 82`, latin + latin-ext | `google/fonts` → `ofl/archivo/Archivo[wdth,wght].ttf` |
+| `public/fonts/inter-var.woff2` | Inter, `wght 400–600` `opsz 14–20`, latin + latin-ext | `google/fonts` → `ofl/inter/Inter[opsz,wght].ttf` |
+| `public/fonts/chivo-mono-var.woff2` | Chivo Mono, `wght 400–600`, latin | `google/fonts` → `ofl/chivomono/ChivoMono[wght].ttf` |
+| `public/fonts/OFL.txt` | the SIL Open Font License 1.1 text | **required by the licence** — shipping the fonts without it is a licence violation |
+
+Alternative: the three `@fontsource-variable/*` packages (v5.3.0, `OFL-1.1`). **New dependency →
+`principal-engineer` decision + `ARCHITECTURE.md` §10 entry.** Flagged, not added.
+
+###### 9.2 Icons
+
+**Lucide** (ISC), used at 16px and 20px, `currentColor`, 1.5px stroke. F0 needs: `Menu`, `X`,
+`Sun`, `Moon`, `Monitor`, `Check`, `ChevronDown`, `Database`, `AlertTriangle`, `RefreshCw`,
+`ArrowRight`. New dependency → `principal-engineer` decision. If it is declined, the fallback is
+eleven hand-authored inline SVGs in `src/components/ui/icons.tsx` on the same 24px grid — no second
+icon set, ever.
+
+###### 9.3 Assigned to **Rishabh** — suggested tracker task `R3`
+
+| Item | Spec |
+|---|---|
+| Favicon | `public/favicon.svg` — square, legible at 16px, works on light and dark browser chrome (single-colour or `prefers-color-scheme`-aware SVG) |
+| App icon | `public/apple-touch-icon.png` — 180×180, PNG, opaque background |
+| Maskable icon | `public/icon-512.png` — 512×512, PNG, content inside an 80% safe area |
+
+**Placeholder that ships until these arrive:** a typographic mark generated from the design system
+itself — an `--ink-primary` rounded square (`--radius-md`) with the product initial set in Archivo
+700 `wdth 82` in `--ink-inverse`, authored as a hand-written SVG in `public/favicon.svg`. It is built
+from a font we are licensed to use and contains no third-party mark. **No F1 logo, no team logo, no
+photograph is used anywhere in F0** — and none is needed, since F0 renders no driver, team or race
+content. R1/R2 are therefore not on F0's critical path.
+
+---
+
+##### 10. Design-system work completed in this gate
+
+| Section | Status |
+|---|---|
+| §1 Design intent | authored, including the three decisions that produce the character |
+| §2 Typography | **complete** — Archivo / Inter / Chivo Mono with binary-level evidence, delivery rules, the 11-step scale, tabular-numeral rules, icon set |
+| §3.4 Reserved semantics | **complete** — exact ink + wash steps per mode, the chip form and why, the residual CVD failure and its mandatory mitigation, status set reduced from five to four **with the measurement that forced it** |
+| §3.5 Surfaces / ink / borders | **complete** for both themes, plus `--border-control`, the achromatic double focus ring, and hue-free interactive expression |
+| §4 Motion | **complete** — easing/duration/spring/stagger tokens defined once, eleven named motions each citing its Framer Motion example, a reduced variant for every one, and a "never animates" list |
+| §5 Spacing / radii / breakpoints / elevation | **complete**, including the different dark-mode elevation model |
+| §7.0–§7.6 | shell components, the five states with final copy, skeleton rules, placeholder policy |
+| §8 Accessibility | **complete** |
+| §9 Validation record | validator **method** documented so any run is reproducible, plus **nine recorded runs** |
+| §10 Theming mechanics | **complete** |
+| §3.1–§3.3, §6.2 | untouched measured facts — extended with an identity-surface rule, never softened |
+| §3.3 rules 4–6, §6.3, full §7 inventory | **deferred to F1** as instructed |
+
+###### 10.1 Validation summary (full tables in `DESIGN_SYSTEM.md` §9.2)
+
+| Run | Palette | Verdict |
+|---|---|---|
+| V-1 | calibration against the recorded §3.2 figures | **reproduced** — Cadillac↔Haas ΔE 3.82 (3.8), Haas C 0.0056 (0.006), Mercedes L 0.786 (0.786), RB↔Alpine deutan 3.17 (3.3) |
+| V-2 | neutrals, light and dark | **PASS** both modes, all text ≥4.5:1, all `--border-control` ≥3:1 |
+| V-3 / V-4 | F1 timing semantics | dark **PASS** (min CVD ΔE 9.2); light **PASS on contrast**, 2 CVD FAILs (green↔yellow deutan 6.9, purple↔yellow tritan 7.2) — hues are fixed by convention, mitigated structurally |
+| V-5 / V-6 | status | dark **PASS** (min CVD ΔE 8.1); light 1 FAIL pair (caution↔critical protan 7.5 / deutan 7.8) — mitigated by mandatory icon + label |
+| V-6b | the rejected 5-level status set | **FAIL** — warning↔serious deutan ΔE **0.4**. This is why the set is four |
+| V-7 | timing-green vs status-good | **distinct** tokens (ΔE 9.9 / 11.4) |
+| V-8 | brand colours vs the new surfaces | dark **PASS** all 11; light **WARN** 6 of 11 <3:1 — unchanged from §3.2, discharged by the identity-surface rule |
+| V-9 | achromatic double focus ring | **PASS** — 4.28:1 light, 4.14:1 dark worst case over every token and brand colour |
+
+---
+
+##### 11. Open questions
+
+For **Rishabh**:
+
+1. **Product name and wordmark — a trademark question, not a design one.** "F1" is a registered trade
+   mark, and Formula 1's published guidelines expressly forbid using their typefaces and warn against
+   using Titillium *"in any manner to create an unauthorised association with the Championship or the
+   Formula 1 companies."* The repository is public. The design system is deliberately built so the
+   product does not lean on F1's visual identity, but the literal string "F1 Analytics" is a naming
+   decision only Rishabh can make. F0 ships the name currently in `package.json`; say the word and it
+   is a one-line token change.
+2. **Interface accent — confirm achromatic.** My recommendation and the whole basis of §1.1 is a
+   neutral interface with colour reserved for teams and timing, because every hue on the wheel is
+   already an identity in this product. If a red (or any) brand accent is wanted for primary actions,
+   it needs a validated exception and it will collide with a team somewhere.
+3. **Favicon / app icon** (R3, §9.3) — with the typographic placeholder shipping until then.
+
+For the **`orchestrator`**:
+
+4. **The framer-motion scope conflict in §6** — brief says F0, technical spec says F1. Recommendation:
+   F0.
+5. **A new asset task `R3`** for the icon set above (tracker rows are the orchestrator's to write).
+
+For the **`principal-engineer`**:
+
+6. **Two dependencies flagged, not added:** the three `@fontsource-variable/*` packages (or vendored
+   `woff2`, which needs none) and `lucide-react` (or eleven inline SVGs, which needs none).
+   `ARCHITECTURE.md` §2 says nothing gets added without your decision in §10.
+7. **`scripts/validate-palette.mjs` + `npm run validate:palette`.** The validator that produced every
+   figure in §9.2 currently lives in the designer's working directory. `DESIGN_SYSTEM.md` §9 requires a
+   re-run whenever a colour changes, and the `reviewer` cannot verify a colour change without it. It
+   belongs in the repository in F1 — no dependencies needed, it is pure arithmetic.
+8. **`ThemeToggle` is a 3-option popover, not a binary flip** (§5.2) — consistent with your
+   `ThemePreference = 'light' | 'dark' | 'system'`, but worth confirming your test 49–55 expectations
+   match a radiogroup rather than a toggle.
+
+---
+
+#### **Orchestrator Gate Record** — 2026-08-04
+
+##### G.1 Gates 1 and 2 — verified and accepted
+
+Both specs are **accepted**. Verification was independent: the claims below were re-executed or
+re-read, not taken from the reporting agent.
+
+| What I checked | How | Result |
+|---|---|---|
+| The `/api/meta` values the Technical Spec is built on | Re-ran the §1.3 and §1.6 statements against `data/f1.db` myself | ✅ `1950 / 2026 / 77`; latest completed `2026 · R10 · Belgian Grand Prix · 2026-07-19 · spa` — matches §0.2 exactly |
+| New trap 15 (`round.number IS NULL`) | Re-ran the three §0.3 counts | ✅ `2 / 2 / 0`; 2026 holds **24 `round` rows, `max(number) = 22`** — the trap is real and correctly stated |
+| `v_entry` / `v_race` decision | Read the four-option table (§1.2) and decision `ARCHITECTURE.md` §10 #7 | ✅ Arrived at by probing a real connection, not by reasoning; the `PRAGMA query_only = 1` latch is the part that makes it airtight |
+| S-7 exception actually deleted | Read `ARCHITECTURE.md` §7.1 | ✅ Reads "no exceptions"; the drafted allow-list is gone, not softened |
+| Decision log revised, not appended-over | Read `ARCHITECTURE.md` §10 | ✅ #11 struck through and marked superseded; #14 (Node 22), #15 (`typescript ~5.9.3`), #16 (`node:sqlite` future-only) present with evidence |
+| Nothing implemented | `git status`; `package.json` diff | ✅ Only `PLAN.md`, `ARCHITECTURE.md`, `DESIGN_SYSTEM.md` modified. `package.json` is untouched (still the F0 placeholder), lockfile holds only `better-sqlite3` and its tree |
+| Placeholders replaced, nothing clobbered | `git diff` hunk analysis on `PLAN.md` | ✅ One contiguous hunk at the two `_pending_` lines; no other line in `PLAN.md` altered by either agent |
+| Measured facts preserved | Read `DESIGN_SYSTEM.md` §3.1–§3.3 | ✅ All twelve brand colours, all four FAIL rows and the WARN row verbatim. §3.3 **extended** with the identity-surface rule; no rule softened |
+| Validator record | Read `DESIGN_SYSTEM.md` §9.1–§9.2 | ✅ Method documented; nine runs recorded with figures. V-1 is a genuine calibration against the pre-existing measurements (ΔE 3.82 vs 3.8; 3.17 vs 3.3) and **discloses** that the tritan model differs while the verdict does not — that disclosure is why the run is credible |
+| Typography evidence | Read `DESIGN_SYSTEM.md` §2.1 | ✅ Axis ranges, name-table licence fields and `zero`-glyph contour counts — binary-level, not from memory. All three OFL 1.1 |
+| Motion citation discipline | Read Design Spec §6 and `DESIGN_SYSTEM.md` §4 | ✅ Every named motion cites a Motion documentation page/example; easings are Motion's own string presets; **no cubic-bézier literal anywhere** |
+| Provenance | `CLAUDE.md` §4.1 grep over the working tree | ✅ `provenance clean` |
+
+**Scope coverage.** Every F0 scope bullet and every F0 acceptance criterion maps to specified work:
+
+| F0 acceptance criterion | Covered by |
+|---|---|
+| `npm run dev` serves the app; `/api/meta` returns real values | Tech T7 (+ T5, T6); values verified in §0.2 |
+| Typecheck, lint, build, tests clean | Tech T1 acceptance; scripts in §3.8 |
+| Missing-database case gives a clear actionable error | Tech §2.7 + E1–E5 + T7; Design §7.1 `DataUnavailableState` |
+| Every route resolves | Tech §3.5 + T10 (11 routes + catch-all, `ARCHITECTURE.md` §5 verbatim); Design §2.3 placeholder anatomy |
+| Theme toggle persists; `prefers-color-scheme` on first load | Tech §3.6 + T11; Design §5.2 + §8 |
+| Data-vintage indicator (NV-9) | Tech §3.4 `selectDataVintage` + T12; Design §5.1 with final copy |
+
+**Cross-spec agreement.** Component names, props and file paths match between Tech §3.1/§3.5 and
+Design §3 with no drift; both independently forbid a font/asset CDN; both put the vintage string in
+`selectDataVintage` and the wording in the Design Spec. **Two contradictions were found — G.3.**
+
+##### G.2 Rulings — binding, and they resolve the open questions put to me
+
+| # | Question | Ruling |
+|---|---|---|
+| R-1 | **Framer Motion scope** — gate-2 brief says F0, Tech §1.1 says "F0 installs it and adds **no** animation" (Design Spec §6, open question 4) | **Resolved in the `designer`'s favour: the ~30-line route/shell motion subset lands in F0.** Gate 4 is visual verification; with zero animation there is nothing to verify, and retrofitting motion into finished markup in F1 is worse work. **Tech §1.1's `framer-motion` row is superseded by this ruling** and the `principal-engineer` corrects the line (G.4 item 1). In scope for F0: `MotionConfig reducedMotion="user"`, M-1, M-2, M-3, M-4, M-5, M-6, M-7, M-8, M-11. Deferred: M-9 (F2), M-10 (F3/F4) |
+| R-2 | **`ThemeToggle` shape** (Design §5.2, open question 8) | **The 3-option radiogroup popover is binding.** `lib/theme.ts` models `light \| dark \| system`; a binary control cannot express `system`, and `prefers-color-scheme` on first load is an F0 acceptance criterion. Consequence: **unit tests 49–55 and 64 must expect a radiogroup, not a cycle** — test 64's "cycles preference" wording is now wrong and the `principal-engineer` corrects it (G.4 item 1) |
+| R-3 | **Interface accent — achromatic?** (Design open question 2) | **Achromatic interface chrome stands for F0.** Unobjected, and the reasoning is sound: every hue is already an identity in this product. No brand accent, no validated exception needed |
+| R-4 | **Product name "F1 Analytics"** (Design open question 1) | **Kept as a working name.** The trademark point is real — "F1" is a registered mark and Formula 1's guidelines forbid implying association — but it is a naming/legal decision, not a design one. **Logged as a release risk in §6, to be decided at F11.** Not now, and not by an agent |
+| R-5 | **New asset task `R3`** (Design §9.3, open question 5) | **Added to the tracker, Owner: Rishabh** — `public/favicon.svg`, `public/apple-touch-icon.png` 180×180, `public/icon-512.png` 512×512 with content inside an 80% safe area. **R3 does not block F0**: the typographic placeholder ships until they arrive |
+| R-6 | **Fonts — vendored `woff2` vs `@fontsource-variable/*`** | Routed to the `principal-engineer` (G.4 item 3), with my preference on record: **vendor the three `woff2` files**, because it needs no dependency at all and S-7/S-14 both favour the smaller tree. Their call, their decision-log entry |
+| R-7 | **Icons — `lucide-react` vs eleven inline SVGs** | Routed to the `principal-engineer` (G.4 item 3), same preference and same reasoning: eleven inline SVGs need no dependency |
+
+##### G.3 ⛔ Two document defects — blocking gate 3
+
+Both are doc-vs-doc contradictions. Per §5.3, a document that disagrees with another is a **defect to
+resolve**, not a preference. Neither is a criticism of the spec work; both are one-line corrections in
+the document each agent owns, and **gate 3 does not start until both land.**
+
+**D-1 — `docs/DESIGN_SYSTEM.md` §10 mandates an inline theme script, which the CSP forbids.**
+Owner: `designer`. That line says the pre-paint theme is set by "a tiny blocking inline script in
+`index.html`". Three places say otherwise, and they are right: Technical Spec §3.6 (`script-src
+'self'` forbids it — S-9, so `public/theme-init.js`), `ARCHITECTURE.md` §7.3 ("an external
+`public/theme-init.js`, not an inline block"), and the **Design Spec's own §8** ("pre-paint
+application via `public/theme-init.js`"). A developer following §10 literally would ship a CSP
+violation and fail T11's "zero CSP violations" criterion. **Ruling: `public/theme-init.js` wins.**
+`DESIGN_SYSTEM.md` §10 is the stale text and the `designer` corrects it.
+
+**D-2 — four stale task cross-references inside the Technical Spec.** Owner:
+`principal-engineer`. The task table is right; the prose pointing at it is off by one, and a developer
+working the list would look for the work under the wrong task:
+
+| Location | Says | Should say |
+|---|---|---|
+| §0.3, "This is not in `DATABASE.md` §7." | Task **T13** adds trap 15 | **T14** — T13 is production serving |
+| §1.7, coverage constants | **T13** extends the §9 checklist | **T14** |
+| §2.4, the `styleSrcAttr` allowance | **T12** verifies zero CSP violations in the **production preview** | **T13** — T12 is the vintage indicator; T11 covers the dev console |
+| §6.4, code-splitting boundary | **T12** records the gzipped initial-chunk size | **T13** |
+
+##### G.4 Routed to the `principal-engineer` — assignment brief
+
+Dispatch **after** D-2 is in hand; these are one revision, not four.
+
+1. **Corrections to your own text** (G.3 D-2 and rulings R-1, R-2): fix the four task
+   cross-references; replace the `framer-motion` dependency-table note so it states the F0 motion
+   subset per R-1; re-word tests 49–55 and 64 for a **radiogroup**, not a cycle (test 64 currently
+   says "cycles preference"). Nothing else in the spec changes.
+2. **Confirm T11/T13 CSP division** while you are there — T11 asserts "zero CSP violations in the
+   console" (dev) and T13 asserts it against the real build. Both are wanted; make it explicit which
+   console each means so the developer does not treat one as the other.
+3. **Two dependency decisions, both currently flagged-not-added by the `designer`** (Design §9.1,
+   §9.2, open question 6). Each needs a verdict and, if accepted, an `ARCHITECTURE.md` §10 entry:
+   - `@fontsource-variable/{archivo,inter,chivo-mono}` v5.3.0 (OFL-1.1) **or** vendored
+     `public/fonts/*.woff2` + `public/fonts/OFL.txt`. Note the licence obliges shipping the OFL text
+     either way. My preference: vendor (R-6).
+   - `lucide-react` (ISC) **or** eleven inline SVGs in `src/components/ui/icons.tsx` on a 24px grid.
+     Needed glyphs: `Menu`, `X`, `Sun`, `Moon`, `Monitor`, `Check`, `ChevronDown`, `Database`,
+     `AlertTriangle`, `RefreshCw`, `ArrowRight`. My preference: inline (R-7).
+4. **`scripts/validate-palette.mjs` + an `npm run validate:palette` script — specify it into F1.**
+   Every figure in `DESIGN_SYSTEM.md` §9.2 was produced by a validator that lives only in the
+   `designer`'s working directory, so **the `reviewer` currently cannot re-verify any colour change**,
+   and §9.1 requires a re-run whenever a colour moves. It is pure arithmetic and needs no dependency.
+   F1 scope, not F0.
+
+##### G.5 Gate 3 preconditions — all three must clear
+
+| # | Precondition | Owner | State |
+|---|---|---|---|
+| P-1 | **Node 22 installed** — `nvm install 22.23.2 && nvm alias default 22.23.2 && node -v`. T1's first acceptance criterion is `node -v ≥ v22.22.0` **before starting**. `nvm ls` shows only v20.18.2; **`/opt/homebrew/opt/node@22` is a mislabelled keg containing v23.7.0 and must not be used** | **Rishabh** | ⛔ Outstanding |
+| P-2 | **D-1** — `DESIGN_SYSTEM.md` §10 theme-script line corrected | `designer` | ⛔ Outstanding |
+| P-3 | **D-2** — four task cross-references corrected, plus G.4 items 1–2 | `principal-engineer` | ⛔ Outstanding |
+
+##### G.6 Gate 4 precondition — Playwright MCP
+
+**Playwright MCP was registered this session** (`claude mcp add playwright -- npx -y
+@playwright/mcp@latest`, local project scope) but **does not appear in the tool list until Claude Code
+restarts**. Gate 4 (`designer` visual verification) and gate 9 (`qa` E2E) therefore **cannot run
+before that restart**. Per §2.1 both agents must stop and report rather than work around it — that
+instruction stands and is not waived by the registration having happened.
 
 ---
 
@@ -332,11 +2403,20 @@ feature invents a token, a duration, or a chart colour.
   tooltip, skeleton, empty state, **no-coverage state**, driver/team avatar with placeholder
 - Chart primitives shared by Recharts and visx: axis, grid, legend, tooltip, table-view toggle
 - Palette validation run and results recorded
+- **`scripts/validate-palette.mjs` + `npm run validate:palette`** — the validator behind every figure
+  in `DESIGN_SYSTEM.md` §9.2 currently lives only in the `designer`'s working directory, so the
+  `reviewer` cannot re-verify a colour change. §9.1 documents the method; F1 lands the script. Pure
+  arithmetic, no dependency. Added 2026-08-04 (orchestrator, F0 gate record G.4 item 4)
+- **CR-004 — team identity encoding** (logo where colours clash, colour where they do not). Logged
+  2026-08-04; §5.5 holds the request and its constraints. It lands here because team-colour resolution
+  internals were already deferred to F1, and it amends `DESIGN_SYSTEM.md` §3.3, whose rules are
+  **measured** — an amendment there needs validator evidence, not argument
 
 **Acceptance**
 - Design system doc complete; every token has a name and a defined use
 - A rendered token/component gallery route (dev-only) exists
 - Palette validation recorded, with secondary-encoding strategy for every failing pair
+- `npm run validate:palette` runs from a clean clone and reproduces the §9.2 figures
 - No hard-coded colour, duration, or font size anywhere outside the token files
 - Light and dark both verified by the `designer` via Playwright MCP
 
@@ -748,6 +2828,186 @@ that decision and its reason in the CR entry.
 | ID | Date | Request | Class | Docs affected | Branch | Status | Approved |
 |---|---|---|---|---|---|---|---|
 | CR-001 | 2026-08-04 | Every requested change must traverse the full agent order, with document impact stated | C | `PLAN.md` §5 (new), `.claude/agents/*` (all six) | `main` (pre-F0 setup) | ✅ Done | 2026-08-04 |
+| CR-002 | 2026-08-04 | Rewrite the passages of `REQUIREMENTS.md` that characterise where the dataset came from, so a fresh clone carries none of it. Fix `HEAD` only; accept the history exposure | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `PLAN.md`, `.claude/agents/reviewer.md` | `change/CR-002-requirements-hygiene` | Not started | — |
+| CR-003 | 2026-08-04 | `REQUIREMENTS.md` §2.2 / §2.5 say 2026 has 24 rounds scheduled; the data holds 24 calendar rows but only 22 numbered rounds | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `PLAN.md` | `change/CR-003-numbered-rounds` | Not started (blocked on F0) | — |
+| CR-004 | 2026-08-04 | "If multiple teams have the same colour, use the logos instead where necessary, and where the colours don't clash use the colours" | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `PLAN.md` | `change/CR-004-team-identity-encoding` | Logged — scheduled for F1 | — |
+
+---
+
+#### CR-002 — `REQUIREMENTS.md` origin-characterisation removal · **Class C** · **highest priority**
+
+**Request (Rishabh, 2026-08-04).** The passages of `REQUIREMENTS.md` that characterise where the
+dataset came from must be rewritten so no future clone carries them. **Fix `HEAD` only and accept the
+history exposure**: do **not** rewrite history, do **not** force-push, do **not** touch the remote.
+
+**Why this is the highest priority.** This is `CLAUDE.md` §4.1 / §2.4 release-blocker class, and it is
+**already on public `main`** in commit `f18d2c4`. Rishabh has decided the remediation is forward-only.
+
+**Triage — what is affected.** Documentation only. **No feature, no route, no endpoint, no component,
+no query, no requirement ID.** Nothing in F0's Technical or Design Spec depends on any of it. Affected
+locations, by line and item number so the offending wording is not restated here:
+
+| File | Locations |
+|---|---|
+| `REQUIREMENTS.md` | §9.1 item 2 (five distinct characterisations in one paragraph: a form, a mechanism, a quantified access limit, and the consequence drawn from it) · §9.1 item 3 (trailing clause) · §9.2 item 5 (a quantified freshness delay, a paid tier, a licence consequence, and a pipeline property) · §9.2 item 9 · §9.2 item 11 · §2.2 line 82 and line 87 (a quantified delay) · §2.5 line 154 (parenthetical) · §6 line 450 (lead-in phrase) · Appendix A line 559 (trailing clause) |
+| `.gitignore` | Add `.claude/settings.local.json`. It currently escapes commit only via Rishabh's **machine-global** ignore file, which protects this machine and nobody else's — and it holds the name of the one non-application table |
+
+**One item needing an explicit verdict, not silence.** `REQUIREMENTS.md` §6 (line ~464) names a
+third-party timing library as a *possible future addition* if telemetry features are ever required.
+My reading is that it **stays**: it describes a hypothetical future source, not the origin of the
+shipped dataset, and it is load-bearing for the §6 out-of-scope argument. The `principal-engineer`
+must confirm or overturn that reading in writing at gate 2 of this CR, so a later reviewer does not
+have to re-litigate it.
+
+**Explicitly out of scope, and why.** `db/schema.sql` needs the same treatment (its header notes and
+its trailing non-application table block describe an ingest pipeline) but is **already owned by F0 task
+T2**, which has its own acceptance criteria and a T14 line-by-line re-read. Cross-referenced here so
+neither CR-002 nor T2 assumes the other did it. **Do not duplicate T2 in this branch** — F0 merges
+first and the branches would conflict.
+
+**Rules for whoever implements this.** The replacement prose must preserve every *product* requirement
+in the passages (the read-only posture, the currency requirement and NV-9, the enum-decode obligation,
+the "confirm terms before public deployment" obligation) while stating nothing about origin.
+**Do not reproduce the removed vocabulary in a commit message, a PR title, a code comment, a test
+name, or in this document.** The behavioural requirement in §2.2 — that a "latest race" surface reads
+the newest round *present in the database* and never assumes today's calendar position — is
+**correct and must survive**; only its quantified justification goes.
+
+##### Document Impact Assessment — CR-002
+
+| Document | Verdict |
+|---|---|
+| `REQUIREMENTS.md` | **CHANGE — the substance of the CR.** Nine locations above. No requirement ID is added, removed or renumbered; no coverage figure changes; §7.2's existing prohibition already says the right thing and stands unedited. |
+| `docs/ARCHITECTURE.md` | **CHANGE — a §10 decision-log entry, required by Class C.** Record: the repository characterises the dataset's origin nowhere; `REQUIREMENTS.md` was rewritten at `HEAD` on this date; the text remains in git history in `f18d2c4` and that is an **accepted, recorded risk**, not a remediated one. No stack, layering, API-surface, routing or performance-budget change. **S-12 needs no amendment** — it already forbids exactly this; the failure was one of enforcement, not of policy. |
+| `docs/DATABASE.md` | **No change.** §1–§9 describe schema, canonical queries, traps, coverage and maintenance only. Re-read at CR open to confirm. |
+| `docs/DESIGN_SYSTEM.md` | **No change to tokens, typography, motion or chart conventions. One verification obligation:** the `designer` must confirm that §7.3's data-currency copy and the Design Spec §5.1 copy do not derive from the §2.2 sentence being rewritten — and correct them in this CR if they do. Expected clean: the `designer` independently chose **coverage** phrasing over elapsed-time phrasing for exactly this reason. **No colour change → no fresh §9 validation run required.** |
+| `PLAN.md` | **CHANGE.** This CR entry; two new §6 risk rows (history exposure; the blocklist's blind spot); a §7 change-log row. §2.4 stands unedited — it is already correct. |
+| `.claude/agents/*.md` | **CHANGE — `reviewer.md` plus a one-line rule in all six.** (1) `.claude/agents/reviewer.md` §S-12 currently defines the check as four greps and says "Any hit is blocking". Verified 2026-08-04: **it never says the grep is a floor rather than the standard.** That is the **root cause, not the symptom** — the blocklist holds vendor names only, so the grep returns `clean` against both the affected passages and `db/schema.sql`, and a reviewer following S-12 literally would have passed this text too. The amendment must fix the **class**: the `reviewer` reads every prose, comment and documentation change in a PR for text that characterises where the data came from, and treats the grep as a floor beneath that read. A rule that only catches vendor names will keep missing paraphrase. (2) **All six agent files** gain the §2.3 standing rule — *file ownership restricts who edits, never who reports* — because an agent that finds this class of text in a file it does not own must escalate rather than move on. Scope extended 2026-08-04 by the `orchestrator`. |
+
+**Gate plan (§5.4), with depth recorded.** Steps 1–2 and 7–9 run in full. Two deviations, recorded
+here rather than taken silently, because **no application exists at this commit**:
+step 3 (design spec) is **skipped — the CR provably touches no UI**, as §5.4 permits, and step 5
+(visual verification) is replaced by the `designer`'s **copy-derivation check** named in the
+assessment above; step 10 (QA) is a **documentation-conformance pass** — requirement-ID traceability
+unbroken, blocklist grep clean, and a read-through of the rewritten passages — in place of E2E, which
+has nothing to run against.
+
+> **✅ Both deviations RULED ON and AUTHORISED, 2026-08-04.** They were escalated, not assumed.
+> Stated reasoning: get the release-blocker text out of the working tree fastest.
+>
+> **Provenance of this authorisation, recorded precisely because this document's value depends on
+> being honest about who decided what:** the ruling reached the `orchestrator` **relayed through the
+> coordinating agent**, attributed to Rishabh. It was not received first-hand from him. It is a valid
+> work instruction and the work proceeds on it; it is **not** recorded as Rishabh's personal
+> countersignature. If he confirms it directly, this line gets replaced with a first-hand record.
+>
+> **A later reviewer must read this as an explicit ruling, not an omission** — the skipped design-spec
+> gate and the two reduced gates are authorised for **CR-002 only**, on the stated grounds that no
+> application exists at this commit. They set **no precedent**: every CR opened after F0 merges has a
+> running application to test against and therefore gets steps 3, 5 and 10 in full.
+
+**Gate ledger for CR-002** — the `orchestrator` fills this in as gates close.
+
+| Step | Gate | Owner | State |
+|---|---|---|---|
+| 1 | CR entry, triage, class, Document Impact Assessment | `orchestrator` | ✅ 2026-08-04 — this entry |
+| 2 | Technical spec + confirms/corrects the doc impact | `principal-engineer` | Not started |
+| 3 | Design spec | — | **Skipped — no UI** (§5.4, approved above) |
+| 4 | Implement on `change/CR-002-requirements-hygiene`, doc updates included | `developer` | Not started |
+| 5 | Copy-derivation check in lieu of visual verification | `designer` | Not started |
+| 6 | Fix design findings | `developer` | Not started |
+| 7 | Code review + verifies doc updates landed | `reviewer` | Not started |
+| 8 | Security audit, S-1 … S-14 | `reviewer` | Not started |
+| 9 | Fix blocking findings | `developer` | Not started |
+| 10 | Documentation-conformance pass in lieu of E2E | `qa` | Not started |
+| 11 | Fix QA findings | `developer` | Not started |
+| 12 | Verify every gate → approve → merge | `orchestrator` | Not started |
+
+---
+
+#### CR-003 — 2026 has 22 numbered rounds, not 24 · **Class C**
+
+**Request (Rishabh, 2026-08-04).** `REQUIREMENTS.md` §2.2 and §2.5 both state that 2026 has "24 rounds
+scheduled". The data holds **24 `round` rows but only 22 numbered rounds** — 2 are cancelled, and a
+cancelled round carries `round.number IS NULL`.
+
+**✅ Re-verified by the orchestrator, 2026-08-04**, independently of the `principal-engineer`:
+
+```
+SELECT count(*) FROM round WHERE number IS NULL;                     -- 2
+SELECT count(*) FROM round WHERE number IS NULL AND is_cancelled=1;  -- 2
+SELECT count(*) FROM round WHERE is_cancelled=1 AND number IS NOT NULL; -- 0
+SELECT count(*), max(number) FROM round r JOIN season s ON s.id=r.season_id
+  WHERE s.year=2026;                                                 -- 24 | 22
+```
+
+**Cross-reference — this is the product-facing half of new trap 15.** The query-facing half is
+`docs/DATABASE.md` trap 15, added by **F0 task T14**: SQLite sorts `NULL` **first**, so a bare
+`ORDER BY r.number` silently puts both cancelled rounds at the top of every season list, and a
+cancelled round is not addressable by `/seasons/:year/races/:round` because it has no number.
+
+**⛔ Blocked on F0.** T14 adds trap 15; this CR cross-references it. Opening this branch before F0
+merges would either duplicate trap 15 or reference something that does not exist. Sequence:
+**CR-002 → F0 merge → CR-003.** CR-002 also rewrites §2.5 line 154, the same line CR-003 corrects, so
+CR-003 rebases onto CR-002 rather than racing it.
+
+**Class C, and the reason is the re-verification pass**, not the size of the edit: §5.3 requires a
+corrected data fact to be re-verified against the database and replaced *everywhere it appears*,
+including Appendix A. That sweep is the work.
+
+##### Document Impact Assessment — CR-003
+
+| Document | Verdict |
+|---|---|
+| `REQUIREMENTS.md` | **CHANGE.** §2.2 line 82 and §2.5 line 154: replace "24 rounds scheduled" with the calendar-rows-vs-numbered-rounds distinction (24 on the calendar, **22 numbered**, 2 cancelled) and state that a cancelled round is neither a scheduled round nor a data gap. **Appendix A must be swept, not assumed clean** — its "141/155 in the 2020s" lap-coverage row is a round-count-derived figure and must be re-verified against the database to establish whether cancelled rounds are inside or outside that denominator. |
+| `docs/ARCHITECTURE.md` | **CHANGE — a §10 decision-log entry, required by Class C**, recording the addressability contract: `/seasons/:year/races/:round` resolves only numbered rounds, so a cancelled round has no URL. §5's routing table gains the same one-line qualification. The Technical Spec §1.3 already behaves this way; the URL contract does not yet say so. |
+| `docs/DATABASE.md` | **CHANGE, but authored by F0 T14, not here.** Trap 15 and the §9 post-refresh check are T14's. This CR's obligation is the Class-C **re-verification pass** over any §4 coverage claim whose denominator counts rounds, and confirming trap 15 as merged reads correctly against the corrected `REQUIREMENTS.md` wording. If F0 has not merged, this CR does not start (see above). |
+| `docs/DESIGN_SYSTEM.md` | **No change — and this is worth recording as evidence rather than an assumption.** §7.3 and Design Spec §5.1 already drive every number from `GET /api/meta` (`Round {round} of {scheduledRounds}`) and already carry a dedicated line surfacing cancelled rounds separately — "{cancelledRounds} rounds on the {year} calendar were cancelled." The design anticipated this correctly; nothing to amend. No colour change → no §9 run. |
+| `PLAN.md` | **CHANGE.** This CR entry; a §7 change-log row. **F0's scope and acceptance criteria are unaffected** — the Technical Spec §0.2/§1.4 already return `scheduledRounds: 22, cancelledRounds: 2, completedRounds: 10`, so no F0 gate is reopened by this correction. |
+| `.claude/agents/*.md` | **No change.** No agent's responsibilities, gates or constraints move. Trap 15 reaches the agents through `docs/DATABASE.md` §7, which they are already required to read. |
+
+---
+
+#### CR-004 — team identity encoding: logos where colours clash · **Class C** · scheduled for **F1**
+
+**Request (Rishabh, 2026-08-04), recorded as his intent:** *"If multiple teams have the same colour,
+use the logos instead where necessary, and where the colours don't clash use the colours."*
+
+**Three constraints were put to Rishabh at the time the request was made, and are recorded with it so
+the CR is not implemented against a rosier reading than he was given:**
+
+1. **It makes R2 (team logos) a hard dependency** for F5, F7 and any two-team chart — today R2 is
+   `Not started` and unowned by any feature's critical path.
+2. **202 of 214 teams have no brand colour, and no logo either.** The deterministic fallback ramp
+   (`DESIGN_SYSTEM.md` §3.1) is therefore **still required regardless**. Logos can only sit in front
+   of it for the current era; they do not replace it and they do not shrink its scope.
+3. **Logos degrade to mud at 8–12px**, which is chart-marker scale. The workable home for logo-based
+   identity is **identity surfaces** — cards, headers, table rows, entity pickers — rather than chart
+   series marks, where the existing secondary-encoding ladder (direct labels, dash patterns, marker
+   shapes) remains the mechanism.
+
+**Why F1.** Team-colour resolution internals (`src/lib/teamColor.ts`, the fallback ramp, the
+collision-detection thresholds, the per-theme chart-safe variants) were **already deferred to F1**.
+Landing this there means one design pass over colour resolution instead of two.
+
+**The binding caveat.** `DESIGN_SYSTEM.md` §3.3's rules are **measured**, not stylistic — they exist
+because a validator failed four checks on the 2026 brand palette (§3.2), reproduced in F0 as run V-1.
+**An amendment to §3.3 needs validator evidence recorded in §9.2, not an argument.** Specifically: any
+claim that a given pair "doesn't clash" and may therefore rely on colour alone must come from a
+recorded run against the §9.1 floors, in **both** themes and under all three CVD models — which is
+also why `scripts/validate-palette.mjs` must land in F1 (F0 gate record G.4 item 4) before this CR can
+be reviewed at all.
+
+##### Document Impact Assessment — CR-004
+
+| Document | Verdict |
+|---|---|
+| `REQUIREMENTS.md` | **CHANGE.** A **new requirement ID** for logo-based identity encoding, so `qa` can trace a test to it, plus the statement that R2 becomes a hard dependency of the surfaces that use it. §6 (out of scope) is **not** touched — missing logos are an asset gap, not a data gap. |
+| `docs/ARCHITECTURE.md` | **CHANGE.** A §10 decision-log entry (Class C). §3's layering rule "colour resolution goes through one module" must be restated to cover **identity resolution** (colour *or* logo *or* ramp) so the decision stays in one module rather than spreading into components. Check the asset-loading path against the §8 bundle budget — 214 potential SVGs must not reach the initial chunk. |
+| `docs/DATABASE.md` | **No change.** No new query, no new trap, no coverage correction. `team.primary_color`'s 12-of-214 coverage is already recorded, and logos are files rather than columns. |
+| `docs/DESIGN_SYSTEM.md` | **CHANGE — this is the substantive one.** §3.3 gains a resolution ladder (when a logo carries identity, when a colour does, when the ramp does), a minimum legible logo size, and an explicit restatement that the fallback ramp survives. §3.1–§3.2's measured facts are **not** re-litigated. **A fresh §9.2 validation run is required for any collision threshold or derived variant this introduces**, per §5.3's colour rule and §3.3 rule 7. |
+| `PLAN.md` | **CHANGE.** This CR entry; F1's scope bullet (already added); F5 and F7's `Depends on` become hard on R2; the R2 tracker row gains the note that it now blocks feature work rather than only enriching it; a §6 risk row; a §7 change-log row. |
+| `.claude/agents/*.md` | **No change.** The `designer` already owns `DESIGN_SYSTEM.md` and already may not soften a measured constraint; the `reviewer` already checks design conformance. No responsibility moves. |
 
 ---
 
@@ -764,6 +3024,20 @@ that decision and its reason in the CR entry.
 | Playwright MCP not configured | `qa` and `designer` must stop and report, never work around it |
 | Design incoherence across features | Design system lands before any feature (F1); nothing invents tokens after |
 
+### 6.1 Accepted risks and open items — recorded 2026-08-04
+
+These are **not** mitigated. They are decided, or they are waiting on someone. Recording them here is
+the mitigation available.
+
+| # | Item | Status |
+|---|---|---|
+| **A-1** | **Origin-characterising text remains in git history.** CR-002 rewrites the working tree only. The text stays in commit `f18d2c4` on public `main`, and **F11's provenance sweep cannot close this** — a working-tree grep does not see history, and Rishabh has decided against a rewrite or force-push. | **Accepted by Rishabh, 2026-08-04.** Forward-only remediation. Revisit only if he changes the decision about the remote. |
+| **A-2** | **`private/provenance-blocklist.txt` is too narrow to detect this leak class.** It holds vendor names only (6 lines), which is exactly why the `CLAUDE.md` §4.1 grep returns `clean` against both the CR-002 passages and `db/schema.sql` today. The terms needed were reported to Rishabh **in chat only** and written to **no file, tracked or untracked** — no agent may write them anywhere. | **⛔ Open — on Rishabh.** Until he extends the file, the grep is a floor and not the standard; CR-002 writes that obligation into `.claude/agents/reviewer.md`. |
+| **A-3** | **Product name.** "F1" is a registered trade mark and Formula 1's published guidelines forbid using their typefaces and warn against using Titillium in any manner that implies association with the Championship. The repository is public. The design system deliberately leans on none of F1's visual identity (`DESIGN_SYSTEM.md` §2.1), but the literal string "F1 Analytics" is a naming and legal decision, not a design one. | **Working name kept. Decision deferred to F11.** Not an agent's call. A rename is a token change, so deferring costs little. |
+| **A-4** | **Playwright MCP is registered but not yet loaded.** Added this session in local project scope; it does not appear in the tool list until Claude Code restarts. **Gates 4 and 9 cannot run before that restart.** | **⛔ Open — needs a restart.** Recorded as F0 gate-record G.6. |
+| **A-5** | **Node 22 is not installed** — `nvm ls` shows only v20.18.2, `lts/jod` is `N/A`, and `/opt/homebrew/opt/node@22` is a **mislabelled keg containing v23.7.0**. F0 task T1's first acceptance criterion is `node -v ≥ v22.22.0` before any work starts. | **⛔ Open — on Rishabh.** One command: `nvm install 22.23.2 && nvm alias default 22.23.2`. Agents must not alter his toolchain. |
+| **A-6** | **R2 becomes a blocking dependency if CR-004 is implemented** — team logos would gate F5, F7 and any two-team identity surface, and 202 of 214 teams will never have one. | Open — CR-004 is scheduled for F1; the fallback ramp remains mandatory regardless, so the risk is to *scope*, not to correctness. |
+
 ---
 
 ## 7. Document change log
@@ -774,3 +3048,12 @@ that decision and its reason in the CR entry.
 | 2026-08-04 | CR-001: change-request workflow + document impact assessment added (§5) | orchestrator |
 | 2026-08-04 | R0 satisfied — database verified present (19 tables, 717,764 laps, through 2026 R10) | orchestrator |
 | 2026-08-04 | F0 started on `feat/foundation`; gates 1–2 dispatched in parallel | orchestrator |
+| 2026-08-04 | F0 Technical Spec written — 14 tasks; `CREATE TEMP VIEW` + `PRAGMA query_only` decision; `/api/meta` values verified against the database; revised for Node 22 after approval (S-7 exception deleted, `ARCHITECTURE.md` §10 #11 superseded by #14, #15–#16 added) | principal-engineer |
+| 2026-08-04 | F0 Design Spec written; `docs/DESIGN_SYSTEM.md` §1–§10 authored (typography verified from font binaries; nine validator runs recorded in §9.2 including a calibration against the pre-existing measurements) | designer |
+| 2026-08-04 | **F0 gates 1–2 verified and accepted** (agent log filled, status → `Ready for dev`). Rulings recorded: Framer Motion subset lands in F0; `ThemeToggle` is a 3-option radiogroup; achromatic chrome stands. Two doc defects block gate 3 (`DESIGN_SYSTEM.md` §10 theme-script vs the CSP; four stale task cross-references in the Technical Spec) | orchestrator |
+| 2026-08-04 | `R3` added (app icons, Owner: Rishabh) — does not block F0. Recorded that R1/R2 are not on F0's critical path | orchestrator |
+| 2026-08-04 | Node 22 LTS and `@hono/node-server` `^2.1.0` approved by Rishabh; stale `PLAN.md` Assignment Brief references corrected (React Router v8; Node 22) | orchestrator |
+| 2026-08-04 | **CR-002** opened (Class C) — `REQUIREMENTS.md` origin-characterisation removal at `HEAD`; history exposure accepted (§6.1 A-1) | orchestrator |
+| 2026-08-04 | **CR-003** opened (Class C) — 2026 has 22 numbered rounds, not 24; blocked on F0 (trap 15 lands in T14) | orchestrator |
+| 2026-08-04 | **CR-004** logged (Class C) — team identity encoding via logos where colours clash; scheduled for F1 | orchestrator |
+| 2026-08-04 | §6.1 accepted-risk register added (A-1 … A-6): git-history exposure, blocklist blind spot, product-name trademark question, Playwright MCP restart, Node 22 install, R2 as a blocking dependency | orchestrator |
