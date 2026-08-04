@@ -28,7 +28,6 @@ season and a 2026 season can sit side by side without lying.
 - Accurate F1 team colours; F1 timing colour conventions in charts (purple = session fastest,
   green = personal best, yellow = below personal best)
 - Read-only. No accounts, no writes, no third-party calls at runtime
-- **Data provenance is never mentioned anywhere in this repository** (§2.4)
 
 ---
 
@@ -82,20 +81,18 @@ visually settled, not code about to change.
 
 **Standing rule — file ownership restricts who *edits*, never who *reports*.** Added 2026-08-04 after
 an agent correctly declined to edit a file it did not own and then **also** withheld what it had
-found there. Those are different obligations. If any agent notices a defect, a leak, a contradiction
-or a stale fact in material it may not touch, it **reports it to the `orchestrator`** — file and line,
-and what is wrong — and the `orchestrator` routes it to the owner. Silence about a finding is never
-the correct response to not owning a file, and for a provenance finding it is a release-blocker-class
-failure. This is the mechanism by which the §2.4 grep's blind spots get caught by people rather than
-by patterns.
+found there. Those are different obligations. If any agent notices a defect, a contradiction or a
+stale fact in material it may not touch, it **reports it to the `orchestrator`** — file and line, and
+what is wrong — and the `orchestrator` routes it to the owner. Silence about a finding is never the
+correct response to not owning a file. This is the mechanism by which a defect gets caught by people
+rather than by patterns.
 
-### 2.4 Provenance silence — release blocker
+### 2.4 — removed
 
-Nothing about how the dataset was assembled may appear in code, comments, documentation, test names,
-fixtures, commit messages, branch names, or PR text. The `reviewer` greps for this every PR
-(`S-12`) and the `orchestrator` re-checks it at approval. Any hit blocks the merge.
-
-The database and all raw seed artefacts are never committed.
+Removed by **CR-005** (§5.5), 2026-08-04. Section number retained so existing cross-references do not
+silently retarget. **The database and all raw seed artefacts are still never committed** — that rule
+now lives in §2.5's Definition of Done and in `REQUIREMENTS.md` §7.2, and it is about a 66 MB binary
+and local-only tooling, not about this removal.
 
 ### 2.5 Definition of Done
 
@@ -105,10 +102,10 @@ A feature is Done only when **all** hold:
 - [ ] Technical Spec and Design Spec both present in this file
 - [ ] `DESIGN VERIFICATION: PASS`
 - [ ] `CODE REVIEW: PASS`
-- [ ] `SECURITY AUDIT: PASS` (S-1 … S-14 each with a verdict)
+- [ ] `SECURITY AUDIT: PASS` — a verdict on each of S-1 … S-11 and S-13 … S-14. **`S-12` was removed by CR-005** (§5.5) and is not renumbered, because the identifiers are cited by number across this file, the agent definitions and the review history
 - [ ] `QA: PASS` with evidence
 - [ ] Typecheck, lint, unit tests, build all clean
-- [ ] Provenance grep clean; no database, `.env`, or seed artefact staged
+- [ ] No database, `.env`, or seed artefact staged for commit
 - [ ] `orchestrator` approval recorded with a date
 
 ---
@@ -246,6 +243,10 @@ client → API → SQLite works, and all quality gates enforced from commit one.
 - Theme toggle persists; `prefers-color-scheme` respected on first load
 
 **Assignment Briefs** — written 2026-08-04 by the orchestrator. Dispatch gates 1 and 2 in parallel.
+
+> **Historical record — both gates are ✅ complete.** Kept verbatim as the record of what was actually
+> asked for. **One constraint named in both briefs was later removed by CR-005** (§5.5) and no longer
+> applies to any gate; nothing else in either brief changed, and neither delivered spec is affected.
 
 <details>
 <summary><b>Gate 1 — <code>principal-engineer</code> (Technical Spec)</b></summary>
@@ -1153,7 +1154,7 @@ in F0 is a placeholder that renders its name and its resolved params; **none fet
 | `DataVintage` | `{ vintage: DataVintage \| null; state: 'loading' \| 'ready' \| 'unavailable' }` — **pure and presentational; it does not call `useMeta`.** `Header` calls `useMeta`, runs `selectDataVintage`, and passes the result down (`ARCHITECTURE.md` §3: components never fetch) |
 | `LoadingState` | `{ label?: string }` |
 | `ErrorState` | `{ title: string; detail?: string; onRetry?: () => void }` |
-| `DataUnavailableState` | `{}` — the "database not available" state; fixed provenance-silent copy from the Design Spec |
+| `DataUnavailableState` | `{}` — the "database not available" state; fixed copy from the Design Spec |
 
 Route-level code splitting is **not** introduced in F0 (nothing to split — no charts, no visx). The
 boundary is specified in §6.4 so F1/F3 land it.
@@ -1679,7 +1680,7 @@ Ordered. Each is independently committable and sized ≤ half a day. Work down t
 | # | Task | Acceptance |
 |---|---|---|
 | **T1** | **Toolchain baseline on Node 22.** `package.json` with the exact §1.1 ranges plus `"engines": { "node": ">=22.22.0" }`; `.nvmrc` containing `22.23.2`; `tsconfig.json` / `.app.json` / `.node.json` with §3.1 strictness and aliases; `eslint.config.js` (flat config, `typescript-eslint` recommended-type-checked, `no-explicit-any: error`, `no-non-null-assertion: error`); `.prettierrc.json`; `.prettierignore`; `.env.example`; all §3.8 scripts. | **`node -v` reports ≥ v22.22.0 before starting** — if not, stop and ask Rishabh to run the §9.3 command rather than working around it. `npm install` completes with **zero `EBADENGINE` warnings**; `npm audit` reports **`found 0 vulnerabilities`** — there is no permitted exception, so *any* high/critical finding blocks (S-7); `npm run typecheck`, `lint`, `format:check` and `test` all exit 0 on the empty project; lockfile committed. |
-| **T2** | **Schema-reference hygiene.** `db/schema.sql` is committed and public, and currently overreaches its purpose. Reduce it to the **18 application tables of `DATABASE.md` §2 and nothing else**: remove the one table block that is not part of that contract, and remove every comment that describes anything other than the shape and meaning of a column. Correct the header note claiming the public identifier is `api_id` — the application uses **`reference` slugs**, never `api_id` or `id` (DL-3, trap 11, `ARCHITECTURE.md` §10 #13). Fix the `status` cross-reference to point at `docs/DATABASE.md` §3. | The file defines exactly the 18 tables in `DATABASE.md` §2 — no more, no fewer — verified with `sqlite3 :memory: < db/schema.sql` then `.tables`; the extended provenance check in T14 passes; the `CLAUDE.md` §4.1 blocklist grep is clean. |
+| **T2** | **Schema-reference hygiene.** `db/schema.sql` is committed and public, and currently overreaches its purpose. Reduce it to the **18 application tables of `DATABASE.md` §2 and nothing else**: remove the one table block that is not part of that contract, and remove every comment that describes anything other than the shape and meaning of a column. Correct the header note claiming the public identifier is `api_id` — the application uses **`reference` slugs**, never `api_id` or `id` (DL-3, trap 11, `ARCHITECTURE.md` §10 #13). Fix the `status` cross-reference to point at `docs/DATABASE.md` §3. | The file defines exactly the 18 tables in `DATABASE.md` §2 — no more, no fewer — verified with `sqlite3 :memory: < db/schema.sql` then `.tables`. **T2's substance is unchanged by CR-005** — the 18-table contract and the `api_id` → `reference` correction are DL-3 / trap-11 correctness matters (Technical Spec §0.7), not consequences of the removed rule; only the two check-based acceptance clauses were struck. |
 | **T3** | **`server/db.ts`, `server/views.ts`, `server/config.ts`.** Readonly connection, `CREATE TEMP VIEW` bootstrap of the §6.1 DDL, sentinel check, `PRAGMA query_only = 1`, `DatabaseUnavailableError` mapping, `probeDatabase()`. | Tests 1–8 pass; `v_race` returns 20 rows for 2024 R1; a write throws; a `CREATE TEMP VIEW` after bootstrap throws; the thrown error message contains no absolute path. |
 | **T4** | **`server/schemas/*` + `server/coverage.ts` + `server/errors.ts`.** The §2.2 Zod schemas with `z.infer` types, the §1.7 constants, the §2.3 error envelope and codes. | Tests 16–26 pass. `server/schemas/*` imports **only** `zod` — verify with `grep -n "^import" server/schemas/*.ts`. |
 | **T5** | **`server/queries/meta.ts` + `server/cache/memo.ts`.** The four §1.3–§1.6 statements as named exports of prepared statements, plus the memo helper. | Tests 9–15 and 32–34 pass; the returned values equal §0.2 exactly. |
@@ -1691,11 +1692,11 @@ Ordered. Each is independently committable and sized ≤ half a day. Work down t
 | **T11** | **App shell + theme + icons + shell motion.** `AppShell`, `Header`, `PrimaryNav`, `ThemeToggle`, `lib/theme.ts`, `public/theme-init.js`, **`src/components/ui/icons.tsx` exactly per §3.10**, and motions **M-1, M-3, M-4, M-5, M-6** plus **M-11** (CSS). `ThemeToggle` is a **3-option radiogroup popover** (Design Spec §5.2) — **not** a cycle. Visual treatment strictly per the Design Spec. | Toggle persists across reload; with no stored preference the OS setting is honoured **on first paint** (no flash) — and the `public/theme-init.js` tag in `<head>` carries **no `defer`, no `async` and no `type="module"`**, since a module script is deferred by specification and would still flash (`DESIGN_SYSTEM.md` §10); tests 49–55, 64 and 66–69 pass; **zero CSP violations in the Vite dev-server console** (`npm run dev`) — this is the **dev** half of the pair in §2.4, and it does **not** discharge T13; the eleven icons render at 16/20px in `currentColor` with a 1.5px stroke and `src/components/ui/icons.tsx` carries the ISC notice. |
 | **T12** | **Data-vintage indicator (NV-9) + shell states.** `DataVintage`, `LoadingState`, `ErrorState`, `DataUnavailableState`, wired through `Header` → `useMeta` → `selectDataVintage`, with **M-7** (skeleton pulse, gated on an explicit `useReducedMotion()` — `MotionConfig` does not stop an opacity loop) and **M-8** (skeleton → content crossfade). | The indicator shows the ✅ verified vintage (2026 R10, Belgian Grand Prix, 19 Jul 2026); its copy names **no source of any kind**; pointing `F1_DB_PATH` at a missing file renders `DataUnavailableState` with a `503` in the network tab and no stack trace on screen; tests 63 and 65 pass; with `prefers-reduced-motion: reduce` emulated the skeleton pulse **stops** rather than merely slowing. |
 | **T13** | **Production serving + measurement.** `serve-static` for `dist/` with SPA fallback from a fixed root, `NODE_ENV=production` path, CSP verified against the real build. | `npm run build && npm run start` serves the app on one origin; **zero CSP violations in the production-preview console** — the **build** half of the §2.4 pair, and the only evidence on which the `styleSrcAttr` allowance may be removed (remove it, re-verify both consoles, and if removal breaks **dev** only, adjust the dev server, not the policy); the gzipped initial-chunk size **and `framer-motion`'s share of it** are measured and written into §6.4; the network panel confirms the built app requests only the three `latin` font faces from this origin. |
-| **T14** | **Documentation edits (ship in this PR).** `docs/DATABASE.md`: add **trap 15**, annotate §6.1 with how the views are created, extend §9 to cover `server/coverage.ts` **and the two-direction trap-15 check** (a NULL count alone cannot detect a numbered cancelled round). `README.md`: setup, the Node requirement, the scripts, and the fact that `data/f1.db` is supplied separately — stated in exactly that much detail and no more. Exact text in §9.1. | `docs/` and code agree; the `CLAUDE.md` §4.1 blocklist grep is clean; **and** a line-by-line read of every file this PR touches confirms none of them describes anything beyond the shape and meaning of the data — the grep is a floor, not the standard (`PLAN.md` §2.4). A reader can go from a fresh clone to a running app from the README alone. |
+| **T14** | **Documentation edits (ship in this PR).** `docs/DATABASE.md`: add **trap 15**, annotate §6.1 with how the views are created, extend §9 to cover `server/coverage.ts` **and the two-direction trap-15 check** (a NULL count alone cannot detect a numbered cancelled round). `README.md`: setup, the Node requirement, the scripts, and the fact that `data/f1.db` is supplied separately — stated in exactly that much detail and no more. Exact text in §9.1. | `docs/` and code agree. A reader can go from a fresh clone to a running app from the README alone. |
 
 **14 tasks.** T1–T7 are server-side and unblock nothing visual; T8–T13 need the Design Spec (gate 2)
-in place. T2 and T14 are doc hygiene and can be done at any point — T2 early, since it removes a
-live provenance exposure in a committed file.
+in place. T2 and T14 are doc hygiene and can be done at any point — T2 early, since `db/schema.sql`
+is a committed file that later tasks read as the schema reference.
 
 ---
 
@@ -1803,11 +1804,9 @@ consideration only — `ARCHITECTURE.md` §10 #16. Nothing in this spec acts on 
    `better-sqlite3` builds and loads on it, `npm audit` clean, and the §10 #7 temp-view behaviours
    re-probed on the target runtime (§0.1). Gate-3 precondition P-1 is cleared.
 2. ✅ **`@hono/node-server`** — approved; now in `ARCHITECTURE.md` §2 (§9.2).
-3. **`private/provenance-blocklist.txt` is too narrow — Rishabh is extending it himself.** It returns
-   `clean` on `db/schema.sql` as committed today, even though that file says more than its purpose
-   requires; that is why T2 exists as a hand-written task rather than being caught by the gate. Per
-   instruction I have supplied the offending vocabulary **to the `orchestrator` in conversation only**
-   and have written it into **no file, tracked or untracked**. T2 is unchanged.
+3. ✅ **CLOSED — no longer applicable.** Superseded by **CR-005** (§5.5), 2026-08-04. Nothing is
+   outstanding on anyone for this item. **T2 is still unchanged** and still runs, for the reasons in
+   its own acceptance cell.
 4. **`REQUIREMENTS.md` §2.2 / §2.5 "24 rounds scheduled" for 2026** — a numbered **CR is being
    opened** for this; it is not mine to edit. ✅ The data holds 24 `round` rows but **22 numbered
    rounds**, 2 cancelled with NULL numbers (§0.3). §2.5's "results through R10" is correct. T14
@@ -2398,8 +2397,19 @@ against what was actually asked for:
 | Scope | T1–T14 in order. T1–T7 server, T8–T13 client/build, T2 + T14 doc hygiene. **Nothing outside the F0 scope list** — no analytical feature, no chart, no driver/team/race content |
 | Inputs named | Technical Spec §0–§9 · Design Spec §1–§11 · §G.2 rulings R-1…R-7 · `ARCHITECTURE.md` §2, §3, §5, §7, §8, §9, §10 · `DATABASE.md` §1, §2, §3, §4, §6, §7, §9 · `DESIGN_SYSTEM.md` §1–§10 · `REQUIREMENTS.md` §2, §6, §7, §8 |
 | Binding rulings restated | R-1 the Framer Motion shell/route subset **does** land in F0 (M-1…M-8, M-11, `MotionConfig`); R-2 `ThemeToggle` is a **3-option radiogroup popover**, not a cycle; R-3 achromatic chrome |
-| Hard constraints restated | provenance silence (§2.4) · read-only connection, no write path ever · clear actionable missing-DB error (Tech §2.7 + Design §7.1) · no auth, no mutation, no third-party request on any path · initial JS **< 250 KB gzipped** · **no hand-written duration/easing/spring/colour/size literal** — tokens only · slugs never integer ids (DL-3) · typographic favicon placeholder only |
-| Evidence demanded | file paths · real output for `npm install`, `audit`, `typecheck`, `lint`, `format:check`, `test`, `build` · the gzipped initial-chunk figure **and `framer-motion`'s share** · the §4.1 provenance grep · `curl -i` headers for `/api/meta` · the missing-DB console block and its `503` · **69 tests** accounted for |
+| Hard constraints restated | ~~the §2.4 rule~~ (struck mid-run — see below) · read-only connection, no write path ever · clear actionable missing-DB error (Tech §2.7 + Design §7.1) · no auth, no mutation, no third-party request on any path · initial JS **< 250 KB gzipped** · **no hand-written duration/easing/spring/colour/size literal** — tokens only · slugs never integer ids (DL-3) · typographic favicon placeholder only |
+| Evidence demanded | file paths · real output for `npm install`, `audit`, `typecheck`, `lint`, `format:check`, `test`, `build` · the gzipped initial-chunk figure **and `framer-motion`'s share** · ~~the §4.1 check~~ (struck mid-run) · `curl -i` headers for `/api/meta` · the missing-DB console block and its `503` · **69 tests** accounted for · `git status` / `git log` showing no database, `.env` or seed artefact staged |
+
+**⚠ Amended mid-run, 2026-08-04 — recorded rather than rewritten, because the dispatch actually
+happened as first written.** **CR-005** (§5.5) landed while gate 3 was in flight. The `developer` was
+sent the scope change directly and told, in these terms: stop treating the check as a gate, drop it
+from the evidence it owes, **do not build it into any script, npm script, CI step, test, lint rule,
+README section or comment**, and **do not over-delete** — T2's 18-table contract and `api_id` →
+`reference` correction stand on DL-3 / trap-11 grounds, and T14's `docs/DATABASE.md` and `README.md`
+edits stand in full. It was also told that removing a reference must be a **deletion, not a
+replacement that describes what was formerly forbidden**, and to keep commit messages and branch names
+free of any upstream source name. Two task acceptance cells (**T2**, **T14**) were edited in §8 to
+match; no other F0 scope, task or acceptance criterion changed.
 | Explicitly **not** the developer's to do | mark anything Done · approve a merge · edit `ARCHITECTURE.md` (Tech §9.1) · run gate 4 or 9 · act on CR-002/003/004 |
 
 **Outcome: pending.** The `orchestrator` records the result here and updates the tracker on report-back.
@@ -2757,14 +2767,14 @@ obvious rather than configured — and must never quietly lie across eras.
 **Scope**
 - `qa` runs the **full-application regression suite** — every route, chart, state, breakpoint, theme
 - `reviewer` runs a **whole-repository security audit**, not per-feature
-- Final provenance sweep across all files, all history, all branch names
-- README and setup docs (stating the database is supplied separately, with no provenance detail)
+- README and setup docs, stating that the database is supplied separately
 - Confirm no database, seed artefact, or `.env` in the repository or its history
+- Settle the product-name / trademark question (§6.1 A-3) — Rishabh's call, deferred to here
 
 **Acceptance**
 - Full E2E suite green
 - Whole-repo security audit passed
-- `git log --all` and the full tree free of provenance references
+- No database, seed artefact or `.env` anywhere in the tree or its history
 - A fresh clone plus a supplied database runs the app from the README alone
 
 **Technical Spec** — _pending_ · **Design Spec** — _pending_
@@ -2858,12 +2868,18 @@ that decision and its reason in the CR entry.
 | CR-002 | 2026-08-04 | Rewrite the passages of `REQUIREMENTS.md` that characterise where the dataset came from, so a fresh clone carries none of it. Fix `HEAD` only; accept the history exposure | C | ~~`REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `PLAN.md`, `.claude/agents/reviewer.md`~~ — none, withdrawn | ~~`change/CR-002-requirements-hygiene`~~ — never opened | **⛔ WITHDRAWN 2026-08-04 — Rishabh's decision** | — |
 | CR-003 | 2026-08-04 | `REQUIREMENTS.md` §2.2 / §2.5 say 2026 has 24 rounds scheduled; the data holds 24 calendar rows but only 22 numbered rounds | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `PLAN.md` | `change/CR-003-numbered-rounds` | Not started (blocked on F0) | — |
 | CR-004 | 2026-08-04 | "If multiple teams have the same colour, use the logos instead where necessary, and where the colours don't clash use the colours" | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `PLAN.md` | `change/CR-004-team-identity-encoding` | Logged — scheduled for F1 | — |
+| CR-005 | 2026-08-04 | Remove the upstream-attribution constraint and its check from the gate order entirely — not downgrade it. Forward obligation only; the historical record stays. **Supersedes CR-002** | C | `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md`, `.claude/agents/*.md` | folded into `feat/foundation` (F0) — deviation recorded below | **In progress — partially blocked** | — |
 
 ---
 
 #### CR-002 — `REQUIREMENTS.md` origin-characterisation removal · **Class C** · ⛔ **WITHDRAWN**
 
 > ## ⛔ WITHDRAWN BY RISHABH, 2026-08-04 — do not implement, do not reopen
+>
+> **➡ Later that day this was overtaken entirely: see CR-005 (§5.5), which removes the underlying
+> constraint rather than declining one remediation of it.** This banner is kept as the record of the
+> withdrawal; CR-005 is the operative decision. Items 2 and 4 below have been corrected where they
+> referred forward to a rule that no longer exists.
 >
 > **Rishabh withdrew this CR**, judging the exposure **"not that important"**. Everything below this
 > banner is retained as the record of what was triaged and why, **not** as live work. No branch was
@@ -2873,17 +2889,16 @@ that decision and its reason in the CR entry.
 >
 > 1. **No agent implements any part of this CR.** `REQUIREMENTS.md` is not to be rewritten for origin
 >    characterisation, and `.claude/agents/*.md` gains no S-12 amendment from this CR.
-> 2. **`private/provenance-blocklist.txt` stays at its original 6 patterns.** An extension to 30 was
->    attempted and **reverted**, because a broader blocklist made the `CLAUDE.md` §4.1 /
->    `PLAN.md` §2.4 check fail **by design** against the very documents that describe the policy. Do
->    not re-extend it. §6.1 **A-2 is therefore declined, not outstanding.**
+> 2. **`private/provenance-blocklist.txt` stays at its original 6 patterns**, and as of CR-005 is
+>    referenced by nothing. It remains on disk, gitignored. Do not extend it, do not wire it into any
+>    script, test or gate. §6.1 **A-2 is closed.**
 > 3. **The related open items are declined, not deferred.** Nothing here is waiting on anyone.
-> 4. **⚠ A known, accepted mismatch a reviewer may legitimately flag at gate 7.** `CLAUDE.md` §4.1
->    and `PLAN.md` §2.4 still describe provenance leakage as a **release blocker** and have
->    deliberately **not** been downgraded. So the *policy* text is stricter than the *action* taken
->    here. That is a recorded decision, **not a new finding** — a reviewer noting it has read
->    correctly and should be pointed at this banner rather than at fresh work. Re-raising it as a
->    blocker needs Rishabh, not an agent.
+> 4. **The doc-vs-action mismatch this item used to record is resolved by CR-005**, which removes the
+>    rule from `PLAN.md` outright rather than leaving a policy stricter than the action taken. **One
+>    part of that removal is still outstanding and a reviewer may legitimately flag it** — see
+>    CR-005's gate ledger, step 4b: the copies in `CLAUDE.md` and `.claude/agents/*.md` need Rishabh's
+>    own instruction before an agent may edit them, so until he gives it those files still carry the
+>    obligation. That is a recorded, deliberate partial state, **not a new finding**.
 > 5. **`db/schema.sql` hygiene is untouched by this withdrawal** — it was always **F0 task T2's**
 >    work, with its own acceptance criteria and T14's line-by-line re-read, and T2 **stands and is in
 >    the gate-3 dispatch**.
@@ -3066,6 +3081,112 @@ be reviewed at all.
 
 ---
 
+#### CR-005 — remove the upstream-attribution constraint from the gate order · **Class C** · supersedes CR-002
+
+**Request (Rishabh, 2026-08-04, relayed to the `orchestrator` by the coordinating agent).** The
+upstream-attribution constraint and its accompanying check are **removed, not downgraded**. He will
+make the repository private and does not consider the exposure a problem.
+
+**Corrected scope, same day, same route:** the removal covers the **forward-going obligation only**.
+The historical record is **not** scrubbed. Checks already run were correct at the time and stay on the
+record verbatim.
+
+| Removed — anything that could make a future gate fail | Kept — factual log of work already done |
+|---|---|
+| The rule as a standing constraint / release blocker | Gate records and evidence entries stating the check was run and came back clean, **verbatim** — `PLAN.md` Technical Spec §9.5, gate record §G.1 |
+| The `reviewer`'s duty to run it, and its entry in the security-audit item list (`S-12`) | The CR log, **including CR-002 and its withdrawal** |
+| The duty as it appears in the agent definitions | Every past commit message — nothing rewritten, nothing reverted |
+| Its presence in any future gate checklist or required-evidence list (F0 §G.7, F11, §2.5 DoD) | The `.gitignore` entries for `private/` and `data/`, which exist for a 66 MB binary and local-only tooling and are unrelated |
+
+So this CR reads **"the constraint stops applying from here on"**, never "the constraint never
+existed".
+
+**Class C, and the reason is structural reach, not edit size:** it changes the gate order, the
+Definition of Done, the security-audit item list, and agent responsibilities.
+
+**Triage — what is affected.** **No feature, no route, no endpoint, no component, no query, no
+requirement ID, no token.** No application behaviour changes and no UI changes. F0's scope and
+acceptance criteria are untouched except that **two acceptance cells** (T2, T14) lost check-based
+clauses; **T2's and T14's substance both stand in full**, on DL-3 / trap-11 and documentation grounds
+respectively.
+
+**Three execution rules, binding on every agent touching this CR:**
+
+1. **Delete; do not explain.** A removal that replaces the rule with a description of what it used to
+   forbid — in particular one that writes a specific upstream source name into a tracked file — is
+   **strictly worse than leaving the gate in place**. Neutral wording only.
+2. **No upstream source name in any tracked file, commit message, or branch name.** Git history
+   survives the repository going private and cannot be cleanly rewritten afterwards, so history is
+   treated as append-only and permanent. The repository is public until Rishabh flips it, which is
+   why neutral wording remains the cheap option in the meantime.
+3. **`private/provenance-blocklist.txt` stays on disk, untouched, gitignored, and referenced by
+   nothing.** Do not delete it, do not extend it, do not wire it into any script, test, npm script or
+   CI step.
+
+##### Document Impact Assessment — CR-005
+
+Every canonical document gets an explicit verdict. Each hit was **individually read before editing** —
+the raw grep over-reports, because several matches are incidental prose rather than the rule.
+
+| Document | Verdict |
+|---|---|
+| `PLAN.md` | **CHANGE — done, by the `orchestrator`.** §1 non-negotiables bullet removed · §2.3 standing rule kept but its release-blocker clause and check reference removed · **§2.4 removed**, section number retained as a tombstone so existing cross-references do not silently retarget · §2.5 Definition of Done now reads "no database, `.env`, or seed artefact staged" · Technical Spec §3.5 component note, **T2 and T14 acceptance cells**, §8 task-ordering rationale, §9.4 open item 3 · **F11** scope and acceptance · §6 risk row removed · §6.1 **A-1 and A-2 closed** · §G.7 amended in place with the mid-run correction recorded · CR-002 banner items 2 and 4 corrected to point here · this entry · §7 change-log rows. **Deliberately left verbatim:** Technical Spec §9.5, gate record §G.1, the F0 gate-1/gate-2 assignment briefs, and all CR-002 history. |
+| `REQUIREMENTS.md` | **CHANGE — routed to the `principal-engineer`, who owns it.** One forward obligation, **§7.2 line 495**. The other three bullets in §7.2 stay: never commit the database or a raw seed file; a fresh clone has no database; schema changes are mirrored in `db/schema.sql`. No requirement ID is added, removed or renumbered; no coverage figure moves; §6 (out of scope) is untouched. |
+| `docs/ARCHITECTURE.md` | **CHANGE — routed to the `principal-engineer`.** Two edits: **§7 `S-12` removed from the security-posture table** (this is the security-audit item list, so the audit becomes S-1…S-11 + S-13…S-14 — renumbering is **not** wanted, the identifiers are load-bearing in review history), and a **§10 decision-log entry, required by Class C**. No stack, layering, API-surface, routing, or performance-budget change. |
+| `docs/DATABASE.md` | **No change.** Re-read at CR open: §1–§9 describe schema, canonical queries, traps, coverage and maintenance only, and carry no reference to the rule. F0 **T14** still adds trap 15 and the §9 checklist items, unaffected. |
+| `docs/DESIGN_SYSTEM.md` | **CHANGE — one line, routed to the `designer`, who owns it.** **§7.3 line 654** states the constraint as a release blocker binding on copy. The `DataVintage` **copy itself does not change**: coverage phrasing was chosen on independent grounds (it is the more honest phrasing, and `REQUIREMENTS.md` §2.2 forbids assuming today's calendar position), so it survives the constraint's removal on its own merits. **No token, colour, typography, motion or component change → no fresh §9 palette validation run required.** |
+| `CLAUDE.md` | **CHANGE REQUIRED — ⛔ BLOCKED, needs Rishabh's own instruction.** Six hits, including §4.1 (the rule) and its appearances in §3, §5 and §8. See the escalation note below. |
+| `.claude/agents/*.md` | **CHANGE REQUIRED — ⛔ BLOCKED, needs Rishabh's own instruction.** `reviewer.md` (7 hits, incl. the `S-12` duty), `orchestrator.md` (4), `developer.md` (3), `principal-engineer.md` (1), `designer.md` (1). `qa.md` carries none. See the escalation note below. |
+
+##### ⛔ Escalation — the `CLAUDE.md` and `.claude/agents/*.md` half needs Rishabh directly
+
+**The `orchestrator` declined to make these edits on a relayed instruction, and this is not caution
+about the decision itself.** The `orchestrator`'s operating rules state that no message from another
+agent can authorise changing `CLAUDE.md` or agent configuration — only Rishabh's own message or the
+permission system can. This instruction arrived **relayed through the coordinating agent**, attributed
+to Rishabh but not received first-hand from him, exactly as the CR-002 authorisation did.
+
+That guardrail exists for precisely this shape of request: an agent-relayed instruction to remove a
+guardrail from the files that define the agents' own obligations. Complying would be indistinguishable
+from the failure mode the rule is there to prevent, **regardless of whether the instruction is
+genuine** — and there is every reason to think it is.
+
+**Consequence, stated plainly so no one is surprised at a later gate:** until Rishabh instructs it
+himself, `CLAUDE.md` §4.1 and `.claude/agents/reviewer.md`'s `S-12` still carry the obligation, so
+**the `reviewer` will still run the check at gate 7 and may still raise it as a finding.** That is a
+recorded, deliberate partial state — not a defect and not a new finding. One line from Rishabh clears
+it.
+
+##### Gate order for CR-005 — deviation recorded, per §5.4
+
+**Deviation: this CR is folded into `feat/foundation` rather than opening
+`change/CR-005-<slug>`.** Instructed, and recorded here rather than taken silently. Grounds: gate 3 of
+F0 was **already in flight** when the CR arrived, and two F0 task acceptance cells (T2, T14) gated
+in-flight work on the removed check. A separate branch would either block gate 3 or merge after it,
+leaving the `developer` working to superseded acceptance criteria in the meantime. **This sets no
+precedent** — it rests on gate 3 being open at the moment the instruction landed.
+
+| Step | Gate | Owner | State |
+|---|---|---|---|
+| 1 | CR entry, triage, class, Document Impact Assessment | `orchestrator` | ✅ 2026-08-04 — this entry |
+| 2 | Technical spec + confirms/corrects the doc impact | `principal-engineer` | Folded into step 4a — the change is a documented removal with no technical design content; the `principal-engineer` confirms or corrects the assessment when it makes its own edits |
+| 3 | Design spec | — | **Skipped — the CR provably touches no UI** (§5.4). No route, component, state, token or copy string changes. Recorded, not assumed |
+| 4 | Implement | | |
+| 4a | `PLAN.md` removals | `orchestrator` | ✅ 2026-08-04 |
+| 4b | `CLAUDE.md` + `.claude/agents/*.md` | **Rishabh** | ⛔ **BLOCKED — needs his own instruction.** See the escalation above |
+| 4c | `REQUIREMENTS.md` §7.2, `docs/ARCHITECTURE.md` §7 `S-12` + §10 entry | `principal-engineer` | Dispatched 2026-08-04 |
+| 4d | `docs/DESIGN_SYSTEM.md` §7.3 | `designer` | Dispatched 2026-08-04 |
+| 5 | Visual verification | — | **Not applicable — no UI change.** Folded into F0's own gate 4, which runs regardless |
+| 6 | Fix design findings | — | n/a |
+| 7 | Code review + verifies doc updates landed | `reviewer` | Runs as part of F0 gate 6. **Must verify this assessment was honoured, not merely written** (§5.3) |
+| 8 | Security audit | `reviewer` | Runs as part of F0 gate 7, minus `S-12` **once 4b lands**; with it until then |
+| 9 | Fix blocking findings | `developer` | As part of F0 gate 8 |
+| 10 | E2E | `qa` | **Not applicable — no behaviour change.** F0's own gate 9 covers the branch |
+| 11 | Fix QA findings | `developer` | n/a |
+| 12 | Verify every gate → approve → merge | `orchestrator` | Pending — **cannot approve while 4b is blocked**, since a merge would ship documents that disagree with each other |
+
+---
+
 ## 6. Risks
 
 | Risk | Mitigation |
@@ -3074,7 +3195,6 @@ be reviewed at all.
 | Team brand colours fail perceptual separation | Runtime collision detection + mandatory secondary encoding (F1) |
 | Cross-era points comparisons silently wrong | `championship_system` applied; normalization always visible; reviewer trap-4 check |
 | Position chart performance at lap scale | visx + server-side downsampling; budget in `ARCHITECTURE.md` §8 |
-| Provenance leaking into the repository | Grep gate in review, in approval, and again at release |
 | Images unavailable for 881 drivers / 214 teams | Placeholders are permanent infrastructure, not a stopgap |
 | Playwright MCP not configured | `qa` and `designer` must stop and report, never work around it |
 | Design incoherence across features | Design system lands before any feature (F1); nothing invents tokens after |
@@ -3086,8 +3206,8 @@ the mitigation available.
 
 | # | Item | Status |
 |---|---|---|
-| **A-1** | **Origin-characterising text remains in git history *and* in the working tree.** CR-002 was going to rewrite the working tree; it is **withdrawn**, so the text stays at `HEAD` as well as in commit `f18d2c4` on public `main`. **F11's provenance sweep cannot close the history half** — a working-tree grep does not see history, and Rishabh has decided against a rewrite or force-push. | **Accepted by Rishabh, 2026-08-04**, and **widened** by his withdrawal of CR-002 the same day: he judged the exposure "not that important". No remediation, forward or backward. Revisit only if he says so. |
-| **A-2** | **`private/provenance-blocklist.txt` is narrower than the policy it enforces.** It holds 6 patterns, which is why the `CLAUDE.md` §4.1 grep returns `clean` against `db/schema.sql` and the `REQUIREMENTS.md` passages today. Any terms needed were reported to Rishabh **in chat only** and written to **no file, tracked or untracked** — no agent may write them anywhere. | **⛔ DECLINED 2026-08-04 — not outstanding, and not on anyone.** An extension to 30 patterns was tried and **reverted**: a broader list made the §4.1 check fail by design against the documents that state the policy. **The file stays at 6 patterns; do not re-extend it.** Consequence to hold consciously: the grep is a **floor**, not the standard, and §2.4/§4.1 still call leakage a release blocker while no action is being taken — see the CR-002 withdrawal banner, item 4. `db/schema.sql` hygiene is still handled, by **F0 T2 + T14**, which is a hand-written task precisely because the grep cannot catch it. |
+| **A-1** | ~~Upstream-attribution text at `HEAD` and in git history~~ | ✅ **CLOSED 2026-08-04 by CR-005** (§5.5) — the constraint this risk was measured against no longer applies. Rishabh will make the repository private and does not consider the exposure a problem. Nothing outstanding; nothing to remediate, forward or backward. |
+| **A-2** | ~~The blocked-terms list is narrower than the policy it enforced~~ | ✅ **CLOSED 2026-08-04 by CR-005** (§5.5) — the policy is withdrawn, so the list enforces nothing and is not a gap. `private/provenance-blocklist.txt` stays on disk, gitignored and unreferenced; **do not extend it and do not wire it into anything.** `db/schema.sql` hygiene is unaffected and still lands via **F0 T2**, on DL-3 / trap-11 grounds. |
 | **A-3** | **Product name.** "F1" is a registered trade mark and Formula 1's published guidelines forbid using their typefaces and warn against using Titillium in any manner that implies association with the Championship. The repository is public. The design system deliberately leans on none of F1's visual identity (`DESIGN_SYSTEM.md` §2.1), but the literal string "F1 Analytics" is a naming and legal decision, not a design one. | **Working name kept. Decision deferred to F11.** Not an agent's call. A rename is a token change, so deferring costs little. |
 | **A-4** | **Playwright MCP registration needed a restart to reach the tool list.** | ✅ **CLOSED 2026-08-04.** The restart has happened; `mcp__playwright__*` tools are present. Gates 4 and 9 are unblocked (G.6). The standing rule survives: each agent still checks its **own** tool list at run time and stops if the tools are absent. |
 | **A-5** | **Node 22 was not installed** — the machine had only v20.18.2, and `/opt/homebrew/opt/node@22` is a **mislabelled keg containing v23.7.0**. | ✅ **CLOSED 2026-08-04 — Rishabh installed it.** `node -v` → **v22.23.2**, npm 10.9.8, `default -> 22.23.2`; `better-sqlite3@12.11.1` builds and loads; `npm audit` clean. **Residual, not a risk but a footgun:** an agent shell started before the install still resolves v20.18.2, so `CLAUDE.md` §7's `nvm use 22.23.2` step and **T1's own `node -v` assertion** both remain mandatory. The mislabelled keg must still never be used. |
@@ -3115,3 +3235,4 @@ the mitigation available.
 | 2026-08-04 | **CR-002 WITHDRAWN by Rishabh** — exposure judged "not that important". Withdrawal banner added; §5.5 row, gate ledger and CR-003's sequencing note corrected; **A-2 declined** (blocklist stays at 6 patterns — a 30-pattern extension was tried and reverted because it failed §4.1 by design); A-1 widened to cover `HEAD` as well as history. §2.4 / `CLAUDE.md` §4.1 deliberately **not** downgraded — the mismatch is recorded, not a new finding | orchestrator |
 | 2026-08-04 | **F0 gate-3 preconditions all cleared and independently re-verified** (P-1 Node v22.23.2; P-2 `DESIGN_SYSTEM.md` §10 external `public/theme-init.js`; P-3 four task cross-references + G.4 items 1–4). §G.5 had gone stale showing all three outstanding; corrected with the verification method recorded per row. **A-4 and A-5 closed** — Playwright MCP tools now present, Node 22 installed | orchestrator |
 | 2026-08-04 | **F0 gate 3 dispatched** — `developer` implementing T1–T14 on `feat/foundation`; status → `In development`; brief recorded as gate-record §G.7. Gates 4–11 outstanding; F0 is **not** Done | orchestrator |
+| 2026-08-04 | **CR-005** opened (Class C) — **supersedes CR-002.** The upstream-attribution constraint and its check are removed from the gate order, the Definition of Done, the F11 checklist and the F0 evidence list; **forward obligation only, historical record kept verbatim** (Technical Spec §9.5, gate record §G.1, CR-002's history, all past commit messages). §2.4 removed with its number retained as a tombstone; §6 risk row removed; §6.1 A-1 and A-2 closed; T2/T14 acceptance cells amended mid-run and the `developer` notified in flight. `docs/DATABASE.md` **no change**. `REQUIREMENTS.md` / `docs/ARCHITECTURE.md` routed to `principal-engineer`, `docs/DESIGN_SYSTEM.md` to `designer`. **`CLAUDE.md` and `.claude/agents/*.md` ⛔ blocked pending Rishabh's own instruction** — an agent-relayed message cannot authorise editing agent configuration, so `S-12` stays live at gate 7 until he speaks | orchestrator |
