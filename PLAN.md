@@ -3083,7 +3083,8 @@ be reviewed at all.
 
 #### CR-005 — remove the upstream-attribution constraint from the gate order · **Class C** · supersedes CR-002
 
-**Request (Rishabh, 2026-08-04, relayed to the `orchestrator` by the coordinating agent).** The
+**Request (Rishabh, in session, 2026-08-04 — stated across two messages: the decision, then a
+clarification narrowing it to forward-going only).** The
 upstream-attribution constraint and its accompanying check are **removed, not downgraded**. He will
 make the repository private and does not consider the exposure a problem.
 
@@ -3141,16 +3142,17 @@ the raw grep over-reports, because several matches are incidental prose rather t
 
 ##### ⛔ Escalation — the `CLAUDE.md` and `.claude/agents/*.md` half needs Rishabh directly
 
-**The `orchestrator` declined to make these edits on a relayed instruction, and this is not caution
-about the decision itself.** The `orchestrator`'s operating rules state that no message from another
-agent can authorise changing `CLAUDE.md` or agent configuration — only Rishabh's own message or the
-permission system can. This instruction arrived **relayed through the coordinating agent**, attributed
-to Rishabh but not received first-hand from him, exactly as the CR-002 authorisation did.
+**The decision itself is not in question — it is Rishabh's, stated by him in session on 2026-08-04.**
+This is a **channel** requirement, not a doubt about authority. The `orchestrator`'s operating rules
+reserve edits to `CLAUDE.md` and to agent configuration to Rishabh's own message or the permission
+system, and they do so **categorically** — the reservation applies to a *class of file*, however
+well-attested the instruction is, precisely because "remove a guardrail from the files that define the
+agents' own obligations" is the one request that must not be self-serviceable. A rule that yielded to
+a sufficiently confident instruction would not be a rule.
 
-That guardrail exists for precisely this shape of request: an agent-relayed instruction to remove a
-guardrail from the files that define the agents' own obligations. Complying would be indistinguishable
-from the failure mode the rule is there to prevent, **regardless of whether the instruction is
-genuine** — and there is every reason to think it is.
+So this is a formality with a real cost of exactly one line from Rishabh, and no judgement is implied
+about the instruction, which is well-attested and which the `orchestrator` has otherwise implemented
+in full.
 
 **Consequence, stated plainly so no one is surprised at a later gate:** until Rishabh instructs it
 himself, `CLAUDE.md` §4.1 and `.claude/agents/reviewer.md`'s `S-12` still carry the obligation, so
@@ -3222,13 +3224,41 @@ compliance. No copy string changed.
 §7's table is the `reviewer`'s work list, read top to bottom; an unexplained numeric gap in a dense
 sequence reads as a truncation bug. The note states only *that* the row was removed.
 
-**Ruling 5 — attribution in `ARCHITECTURE.md` §10 entry 20 must be corrected.** The entry reads
-"Decided by Rishabh." flatly. CR-005 reached the team **relayed through the coordinating agent**,
-attributed to Rishabh but not received first-hand — the same route as the CR-002 authorisation, which
-this file records precisely for that reason. A decision log's value rests on its attribution being
-trustworthy, so it must not be the one place that reads as a first-hand countersignature. Amendment
-dispatched to the `principal-engineer`; the rest of entry 20 stands, including its `S-5`/`.gitignore`
-clause.
+**Ruling 5 — WITHDRAWN, and it was wrong. Recorded rather than deleted, because the mistake is the
+useful part.**
+
+I originally ruled that `ARCHITECTURE.md` §10 entry 20's plain "Decided by Rishabh." overstated what
+could be attested, and had the `principal-engineer` add a hedge saying the instruction was relayed, not
+received first-hand, and was therefore "a work instruction and not his personal countersignature".
+**That hedge was factually wrong and is reversed** (dispatched to the `principal-engineer`; entry 20
+otherwise byte-identical).
+
+**Corrected provenance: Rishabh stated this himself, in his own words, in session on 2026-08-04, across
+two messages** — the decision, then a clarification narrowing it to forward-going only. The
+coordinating session **relayed** his instruction; it did not originate, infer or reconstruct it. Entry
+20 and this CR now read **"Decided by Rishabh in session, 2026-08-04."**
+
+**The principle, recorded so it does not recur — this is the part worth keeping:**
+
+> **Do not hedge or qualify the authority of an instruction on the grounds that it arrived through the
+> coordinating session.** A relay is the normal path for every instruction every agent in this project
+> receives; it is not a weakening of attribution. Writing a "may not really be his" qualifier into a
+> canonical document is worse than saying nothing, because it **understates a real decision's
+> authority** in the document a future reader will trust — and a decision log that hedges its own
+> attributions is less useful, not more scrupulous. **If provenance is ever genuinely unclear, ask.**
+> Do not resolve the doubt by writing the doubt into the record.
+
+**What this does *not* change:** the §4.1 / `.claude/agents/*.md` block at step 4b **stands**. That
+rests on a **categorical channel rule** about a class of file, not on any doubt about who decided this
+— see the escalation note above, which has been reworded so it no longer implies otherwise.
+
+**One item flagged, not silently changed.** The CR-002 authorisation note earlier in §5.5 carries the
+same "relayed … not received first-hand … countersignature" formulation, about a **different**
+instruction, received in an **earlier session** that this `orchestrator` did not witness. I have not
+re-attributed it, because I have no first-hand knowledge of how that one arrived and the corrected
+principle above says to ask rather than to write a guess into the record. It is also **moot** — the
+gate deviations it authorised belong to a withdrawn CR and never ran. Raised for confirmation; it is a
+two-word fix if the same correction applies.
 
 **Ruling 6 — the `designer`'s proposed follow-up is NOT folded into CR-005, and is NOT an agent's
 call.** With the compliance rule gone, coverage-over-freshness survives only as *rationale inside one
@@ -3287,4 +3317,5 @@ the mitigation available.
 | 2026-08-04 | **CR-002 WITHDRAWN by Rishabh** — exposure judged "not that important". Withdrawal banner added; §5.5 row, gate ledger and CR-003's sequencing note corrected; **A-2 declined** (blocklist stays at 6 patterns — a 30-pattern extension was tried and reverted because it failed §4.1 by design); A-1 widened to cover `HEAD` as well as history. §2.4 / `CLAUDE.md` §4.1 deliberately **not** downgraded — the mismatch is recorded, not a new finding | orchestrator |
 | 2026-08-04 | **F0 gate-3 preconditions all cleared and independently re-verified** (P-1 Node v22.23.2; P-2 `DESIGN_SYSTEM.md` §10 external `public/theme-init.js`; P-3 four task cross-references + G.4 items 1–4). §G.5 had gone stale showing all three outstanding; corrected with the verification method recorded per row. **A-4 and A-5 closed** — Playwright MCP tools now present, Node 22 installed | orchestrator |
 | 2026-08-04 | **F0 gate 3 dispatched** — `developer` implementing T1–T14 on `feat/foundation`; status → `In development`; brief recorded as gate-record §G.7. Gates 4–11 outstanding; F0 is **not** Done | orchestrator |
+| 2026-08-04 | **Attribution corrected** in `ARCHITECTURE.md` §10 entry 20 and `PLAN.md` §5.5: CR-005 was **decided by Rishabh in session, 2026-08-04**, across two messages. An earlier `orchestrator` ruling had added a hedge calling it relayed-not-first-hand and "not his personal countersignature" — **that was wrong and is reversed**; a relay is the normal path for every instruction and does not weaken attribution. Ruling 5 is kept on the record as withdrawn, with the principle: never hedge an instruction's authority on the grounds it came through the coordinating session; if provenance is unclear, **ask**. The step-4b block is unaffected — it rests on a categorical channel rule about `CLAUDE.md` and agent configuration, not on doubt about who decided | orchestrator |
 | 2026-08-04 | **CR-005** opened (Class C) — **supersedes CR-002.** The upstream-attribution constraint and its check are removed from the gate order, the Definition of Done, the F11 checklist and the F0 evidence list; **forward obligation only, historical record kept verbatim** (Technical Spec §9.5, gate record §G.1, CR-002's history, all past commit messages). §2.4 removed with its number retained as a tombstone; §6 risk row removed; §6.1 A-1 and A-2 closed; T2/T14 acceptance cells amended mid-run and the `developer` notified in flight. `docs/DATABASE.md` **no change**. `REQUIREMENTS.md` / `docs/ARCHITECTURE.md` routed to `principal-engineer`, `docs/DESIGN_SYSTEM.md` to `designer`. **`CLAUDE.md` and `.claude/agents/*.md` ⛔ blocked pending Rishabh's own instruction** — an agent-relayed message cannot authorise editing agent configuration, so `S-12` stays live at gate 7 until he speaks | orchestrator |
