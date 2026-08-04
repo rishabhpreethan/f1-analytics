@@ -224,6 +224,85 @@ client → API → SQLite works, and all quality gates enforced from commit one.
 - Every route resolves (placeholders acceptable)
 - Theme toggle persists; `prefers-color-scheme` respected on first load
 
+**Assignment Briefs** — written 2026-08-04 by the orchestrator. Dispatch gates 1 and 2 in parallel.
+
+<details>
+<summary><b>Gate 1 — <code>principal-engineer</code> (Technical Spec)</b></summary>
+
+**Scope IN:** Vite + React 19 + TS (`strict`), Tailwind, path aliases · Hono API on Node with
+`better-sqlite3` opened `readonly: true` · the canonical views `v_entry` / `v_race` (DDL in
+`docs/DATABASE.md` §6.1) — **decide and justify where/how they are created**, given the database is
+read-only at runtime and not committed · `GET /api/meta` as the proving path (data vintage, latest
+completed round, season range) · TanStack Query provider · React Router v7 with the route table from
+`docs/ARCHITECTURE.md` §5 (placeholder components fine) · Zod pattern with types via `z.infer` ·
+security headers, non-leaking error handler (S-6, S-9), per-IP rate limit (S-13) · ESLint, Prettier,
+Vitest · `npm run dev` runs client + API together · app shell (header, nav, theme toggle, outlet) ·
+data-vintage indicator (NV-9).
+
+**Scope OUT:** any analytical feature, any chart, any driver/team/race page content.
+
+**Read:** `PLAN.md` §2 + this F0 section + §5 · `REQUIREMENTS.md` §2, §7 (DL-1…DL-8), §8 ·
+`docs/ARCHITECTURE.md` in full · `docs/DATABASE.md` §1, §6, §7, §8.
+
+**Constraints that bite:** fresh clone has no `data/f1.db` — the missing-DB case must give a clear
+actionable error, never a stack trace · `better-sqlite3` is synchronous by design · DL-1 never write ·
+DL-2 no third-party calls on a request path · DL-3 no internal integer ids in URLs · S-4 Zod-validate
+every param · S-6 no stack traces/SQL/paths in responses · trap 1: `has_time_data` unreliable — test
+for `lap` rows · Node v20.18.2 (`node:sqlite` unavailable) · **provenance silence**.
+
+**Verify, don't assume:** query `data/f1.db` directly to confirm the real values `/api/meta` returns
+and how "data vintage" is computed from the data itself.
+
+**Evidence required:** spec location · task count · the `v_entry`/`v_race` decision + reasoning ·
+verified `/api/meta` values · any dependency not already in `ARCHITECTURE.md` §2 (flag, don't add) ·
+anything escalated.
+
+</details>
+
+<details>
+<summary><b>Gate 2 — <code>designer</code> (Design Spec + design-system foundations)</b></summary>
+
+**Scope IN — Design Spec:** app shell (header, nav, theme toggle, outlet) · **data-vintage
+indicator** (NV-9) — honest and unobtrusive, and it must convey freshness **without naming or
+hinting at a source** · theme foundation, light and dark designed separately · loading / error /
+empty shell states including **"database not available"**, which a developer hits on a fresh clone ·
+route transition motion and shell entry motion.
+
+**Scope IN — `docs/DESIGN_SYSTEM.md`** (currently a handover with `_TO BE COMPLETED_` markers):
+complete §2 Typography (actual families, weights, modular scale; max three families; **verify fonts
+exist and are web-licensed by searching**) · §3.5 surfaces/ink/borders for both themes · §4 Motion
+(named timing/easing/spring set + reduced-motion variant for each) · §5 spacing scale and breakpoints
+390/768/1440 · §7 shell-relevant components (button, badge, skeleton, empty state, no-coverage state)
+with all states.
+
+**Defer to F1:** chart specifications, full component inventory, team-colour resolution internals.
+
+**Read first:** all of `docs/DESIGN_SYSTEM.md` — **§3 and §4 contain MEASURED facts** (a palette
+validation that failed four checks; verified F1 timing conventions). Build on them; do not
+re-litigate or soften them. Then `PLAN.md` §2 + this section + §5 · `REQUIREMENTS.md` §1.1, §2, §8 ·
+`docs/ARCHITECTURE.md` §5, §8.
+
+**Overriding requirement:** coherence. One type scale, one spacing scale, one motion vocabulary. The
+theme and typography must match the vibe — technical, precise, fast, confident — and must not be all
+over the place.
+
+**Motion:** do not hand-roll animation logic or invent easing curves. Use Framer Motion's own
+documented examples per category (`WebFetch`/`WebSearch`) and **cite which example each pattern
+derives from**. Define the timing set once. Honour `prefers-reduced-motion` everywhere.
+
+**Validate colour, don't reason about it.** Run the validator for every palette introduced, both
+modes, and record output in `DESIGN_SYSTEM.md` §9.
+
+**Constraints that bite:** assets are **Rishabh's** — specify precisely (path, dimensions, format,
+naming) and mark assigned to him, plus the shipping placeholder · **provenance silence** in all copy ·
+design only what the data supports (`REQUIREMENTS.md` §6) · never a dual-axis chart.
+
+**Evidence required:** spec location · which `DESIGN_SYSTEM.md` sections completed · typography choice
+with evidence the fonts exist and are licensed · actual validator output per palette · Framer Motion
+examples referenced by name · assets assigned to Rishabh · open questions for Rishabh.
+
+</details>
+
 **Technical Spec** — _pending `principal-engineer`_
 
 **Design Spec** — _pending `designer`_
