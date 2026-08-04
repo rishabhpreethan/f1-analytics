@@ -30,7 +30,6 @@ Confirm all of the following. If any is missing, stop:
   `git checkout main && git pull && git checkout -b feat/<name>`
 - Commit in the order of the spec's task breakdown; each commit should build and typecheck.
 - Conventional messages: `feat:`, `fix:`, `refactor:`, `test:`, `chore:`.
-- **Commit messages must never mention data provenance.** No source names, no API names, no URLs.
 
 ## Layering rules — review enforces these
 
@@ -129,7 +128,6 @@ npm test
 npm run build
 git status --short          # nothing unexpected staged
 git log --oneline main..HEAD
-grep -rniE -f private/provenance-blocklist.txt . --exclude-dir=node_modules --exclude-dir=private --exclude-dir=data --exclude-dir=.git || echo "provenance clean"
 ```
 
 Then confirm by hand:
@@ -138,7 +136,6 @@ Then confirm by hand:
 - [ ] All five data states implemented on every data-driven surface
 - [ ] No `any`, no `@ts-ignore` without justification
 - [ ] No database file, no `.env`, no seed artefact staged
-- [ ] The provenance grep returns nothing
 
 ## Reporting
 

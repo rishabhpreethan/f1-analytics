@@ -102,7 +102,8 @@ Verify each applicable trap by name:
 ## Pass 2 — Security audit
 
 A full audit against `ARCHITECTURE.md` §7. Run it on **every** feature, not once per project — new
-code creates new surface. Work through S-1 to S-14 and record a verdict for each.
+code creates new surface. Work through S-1 to S-14 and record a verdict for each. **`S-12` is
+retired — skip it; it is not a gap in your coverage.**
 
 | ID | Check | How to verify |
 |---|---|---|
@@ -117,9 +118,13 @@ code creates new surface. Work through S-1 to S-14 and record a verdict for each
 | S-9 | **Headers** | CSP, `nosniff`, `Referrer-Policy`, `X-Frame-Options` present; CSP has no script `unsafe-inline` |
 | S-10 | **Query-cost DoS** | Lap endpoints bound their result set; no unbounded scan reachable from a request |
 | S-11 | **CORS** | Same-origin only; no wildcard |
-| S-12 | **Provenance leak** | See below — release blocker |
 | S-13 | **Rate limiting** | Per-IP limit present on the API |
 | S-14 | **Supply chain** | Playwright/MCP tooling versions pinned |
+
+**`S-12` was removed on 2026-08-04 (CR-005, `PLAN.md` §5.5) and its number is retired — never
+reused.** `S-13` and `S-14` are cited by identifier across `PLAN.md`, the agent definitions and the
+review history, so renumbering would silently retarget those citations. The list is S-1…S-11 plus
+S-13…S-14.
 
 Useful starting commands (extend as needed — do not treat this as exhaustive):
 
@@ -130,30 +135,12 @@ grep -rnE '\$\{[^}]*\}' server/queries/ || echo "no interpolation in queries"
 grep -rn "readonly" server/db.ts
 grep -rniE "api[_-]?key|secret|token|password|bearer" --include="*.ts" --include="*.tsx" src/ server/ | grep -v node_modules
 grep -rn "console.log" src/ server/ || echo "clean"
-```
 
-### S-12 — provenance leak (release blocker)
-
-Nothing about how the dataset was obtained may appear anywhere that reaches GitHub. Check code,
-comments, docs, test names, fixtures, commit messages, and branch names:
-
-```bash
-# The blocklist itself lives outside the repository so the terms never appear in it.
-grep -rniE -f private/provenance-blocklist.txt . \
-  --exclude-dir=node_modules --exclude-dir=private --exclude-dir=data --exclude-dir=.git \
-  && echo "PROVENANCE LEAK — BLOCKING" || echo "provenance clean"
-
-git log main..HEAD --format='%s%n%b' | grep -inE -f private/provenance-blocklist.txt \
-  && echo "COMMIT MESSAGE LEAK" || echo "commits clean"
-
-git rev-parse --abbrev-ref HEAD | grep -inE -f private/provenance-blocklist.txt \
-  && echo "BRANCH NAME LEAK" || echo "branch clean"
-
+# S-5: no gitignored path may be staged — `data/` is a 66 MB binary, `private/` is local-only
+# tooling. Neither is ever committed. Any hit here is blocking.
 git diff main...HEAD --name-only | grep -E "^(data/|private/)" \
-  && echo "IGNORED PATH STAGED" || echo "no ignored paths"
+  && echo "IGNORED PATH STAGED — BLOCKING" || echo "no ignored paths"
 ```
-
-Any hit is **blocking**, regardless of how minor it looks.
 
 ## Reporting findings
 
@@ -162,7 +149,7 @@ do. Vague findings cause a wasted cycle.
 
 | Severity | Meaning |
 |---|---|
-| **Blocking** | Must be fixed before QA. Security issues, requirement gaps, spec violations, data-trap violations, dual-axis charts, provenance leaks. |
+| **Blocking** | Must be fixed before QA. Security issues, requirement gaps, spec violations, data-trap violations, dual-axis charts. |
 | **Should fix** | Real problems not worth blocking on alone; fix now unless the orchestrator defers them. |
 | **Nit** | Style and preference. Never blocking. Keep these few — a wall of nits buries the real findings. |
 
@@ -176,7 +163,7 @@ the developer's time and devalues your real findings.
 You sign off **twice**, separately:
 
 1. `CODE REVIEW: PASS` — or a list of blocking findings
-2. `SECURITY AUDIT: PASS` — with a verdict recorded for each of S-1 … S-14
+2. `SECURITY AUDIT: PASS` — with a verdict recorded for each of S-1 … S-14, excluding retired `S-12`
 
 Report both to the orchestrator. **You do not approve merges** — the orchestrator does, and only
 after QA has also signed off.

@@ -227,7 +227,6 @@ tracker assigned to Rishabh. Always specify the placeholder that ships until an 
 
 ## Hard constraints
 
-- **No provenance.** Never reference where the data came from, in any copy or comment.
 - Design only what the data supports. `REQUIREMENTS.md` §6 lists what does not exist — **no tyre
   compounds, no weather, no sector times, no telemetry, no practice analysis.** Designing them is
   a scope failure.

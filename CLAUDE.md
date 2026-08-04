@@ -76,26 +76,20 @@ as the code.
 
 ## 4. Hard constraints — violating these blocks a merge
 
-### 4.1 Provenance silence (release blocker)
+### 4.1 *(removed — number retained, never reused)*
 
-**Never reference how the dataset was assembled** — not in code, comments, docs, test names,
-fixtures, commit messages, branch names, or PR text. The repo is **public**.
-
-The blocked terms live in `private/provenance-blocklist.txt` (gitignored, so the terms never appear
-in the repo). Check with:
-
-```bash
-grep -rniE -f private/provenance-blocklist.txt . \
-  --exclude-dir=node_modules --exclude-dir=private --exclude-dir=data --exclude-dir=.git \
-  && echo "LEAK — BLOCKING" || echo "clean"
-```
+The upstream-attribution constraint and its blocked-terms check were **removed on 2026-08-04**
+(CR-005, `PLAN.md` §5.5; `ARCHITECTURE.md` §10 entry 20). Rishabh is making the repo private and
+does not regard the exposure as a problem. **Forward-going only** — existing gate records, evidence
+entries and commit messages stand verbatim, and the checks already run were correct at the time.
+Do not reinstate this, and do not raise it at a gate.
 
 ### 4.2 The database is an input, never an artefact
 
 - `data/f1.db` (~66 MB) is **gitignored**. Never commit it or any raw seed file.
 - A fresh clone has no database. The missing-DB case must give a clear actionable error.
 - Opened **read-only**. The application never writes. Any write path is a defect.
-- `private/` holds local-only seed tooling and provenance notes — **gitignored, never committed**.
+- `private/` holds local-only seed tooling and notes — **gitignored, never committed**.
 
 ### 4.3 Read-only product
 
@@ -177,13 +171,13 @@ around it. Registration having happened does not waive this.
   Motion shell/route subset **does** land in F0
 - ➡️ **NEXT ACTION: dispatch gate 3 (`developer`) to implement T1–T14** on `feat/foundation`. Nothing
   blocks it. T1 must still assert `node -v ≥ v22.22.0` and stop if not.
-- **CR-002 (provenance hygiene) is WITHDRAWN — Rishabh's decision, 2026-08-04.** He judged the
-  exposure "not that important". `private/provenance-blocklist.txt` stays at its original 6 patterns
-  (an extension to 30 was tried and reverted, because it made the §4.1 check fail by design). The
-  related open items are **declined, not outstanding** — do not reopen them, re-extend the blocklist,
-  or re-raise this as a release blocker unless Rishabh asks. §4.1 and `PLAN.md` §2.4 still describe it
-  as a blocker and have **not** been downgraded, so a reviewer may flag it at gate 7; that is a known
-  mismatch, not a new finding. **CR-003** (2026 has 22 numbered rounds, not 24) is blocked on F0.
+- **CR-005 supersedes CR-002: the upstream-attribution constraint is GONE — Rishabh's decision,
+  2026-08-04.** He is making the repo private and judged the exposure not a problem. Removed from
+  §4.1 (tombstoned above), `PLAN.md` §2.4, the gate order, the Definition of Done, the F11 checklist,
+  the F0 evidence list, `S-12` in the security audit (number **retired**, S-13/S-14 unchanged), and
+  every agent definition. **Forward-going only — history stands verbatim.** Do not reinstate it,
+  re-extend the blocklist, or raise it at gate 7. CR-002's own withdrawal stays on the record.
+  **CR-003** (2026 has 22 numbered rounds, not 24) is blocked on F0.
   **CR-004** (Rishabh's proposal: team logos where brand colours collide, colours where they don't) is
   scheduled for F1
 - If the orchestrator's `PLAN.md` §5.5 still shows CR-002 as open and highest-priority, that is stale

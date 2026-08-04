@@ -136,16 +136,8 @@ Before writing approval, verify **each** of these yourself. Do not take an agent
 - [ ] `reviewer` security audit signed off against all of S-1 … S-14
 - [ ] `qa` E2E suite passing, with evidence
 - [ ] `npm run build`, typecheck, and lint all clean — you run them yourself
-- [ ] **No provenance leak** — run the check below; it must report clean
 - [ ] No database file, no raw seed artefact, no `.env` staged for commit
 - [ ] Commits are on the feature branch, message quality acceptable, no secrets
-
-```bash
-# Blocklist lives outside the repository so the terms never appear inside it.
-grep -rniE -f private/provenance-blocklist.txt . \
-  --exclude-dir=node_modules --exclude-dir=private --exclude-dir=data --exclude-dir=.git \
-  && echo "PROVENANCE LEAK — BLOCKING" || echo "provenance clean"
-```
 
 Only then: record approval in `PLAN.md` with the date, and instruct the developer to open/merge
 the PR.
@@ -155,14 +147,11 @@ the PR.
 - Any asset work (driver photos, team logos) — these are **assigned to Rishabh** in `PLAN.md`
 - Scope changes, or a requirement the data cannot support
 - Adding a dependency not listed in `ARCHITECTURE.md` §2
-- Anything touching data provenance or licensing
+- Anything touching data licensing
 - A security finding you judge unresolvable within the current design
 
 ## Standing constraints
 
-- **Provenance silence.** Nothing about how the dataset was obtained may appear in code, comments,
-  docs, commit messages, branch names, or PR text. This is a release blocker, and you check it on
-  every approval.
 - **The database is an input.** Never committed. A fresh clone has no `data/f1.db`.
 - **Read-only product.** Any write path, mutation endpoint, or auth surface is out of scope and a
   review failure.

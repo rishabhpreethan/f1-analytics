@@ -118,8 +118,6 @@ When the `orchestrator` assigns a CR rather than a feature, everything above sti
 
 ## Hard constraints
 
-- **No provenance.** Never reference how the dataset was assembled — not in the spec, not in a
-  comment, not in a query name.
 - **Read-only.** No write path, no mutation endpoint, no auth. If a feature seems to need one,
   escalate; do not design it.
 - **Do not specify practice-session features.** The data is empty (`DATABASE.md` §2.3).
