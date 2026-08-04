@@ -125,7 +125,7 @@ Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` �
 | R1 | Driver images | — | — | Not started | — |
 | R2 | Team logos | — | — | Not started | — |
 | R3 | App icons (favicon, touch, maskable) | — | — | Not started | — |
-| F0 | Foundation & scaffold | `feat/foundation` | R0 | Ready for dev ⛔ | — |
+| F0 | Foundation & scaffold | `feat/foundation` | R0 | In development | — |
 | F1 | Design system | `feat/design-system` | F0 | Not started | — |
 | F2 | Season hub | `feat/season-hub` | F1 | Not started | — |
 | F3 | Race deep dive | `feat/race-deep-dive` | F1 | Not started | — |
@@ -138,11 +138,11 @@ Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` �
 | F10 | Accessibility & performance | `feat/polish` | F2–F9 | Not started | — |
 | F11 | Release hardening | `feat/release-hardening` | F10 | Not started | — |
 
-**⛔ F0 is `Ready for dev` but gate 3 cannot start.** Three preconditions, all recorded in the F0
-section under **Orchestrator Gate Record** §G.5: **P-1** Node 22 is not installed (T1's first
-acceptance criterion, Rishabh's to run); **P-2** and **P-3** are two document defects found at gate
-verification — one in `DESIGN_SYSTEM.md`, one in the Technical Spec — each a one-line-class correction
-in the document its author owns (§G.3).
+**✅ F0 gate 3 is running — all three preconditions cleared, re-verified by the `orchestrator`
+2026-08-04** (§G.5): **P-1** Node **v22.23.2** installed; **P-2** `DESIGN_SYSTEM.md` §10 corrected to
+the external `public/theme-init.js`; **P-3** all four stale task cross-references corrected. The
+`developer` is implementing T1–T14 on `feat/foundation`. Gates 4–11 follow; nothing is Done until the
+`orchestrator` records approval.
 
 **R1 / R2 are not on F0's critical path.** F0 renders no driver, team or race content, so no
 headshot, logo or placeholder-avatar surface exists in it. They first bind at F4 (R1) and F5 (R2).
@@ -155,7 +155,7 @@ Filled in by the `orchestrator` as gates complete.
 
 | ID | Spec | Design | Dev | Design verify | Review | Security | QA | Approved |
 |---|---|---|---|---|---|---|---|---|
-| F0 | ✅ 2026-08-04 · `PLAN.md` F0 → Technical Spec (14 tasks, T1–T14) · verified by orchestrator | ✅ 2026-08-04 · `PLAN.md` F0 → Design Spec + `docs/DESIGN_SYSTEM.md` §1–§10 · verified by orchestrator | | | | | | |
+| F0 | ✅ 2026-08-04 · `PLAN.md` F0 → Technical Spec (14 tasks, T1–T14) · verified by orchestrator | ✅ 2026-08-04 · `PLAN.md` F0 → Design Spec + `docs/DESIGN_SYSTEM.md` §1–§10 · verified by orchestrator | ⏳ 2026-08-04 · dispatched, T1–T14 on `feat/foundation` · brief §G.7 | | | | | |
 | F1 | | | | | | | | |
 | F2 | | | | | | | | |
 | F3 | | | | | | | | |
@@ -2364,19 +2364,46 @@ Dispatch **after** D-2 is in hand; these are one revision, not four.
 
 ##### G.5 Gate 3 preconditions — all three must clear
 
-| # | Precondition | Owner | State |
-|---|---|---|---|
-| P-1 | **Node 22 installed** — `nvm install 22.23.2 && nvm alias default 22.23.2 && node -v`. T1's first acceptance criterion is `node -v ≥ v22.22.0` **before starting**. `nvm ls` shows only v20.18.2; **`/opt/homebrew/opt/node@22` is a mislabelled keg containing v23.7.0 and must not be used** | **Rishabh** | ⛔ Outstanding |
-| P-2 | **D-1** — `DESIGN_SYSTEM.md` §10 theme-script line corrected | `designer` | ⛔ Outstanding |
-| P-3 | **D-2** — four task cross-references corrected, plus G.4 items 1–2 | `principal-engineer` | ⛔ Outstanding |
+**✅ ALL THREE CLEARED — re-verified by the `orchestrator` 2026-08-04 before dispatching gate 3.**
+This table previously read `⛔ Outstanding` on all three rows after the underlying work had landed; the
+staleness is recorded rather than quietly overwritten, because the tracker's value depends on it not
+drifting.
 
-##### G.6 Gate 4 precondition — Playwright MCP
+| # | Precondition | Owner | State | How I verified it |
+|---|---|---|---|---|
+| P-1 | **Node 22 installed** — T1's first acceptance criterion is `node -v ≥ v22.22.0` **before starting**. **`/opt/homebrew/opt/node@22` remains a mislabelled keg containing v23.7.0 and must not be used** | **Rishabh** | ✅ **Cleared** | `node -v` → **v22.23.2** in the session shell. Agent shells may still inherit a PATH pinning v20.18.2, so the `nvm use` step in `CLAUDE.md` §7 stays mandatory and T1's assertion is **not** waived |
+| P-2 | **D-1** — `DESIGN_SYSTEM.md` §10 theme-script line corrected | `designer` | ✅ **Cleared** | `grep -n "theme-init\|inline script\|inline block" docs/DESIGN_SYSTEM.md` → §10 line 824 now specifies `public/theme-init.js` as **external**, line 829 records that an inline block is a CSP violation (S-9), and §11 logs the D-1 fix. No token, colour, type or motion change, so no re-validation was owed |
+| P-3 | **D-2** — four task cross-references corrected, plus G.4 items 1–2 | `principal-engineer` | ✅ **Cleared** | Read all four sites: §0.3 → **T14** ✅, §1.7 → **T14** ✅, §2.4 `styleSrcAttr` → **T13** ✅, §6.4 bundle figure → **T13** ✅. G.4 item 1 also landed: the `framer-motion` row is explicitly superseded per R-1, and tests 49–55/64 now specify a **radiogroup** rather than a cycle. G.4 item 2 landed as the two-console table in §2.4. G.4 item 3 landed as §9.2 (fonts vendored, icons inline — **no new dependency**). G.4 item 4 landed as §9.6 (F1 scope) |
 
-**Playwright MCP was registered this session** (`claude mcp add playwright -- npx -y
-@playwright/mcp@latest`, local project scope) but **does not appear in the tool list until Claude Code
-restarts**. Gate 4 (`designer` visual verification) and gate 9 (`qa` E2E) therefore **cannot run
-before that restart**. Per §2.1 both agents must stop and report rather than work around it — that
-instruction stands and is not waived by the registration having happened.
+##### G.6 Gate 4 precondition — Playwright MCP · ✅ CLEARED
+
+Registered 2026-08-04 (`claude mcp add playwright -- npx -y @playwright/mcp@latest`, local project
+scope). It needed a Claude Code restart to appear in the tool list; **that has happened** —
+`mcp__playwright__*` tools are present in the `orchestrator`'s session as of 2026-08-04, so gate 4
+(`designer` visual verification) and gate 9 (`qa` E2E) are **unblocked**.
+
+**The standing instruction is not waived.** Both agents must still check for `mcp__playwright__*` in
+their **own** tool list at the moment they run, and **stop and report** if it is absent rather than
+working around it (§2.1). Registration having happened is not the same as the tool being available in
+a given agent's session.
+
+##### G.7 Gate 3 — dispatched 2026-08-04
+
+**Assignment:** `developer`, tasks **T1–T14** of the Technical Spec §8, on `feat/foundation`. Full
+brief issued in the dispatch message; its load-bearing terms, recorded here so the gate can be audited
+against what was actually asked for:
+
+| Term | Value |
+|---|---|
+| Scope | T1–T14 in order. T1–T7 server, T8–T13 client/build, T2 + T14 doc hygiene. **Nothing outside the F0 scope list** — no analytical feature, no chart, no driver/team/race content |
+| Inputs named | Technical Spec §0–§9 · Design Spec §1–§11 · §G.2 rulings R-1…R-7 · `ARCHITECTURE.md` §2, §3, §5, §7, §8, §9, §10 · `DATABASE.md` §1, §2, §3, §4, §6, §7, §9 · `DESIGN_SYSTEM.md` §1–§10 · `REQUIREMENTS.md` §2, §6, §7, §8 |
+| Binding rulings restated | R-1 the Framer Motion shell/route subset **does** land in F0 (M-1…M-8, M-11, `MotionConfig`); R-2 `ThemeToggle` is a **3-option radiogroup popover**, not a cycle; R-3 achromatic chrome |
+| Hard constraints restated | provenance silence (§2.4) · read-only connection, no write path ever · clear actionable missing-DB error (Tech §2.7 + Design §7.1) · no auth, no mutation, no third-party request on any path · initial JS **< 250 KB gzipped** · **no hand-written duration/easing/spring/colour/size literal** — tokens only · slugs never integer ids (DL-3) · typographic favicon placeholder only |
+| Evidence demanded | file paths · real output for `npm install`, `audit`, `typecheck`, `lint`, `format:check`, `test`, `build` · the gzipped initial-chunk figure **and `framer-motion`'s share** · the §4.1 provenance grep · `curl -i` headers for `/api/meta` · the missing-DB console block and its `503` · **69 tests** accounted for |
+| Explicitly **not** the developer's to do | mark anything Done · approve a merge · edit `ARCHITECTURE.md` (Tech §9.1) · run gate 4 or 9 · act on CR-002/003/004 |
+
+**Outcome: pending.** The `orchestrator` records the result here and updates the tracker on report-back.
+Gate 3 completing does **not** make F0 Done — gates 4–11 follow.
 
 ---
 
@@ -2828,13 +2855,44 @@ that decision and its reason in the CR entry.
 | ID | Date | Request | Class | Docs affected | Branch | Status | Approved |
 |---|---|---|---|---|---|---|---|
 | CR-001 | 2026-08-04 | Every requested change must traverse the full agent order, with document impact stated | C | `PLAN.md` §5 (new), `.claude/agents/*` (all six) | `main` (pre-F0 setup) | ✅ Done | 2026-08-04 |
-| CR-002 | 2026-08-04 | Rewrite the passages of `REQUIREMENTS.md` that characterise where the dataset came from, so a fresh clone carries none of it. Fix `HEAD` only; accept the history exposure | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `PLAN.md`, `.claude/agents/reviewer.md` | `change/CR-002-requirements-hygiene` | Not started | — |
+| CR-002 | 2026-08-04 | Rewrite the passages of `REQUIREMENTS.md` that characterise where the dataset came from, so a fresh clone carries none of it. Fix `HEAD` only; accept the history exposure | C | ~~`REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `PLAN.md`, `.claude/agents/reviewer.md`~~ — none, withdrawn | ~~`change/CR-002-requirements-hygiene`~~ — never opened | **⛔ WITHDRAWN 2026-08-04 — Rishabh's decision** | — |
 | CR-003 | 2026-08-04 | `REQUIREMENTS.md` §2.2 / §2.5 say 2026 has 24 rounds scheduled; the data holds 24 calendar rows but only 22 numbered rounds | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `PLAN.md` | `change/CR-003-numbered-rounds` | Not started (blocked on F0) | — |
 | CR-004 | 2026-08-04 | "If multiple teams have the same colour, use the logos instead where necessary, and where the colours don't clash use the colours" | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `PLAN.md` | `change/CR-004-team-identity-encoding` | Logged — scheduled for F1 | — |
 
 ---
 
-#### CR-002 — `REQUIREMENTS.md` origin-characterisation removal · **Class C** · **highest priority**
+#### CR-002 — `REQUIREMENTS.md` origin-characterisation removal · **Class C** · ⛔ **WITHDRAWN**
+
+> ## ⛔ WITHDRAWN BY RISHABH, 2026-08-04 — do not implement, do not reopen
+>
+> **Rishabh withdrew this CR**, judging the exposure **"not that important"**. Everything below this
+> banner is retained as the record of what was triaged and why, **not** as live work. No branch was
+> ever opened; no gate beyond step 1 ever ran.
+>
+> **What this means concretely, so no agent re-derives it:**
+>
+> 1. **No agent implements any part of this CR.** `REQUIREMENTS.md` is not to be rewritten for origin
+>    characterisation, and `.claude/agents/*.md` gains no S-12 amendment from this CR.
+> 2. **`private/provenance-blocklist.txt` stays at its original 6 patterns.** An extension to 30 was
+>    attempted and **reverted**, because a broader blocklist made the `CLAUDE.md` §4.1 /
+>    `PLAN.md` §2.4 check fail **by design** against the very documents that describe the policy. Do
+>    not re-extend it. §6.1 **A-2 is therefore declined, not outstanding.**
+> 3. **The related open items are declined, not deferred.** Nothing here is waiting on anyone.
+> 4. **⚠ A known, accepted mismatch a reviewer may legitimately flag at gate 7.** `CLAUDE.md` §4.1
+>    and `PLAN.md` §2.4 still describe provenance leakage as a **release blocker** and have
+>    deliberately **not** been downgraded. So the *policy* text is stricter than the *action* taken
+>    here. That is a recorded decision, **not a new finding** — a reviewer noting it has read
+>    correctly and should be pointed at this banner rather than at fresh work. Re-raising it as a
+>    blocker needs Rishabh, not an agent.
+> 5. **`db/schema.sql` hygiene is untouched by this withdrawal** — it was always **F0 task T2's**
+>    work, with its own acceptance criteria and T14's line-by-line re-read, and T2 **stands and is in
+>    the gate-3 dispatch**.
+> 6. **CR-003 no longer rebases onto CR-002.** The §2.5 line-154 collision the sequencing note below
+>    was written to avoid cannot happen now. CR-003's sequencing is simply **F0 merge → CR-003**.
+>
+> **Recording provenance of the withdrawal honestly:** the previous agent recording this decision was
+> stopped before it wrote, which is why §5.5 and §6.1 showed CR-002 as open-and-highest-priority
+> afterwards. This banner is that correction.
 
 **Request (Rishabh, 2026-08-04).** The passages of `REQUIREMENTS.md` that characterise where the
 dataset came from must be rewritten so no future clone carries them. **Fix `HEAD` only and accept the
@@ -2906,22 +2964,15 @@ has nothing to run against.
 > application exists at this commit. They set **no precedent**: every CR opened after F0 merges has a
 > running application to test against and therefore gets steps 3, 5 and 10 in full.
 
-**Gate ledger for CR-002** — the `orchestrator` fills this in as gates close.
+**Gate ledger for CR-002 — CLOSED WITHOUT IMPLEMENTATION.**
 
 | Step | Gate | Owner | State |
 |---|---|---|---|
 | 1 | CR entry, triage, class, Document Impact Assessment | `orchestrator` | ✅ 2026-08-04 — this entry |
-| 2 | Technical spec + confirms/corrects the doc impact | `principal-engineer` | Not started |
-| 3 | Design spec | — | **Skipped — no UI** (§5.4, approved above) |
-| 4 | Implement on `change/CR-002-requirements-hygiene`, doc updates included | `developer` | Not started |
-| 5 | Copy-derivation check in lieu of visual verification | `designer` | Not started |
-| 6 | Fix design findings | `developer` | Not started |
-| 7 | Code review + verifies doc updates landed | `reviewer` | Not started |
-| 8 | Security audit, S-1 … S-14 | `reviewer` | Not started |
-| 9 | Fix blocking findings | `developer` | Not started |
-| 10 | Documentation-conformance pass in lieu of E2E | `qa` | Not started |
-| 11 | Fix QA findings | `developer` | Not started |
-| 12 | Verify every gate → approve → merge | `orchestrator` | Not started |
+| 2–12 | Everything after triage | — | ⛔ **Never ran — CR withdrawn by Rishabh 2026-08-04.** No branch opened, no code or document changed |
+
+**The two gate deviations authorised above (skipped design spec; reduced gates 5 and 10) are moot** and
+set no precedent, exactly as they said they did not.
 
 ---
 
@@ -2946,10 +2997,14 @@ SELECT count(*), max(number) FROM round r JOIN season s ON s.id=r.season_id
 `ORDER BY r.number` silently puts both cancelled rounds at the top of every season list, and a
 cancelled round is not addressable by `/seasons/:year/races/:round` because it has no number.
 
-**⛔ Blocked on F0.** T14 adds trap 15; this CR cross-references it. Opening this branch before F0
-merges would either duplicate trap 15 or reference something that does not exist. Sequence:
-**CR-002 → F0 merge → CR-003.** CR-002 also rewrites §2.5 line 154, the same line CR-003 corrects, so
-CR-003 rebases onto CR-002 rather than racing it.
+**⛔ Blocked on F0 — and that is now the *only* thing blocking it.** T14 adds trap 15; this CR
+cross-references it. Opening this branch before F0 merges would either duplicate trap 15 or reference
+something that does not exist. Sequence: **F0 merge → CR-003.**
+
+**Updated 2026-08-04:** this previously read `CR-002 → F0 merge → CR-003`, because CR-002 was going to
+rewrite §2.5 line 154 — the same line CR-003 corrects — and CR-003 was to rebase onto it. **CR-002 is
+withdrawn**, so that collision cannot occur and there is no rebase dependency. CR-003 edits §2.5
+line 154 directly.
 
 **Class C, and the reason is the re-verification pass**, not the size of the edit: §5.3 requires a
 corrected data fact to be re-verified against the database and replaced *everywhere it appears*,
@@ -3031,11 +3086,11 @@ the mitigation available.
 
 | # | Item | Status |
 |---|---|---|
-| **A-1** | **Origin-characterising text remains in git history.** CR-002 rewrites the working tree only. The text stays in commit `f18d2c4` on public `main`, and **F11's provenance sweep cannot close this** — a working-tree grep does not see history, and Rishabh has decided against a rewrite or force-push. | **Accepted by Rishabh, 2026-08-04.** Forward-only remediation. Revisit only if he changes the decision about the remote. |
-| **A-2** | **`private/provenance-blocklist.txt` is too narrow to detect this leak class.** It holds vendor names only (6 lines), which is exactly why the `CLAUDE.md` §4.1 grep returns `clean` against both the CR-002 passages and `db/schema.sql` today. The terms needed were reported to Rishabh **in chat only** and written to **no file, tracked or untracked** — no agent may write them anywhere. | **⛔ Open — on Rishabh.** Until he extends the file, the grep is a floor and not the standard; CR-002 writes that obligation into `.claude/agents/reviewer.md`. |
+| **A-1** | **Origin-characterising text remains in git history *and* in the working tree.** CR-002 was going to rewrite the working tree; it is **withdrawn**, so the text stays at `HEAD` as well as in commit `f18d2c4` on public `main`. **F11's provenance sweep cannot close the history half** — a working-tree grep does not see history, and Rishabh has decided against a rewrite or force-push. | **Accepted by Rishabh, 2026-08-04**, and **widened** by his withdrawal of CR-002 the same day: he judged the exposure "not that important". No remediation, forward or backward. Revisit only if he says so. |
+| **A-2** | **`private/provenance-blocklist.txt` is narrower than the policy it enforces.** It holds 6 patterns, which is why the `CLAUDE.md` §4.1 grep returns `clean` against `db/schema.sql` and the `REQUIREMENTS.md` passages today. Any terms needed were reported to Rishabh **in chat only** and written to **no file, tracked or untracked** — no agent may write them anywhere. | **⛔ DECLINED 2026-08-04 — not outstanding, and not on anyone.** An extension to 30 patterns was tried and **reverted**: a broader list made the §4.1 check fail by design against the documents that state the policy. **The file stays at 6 patterns; do not re-extend it.** Consequence to hold consciously: the grep is a **floor**, not the standard, and §2.4/§4.1 still call leakage a release blocker while no action is being taken — see the CR-002 withdrawal banner, item 4. `db/schema.sql` hygiene is still handled, by **F0 T2 + T14**, which is a hand-written task precisely because the grep cannot catch it. |
 | **A-3** | **Product name.** "F1" is a registered trade mark and Formula 1's published guidelines forbid using their typefaces and warn against using Titillium in any manner that implies association with the Championship. The repository is public. The design system deliberately leans on none of F1's visual identity (`DESIGN_SYSTEM.md` §2.1), but the literal string "F1 Analytics" is a naming and legal decision, not a design one. | **Working name kept. Decision deferred to F11.** Not an agent's call. A rename is a token change, so deferring costs little. |
-| **A-4** | **Playwright MCP is registered but not yet loaded.** Added this session in local project scope; it does not appear in the tool list until Claude Code restarts. **Gates 4 and 9 cannot run before that restart.** | **⛔ Open — needs a restart.** Recorded as F0 gate-record G.6. |
-| **A-5** | **Node 22 is not installed** — `nvm ls` shows only v20.18.2, `lts/jod` is `N/A`, and `/opt/homebrew/opt/node@22` is a **mislabelled keg containing v23.7.0**. F0 task T1's first acceptance criterion is `node -v ≥ v22.22.0` before any work starts. | **⛔ Open — on Rishabh.** One command: `nvm install 22.23.2 && nvm alias default 22.23.2`. Agents must not alter his toolchain. |
+| **A-4** | **Playwright MCP registration needed a restart to reach the tool list.** | ✅ **CLOSED 2026-08-04.** The restart has happened; `mcp__playwright__*` tools are present. Gates 4 and 9 are unblocked (G.6). The standing rule survives: each agent still checks its **own** tool list at run time and stops if the tools are absent. |
+| **A-5** | **Node 22 was not installed** — the machine had only v20.18.2, and `/opt/homebrew/opt/node@22` is a **mislabelled keg containing v23.7.0**. | ✅ **CLOSED 2026-08-04 — Rishabh installed it.** `node -v` → **v22.23.2**, npm 10.9.8, `default -> 22.23.2`; `better-sqlite3@12.11.1` builds and loads; `npm audit` clean. **Residual, not a risk but a footgun:** an agent shell started before the install still resolves v20.18.2, so `CLAUDE.md` §7's `nvm use 22.23.2` step and **T1's own `node -v` assertion** both remain mandatory. The mislabelled keg must still never be used. |
 | **A-6** | **R2 becomes a blocking dependency if CR-004 is implemented** — team logos would gate F5, F7 and any two-team identity surface, and 202 of 214 teams will never have one. | Open — CR-004 is scheduled for F1; the fallback ramp remains mandatory regardless, so the risk is to *scope*, not to correctness. |
 
 ---
@@ -3057,3 +3112,6 @@ the mitigation available.
 | 2026-08-04 | **CR-003** opened (Class C) — 2026 has 22 numbered rounds, not 24; blocked on F0 (trap 15 lands in T14) | orchestrator |
 | 2026-08-04 | **CR-004** logged (Class C) — team identity encoding via logos where colours clash; scheduled for F1 | orchestrator |
 | 2026-08-04 | §6.1 accepted-risk register added (A-1 … A-6): git-history exposure, blocklist blind spot, product-name trademark question, Playwright MCP restart, Node 22 install, R2 as a blocking dependency | orchestrator |
+| 2026-08-04 | **CR-002 WITHDRAWN by Rishabh** — exposure judged "not that important". Withdrawal banner added; §5.5 row, gate ledger and CR-003's sequencing note corrected; **A-2 declined** (blocklist stays at 6 patterns — a 30-pattern extension was tried and reverted because it failed §4.1 by design); A-1 widened to cover `HEAD` as well as history. §2.4 / `CLAUDE.md` §4.1 deliberately **not** downgraded — the mismatch is recorded, not a new finding | orchestrator |
+| 2026-08-04 | **F0 gate-3 preconditions all cleared and independently re-verified** (P-1 Node v22.23.2; P-2 `DESIGN_SYSTEM.md` §10 external `public/theme-init.js`; P-3 four task cross-references + G.4 items 1–4). §G.5 had gone stale showing all three outstanding; corrected with the verification method recorded per row. **A-4 and A-5 closed** — Playwright MCP tools now present, Node 22 installed | orchestrator |
+| 2026-08-04 | **F0 gate 3 dispatched** — `developer` implementing T1–T14 on `feat/foundation`; status → `In development`; brief recorded as gate-record §G.7. Gates 4–11 outstanding; F0 is **not** Done | orchestrator |
