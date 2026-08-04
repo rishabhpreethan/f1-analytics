@@ -1,0 +1,219 @@
+/*
+ * Design tokens. The single source for every colour, size, radius and duration in
+ * this product (docs/DESIGN_SYSTEM.md). A literal value written anywhere else — in a
+ * component, in a chart config, in a "just this once" escape — is a review failure.
+ *
+ * Two layers:
+ *   1. `@theme`  — Tailwind's token namespaces, so utilities exist for them.
+ *   2. `:root` / `[data-theme="dark"]` — the semantic colour layer. Light and dark are
+ *      designed separately (§3.5); dark is never an automatic inversion.
+ */
+
+@theme {
+  /* ---------------------------------------------------------------- families
+   * §2.2. Fallbacks are metric-tolerant. The @font-face blocks in fonts.css declare
+   * exactly these family names, which is why no alias is needed.
+   */
+  --font-display: Archivo, 'Arial Narrow', system-ui, sans-serif;
+  --font-text: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Chivo Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ---------------------------------------------------------------- type scale
+   * §2.3 — eleven steps and nothing off them. Tailwind's default font sizes are
+   * cleared first, so an off-scale size is a missing utility rather than a review
+   * finding discovered late. The display steps live in Tailwind's font-size
+   * namespace as `--text-display-*`; they are §2.3's `--display-*` tokens.
+   */
+  --text-*: initial;
+
+  --text-2xs: 0.6875rem; /* 11 */
+  --text-2xs--line-height: 0.875rem; /* 14 */
+  --text-2xs--letter-spacing: 0.06em;
+  --text-2xs--font-weight: 500;
+
+  --text-xs: 0.75rem; /* 12 */
+  --text-xs--line-height: 1rem; /* 16 */
+
+  --text-sm: 0.8125rem; /* 13 */
+  --text-sm--line-height: 1.125rem; /* 18 */
+
+  --text-base: 0.875rem; /* 14 */
+  --text-base--line-height: 1.25rem; /* 20 */
+
+  --text-md: 1rem; /* 16 */
+  --text-md--line-height: 1.5rem; /* 24 */
+  --text-md--letter-spacing: -0.005em;
+
+  --text-lg: 1.125rem; /* 18 */
+  --text-lg--line-height: 1.625rem; /* 26 */
+  --text-lg--letter-spacing: -0.01em;
+  --text-lg--font-weight: 500;
+
+  --text-display-xs: 1.25rem; /* 20 */
+  --text-display-xs--line-height: 1.5rem; /* 24 */
+  --text-display-xs--letter-spacing: 0.005em;
+  --text-display-xs--font-weight: 600;
+
+  --text-display-sm: 1.5rem; /* 24 */
+  --text-display-sm--line-height: 1.75rem; /* 28 */
+  --text-display-sm--font-weight: 600;
+
+  --text-display-md: 2rem; /* 32 */
+  --text-display-md--line-height: 2.125rem; /* 34 */
+  --text-display-md--letter-spacing: -0.01em;
+  --text-display-md--font-weight: 700;
+
+  --text-display-lg: 2.75rem; /* 44 */
+  --text-display-lg--line-height: 2.75rem; /* 44 */
+  --text-display-lg--letter-spacing: -0.015em;
+  --text-display-lg--font-weight: 700;
+
+  --text-display-xl: 3.75rem; /* 60 */
+  --text-display-xl--line-height: 3.5rem; /* 56 */
+  --text-display-xl--letter-spacing: -0.02em;
+  --text-display-xl--font-weight: 700;
+
+  /* Archivo is set at wdth 82 at every display step (§2.3). Applied in CSS, never
+   * baked into the binary and never via font-variation-settings, which would bypass
+   * the cascade for the other axes. */
+  --font-stretch-display: 82%;
+
+  /* ---------------------------------------------------------------- radii — §5.2 */
+  --radius-*: initial;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+
+  /* ---------------------------------------------------------------- breakpoints
+   * §5.3 — design and verification breakpoints are 390 / 768 / 1440.
+   */
+  --breakpoint-md: 48rem; /* 768 */
+  --breakpoint-lg: 64rem; /* 1024 */
+  --breakpoint-xl: 90rem; /* 1440 */
+
+  /* ---------------------------------------------------------------- durations
+   * §4.3. The same figures are mirrored in src/lib/motion.ts for Framer Motion,
+   * which takes seconds. These are the CSS-side values, used by M-11 and by
+   * :focus-visible-adjacent transitions.
+   */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --dur-chart: 400ms;
+
+  /* Easings are CSS keywords that correspond exactly to Framer Motion's own string
+   * presets (`easeOut`, `easeIn`, `easeInOut`). No cubic-bézier literal exists
+   * anywhere in this product. `ease.mech` ("circOut") has no CSS keyword and has no
+   * CSS use in F0, so it is not defined here. */
+  --ease-enter: ease-out;
+  --ease-exit: ease-in;
+  --ease-move: ease-in-out;
+
+  /* ---------------------------------------------------------------- colours
+   * Tailwind's default palette is cleared: every colour in this product is either a
+   * semantic neutral below or a team's identity, and a stray `bg-blue-500` would
+   * collide with an identity somewhere (§1.1).
+   */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-border-control: var(--border-control);
+
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-status-info-ink: var(--status-info-ink);
+  --color-status-info-wash: var(--status-info-wash);
+  --color-status-good-ink: var(--status-good-ink);
+  --color-status-good-wash: var(--status-good-wash);
+  --color-status-caution-ink: var(--status-caution-ink);
+  --color-status-caution-wash: var(--status-caution-wash);
+  --color-status-critical-ink: var(--status-critical-ink);
+  --color-status-critical-wash: var(--status-critical-wash);
+}
+
+/*
+ * Semantic colour, light — §3.5. All neutrals are generated in OkLCh at hue 264 with
+ * chroma 0.000–0.013: enough cool cast to read as an instrument, little enough not to
+ * fight McLaren orange or Ferrari red. Every text pair clears 4.5:1 and every
+ * --border-control pair clears 3:1 (measured, §9.2 V-2).
+ */
+:root {
+  color-scheme: light;
+
+  --surface-sunken: #eff1f5;
+  --surface-canvas: #f7f8fb;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+
+  --border-subtle: #dde0e4;
+  --border-strong: #b9bcc3;
+  --border-control: #878b92;
+
+  --ink-primary: #1b1e24;
+  --ink-secondary: #53575e;
+  --ink-tertiary: #6a6d74;
+  --ink-inverse: #ffffff;
+
+  --status-info-ink: #034f89;
+  --status-info-wash: #e1eefc;
+  --status-good-ink: #0a7554;
+  --status-good-wash: #d2f7e7;
+  --status-caution-ink: #6f5306;
+  --status-caution-wash: #feebc4;
+  --status-critical-ink: #c50721;
+  --status-critical-wash: #fde7e5;
+
+  /* §5.4 — two levels, and the dark model is different. */
+  --elev-1-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  --elev-2-shadow: 0 8px 24px rgb(0 0 0 / 0.1);
+  --elev-2-border: var(--border-subtle);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-sunken: #08090c;
+  --surface-canvas: #0e0f13;
+  --surface-raised: #1a1c20;
+  --surface-overlay: #23252a;
+
+  --border-subtle: #2f3237;
+  --border-strong: #4f535a;
+  --border-control: #64686f;
+
+  --ink-primary: #f5f7f9;
+  --ink-secondary: #b3b6ba;
+  --ink-tertiary: #86898f;
+  --ink-inverse: #0e0f13;
+
+  --status-info-ink: #2e9cfd;
+  --status-info-wash: #142f4b;
+  --status-good-ink: #26f0b0;
+  --status-good-wash: #0f3830;
+  --status-caution-ink: #fec431;
+  --status-caution-wash: #3c2b02;
+  --status-critical-ink: #fd5e5a;
+  --status-critical-wash: #47211e;
+
+  /* Elevation is a surface step plus a border here, because a soft shadow on a
+   * near-black canvas is invisible. Overlays are the only dark-mode shadow, and it
+   * is deep enough to read. */
+  --elev-1-shadow: none;
+  --elev-2-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
+  --elev-2-border: var(--border-strong);
+}

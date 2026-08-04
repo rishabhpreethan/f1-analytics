@@ -1,0 +1,183 @@
+@import 'tailwindcss';
+@import './tokens.css';
+@import './fonts.css';
+
+/*
+ * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so
+ * `dark:` utilities key off the same `data-theme` attribute that public/theme-init.js
+ * sets before first paint.
+ */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@layer base {
+  html {
+    font-family: var(--font-text);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--surface-canvas);
+    color: var(--ink-primary);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    /* M-11: the theme change is a colour transition and nothing else. No transform,
+     * no scale, and deliberately no transition on the custom properties themselves. */
+    transition:
+      background-color var(--dur-base) var(--ease-move),
+      color var(--dur-base) var(--ease-move);
+  }
+
+  /* M-11 reduced-motion variant: the transition is removed entirely, not slowed. */
+  @media (prefers-reduced-motion: reduce) {
+    body {
+      transition: none;
+    }
+  }
+
+  /*
+   * §3.5.1 — one achromatic double ring, everywhere, applied via :focus-visible only.
+   * Focus can land on a control sitting on a team-coloured band, so a coloured ring
+   * cannot be guaranteed visible. Never removed, never replaced per component, and
+   * never substituted by motion.
+   */
+  :focus-visible {
+    outline: 2px solid var(--ink-primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--surface-raised);
+  }
+
+  ::selection {
+    background-color: var(--ink-primary);
+    color: var(--ink-inverse);
+  }
+}
+
+/*
+ * Semantic type classes. Each bundles family, size, line-height, weight, tracking and
+ * — for the display steps — Archivo's `wdth 82`, entirely from tokens, so a component
+ * never writes a size, a weight or a family of its own.
+ */
+@layer components {
+  .t-2xs {
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    font-weight: var(--text-2xs--font-weight);
+    text-transform: uppercase;
+  }
+
+  .t-xs {
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .t-sm {
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  .t-base {
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+
+  .t-md {
+    font-size: var(--text-md);
+    line-height: var(--text-md--line-height);
+    letter-spacing: var(--text-md--letter-spacing);
+  }
+
+  .t-lg {
+    font-size: var(--text-lg);
+    line-height: var(--text-lg--line-height);
+    letter-spacing: var(--text-lg--letter-spacing);
+    font-weight: var(--text-lg--font-weight);
+  }
+
+  .t-display-xs,
+  .t-display-sm,
+  .t-display-md,
+  .t-display-lg,
+  .t-display-xl {
+    font-family: var(--font-display);
+    font-stretch: var(--font-stretch-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .t-display-xs {
+    font-size: var(--text-display-xs);
+    line-height: var(--text-display-xs--line-height);
+    letter-spacing: var(--text-display-xs--letter-spacing);
+    font-weight: var(--text-display-xs--font-weight);
+  }
+
+  .t-display-sm {
+    font-size: var(--text-display-sm);
+    line-height: var(--text-display-sm--line-height);
+    font-weight: var(--text-display-sm--font-weight);
+  }
+
+  .t-display-md {
+    font-size: var(--text-display-md);
+    line-height: var(--text-display-md--line-height);
+    letter-spacing: var(--text-display-md--letter-spacing);
+    font-weight: var(--text-display-md--font-weight);
+  }
+
+  .t-display-lg {
+    font-size: var(--text-display-lg);
+    line-height: var(--text-display-lg--line-height);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    font-weight: var(--text-display-lg--font-weight);
+  }
+
+  .t-display-xl {
+    font-size: var(--text-display-xl);
+    line-height: var(--text-display-xl--line-height);
+    letter-spacing: var(--text-display-xl--letter-spacing);
+    font-weight: var(--text-display-xl--font-weight);
+  }
+
+  /* §2.4 — figures are mono and always tabular. tabular-nums is set as well so a
+   * fallback font still aligns by column. */
+  .t-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* §5.4 elevation, as classes so no component writes a shadow. */
+  .elev-1 {
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--elev-1-shadow);
+  }
+
+  .elev-2 {
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
+  }
+
+  /* §8 — the skip link is the first focusable element and is visually hidden until
+   * focused, then a legible overlay chip. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 50;
+  }
+
+  /* Offsets are multiples of Tailwind's own `--spacing` step (§5.1's 4px scale), so
+   * no length literal appears here either. */
+  .skip-link:focus-visible {
+    left: calc(var(--spacing) * 4);
+    top: calc(var(--spacing) * 2);
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
+    border-radius: var(--radius-md);
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    color: var(--ink-primary);
+  }
+}

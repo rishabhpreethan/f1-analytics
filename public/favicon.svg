@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="F1 Analytics">
+  <!--
+    Typographic placeholder (PLAN.md F0 Design Spec §9.3). An --ink-primary rounded
+    square carrying the product initial set in Archivo 700 at wdth 82, in
+    --ink-inverse. Built from a font this project is licensed to use and carrying no
+    third-party mark. The real icon set is R3 and is Rishabh's.
+
+    A favicon is a standalone document and cannot read the page's custom properties,
+    so the two token values are written literally here and nowhere else:
+    --ink-primary / --ink-inverse, light then dark (DESIGN_SYSTEM.md §3.5).
+  -->
+  <style>
+    .field { fill: #1b1e24; }
+    .mark { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .field { fill: #f5f7f9; }
+      .mark { fill: #0e0f13; }
+    }
+  </style>
+  <rect class="field" width="64" height="64" rx="12" />
+  <text
+    class="mark"
+    x="32"
+    y="46"
+    text-anchor="middle"
+    font-family="Archivo, 'Arial Narrow', system-ui, sans-serif"
+    font-size="44"
+    font-weight="700"
+    font-stretch="82%"
+  >F</text>
+</svg>

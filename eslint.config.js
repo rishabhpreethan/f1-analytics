@@ -30,7 +30,9 @@ export default tseslint.config(
   // Client — React rules and browser globals.
   {
     files: ['src/**/*.{ts,tsx}'],
-    extends: [reactHooks.configs['recommended-latest'], reactRefresh.configs.vite],
+    // `configs.flat.recommended` is the flat-config shape. The top-level
+    // `configs.recommended` is still the legacy eslintrc form, which ESLint 10 rejects.
+    extends: [reactHooks.configs.flat.recommended, reactRefresh.configs.vite],
     languageOptions: {
       globals: globals.browser,
     },
