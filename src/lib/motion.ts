@@ -50,6 +50,12 @@ export const shellMount: Variants = {
   visible: { opacity: 1, y: 0, transition: enterTransition },
 };
 
+/** M-1 reduced variant: opacity only, `dur.fast`, no `y`. */
+export const shellMountReduced: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: fastEnterTransition },
+};
+
 /**
  * M-2 — route content enter, keyed on `location.pathname`.
  *
@@ -86,6 +92,18 @@ export const sheet: Variants = {
   hidden: { opacity: 0, y: -8 },
   visible: { opacity: 1, y: 0, transition: spring.surface },
   exit: { opacity: 0, y: -8, transition: fastExitTransition },
+};
+
+/**
+ * M-4 reduced variant: opacity only at `dur.fast` on the panel too.
+ *
+ * `MotionConfig` drops the `y`, but the panel's spring would still govern the opacity,
+ * and §4.4 specifies a `dur.fast` tween for the reduced form.
+ */
+export const sheetReduced: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: fastEnterTransition },
+  exit: { opacity: 0, transition: fastExitTransition },
 };
 
 /** M-4 — the scrim behind the sheet. Opacity only, in both directions. */

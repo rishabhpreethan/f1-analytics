@@ -168,6 +168,156 @@
     z-index: 50;
   }
 
+  /* ------------------------------------------------------------- Shell §2.1 / §2.2
+   * Header height is 56px at every breakpoint and 14 is not a permitted spacing step
+   * (§5.1 names it explicitly), so the height comes from a token rather than `h-14`.
+   */
+  .shell-container {
+    width: 100%;
+    max-width: var(--size-shell-max);
+    margin-inline: auto;
+  }
+
+  .shell-header {
+    background-color: var(--surface-raised);
+    border-bottom: 1px solid var(--border-subtle);
+    /* --elev-1, and §2.1 is explicit that the header carries no shadow in either
+     * theme — so the surface step and the border are the whole treatment. */
+  }
+
+  .shell-bar {
+    height: var(--size-header);
+  }
+
+  .shell-wordmark {
+    letter-spacing: var(--tracking-wordmark);
+  }
+
+  /* Each nav item is the full header height, so the hit area is generous and the 2px
+   * active rule can sit flush to the header's bottom edge. */
+  .nav-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: var(--size-header);
+  }
+
+  .nav-rule {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--size-rule);
+    background-color: var(--ink-primary);
+  }
+
+  /* M-4 — the sheet drops from under the header, full width. */
+  .nav-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: var(--size-header);
+    z-index: 40;
+    background-color: var(--surface-overlay);
+    border-bottom: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
+  }
+
+  .nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background-color: var(--scrim);
+  }
+
+  .nav-sheet-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: var(--size-sheet-row);
+  }
+
+  /* In the sheet the active item takes a leading rule instead of an underline (§2.2). */
+  .nav-sheet-rule {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--size-rule);
+    background-color: var(--ink-primary);
+  }
+
+  /* --------------------------------------------------------- Icon-only controls
+   * 32×32 by default, 44×44 where the pointer is coarse (§8 touch targets).
+   */
+  .btn-icon {
+    width: var(--size-toggle);
+    height: var(--size-toggle);
+    padding-inline: 0;
+  }
+
+  @media (pointer: coarse) {
+    .btn-icon {
+      width: var(--size-touch);
+      height: var(--size-touch);
+    }
+  }
+
+  /* ---------------------------------------------------------------- Popovers §5.2
+   * M-5's transform-origin is the trigger corner; the popover is anchored to the
+   * trigger's right edge, so that is the top-right.
+   */
+  .popover-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + var(--spacing));
+    z-index: 40;
+    transform-origin: top right;
+    border-radius: var(--radius-xl);
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
+  }
+
+  .popover-theme {
+    width: var(--size-popover-theme);
+  }
+
+  .popover-coverage {
+    max-width: var(--size-popover-coverage);
+  }
+
+  .option-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: var(--size-control-md);
+    border: 0;
+    border-radius: var(--radius-md);
+    background-color: transparent;
+    color: var(--ink-secondary);
+    cursor: pointer;
+    text-align: start;
+    transition: background-color var(--dur-instant) var(--ease-move);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .option-row {
+      transition: none;
+    }
+  }
+
+  .option-row:hover {
+    background-color: var(--surface-sunken);
+    color: var(--ink-primary);
+  }
+
+  /* Selection is an inverse-ish fill and ink weight, never a hue (§3.5.2). */
+  .option-row-selected {
+    background-color: var(--surface-sunken);
+    color: var(--ink-primary);
+  }
+
   /* ------------------------------------------------------------------ Button §7.1
    * Height, radius and the hue-free interactive expression of §3.5.2. `scale(0.985)`
    * on press is M-6 and is applied by Framer Motion, not here.

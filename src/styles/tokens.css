@@ -73,6 +73,10 @@
   --text-display-xl--letter-spacing: -0.02em;
   --text-display-xl--font-weight: 700;
 
+  /* §2.1 sets the wordmark at --display-xs but with its own tracking, which is the one
+   * place a display step is not used exactly as the scale defines it. */
+  --tracking-wordmark: 0.02em;
+
   /* Archivo is set at wdth 82 at every display step (§2.3). Applied in CSS, never
    * baked into the binary and never via font-variation-settings, which would bypass
    * the cascade for the other axes. */
@@ -182,6 +186,12 @@
   --elev-1-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   --elev-2-shadow: 0 8px 24px rgb(0 0 0 / 0.1);
   --elev-2-border: var(--border-subtle);
+
+  /* ⚠ NOT IN THE DESIGN SYSTEM. M-4 specifies a scrim that animates `opacity 0→1`
+   * behind the mobile nav sheet, but §3.5 and §5.4 define no scrim colour. This is the
+   * minimal achromatic choice that keeps the rule achromatic (§1.1) and is **flagged for
+   * the `designer` at gate 4** rather than treated as settled. */
+  --scrim: rgb(0 0 0 / 0.4);
 }
 
 /*
@@ -251,4 +261,9 @@
   --elev-1-shadow: none;
   --elev-2-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
   --elev-2-border: var(--border-strong);
+
+  /* Deeper in dark mode for the same reason overlays carry the only dark shadow: the
+   * canvas is already near-black, so a light scrim would not read. See the light-mode
+   * note — this token is flagged for the `designer`. */
+  --scrim: rgb(0 0 0 / 0.6);
 }
