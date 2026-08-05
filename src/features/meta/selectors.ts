@@ -83,15 +83,28 @@ export function selectCoverageDetail(meta: Meta): CoverageDetail | null {
 
   const seasons = `${String(firstYear)}–${String(latestYear)}`;
 
+  // Rounds still to come. `scheduledRounds` excludes cancelled rounds, and cancelled
+  // rounds carry no round number, so the remaining count is the plain difference.
+  const remainingRounds = scheduledRounds - round.round;
+
   return {
     triggerName: `Data coverage: ${String(year)} season, ${String(completedRounds)} of ${String(scheduledRounds)} rounds complete. Show detail.`,
     coverageLine: `Complete results through Round ${String(round.round)} of ${String(scheduledRounds)} — ${round.roundName}, ${formatIsoDate(round.date)}.`,
-    scheduledLine: isComplete
-      ? null
-      : `Rounds ${String(round.round + 1)}–${String(scheduledRounds)} are scheduled and have no results yet.`,
-    // The Design Spec's sentence is written for the plural, which is the live case (2).
-    // A single cancelled round is grammatically different and the plural form would read
-    // as a defect, so the singular is spelled out rather than approximated.
+    // Pluralisation is part of the copy spec (`DESIGN_SYSTEM.md` §7.3), not an
+    // implementation detail: the plural form renders "Rounds 22–22" once a single round
+    // remains, which is a copy defect even though the number is right. The `<= 0` arm is
+    // not reachable from the present data — no season numbers a round beyond its
+    // non-cancelled count — but there is no truthful sentence for it, so it says nothing
+    // rather than "Rounds 23–22".
+    scheduledLine:
+      isComplete || remainingRounds <= 0
+        ? null
+        : remainingRounds === 1
+          ? `Round ${String(scheduledRounds)} is scheduled and has no results yet.`
+          : `Rounds ${String(round.round + 1)}–${String(scheduledRounds)} are scheduled and have no results yet.`,
+    // The same reasoning, one line down: the Design Spec's cancelled sentence is written
+    // for the plural, which is the live case (2), and the plural form would render
+    // "1 rounds", so the singular is spelled out rather than approximated.
     cancelledLine:
       cancelledRounds === 0
         ? null

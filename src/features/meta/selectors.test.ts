@@ -72,6 +72,54 @@ describe('selectCoverageDetail', () => {
     );
   });
 
+  it('reads grammatically when exactly one round remains scheduled', () => {
+    // The boundary the plural-only form got wrong: with Round 21 of 22 complete it
+    // rendered "Rounds 22–22 are scheduled…" (`DESIGN_SYSTEM.md` §7.3). Live from
+    // 2026-11-29.
+    const penultimate: Meta = {
+      ...META_REAL,
+      latestSeason: { ...META_REAL.latestSeason, completedRounds: 21 },
+      latestCompletedRound: {
+        year: 2026,
+        round: 21,
+        roundName: 'Qatar Grand Prix',
+        date: '2026-11-29',
+        circuitRef: 'losail',
+        circuitName: 'Losail International Circuit',
+      },
+      nextScheduledRound: {
+        year: 2026,
+        round: 22,
+        roundName: 'Abu Dhabi Grand Prix',
+        date: '2026-12-06',
+        circuitRef: 'yas_marina',
+        circuitName: 'Yas Marina Circuit',
+      },
+    };
+    expect(selectCoverageDetail(penultimate)?.scheduledLine).toBe(
+      'Round 22 is scheduled and has no results yet.',
+    );
+  });
+
+  it('says nothing rather than an inverted range when no round remains', () => {
+    // Not reachable from the present data (no season numbers a round beyond its
+    // non-cancelled count), but "Rounds 23–22" must never be renderable.
+    const beyond: Meta = {
+      ...META_REAL,
+      latestSeason: { ...META_REAL.latestSeason, completedRounds: 22, isComplete: false },
+      latestCompletedRound: {
+        year: 2026,
+        round: 22,
+        roundName: 'Abu Dhabi Grand Prix',
+        date: '2026-12-06',
+        circuitRef: 'yas_marina',
+        circuitName: 'Yas Marina Circuit',
+      },
+      nextScheduledRound: null,
+    };
+    expect(selectCoverageDetail(beyond)?.scheduledLine).toBeNull();
+  });
+
   it('reads grammatically when exactly one round was cancelled', () => {
     const one: Meta = {
       ...META_REAL,
