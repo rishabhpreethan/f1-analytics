@@ -651,7 +651,7 @@ width does not change. Motion: M-6.
 ### 7.3 Data-currency indicator (NV-9)
 
 The design decision: **express currency as coverage, never as a fetch event.** "Complete through
-Round 10 of 24" is a fact about the sport's calendar. "Updated 12 days ago" is a fact about a
+Round 10 of 22" is a fact about the sport's calendar. "Updated 12 days ago" is a fact about a
 process. Coverage phrasing is also the more honest of the two — `REQUIREMENTS.md` §2.2 warns the
 newest round may lag reality, and coverage phrasing states exactly that without pretending to know
 today's calendar position.
@@ -660,18 +660,29 @@ today's calendar position.
 |---|---|
 | Trigger (≥768px) | `ghost` button, 28px high, containing an 8px `--radius-full` dot in `--ink-tertiary` (**static** — never pulses, §4.5), then `--font-mono` `--text-xs`: `2026 · R10` |
 | Trigger (<768px) | dot + `R10` only |
-| Accessible name | `"Data coverage: 2026 season, 10 of 24 rounds complete. Show detail."` |
+| Accessible name | `"Data coverage: 2026 season, 10 of 22 rounds complete. Show detail."` — 22 is the verified 2026 figure (`round` rows with a non-null `number`); the value is read from `GET /api/meta` and never hardcoded |
 | Detail | popover, `--elev-2`, max-width 320, `--radius-xl`, M-5, dismiss on Esc / outside click, focus returns to the trigger |
 | Footer echo | the same facts as plain text, so the information is reachable without opening anything |
 
 Copy — every value comes from `GET /api/meta`, nothing hardcoded:
 
-- Popover heading: **"Data coverage"**
+- Popover heading: **"Data coverage"** — authored in sentence case and uppercased by `--text-2xs`'s
+  `text-transform`, so assistive technology reads it as a word rather than an initialism
 - Line 1: **"Complete results through Round {n} of {total} — {roundName}, {date}."**
 - Line 2: **"Rounds {n+1}–{total} are scheduled and have no results yet."** _(omitted when the season
-  is complete)_
-- Line 3: **"Seasons available: {minYear}–{maxYear}."**
+  is complete)_ — when exactly one round remains, the singular form
+  **"Round {total} is scheduled and has no results yet."**
+- Line 3: **"{cancelledRounds} rounds on the {year} calendar were cancelled."** _(omitted when
+  `cancelledRounds === 0`)_ — when exactly one was cancelled, the singular form
+  **"1 round on the {year} calendar was cancelled."** Trap 12, surfaced rather than hidden: 2026
+  carries two cancelled rounds (Bahrain, Saudi Arabian), and they are the reason the round count and
+  the calendar length disagree.
+- Line 4: **"Seasons available: {minYear}–{maxYear}."**
 - Footer echo: **"Complete results through {year} Round {n} · Seasons {minYear}–{maxYear}"**
+
+**Pluralisation is part of the copy spec, not an implementation detail.** Any counted noun in this
+component ships both grammatical numbers. A string that can render `1 rounds` or `Rounds 22–22` is a
+copy defect even though the number is correct.
 
 Banned from this component and its tests, fixtures and comments: any word for a refresh or update
 mechanism. The component states coverage of the sport's calendar, never an update event
@@ -840,4 +851,5 @@ thresholds (§3.3 rule 4).
 | 2026-08-04 | Handover created with the measured §3 / §4 constraints | principal-engineer |
 | 2026-08-04 | F0: §1 intent, §2 typography (Archivo / Inter / Chivo Mono, verified), §3.4 exact semantic steps + status set reduced to four with evidence, §3.5 surfaces / ink / borders / focus for both themes, §4 motion token set + 11 named motions with Framer Motion references, §5 spacing / radii / breakpoints / elevation, §7.0–§7.6 shell components and the five states, §8 accessibility, §9 validator method + 9 recorded runs, §10 theming mechanics | designer |
 | 2026-08-04 | D-1 fix: §10 pre-paint theme script corrected from an inline `index.html` block to external `public/theme-init.js`, with the CSP (`script-src 'self'`, S-9) reason recorded. No token, colour, type, motion or component change; no re-validation required | designer |
+| 2026-08-05 | **Gate 4 doc-conflict resolution (§7.3).** Three defects fixed, all in this file's favour of `PLAN.md` F0 Design Spec §5.1: (a) the cancelled-rounds line was **missing** from §7.3's copy list — restored as Line 3 and "Seasons available" renumbered to Line 4, so §7.3 and §5.1 now agree at 4 lines; (b) the accessible-name example and the §7.3 lead paragraph said **"of 24"** — corrected to **22**, verified by query (`round` rows for 2026 with a non-null `number` = 22; two rows carry `is_cancelled = 1`); (c) **pluralisation is now specified** for both counted sentences, including the previously unspecified single-remaining-round case. No token, colour, typography, motion or component change → no §9 validation run | designer |
 | 2026-08-04 | **CR-005** (`PLAN.md` §5.5): the upstream-attribution constraint is removed from §7.3 as a forward obligation — both the release-blocker framing and the derived clause in the ban list. The §7.3 ban on refresh/update language is **retained on independent grounds** (`REQUIREMENTS.md` §2.2 — a currency surface must not assume today's calendar position). **No copy string changed**: the coverage phrasing survives on its own merits. No token, colour, typography, motion or component change → no §9 validation run | designer |

@@ -2077,8 +2077,8 @@ the trigger's right edge, `Esc` and outside-click dismiss, focus returns to the 
 | Trigger accessible name | "Data coverage: {year} season, {completedRounds} of {scheduledRounds} rounds complete. Show detail." |
 | Popover heading (`--text-2xs`, uppercase, `--ink-tertiary`) | "DATA COVERAGE" |
 | Line 1 (`--text-sm`, `--ink-primary`) | "Complete results through Round {round} of {scheduledRounds} — {roundName}, {date}." → **"Complete results through Round 10 of 22 — Belgian Grand Prix, 19 Jul 2026."** |
-| Line 2 (`--text-sm`, `--ink-secondary`) — omit when `isComplete` | "Rounds {round+1}–{scheduledRounds} are scheduled and have no results yet." → **"Rounds 11–22 are scheduled and have no results yet."** |
-| Line 3 (`--text-sm`, `--ink-secondary`) — omit when `cancelledRounds === 0` | "{cancelledRounds} rounds on the {year} calendar were cancelled." → **"2 rounds on the 2026 calendar were cancelled."** _(trap 12, surfaced rather than hidden)_ |
+| Line 2 (`--text-sm`, `--ink-secondary`) — omit when `isComplete` | "Rounds {round+1}–{scheduledRounds} are scheduled and have no results yet." → **"Rounds 11–22 are scheduled and have no results yet."** **Singular when one round remains:** "Round {scheduledRounds} is scheduled and has no results yet." _(gate-4 correction: the plural-only form renders "Rounds 22–22" after R21, which is a copy defect)_ |
+| Line 3 (`--text-sm`, `--ink-secondary`) — omit when `cancelledRounds === 0` | "{cancelledRounds} rounds on the {year} calendar were cancelled." → **"2 rounds on the 2026 calendar were cancelled."** **Singular when one:** "1 round on the {year} calendar was cancelled." _(trap 12, surfaced rather than hidden; gate-4 correction — the plural-only form renders "1 rounds")_ |
 | Line 4 (`--text-xs`, `--ink-tertiary`) | "Seasons available: {firstYear}–{latestYear}." → **"Seasons available: 1950–2026."** |
 | Footer echo (plain text, no interaction) | "Complete results through {year} Round {round} · Seasons {firstYear}–{latestYear}" |
 
