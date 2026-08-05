@@ -67,7 +67,11 @@ export function PrimaryNav({ items }: PrimaryNavProps) {
                   {item.label}
                 </Link>
                 {active && (
-                  <motion.span layoutId="nav-rule" className="nav-rule" transition={spring.layout} />
+                  <motion.span
+                    layoutId="nav-rule"
+                    className="nav-rule"
+                    transition={spring.layout}
+                  />
                 )}
               </motion.span>
             </li>

@@ -40,10 +40,7 @@ export function AppShell({ children, footerNote }: AppShellProps) {
         <Header />
       </motion.header>
 
-      <main
-        id="main"
-        className="shell-container flex-1 px-4 py-6 md:px-6 md:py-8 xl:px-8 xl:py-12"
-      >
+      <main id="main" className="shell-container flex-1 px-4 py-6 md:px-6 md:py-8 xl:px-8 xl:py-12">
         {children}
       </main>
 

@@ -43,7 +43,9 @@ function PreferenceIcon({ preference, size }: { preference: ThemePreference; siz
 
 export function ThemeToggle() {
   const [preference, setPreference] = useState<ThemePreference>(readThemePreference);
-  const [resolved, setResolved] = useState<ResolvedTheme>(() => resolveTheme(readThemePreference()));
+  const [resolved, setResolved] = useState<ResolvedTheme>(() =>
+    resolveTheme(readThemePreference()),
+  );
   const [open, setOpen] = useState(false);
   // The tentative selection while the popover is open. Arrow keys move it; only a
   // commit turns it into the preference.
