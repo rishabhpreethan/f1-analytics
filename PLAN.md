@@ -66,18 +66,36 @@ claude mcp add playwright -- npx -y @playwright/mcp@latest
 1. principal-engineer  → Technical Spec into this file
 2. designer            → Design Spec into this file          (1 ‖ 2 may run in parallel)
 3. developer           → implement on feat/<slug> + unit tests
-4. designer            → Visual verification (Playwright MCP screenshots)
-5. developer           → fix design findings                  (loop 4–5)
-6. reviewer            → code review vs all canonical docs
-7. reviewer            → security audit, S-1 … S-14
-8. developer           → fix blocking findings                (loop 6–8)
-9. qa                  → E2E suite via Playwright MCP
-10. developer          → fix QA findings                      (loop 9–10)
-11. orchestrator       → verify every gate → approve → merge
+4. reviewer            → ONE pass: code review + the S-checklist folded in
+5. developer           → fix blocking findings                (loop 4–5)
+6. Rishabh             → reviews the running frontend himself
+7. orchestrator        → verify gates → approve → merge
 ```
 
-Design verification precedes code review deliberately: the reviewer should read code that is
-visually settled, not code about to change.
+**Reduced from eleven gates to seven by CR-006 (§5.5), 2026-08-05 — Rishabh's decision.** Development
+was taking too long and consuming too many credits. What was removed, and what happens to its
+concerns:
+
+| Removed gate | Was | Now |
+|---|---|---|
+| `designer` visual verification | gates 4–5 | **Rishabh reviews the frontend himself** at gate 6. The `designer` still writes the Design Spec at gate 2 — only the after-the-fact screenshot pass is gone |
+| `reviewer` separate security audit | gate 7 | **Folded into the single review pass at gate 4.** Not deleted — see below |
+| `qa` E2E suite | gates 9–10 | **Dropped.** The `qa` agent is dormant, not deleted |
+
+**Why the security concerns fold rather than vanish.** This is a read-only product with no auth, no
+accounts, no mutations and no third-party calls (`ARCHITECTURE.md` §7), so most of S-1…S-14 cannot
+fail by construction. Four can, and they stay as a checklist inside the gate-4 review because each
+guards something a code change could actually break: **S-4** input validation, **S-6** error hygiene
+(no stack traces, SQL or absolute paths in a response), **S-7** `npm audit` and the lockfile, and
+**S-10** query-cost bounds on lap-scale data. A finding against any of them is blocking. The other
+identifiers are not re-verified per feature. This is a deliberate, recorded reduction in assurance,
+not an oversight.
+
+**On dropping E2E.** Playwright MCP was in any case unreachable from subagents (recorded at CR-006),
+so the E2E gate could not run as specified. Unit tests remain mandatory. The cost is that
+browser-only behaviour — first-paint theme flash, `prefers-reduced-motion`, CSP console violations —
+is now **verified by Rishabh's own review or not at all**, and any doc that claims otherwise is
+stale.
 
 **Standing rule — file ownership restricts who *edits*, never who *reports*.** Added 2026-08-04 after
 an agent correctly declined to edit a file it did not own and then **also** withheld what it had
@@ -100,21 +118,23 @@ A feature is Done only when **all** hold:
 
 - [ ] Every requirement ID in scope implemented, or deferred with a recorded reason
 - [ ] Technical Spec and Design Spec both present in this file
-- [ ] `DESIGN VERIFICATION: PASS`
-- [ ] `CODE REVIEW: PASS`
-- [ ] `SECURITY AUDIT: PASS` — a verdict on each of S-1 … S-11 and S-13 … S-14. **`S-12` was removed by CR-005** (§5.5) and is not renumbered, because the identifiers are cited by number across this file, the agent definitions and the review history
-- [ ] `QA: PASS` with evidence
-- [ ] Typecheck, lint, unit tests, build all clean
+- [ ] `CODE REVIEW: PASS` — including verdicts on **S-4, S-6, S-7, S-10** (§2.3)
+- [ ] Typecheck, lint, format, unit tests, build all clean
+- [ ] Bundle inside the gzipped budget, **measured**
+- [ ] **Rishabh has reviewed the running frontend**
 - [ ] No database, `.env`, or seed artefact staged for commit
 - [ ] `orchestrator` approval recorded with a date
+
+**Removed from this list by CR-006:** `DESIGN VERIFICATION: PASS`, `SECURITY AUDIT: PASS` and
+`QA: PASS`. `S-12` remains retired from CR-005 and is still never renumbered.
 
 ---
 
 ## 3. Master tracker
 
-Status vocabulary: `Not started` · `Spec in progress` · `Design in progress` · `Ready for dev` ·
-`In development` · `Design verification` · `In review` · `Security audit` ·
-`Fixing findings` · `In QA` · `Awaiting approval` · `✅ Done`
+Status vocabulary (CR-006 reduced this with the gate order): `Not started` · `Spec in progress` ·
+`Design in progress` · `Ready for dev` · `In development` · `In review` · `Fixing findings` ·
+`Rishabh review` · `Awaiting approval` · `✅ Done`
 
 | ID | Feature | Branch | Depends on | Status | Approved |
 |---|---|---|---|---|---|
@@ -1868,7 +1888,13 @@ consideration only — `ARCHITECTURE.md` §10 #16. Nothing in this spec acts on 
 
 ###### 9.5 Confirmed clean
 
-Provenance grep (`CLAUDE.md` §4.1) run against the working tree with this spec in place:
+**⚠ HISTORICAL RECORD — not a standing check. Do not re-run this.** The constraint it evidenced was
+removed by **CR-005** (§5.5); `CLAUDE.md` §4.1 is now a tombstone. This subsection is retained
+verbatim because CR-005 is forward-going only and the checks already run stay on the record. Two
+`developer` runs have re-run this grep after CR-005 closed, because the citation below reads as live
+— it is not.
+
+Run against the working tree with this spec in place, before the constraint was withdrawn:
 
 ```
 $ grep -rniE -f private/provenance-blocklist.txt . \
@@ -2926,22 +2952,31 @@ is a valid answer, silence is not.
 Identical to a feature. Branch: `change/CR-<id>-<slug>`.
 
 ```
-1.  orchestrator        → CR entry, triage, class, Document Impact Assessment
-2.  principal-engineer  → technical spec + confirms/corrects the doc impact
-3.  designer            → design spec (skip only if the CR touches no UI — recorded explicitly)
-4.  developer           → implement on change/CR-<id>-<slug>, including doc updates
-5.  designer            → visual verification via Playwright MCP
-6.  developer           → fix design findings                       (loop 5–6)
-7.  reviewer            → code review + verifies doc updates landed
-8.  reviewer            → security audit, S-1 … S-14
-9.  developer           → fix blocking findings                     (loop 7–9)
-10. qa                  → E2E for affected surfaces + regression on neighbours
-11. developer           → fix QA findings                           (loop 10–11)
-12. orchestrator        → verify every gate → approve → merge
+1. orchestrator        → CR entry, triage, class, Document Impact Assessment
+2. principal-engineer  → technical spec + confirms/corrects the doc impact
+3. designer            → design spec (skip only if the CR touches no UI — recorded explicitly)
+4. developer           → implement on change/CR-<id>-<slug>, including doc updates
+5. reviewer            → code review + S-4/S-6/S-7/S-10 + verifies doc updates landed
+6. developer           → fix blocking findings                     (loop 5–6)
+7. Rishabh             → reviews the running frontend if the CR touched UI
+8. orchestrator        → verify gates → approve → merge
 ```
 
-Step 3 may be skipped **only** when the CR provably touches no UI, and the `orchestrator` records
-that decision and its reason in the CR entry.
+Reduced from twelve steps to eight by **CR-006** (§5.5), in step with §2.3. Step 3 may be skipped
+**only** when the CR provably touches no UI, and the `orchestrator` records that decision and its
+reason in the CR entry.
+
+**Efficiency rules, added by CR-006 — these bind every agent.** The gate reduction alone does not
+control cost; re-reading this file does. This file is over 200 KB, and an agent that opens it whole
+spends more than the work is worth.
+
+- **Every assignment brief must name the exact sections to read.** "Read `PLAN.md`" is not an
+  assignment. An agent given no section list reads §2, its own feature section, and nothing else.
+- **The `orchestrator` is not dispatched for work a single agent can do.** Spec, build and review
+  are dispatched directly; the `orchestrator` is for triage, gate verification and approval.
+- **Prefer one agent with a precise brief over a chain of agents each re-establishing context.**
+- **Never re-verify what the coordinating session already verified and stated.** Assignment briefs
+  carry verified state (HEAD, tree status, command results); take them as given.
 
 ### 5.5 Change request log
 
@@ -2951,7 +2986,59 @@ that decision and its reason in the CR entry.
 | CR-002 | 2026-08-04 | Rewrite the passages of `REQUIREMENTS.md` that characterise where the dataset came from, so a fresh clone carries none of it. Fix `HEAD` only; accept the history exposure | C | ~~`REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `PLAN.md`, `.claude/agents/reviewer.md`~~ — none, withdrawn | ~~`change/CR-002-requirements-hygiene`~~ — never opened | **⛔ WITHDRAWN 2026-08-04 — Rishabh's decision** | — |
 | CR-003 | 2026-08-04 | `REQUIREMENTS.md` §2.2 / §2.5 say 2026 has 24 rounds scheduled; the data holds 24 calendar rows but only 22 numbered rounds | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `PLAN.md` | `change/CR-003-numbered-rounds` | Not started (blocked on F0) | — |
 | CR-004 | 2026-08-04 | "If multiple teams have the same colour, use the logos instead where necessary, and where the colours don't clash use the colours" | C | `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `PLAN.md` | `change/CR-004-team-identity-encoding` | Logged — scheduled for F1 | — |
-| CR-005 | 2026-08-04 | Remove the upstream-attribution constraint and its check from the gate order entirely — not downgrade it. Forward obligation only; the historical record stays. **Supersedes CR-002** | C | `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md`, `.claude/agents/*.md` · **`docs/DATABASE.md` and `.gitignore`: no change** | folded into `feat/foundation` (F0) — deviation recorded below | **All doc changes landed** — rides F0 gates 6–11 | — |
+| CR-005 | 2026-08-04 | Remove the upstream-attribution constraint and its check from the gate order entirely — not downgrade it. Forward obligation only; the historical record stays. **Supersedes CR-002** | C | `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md`, `.claude/agents/*.md` · **`docs/DATABASE.md` and `.gitignore`: no change** | folded into `feat/foundation` (F0) — deviation recorded below | **All doc changes landed** | — |
+| CR-006 | 2026-08-05 | **Cut the gate count.** Drop `designer` visual verification, the separate security audit, and the `qa` E2E gate. The `reviewer` just reviews code; Rishabh reviews the frontend himself. Development was too slow and consumed too many credits | C | `PLAN.md` §2.3/§2.5/§3/§5.4, `CLAUDE.md` §3, `.claude/agents/reviewer.md`, `.claude/agents/qa.md`, `.claude/agents/designer.md`, `.claude/agents/orchestrator.md` · **`REQUIREMENTS.md`, `docs/DATABASE.md`: no change** | folded into `feat/foundation` (F0) | Doc changes landing now | — |
+| CR-007 | 2026-08-05 | **Redo the F0 frontend.** The shell is "too basic, too bland, too ew". Wanted: a landing page with a wow factor, a moving background matching the vibe, a real accent colour used throughout, a richer nav (floating dock or collapsible sidebar) with strong animation, pervasive hover/interaction feedback, and **GSAP** as the animation library. Design delegated to Claude — "I want you to wow me" | **B** | `PLAN.md` (F0 Design Spec + Technical Spec), `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md` (§2 dependencies, §10 decision log) · **`REQUIREMENTS.md`: change — new landing surface** · **`docs/DATABASE.md`: no change** | folded into `feat/foundation` (F0) | Specs in progress | — |
+
+---
+
+#### CR-007 — redo the F0 frontend · **Class B** · design delegated
+
+**Rishabh's words, 2026-08-05, after running the built shell:** *"i dont really like this frontend
+its too basic and too bland, i want more thump and a wow factor to it when its opened"*, *"it should
+look like wow what a website"*, *"im leaving the design upto you i want you to wow me"*, and
+*"if you need to start from scratch you can do that as well"*.
+
+**What he asked for, itemised so nothing is quietly dropped:**
+
+1. A **landing page** that is genuinely attractive — the first thing a visitor sees.
+2. A **moving background** that matches the vibe.
+3. A **good theme**, chosen by Claude.
+4. An **accent colour used throughout** — the built shell had none, and that is the single biggest
+   cause of the blandness. It rendered as near-monochrome greys.
+5. **Richer navigation** — his suggestions were a floating bottom bar or a collapsible sidebar, with
+   really good animations. Not the plain top bar that shipped.
+6. **More interactivity** — hover effects and intuitive affordances throughout.
+7. **GSAP** animations wherever possible.
+
+**Verified before specifying, not assumed:**
+
+- **GSAP licensing is not a blocker.** Free for commercial use since April 2025, including every
+  formerly paid plugin — ScrollTrigger, SplitText, MorphSVG, ScrollSmoother, Inertia.
+- **GSAP is cheaper than what we ship today.** Core ≈23 KB gzipped, ≈33 KB with ScrollTrigger,
+  against `framer-motion`'s **measured 40.8 KB** in our own bundle. **GSAP therefore replaces
+  `framer-motion` rather than joining it** — one animation system, and the bundle goes down. Two
+  libraries for one job would be an architectural defect.
+
+**Binding constraints the redo must respect — these are not negotiable by taste:**
+
+- **The accent may not be purple, green or yellow.** Those are reserved F1 timing semantics
+  (`DESIGN_SYSTEM.md` §3.1): purple = session fastest, green = personal best, yellow = below
+  personal best. This rules out the violet/indigo accent that most modern dashboards reach for.
+- **Brand colours stay identity-only, never a categorical chart palette** (§3.2 — measured, four
+  collisions). The redo changes chrome and motion, not that finding.
+- **Reduced motion is a correctness requirement, not a preference.** A moving background must have a
+  genuinely static state under `prefers-reduced-motion: reduce` — stopped, not slowed.
+- **The 250 KB gzipped budget still binds.** Current measured baseline: 147.46 KB.
+- **The background must not compete with data.** F2 onward puts dense charts on these surfaces; an
+  animated field behind a lap-time chart is a legibility defect, so its intensity is scoped.
+- **F0 still renders no driver, team or race content.** The wow comes from craft, not from content
+  that does not exist yet.
+
+**Rework this reopens.** T8, T10, T11 and T12 are all affected: the motion token module, every
+`framer-motion` call site, `AppShell`/`Header`/`PrimaryNav`, and M-1…M-11. `a2f3a6c`, `0f786aa`,
+`dee4e1c` and their fixes stand as history but their UI is superseded. The server, the data layer,
+the schemas and the query code are **untouched** by this CR.
 
 ---
 

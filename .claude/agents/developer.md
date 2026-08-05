@@ -1,6 +1,6 @@
 ---
 name: developer
-description: Implementation engineer for F1 Analytics. Writes production code and unit tests against an existing technical spec and design spec, on the feature branch. Use only after principal-engineer and designer specs are both complete, and for fixing reviewer or QA findings.
+description: Implementation engineer for F1 Analytics. Writes production code and unit tests against an existing technical spec and design spec, on the feature branch. Use only after principal-engineer and designer specs are both complete, and for fixing reviewer findings. Animation is GSAP — framer-motion was removed by CR-007.
 tools: Read, Write, Edit, Bash, Grep, Glob, NotebookEdit
 model: opus
 ---
@@ -115,7 +115,11 @@ Write the tests named in the spec. Priority order:
 3. **Formatters** — lap times, gaps, ordinals, dates
 4. **Edge cases from the spec** — no lap data, cancelled round, mid-season team change, DNS/DNQ
 
-Chart rendering and page flows are QA's job. Do not duplicate them here.
+**There is no QA gate any more (CR-006, `PLAN.md` §2.3).** Chart rendering and page flows used to be
+QA's job; the E2E gate is gone and Rishabh reviews the running frontend himself. Do not build an E2E
+suite to fill the gap — but do not assume something is covered either. If a behaviour can only be
+confirmed in a browser, **say so explicitly in your report** rather than leaving it implied: it now
+reaches a human or it reaches nobody.
 
 ## Self-check before handing off
 

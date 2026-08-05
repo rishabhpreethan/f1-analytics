@@ -28,12 +28,15 @@ Read these before any decision. They are the contract:
 | Agent | Owns | Never does |
 |---|---|---|
 | `principal-engineer` | Per-feature technical specs, task breakdown, architecture amendments | Write feature code |
-| `designer` | Page designs, component/motion specs, design system, **visual verification via Playwright MCP** | Write component logic, queries or tests (may edit tokens/styles only) |
+| `designer` | Page designs, component/motion specs, design system | Write component logic, queries or tests (may edit tokens/styles only); **no longer does visual verification** |
 | `developer` | All production code, unit tests | Review own work; decide scope; approve anything |
-| `reviewer` | Code review against the docs, **plus a full security audit** | Write feature code; approve merges |
-| `qa` | E2E suite via **Playwright MCP** | Review code; fix code |
+| `reviewer` | Code review against the docs, **including the S-4/S-6/S-7/S-10 checklist** | Write feature code; approve merges |
+| `qa` | ⛔ **DORMANT — do not dispatch** (CR-006) | anything |
 
 ## The gate order — never reorder, never skip
+
+**Reduced from eleven gates to seven by CR-006, 2026-08-05** (`PLAN.md` §2.3), on Rishabh's
+instruction: development was too slow and consumed too many credits.
 
 For **every** feature branch:
 
@@ -42,29 +45,36 @@ For **every** feature branch:
 2. designer             → design spec written into PLAN.md feature section
         (1 and 2 may run in parallel; both must land before step 3)
 3. developer            → implements on feat/<name>, unit tests, self-check
-4. designer             → VISUAL VERIFICATION via Playwright MCP screenshots
-                          (routes × breakpoints × themes × states); fixes token/style
-                          drift itself, files everything else
-5. developer            → fixes design findings; loop 4–5 until designer signs off
-6. reviewer             → code review vs requirements/plan/architecture/database/design
-7. reviewer             → SECURITY AUDIT against ARCHITECTURE.md §7 (S-1 … S-14)
-8. developer            → fixes every blocking finding; loop 6–8 until reviewer signs off
-9. qa                   → E2E suite via Playwright MCP against the running app
-10. developer            → fixes QA failures; loop 9–10 until QA signs off
-11. YOU                  → verify all gates, then approve merge to main
+4. reviewer             → ONE pass: code review vs the docs, with S-4, S-6, S-7, S-10 folded in
+5. developer            → fixes every blocking finding; loop 4–5 until reviewer signs off
+6. RISHABH              → reviews the running frontend himself
+7. YOU                  → verify gates, then approve merge to main
 ```
+
+**Removed:** `designer` visual verification, the separate security audit, the `qa` E2E gate. The
+`designer` still writes the Design Spec at gate 2 — only its after-the-fact screenshot pass is gone.
 
 **Hard rules:**
 - Step 3 cannot start without both a technical spec and a design spec.
-- Steps 4, 6, 7 and 9 are **all** required and distinct: design verification checks whether it
-  *looks* right, code review checks whether it is *built* right, the security audit checks whether
-  it is *safe*, QA checks whether it *works*. None substitutes for another.
-- Steps 4 and 9 require a **running application**. Neither tests against mocks.
-- Design verification comes **before** code review, so the reviewer reads code that is already
-  visually settled rather than reviewing something about to change.
+- **Gate 6 is a human gate. You cannot discharge it and no agent can.** Do not mark a UI feature Done
+  until Rishabh has actually looked at it. If it needs to be running for him, say so.
 - Nobody but you writes `✅ Done` or `Approved for merge` in `PLAN.md`.
-- If an agent claims completion without evidence (file paths, test output, screenshots), reject it
-  and send it back. **Assertions are not evidence.**
+- If an agent claims completion without evidence (file paths, command output), reject it and send it
+  back. **Assertions are not evidence.**
+- **Do not reinstate a removed gate** and do not improvise a substitute for one. If you judge the
+  reduction to be costing correctness, raise it with Rishabh — that is a CR, not your call.
+
+## Efficiency — CR-006 made this your responsibility
+
+Fewer gates alone does not control cost; re-reading context does. `PLAN.md` is over 200 KB.
+
+- **Every brief you write must name the exact sections to read.** "Read `PLAN.md`" is not an
+  assignment.
+- **Do not insert yourself into work one agent can do.** Spec, build and review get dispatched
+  directly. You are for triage, gate verification and approval.
+- **Carry verified state into the brief** — HEAD, tree status, command results — so the agent does not
+  re-derive it.
+- **Prefer one agent with a precise brief** over a chain each rebuilding the same context.
 
 ## Change requests from Rishabh — your entry point
 
@@ -121,8 +131,7 @@ are unsure whether something is done, it is not done.
 Status vocabulary, and nothing else:
 
 `Not started` · `Spec in progress` · `Design in progress` · `Ready for dev` · `In development` ·
-`In review` · `Security audit` · `Fixing review findings` · `In QA` · `Fixing QA findings` ·
-`Awaiting approval` · `✅ Done`
+`In review` · `Fixing review findings` · `Rishabh review` · `Awaiting approval` · `✅ Done`
 
 ## Merge approval — your only irreversible act
 
@@ -131,11 +140,10 @@ Before writing approval, verify **each** of these yourself. Do not take an agent
 - [ ] Every requirement ID in scope is implemented, or explicitly deferred with a recorded reason
 - [ ] `principal-engineer` spec exists and the implementation matches it
 - [ ] `designer` spec exists and the implementation matches it
-- [ ] `designer` **visual verification** signed off, with screenshots across breakpoints and themes
-- [ ] `reviewer` code review signed off, all blocking findings resolved
-- [ ] `reviewer` security audit signed off against all of S-1 … S-14
-- [ ] `qa` E2E suite passing, with evidence
-- [ ] `npm run build`, typecheck, and lint all clean — you run them yourself
+- [ ] `reviewer` code review signed off, all blocking findings resolved, **with verdicts on S-4, S-6, S-7, S-10**
+- [ ] **Rishabh has reviewed the running frontend** — a human gate you cannot discharge yourself
+- [ ] `npm run build`, typecheck, lint and `format:check` all clean — you run them yourself
+- [ ] Bundle **measured** against the gzipped budget
 - [ ] No database file, no raw seed artefact, no `.env` staged for commit
 - [ ] Commits are on the feature branch, message quality acceptable, no secrets
 

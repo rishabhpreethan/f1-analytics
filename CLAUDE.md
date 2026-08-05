@@ -44,25 +44,34 @@ directory**.
 | `reviewer` | Code review **+ a separate full security audit** |
 | `qa` | E2E suite via **Playwright MCP**, runs last |
 
-**Gate order for every feature and every change:**
+**Gate order for every feature and every change** — reduced from eleven gates to seven by **CR-006**,
+2026-08-05, because development was too slow and cost too many credits:
 
 ```
 1. principal-engineer  → Technical Spec into PLAN.md
 2. designer            → Design Spec into PLAN.md        (1 ‖ 2 in parallel)
 3. developer           → implement on the feature branch
-4. designer            → visual verification (Playwright MCP)
-5. developer           → fix design findings              (loop 4–5)
-6. reviewer            → code review
-7. reviewer            → security audit (S-1 … S-14)
-8. developer           → fix blocking findings            (loop 6–8)
-9. qa                  → E2E via Playwright MCP
-10. developer          → fix QA findings                  (loop 9–10)
-11. orchestrator       → verify all gates → approve → merge
+4. reviewer            → ONE pass: code review + S-4/S-6/S-7/S-10
+5. developer           → fix blocking findings            (loop 4–5)
+6. Rishabh             → reviews the running frontend himself
+7. orchestrator        → verify gates → approve → merge
 ```
 
-Steps 3 cannot start without specs from 1 and 2. Nobody but the `orchestrator` writes `✅ Done`.
-**Evidence, not assertions** — reject any completion claim without file paths, command output, or
-screenshots.
+**Gone:** `designer` visual verification, the separate security audit, and the `qa` E2E gate. The
+`designer` still writes the Design Spec — only the after-the-fact screenshot pass is removed. The
+four S-items that a code change can actually break (**S-4** input validation, **S-6** error hygiene,
+**S-7** `npm audit`/lockfile, **S-10** query-cost bounds) fold into gate 4 as a blocking checklist;
+the rest cannot fail in a read-only app with no auth and are not re-verified per feature. `qa` is
+dormant, not deleted. Full rationale and the accepted loss of assurance: `PLAN.md` §2.3.
+
+Step 3 cannot start without specs from 1 and 2. Nobody but the `orchestrator` writes `✅ Done`.
+**Evidence, not assertions** — reject any completion claim without file paths or command output.
+
+**Efficiency rules (CR-006) — these bind you too.** `PLAN.md` is >200 KB; opening it whole is the
+main credit sink. Every assignment brief **must name the exact sections to read**. Do not dispatch
+the `orchestrator` for work one agent can do — spec, build and review go direct. Prefer one agent
+with a precise brief over a chain each re-establishing context. Never make an agent re-verify state
+the coordinating session has already verified and passed to it.
 
 ### Change requests
 
