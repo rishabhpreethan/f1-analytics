@@ -29,6 +29,11 @@ describe('DataVintage', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('status')).toBeNull();
 
+    // A disclosure, not a menu button: `aria-haspopup` would promise a menu (ARIA 1.2
+    // defines `"true"` as `"menu"`) that this static-prose panel never delivers.
+    expect(trigger.hasAttribute('aria-haspopup')).toBe(false);
+    expect(trigger.getAttribute('aria-controls')).toBe('data-coverage-detail');
+
     // The label proper — the coverage sentence — is in the detail popover.
     await userEvent.click(trigger);
     expect(trigger.getAttribute('aria-expanded')).toBe('true');

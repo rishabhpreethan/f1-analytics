@@ -35,6 +35,8 @@ const LABELS: Record<ThemePreference, string> = {
   dark: 'Dark',
 };
 
+const PANEL_ID = 'theme-preference-group';
+
 function PreferenceIcon({ preference, size }: { preference: ThemePreference; size: 16 | 20 }) {
   if (preference === 'light') return <Sun size={size} />;
   if (preference === 'dark') return <Moon size={size} />;
@@ -148,7 +150,14 @@ export function ThemeToggle() {
         type="button"
         className="btn btn-ghost btn-icon"
         aria-expanded={open}
-        aria-haspopup="true"
+        /*
+         * No `aria-haspopup`, for the same reason as `DataVintage`: ARIA 1.2 requires the
+         * value to match a popup container role of menu / listbox / tree / grid / dialog,
+         * `"true"` means `"menu"`, and this panel is a `radiogroup` — which is not an
+         * allowed popup role at all, so no value of the attribute would be correct.
+         * `aria-expanded` + `aria-controls` carry the disclosure relationship.
+         */
+        aria-controls={PANEL_ID}
         aria-label={`Theme: ${LABELS[preference]} (currently ${resolved}). Change theme.`}
         onClick={() => {
           if (open) closePopover();
@@ -163,6 +172,7 @@ export function ThemeToggle() {
       <AnimatePresence>
         {open && (
           <motion.div
+            id={PANEL_ID}
             className="popover-panel popover-theme flex flex-col gap-0 p-1.5"
             variants={popover}
             initial="hidden"

@@ -100,7 +100,14 @@ export function DataVintage({ vintage, detail, state }: DataVintageProps) {
                 type="button"
                 className="btn btn-ghost btn-sm t-mono t-xs gap-2"
                 aria-expanded={open}
-                aria-haspopup="true"
+                /*
+                 * No `aria-haspopup`. ARIA 1.2 requires the popup container's role to be
+                 * one of menu / listbox / tree / grid / dialog and the attribute's value
+                 * to match it; `"true"` is defined as equivalent to `"menu"`, and this
+                 * panel is static prose, not a menu. It is a **disclosure**, so
+                 * `aria-expanded` states the state and `aria-controls` names what it
+                 * controls — the presence of which is exactly what this button controls.
+                 */
                 aria-controls={PANEL_ID}
                 aria-label={detail.triggerName}
                 onClick={() => {

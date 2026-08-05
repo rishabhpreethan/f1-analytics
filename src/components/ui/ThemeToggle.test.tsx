@@ -79,10 +79,17 @@ describe('ThemeToggle', () => {
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('radiogroup')).toBeNull();
 
+    // The trigger discloses a radiogroup, which is not one of the popup container roles
+    // `aria-haspopup` may name (menu / listbox / tree / grid / dialog), so the attribute
+    // is deliberately absent and `aria-controls` carries the relationship instead.
+    expect(trigger.hasAttribute('aria-haspopup')).toBe(false);
+    expect(trigger.getAttribute('aria-controls')).toBe('theme-preference-group');
+
     await userEvent.click(trigger);
 
     const group = screen.getByRole('radiogroup', { name: 'Theme' });
     expect(group).toBeDefined();
+    expect(group.id).toBe('theme-preference-group');
     const options = screen.getAllByRole('radio');
     expect(options).toHaveLength(3);
     expect(options.map((option) => option.textContent)).toEqual(['System', 'Light', 'Dark']);
