@@ -140,11 +140,17 @@ or label, never colour alone.
 
 ## Motion — GSAP
 
-**GSAP replaced `framer-motion` on 2026-08-05 (CR-007).** Verified before the decision: GSAP is free
-for commercial use including all former Club plugins (ScrollTrigger, SplitText, MorphSVG,
-ScrollSmoother, Inertia) since April 2025, and core is ≈23 KB gzipped (≈33 KB with ScrollTrigger)
-against `framer-motion`'s measured 40.8 KB here — so this costs less than what it replaces. **One
+**GSAP replaced `framer-motion` on 2026-08-05 (CR-007).** Free for commercial use including all former
+Club plugins (ScrollTrigger, SplitText, MorphSVG, ScrollSmoother, Inertia) since April 2025. **One
 animation library. Specifying `framer-motion` is now a defect.**
+
+**Sizes — measured, gzipped.** An earlier version of this file said "≈23 KB core, ≈33 KB with
+ScrollTrigger, so it costs less than what it replaces." That came from a web search and **was wrong.**
+Measured by the `principal-engineer`: GSAP core **27.6 KB** · core + ScrollTrigger + `@gsap/react`
+**45.5 KB** · `framer-motion` **40.8 KB**. So core alone is ~13 KB cheaper, but **with ScrollTrigger it
+is ~4.6 KB dearer than what we ship today.** Projection: ≈140 KB without ScrollTrigger, ≈157 KB with,
+against the 250 KB budget — ~100 KB headroom either way, so this does not constrain your design. Quote
+these figures, not the old ones. **`SplitText` adds ~3 KB** on top.
 
 Animation should feel fast, mechanical and deliberate — never floaty or decorative. It is an F1
 product: think mechanical precision, weight transfer, things that settle rather than bounce.

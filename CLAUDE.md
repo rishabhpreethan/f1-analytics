@@ -9,7 +9,7 @@ Do not start building on your own — that bypasses the process and is a review 
 
 A Formula 1 analytics web application for enthusiasts — driver/team/race/circuit analysis, with
 comparison across seasons and eras as its centre of gravity. React + TypeScript, heavy but purposeful
-Framer Motion animation, accurate F1 team colours and timing conventions.
+GSAP animation, accurate F1 team colours and timing conventions.
 
 **Current phase: F0 (foundation scaffold). No application code exists yet.** Everything committed so
 far is documentation and agent definitions.
@@ -167,33 +167,46 @@ around it. Registration having happened does not waive this.
 
 ## 8. Where we are right now
 
-- `main` — foundation docs + agent definitions, pushed
-- **`feat/foundation` — current branch.** **F0 gates 1 and 2 are complete and verified.** Tracker says
-  `Ready for dev ⛔`. Technical Spec (14 tasks, T1–T14) and Design Spec both live in `PLAN.md` §4 F0;
-  `docs/DESIGN_SYSTEM.md` is authored through §10
-- **Gate 3 preconditions — ALL CLEARED.** `PLAN.md` F0 → **Orchestrator Gate Record** §G.5. **P-1
-  Node 22 ✅** (`v22.23.2`, `better-sqlite3` builds, temp-view decision and `/api/meta` values
-  re-probed on the target runtime). **P-2 ✅** — `DESIGN_SYSTEM.md` §10 now specifies the external
-  `public/theme-init.js`. **P-3 ✅** — all four stale task cross-references corrected; verified by
-  grep, the only surviving `T12`/`T13` mentions are the legitimate task rows and §G.3's record of
-  what was fixed. **Read §G.2 before building — five rulings are binding**, including that the Framer
-  Motion shell/route subset **does** land in F0
-- ➡️ **NEXT ACTION: dispatch gate 3 (`developer`) to implement T1–T14** on `feat/foundation`. Nothing
-  blocks it. T1 must still assert `node -v ≥ v22.22.0` and stop if not.
-- **CR-005 supersedes CR-002: the upstream-attribution constraint is GONE — Rishabh's decision,
-  2026-08-04.** He is making the repo private and judged the exposure not a problem. Removed from
-  §4.1 (tombstoned above), `PLAN.md` §2.4, the gate order, the Definition of Done, the F11 checklist,
-  the F0 evidence list, `S-12` in the security audit (number **retired**, S-13/S-14 unchanged), and
-  every agent definition. **Forward-going only — history stands verbatim.** Do not reinstate it,
-  re-extend the blocklist, or raise it at gate 7. CR-002's own withdrawal stays on the record.
-  **CR-003** (2026 has 22 numbered rounds, not 24) is blocked on F0.
-  **CR-004** (Rishabh's proposal: team logos where brand colours collide, colours where they don't) is
-  scheduled for F1
-- If the orchestrator's `PLAN.md` §5.5 still shows CR-002 as open and highest-priority, that is stale
-  — the agent recording the withdrawal was stopped before it wrote. Correct it, don't act on it
-- R0 (database) ✅ done. **R1 (driver images), R2 (team logos) and R3 (app icons) are Rishabh's** —
-  never fabricate, generate, or hotlink images. **None of the three blocks F0**, which renders no
-  driver, team or race content and ships a typographic favicon placeholder
+*Last updated 2026-08-06. Correct this section whenever it drifts — a stale "next action" here has
+already misled agents once.*
+
+- `main` — foundation docs + agent definitions, pushed. **Nothing since has been pushed.**
+- **`feat/foundation` — current branch.** F0 was **built end to end**: T1–T14 all landed and verified
+  (typecheck, lint, `format:check`, **89 tests / 14 files**, build all clean; measured bundle
+  **147.46 KB gzipped** = 59 % of the 250 KB budget; the missing-database path gives a clear console
+  message and a `503` with no stack trace or filesystem path in the body)
+- ⚠️ **The F0 frontend is being REDONE — CR-007.** Rishabh ran the built shell on 2026-08-05 and
+  rejected it as *"too basic and too bland"*, *"too ew"*. Wanted: a landing page with a real wow
+  factor, a moving background, an accent colour used throughout (the shell had **none** — that is the
+  root cause), richer nav with strong animation, pervasive hover/pointer feedback, and **GSAP**.
+  Design is delegated to Claude. **`PLAN.md` §5.5 → CR-007** is the contract
+- **GSAP has replaced `framer-motion`.** Specifying or importing `framer-motion` is now a **defect**.
+  Free for commercial use (all former Club plugins included) since April 2025. **Measured** sizes,
+  gzipped: GSAP core **27.6 KB**, core + ScrollTrigger + `@gsap/react` **45.5 KB**, against
+  `framer-motion`'s **40.8 KB**. So core alone is cheaper, but **with ScrollTrigger it is ~4.6 KB
+  dearer** — the earlier "23/33 KB, the bundle goes down" claim came from a web search and was wrong.
+  Projection: **≈140 KB** without ScrollTrigger, **≈157 KB** with. Either way ~100 KB of headroom
+- **Gate order is now SEVEN gates, not eleven — CR-006, 2026-08-05.** Dropped: `designer` visual
+  verification, the separate security audit, the `qa` E2E gate. **Gate 6 is Rishabh reviewing the
+  running frontend himself, and no agent can discharge it.** S-4/S-6/S-7/S-10 fold into the single
+  review pass. `qa` is **dormant — do not dispatch it.** Efficiency rules in §3 bind every brief
+- ➡️ **NEXT ACTION:** CR-007 specs. **Technical Spec is done** — `PLAN.md` F0 →
+  `Technical Spec — CR-007 supersession` (§S.0–§S.9), 8 tasks **C7-1…C7-8** and 20 unit tests
+  CT-1…CT-20, plus `ARCHITECTURE.md` §2/§5/§10 (#21–#24). **Design Spec was in progress at last
+  update.** Then gate 3 builds C7-1…C7-8. **T10, T11 and T12 are dead task rows**; T1–T7, T9, T13,
+  T14 stand verbatim
+- **`/` is the Landing; the season hub moved to `/seasons`**, no redirect either way
+  (`ARCHITECTURE.md` §10 #23). If a spec merges hub and landing, go back to `principal-engineer`
+- **CR-005 supersedes CR-002: the upstream-attribution constraint is GONE** — Rishabh's decision,
+  2026-08-04; he is making the repo private and judged the exposure not a problem. §4.1 is a
+  tombstone, `S-12` is retired and never renumbered. **Forward-going only — history stands verbatim.**
+  Do not reinstate it, re-extend the blocklist, or raise it at a gate. Two `developer` runs re-ran the
+  deleted grep anyway because `PLAN.md` §9.5 read as live; it is now banner-marked as historical
+- **CR-003** (2026 has 22 numbered rounds, not 24) is blocked on F0. **CR-004** (team logos where brand
+  colours collide) is scheduled for F1
+- R0 (database) ✅ done. **R1 (driver images), R2 (team logos), R3 (app icons) are Rishabh's** — never
+  fabricate, generate, or hotlink images. **None blocks F0**, which renders no driver, team or race
+  content and ships a typographic favicon placeholder
 
 ---
 

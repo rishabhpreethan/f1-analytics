@@ -553,7 +553,13 @@ Node is told by `npm`, not by a reviewer.
 | `react` / `react-dom` | `^19.2.8` | 19.2.8 | satisfies `react-router@8`'s `>=19.2.7` peer |
 | `react-router` | `^8.3.0` | **8.3.0** | audit-clean. Declarative mode; all APIs used come from `react-router` (§0.1) |
 | `@tanstack/react-query` | `^5.101.4` | 5.101.4 | |
-| `framer-motion` | `^12.43.0` | 12.43.0 | **F0 lands the shell/route motion subset** — see below |
+| ~~`framer-motion`~~ | ~~`^12.43.0`~~ | ~~12.43.0~~ | ⚠ **REMOVED BY CR-007. Replaced by `gsap@^3.15.0` + `@gsap/react@^2.1.2`** — see the **CR-007 supersession** spec §S.3.2 and `ARCHITECTURE.md` §10 #21. Everything below this table's `framer-motion` note is history |
+
+> ⚠ **The rest of §1.1's motion material — the ten-motion table, the `src/lib/motion.ts` rule and the
+> "`framer-motion` is in the initial chunk" note — is SUPERSEDED BY CR-007.** Read the **Technical Spec
+> — CR-007 supersession** section (§S.0 for what dies, §S.3.3 for the GSAP/React pattern, §S.3.4 for
+> reduced motion). It is retained below as the record of what was built at T8–T12. The
+> `devDependencies` table and every non-motion row above are **unaffected and still binding**.
 
 **⚠ `framer-motion` in F0 — this supersedes the first draft of this row.** An earlier version of this
 table read *"F1 uses it; F0 installs it and adds no animation."* That is **withdrawn** by ruling R-1
@@ -938,6 +944,13 @@ nothing about a file, a location, or an origin.
    requires verifying zero CSP violations in the production preview console and removing the
    allowance if none appear.** Verify; do not reason about it.
 
+   > ⚠ **CR-007 update.** T13 could not produce the required browser evidence, so the allowance is
+   > still present. **`CR-007 task C7-8` now owns closing this**, and the reasoning is stronger than it
+   > was: `framer-motion` is gone, and GSAP writes styles through `element.style` and — verified by
+   > grepping the shipped `gsap`, `ScrollTrigger` and `SplitText` source — **injects no `<style>`
+   > element at all**. The two-console rule below is unchanged and still not dischargeable by one
+   > screenshot.
+
    **The CSP is verified twice, in two different consoles, and neither discharges the other.**
    T11 and T13 both say "zero CSP violations"; they are not the same check:
 
@@ -1061,7 +1074,7 @@ src/
     ui/icons.tsx           the eleven inline SVG icons — see §3.10
   lib/
     api.ts  queryClient.ts  theme.ts  format.ts
-    motion.ts              minimal F0 motion tokens — see §1.1; F1 completes it
+    motion.ts              ⚠ DELETED BY CR-007 — replaced by the src/lib/motion/ directory (§S.3.1)
   styles/index.css  styles/fonts.css
 
 public/
@@ -1147,6 +1160,11 @@ export function selectSeasonProgress(meta: Meta): { completed: number; scheduled
   `toLocaleDateString` without an explicit locale, or tests differ per machine).
 
 ###### 3.5 Component tree
+
+> ⚠ **SUPERSEDED IN PART BY CR-007 §S.3.6.** `/` is now the **Landing** page and the season hub moves to
+> `/seasons`, so the table is **12 routes plus `*`**, not 11; `PrimaryNav` is replaced; `AppShell` gains
+> `Backdrop`; `RouteTransition` is extracted from `RootLayout`. The props table below is otherwise
+> unchanged and still binding.
 
 ```
 <QueryClientProvider>
@@ -1534,6 +1552,11 @@ N/A — F0 touches no lap-scale data. The precedent it must **not** set is an un
 
 ###### 6.4 Code-splitting boundary
 
+> ⚠ **SUPERSEDED BY CR-007 §S.6.** The `framer-motion` bullet and the measured baseline table below
+> describe the bundle at `792b4c9`; they remain the **historical** T13 measurement and the baseline the
+> CR-007 projection subtracts from, so they are not deleted. The **current** boundary, the projection and
+> the `ScrollTrigger` decision rule are in §S.6.1–§S.6.3, and C7-8 records the new measured figures there.
+
 F0 introduces none, and that is deliberate — splitting an app with two rendered components adds
 waterfall for no gain. The boundary is fixed here so F1/F3 do not invent one:
 
@@ -1606,6 +1629,10 @@ consoles per the §2.4 table.
 ---
 
 ##### 7. Unit test list
+
+> ⚠ **SUPERSEDED IN PART BY CR-007 §S.7.** Tests 1–48 and 56–63 are untouched. Tests 49–55, 64 and 66–69
+> must keep passing. **Test 65 is rewritten** (the skeleton pulse becomes CSS) and any test asserting a
+> `framer-motion` prop is deleted with its call site. The new tests are numbered `CT-1…CT-20` in §S.7.
 
 Vitest. Server and pure-logic tests in the `node` environment; the three component tests in
 `jsdom`. Named exactly as the developer must create them.
@@ -1745,6 +1772,11 @@ exception:** `MotionConfig reducedMotion="user"` and M-7's explicit `useReducedM
 ---
 
 ##### 8. Task breakdown
+
+> ⚠ **SUPERSEDED IN PART BY CR-007 §S.8.** **T10, T11 and T12 are dead**, and **T8's motion clauses**
+> (`MotionConfig`, `src/lib/motion.ts`) are dead — T8's Vite/Tailwind/fonts half stands. **T1–T7, T9,
+> T13 and T14 stand verbatim and are complete.** The replacement tasks are **C7-1…C7-8** in §S.8. Every
+> task below is already landed; this table is the record of what was built, not a work list.
 
 Ordered. Each is independently committable and sized ≤ half a day. Work down the list.
 
@@ -1945,7 +1977,771 @@ worse than none:
 **Not in scope for the script:** deciding tokens, generating palettes, or proposing fixes. It measures
 and it exits non-zero. The `designer` owns what to do about a FAIL.
 
-#### **Design Spec** — `designer`, 2026-08-04
+#### **Technical Spec — CR-007 supersession** — `principal-engineer`, 2026-08-06
+
+> **This section supersedes parts of the Technical Spec above. It does not replace it.** Everything
+> server-side stands verbatim. Where the two disagree about the client, **this section wins**, and the
+> superseded passages above carry a pointer to it. Read §S.0 first — it says exactly what is dead and
+> what is still binding.
+>
+> Written at gate 1 of **CR-007** (§5.5). The `designer` writes the Design Spec for the same CR in
+> parallel; **at the time of writing it does not exist yet**, so every visual value here is deferred to
+> it by name. This section specifies structure, dependencies, boundaries, mechanism and tasks. Where a
+> decision depends on the Design Spec it is written as a contract with a named fallback, never as an
+> assumption.
+
+##### S.0 What is superseded, what is retained
+
+**Superseded — do not build from these any more:**
+
+| Site | What dies |
+|---|---|
+| §1.1 `framer-motion` row + the ten-motion table under it | The whole dependency choice and the F0 motion subset table (`MotionConfig`, M-1…M-8, M-11 as Framer Motion constructs) |
+| §3.1 file layout — `lib/motion.ts` | Replaced by the `src/lib/motion/` directory (§S.3.1) |
+| §3.5 component tree — `PrimaryNav`, and "11 routes" | Nav is re-specified (§S.3.6); the route table becomes 12 routes plus `*` |
+| §6.4 code-splitting boundary — the `framer-motion` bullet and the measured baseline table | Replaced by §S.6 |
+| §7 unit test list — the tests that assert Framer Motion behaviour | Replaced by the `CT-*` list in §S.7 |
+| §8 task breakdown — **T8 (motion root + `lib/motion.ts` only), T10, T11, T12** | Replaced by **C7-1 … C7-8** (§S.8). T8's Vite/Tailwind/fonts half is **retained** — only its `MotionConfig` and `src/lib/motion.ts` clauses die |
+
+**Retained and still binding — this CR touches none of it:**
+
+- **The entire server.** `server/**` is not edited by this CR. No new endpoint, no new query, no new
+  schema, no change to `server/coverage.ts`, no change to the rate limiter or the error envelope.
+  A diff that touches `server/` outside a comment is out of scope and a review finding.
+- T1–T7, T9, T13's serving half, T14. §1.2–§1.8, §2.1–§2.7, §3.2–§3.4, §3.6–§3.10, §4, §6.1–§6.3,
+  §9.1's `DATABASE.md` edits.
+- **§2.4's CSP verbatim**, including `styleSrcAttr` still being present. See §S.2.
+- The theme model (`src/lib/theme.ts`, `public/theme-init.js`) and the vendored fonts and icons.
+- Every accessibility obligation already specified: the `:focus-visible` double ring, the skip link,
+  the `ThemeToggle` 3-option radiogroup, 44 px coarse-pointer targets, `aria-current` on the active
+  nav item. **A "wow" redesign that loses one of these is a regression, not a redesign.**
+
+**Commits whose UI is superseded but whose history stands:** `4758f26` (T8 — the `MotionConfig` and
+`src/lib/motion.ts` parts only), `0f786aa` (T10), `a2f3a6c` + `62985d0` (T11), `dee4e1c` (T12),
+`a6dbafd`, `4083e8b`, `d823d50` (the gate-4 design corrections to T11/T12 components).
+**Commits fully retained:** `cb82c62`…`b860c38` (T1–T7, T9), `aef40b2` (T13 serving), `a347d47` (T14),
+`26efa77` (the theme/`ThemeToggle` tests — these survive, and C7-5/C7-7 must keep them passing or
+justify each change in the commit message).
+
+##### S.1 Data contract
+
+**N/A — and the reason matters.** This CR adds no query, so there is no SQL, no view, no coverage
+window and no trap to mitigate in it. Two data rules bind anyway, because a landing page is where
+invented numbers get typed:
+
+1. **The landing page may consume `useMeta()` and nothing else.** Every figure it renders comes from
+   `GET /api/meta`'s existing response (§2.2): `seasons.firstYear/latestYear/count`,
+   `latestSeason.{year,scheduledRounds,completedRounds,cancelledRounds,isComplete}`,
+   `latestCompletedRound`, `nextScheduledRound`, `coverage.*`. Nothing else exists to render, and F0
+   still renders **no driver, team or race analysis** (a round *name* is already shipped in
+   `DataVintage` and is the one precedent).
+2. **A hard-coded statistic is a defect, not a placeholder.** `77`, `1950`, `2026`, `22`, `10` must not
+   appear as literals in `src/routes/Landing.tsx` or in any component it renders. They go stale on the
+   next database refresh, silently, on the most visible surface in the product. CT-14 enforces this
+   mechanically.
+
+Traps from `DATABASE.md` §7 that could reach this surface *through* `/api/meta` and are **already
+mitigated upstream, in queries this CR does not touch**: trap 15 (cancelled rounds carry
+`number IS NULL`, so `scheduledRounds` is `max(number)` = 22 for 2026, not `count(*)` = 24) and trap 11
+(slugs, never integer ids — `circuitRef`, and every route param stays a slug). The landing page must
+**not** re-derive either: if it wants "Round 10 of 22" it reads `completedRounds` and
+`scheduledRounds`, and if it wants a link it uses `circuitRef`.
+
+##### S.2 API contract
+
+**Unchanged. No endpoint is added, removed or altered.** Three consequences that are not "no change":
+
+1. **Caching is unchanged and is now load-bearing for a first impression.** `/api/meta` is
+   `Cache-Control: public, max-age=300` with a 5-minute client `staleTime`. The landing page's hero
+   therefore paints from cache on every navigation back to `/`, and its loading state is seen once per
+   session. Do not add a refetch-on-mount, do not lower `staleTime` to make the hero feel "live".
+2. **The `styleSrcAttr: 'unsafe-inline'` allowance can now probably go, and this CR is where it gets
+   settled.** §2.4 permits removal on exactly one evidence: zero CSP violations in the
+   **production-preview** console. GSAP writes styles through `element.style` (CSSOM), which CSP does
+   not govern, and — **verified by grepping the shipped ESM source of `gsap`, `ScrollTrigger` and
+   `SplitText`, where there is no `document.createElement("style")` at all** — GSAP injects no
+   stylesheet either. So the policy should hold with `styleSrcAttr` removed. **C7-8 owns the check.**
+   If removal breaks the *dev* console only, the dev server gets adjusted, not the policy.
+3. **`script-src 'self'` / `style-src 'self'` are compatible with everything specified here, and this
+   was checked rather than assumed.** No inline `<script>`, no inline `<style>`, no `blob:` worker (we
+   ship no worker), no `unsafe-eval` (GSAP does not use `eval`; only `CustomEase` and GSDevTools go
+   near string-compiled behaviour and both are denylisted, `ARCHITECTURE.md` §10 #21). The backdrop's
+   grain is a `data:image/svg+xml` **`background-image`**, governed by `img-src 'self' data:`, which is
+   already permitted. **The background makes no network request of any kind** — no image file, no font,
+   no fetch, no `import()` of remote code.
+
+##### S.3 Client structure
+
+###### S.3.1 File layout — the delta only
+
+```
+src/
+  lib/motion/
+    tokens.ts          durations, GSAP named eases, distances, stagger, ambient periods
+    gsap.ts            the ONLY module that imports 'gsap' — registers plugins, sets defaults, re-exports
+    reducedMotion.ts   pure: MOTION_QUERY_REDUCE, prefersReducedMotion(), matchesReduce(mql)
+    useMotion.ts       the one hook that creates tweens
+    motion.test.ts  useMotion.test.ts  reducedMotion.test.ts  tokens.test.ts
+  components/layout/
+    AppShell.tsx       + mounts <Backdrop/>, owns the stacking context
+    Backdrop.tsx       the moving background (§S.3.5)
+    backdrop.ts        pure: backdropIntensityFor(pathname) → 'full' | 'muted' | 'off'
+    Dock.tsx           replaces PrimaryNav.tsx  (name per Design Spec — see §S.3.6)
+    navItems.ts        pure: NAV_ITEMS, isActiveNavItem(pathname, to), computeIndicatorGeometry(...)
+    Header.tsx         retained, re-skinned
+  routes/
+    Landing.tsx        NEW — the '/' surface
+    SeasonHub.tsx      unchanged component, now mounted at /seasons and /seasons/:year
+    RouteTransition.tsx  extracted from RootLayout — owns the route-enter motion
+  features/landing/
+    selectors.ts       pure: selectHeroFigures(meta) and friends
+    selectors.test.ts
+  styles/
+    motion.css         @keyframes + the two reduced-motion / visibility chokepoints
+    backdrop.css       the backdrop layers
+    motion.css.test.ts backdrop.css.test.ts   ← stylesheet assertions, see CT-9/CT-10
+
+DELETED: src/lib/motion.ts · src/components/layout/PrimaryNav.tsx
+```
+
+`src/styles/index.css` imports `./motion.css` and `./backdrop.css` after `./tokens.css`. No new alias,
+no new build plugin, no change to `vite.config.ts` other than nothing at all.
+
+###### S.3.2 The dependency change
+
+| Package | Action | Version | Notes |
+|---|---|---|---|
+| `framer-motion` | **remove** | — | `npm uninstall framer-motion`. Zero references may survive anywhere, including comments. |
+| `gsap` | **add** to `dependencies` | `^3.15.0` (resolved 3.15.0) | Zero runtime deps · no install scripts · `sideEffects: false` · ships its own types, so **no `@types/gsap`** |
+| `@gsap/react` | **add** to `dependencies` | `^2.1.2` (resolved 2.1.2) | Zero runtime deps · peers `gsap ^3.12.5` and `react >=17`, both satisfied · ships types · 0.4 KB gz |
+
+Recorded as `ARCHITECTURE.md` §10 **#21**, with the measured figures and the plugin allow/denylist.
+**Escalation:** two new dependencies — the `orchestrator` must put them to Rishabh before C7-1 lands,
+per the standing rule that new dependencies go through the `principal-engineer` and are escalated. My
+recommendation is approve; the reasoning is in #21.
+
+###### S.3.3 How GSAP integrates with React 19 — the canonical pattern, verified
+
+Verified against GreenSock's own React guidance (`gsap.com/resources/React/`, `gsap.com/docs/v3/React/tools/useGSAP/`,
+`gsap.com/docs/v3/GSAP/gsap.matchMedia()/`) and against the shipped source of `@gsap/react@2.1.2`,
+not from memory. Six rules; each one is a defect class if broken.
+
+**R-G1 — `useGSAP()` is the only place an animation is created. Never `useEffect`.**
+`useGSAP()` is GreenSock's drop-in replacement for `useEffect`/`useLayoutEffect` that "automatically
+handles cleanup using `gsap.context()`". Its source uses `useLayoutEffect` whenever `document` is
+defined (the `useIsomorphicLayoutEffect` technique). **That is not a stylistic preference: `gsap.from()`
+applies its start values immediately on creation, so building in a layout effect means the start state
+lands before paint. Building in `useEffect` paints the resting state first and then jumps — a visible
+flash on every mount.** React 19 does not change `useLayoutEffect` semantics, and we never server-render,
+so there is no SSR caveat to manage.
+
+**R-G2 — every animation is scoped to a container ref, and the hook owns that ref.**
+`useGSAP(cb, { scope })` confines all selector strings to descendants of `scope`. Our `useMotion`
+wrapper **creates and returns the ref**, so a caller cannot forget to scope. This is the mechanism that
+stops a route's animation reaching into the shell or the next route: a selector that matches nothing
+outside the container cannot leak, and on unmount the context reverts every tween, timeline,
+ScrollTrigger and event listener created inside it.
+
+**R-G3 — a non-empty dependency array requires `revertOnUpdate: true`, so our wrapper always sets it.**
+`useGSAP`'s default is `revertOnUpdate: false`, which reverts only on unmount. With dependencies, a
+dep change then **adds** new tweens on top of the old ones, and their leftover inline transforms fight.
+That is the classic GSAP-in-React leak, and it is exactly what a route-keyed animation on a
+**persistent** shell component (the dock, the backdrop, the route-transition wrapper — none of which
+unmount on navigation) would hit. `useMotion` hard-codes `revertOnUpdate: true`; there is no option to
+turn it off.
+
+**R-G4 — animations created after the hook has run must be context-safe.**
+Hover, click and `setTimeout` handlers execute after the effect, so tweens they create are outside the
+context and are never cleaned up. `useGSAP` returns `contextSafe()` for this. `useMotion` re-exports it
+as `motionSafe()`, which additionally **returns a no-op under reduced motion** (§S.3.4).
+
+**R-G5 — GSAP animates the DOM; React never re-renders on a frame.**
+No `onUpdate` may call `setState`, and no animated value may be mirrored into React state. Sixty
+re-renders a second on a page that will hold charts from F2 is a performance defect. Corollary: never
+put a GSAP-controlled property into a component's `style` prop — React will overwrite it on the next
+render.
+
+**R-G6 — plugins are registered exactly once, in `src/lib/motion/gsap.ts`, and `useGSAP` is registered too.**
+`gsap.registerPlugin(useGSAP)` is GreenSock's documented way to make the hook bind to the same core
+instance. Registering in a component means registering per mount.
+
+`src/lib/motion/gsap.ts` — the single choke point:
+
+```ts
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
+import { MOTION } from './tokens';
+// ScrollTrigger is imported here, or not at all — see §S.6.3.
+
+gsap.registerPlugin(useGSAP /*, ScrollTrigger */);
+gsap.defaults({ duration: MOTION.dur.base, ease: MOTION.ease.enter, overwrite: 'auto' });
+gsap.config({ nullTargetWarn: false });   // a scoped selector legitimately matches nothing
+export { gsap, useGSAP };
+```
+
+`overwrite: 'auto'` is deliberate: it kills conflicting tweens of the same property on the same target,
+which is what makes rapid hover-in/hover-out land on a correct final value instead of a race.
+
+**ESLint, added in C7-2** — the rule that makes R-G1/R-G6 enforceable rather than aspirational:
+
+```js
+'no-restricted-imports': ['error', { paths: [
+  { name: 'framer-motion', message: 'Removed by CR-007. Use @/lib/motion.' },
+  { name: 'gsap',        message: 'Import from @/lib/motion/gsap — one registration site (ARCHITECTURE §10 #21).' },
+  { name: '@gsap/react', message: 'Import from @/lib/motion/gsap.' },
+], patterns: ['gsap/*'] }]
+```
+with an override permitting `gsap`, `gsap/*` and `@gsap/react` **only** inside `src/lib/motion/**`.
+
+###### S.3.4 Reduced motion, structurally
+
+The requirement is a **stopped** state, not a slowed one. Two chokepoints, both global, both testable.
+Recorded as `ARCHITECTURE.md` §10 #22.
+
+**Chokepoint 1 — CSS, for every loop and every transition.** One block, in `src/styles/motion.css`:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+```
+It is global on purpose: a per-component reduced variant is a thing you can forget, and CR-002-era
+history in this file shows what forgetting costs. The existing per-component `@media` blocks in
+`index.css` (`body`, `.btn`, `.option-row`) become redundant; C7-2 removes them so there is **one**
+place, not four. **This is only correct because of MR-2 below.**
+
+**Chokepoint 2 — GSAP, for every tween.** `useMotion` runs its builders inside
+`gsap.matchMedia()`, which GreenSock documents as automatically reverting everything created under a
+condition when that condition stops matching — so a user toggling the OS setting mid-session gets the
+correct state without a reload, and without any listener code of ours.
+
+```ts
+const mm = gsap.matchMedia();
+mm.add({ reduce: '(prefers-reduced-motion: reduce)' }, (ctx) => {
+  const reduced = ctx.conditions.reduce === true;
+  settle?.({ root, q, gsap });          // ALWAYS — gsap.set only, instant, both modes
+  if (reduced) return;                  // ← no tween is created. Nothing to slow down.
+  const tl = gsap.timeline();
+  animate({ tl, root, q, gsap });
+  return () => { tl.kill(); };
+}, scopeRef);
+```
+
+**Why this is genuinely stopped, and not merely fast:** under reduce **no tween object exists**, so
+GSAP's ticker never has an active child and puts itself to sleep — verified in `gsap-core.js`, where
+the global timeline calls `_ticker.sleep()` when it has no active child. Zero `requestAnimationFrame`
+callbacks, zero property writes. A `duration: 0` tween, which GSAP's own reduced-motion example uses,
+would still instantiate, render once and touch the ticker; we do not use it.
+
+**MR-1 (binding):** looping motion is CSS `@keyframes`; one-shot and interaction motion is GSAP. There
+is no third mechanism. The skeleton pulse (was M-7, was JS) becomes a CSS `@keyframes` and loses its
+bespoke `useReducedMotion()` branch entirely.
+
+**MR-2 (binding, and the reason chokepoint 1 is safe):** **an element's CSS resting state is always its
+final, readable state.** Entrance motion is therefore authored as `from`/`fromTo`, never as
+`to`-from-a-CSS-hidden-state. If a tween is never created — reduced motion, a JS error, a stalled
+chunk — the content is *visible and correct*, not invisible. An element whose base CSS is
+`opacity: 0` is a review failure.
+
+**MR-3:** nothing animates while the tab is hidden (`DESIGN_SYSTEM.md` §4.5, already binding and
+currently unimplemented). One implementation, in `AppShell`: a `useDocumentVisible()` hook toggles
+`data-motion-paused` on `<html>`, and one CSS rule pauses every animation:
+
+```css
+html[data-motion-paused] *, html[data-motion-paused] *::before, html[data-motion-paused] *::after {
+  animation-play-state: paused !important;
+}
+```
+GSAP needs no equivalent: its animations here are short one-shots, and browsers throttle `rAF` on a
+hidden tab anyway.
+
+###### S.3.5 The backdrop
+
+`src/components/layout/Backdrop.tsx` · `src/styles/backdrop.css` · `src/components/layout/backdrop.ts`
+
+**Technology: CSS-composited gradient layers.** Canvas 2D, WebGL and animated filters are rejected;
+the full justification is `ARCHITECTURE.md` §10 #24. Bundle cost: **0 KB of library, ~0.4 KB gz of
+component, and a hard cap of +4 KB gz of CSS** (C7-4 measures it; over the cap, layers get cut).
+
+**Mount point and stacking.** `AppShell` renders it as its **first child**, once, outside the router
+outlet, so it never remounts on navigation:
+
+```tsx
+<div className="shell-root">     {/* position: relative; isolation: isolate */}
+  <Backdrop />                   {/* position: fixed; inset: 0; z-index: var(--z-backdrop) */}
+  <Header/> <Dock/> <main id="main">{children}</main>
+</div>
+```
+
+`isolation: isolate` on `.shell-root` so no blend mode can escape the shell. The backdrop is
+`position: fixed; inset: 0; pointer-events: none; contain: strict; aria-hidden="true"`, contains no
+focusable element and no text, and is `display: none` in `@media print`. **A z-index token scale is
+required** because `index.css` currently hard-codes 20/40/50; the `designer` owns the values, and the
+layer order is: backdrop → content → sticky header → dock → scrim → popover/overlay.
+
+**Intensity is a pure function of the route**, not context and not an effect — no provider, no ordering
+bug, and unit-testable:
+
+```ts
+export type BackdropIntensity = 'full' | 'muted' | 'off';
+export function backdropIntensityFor(pathname: string): BackdropIntensity;
+```
+`'/'` → `full`. `/seasons`, `/seasons/:year`, `/drivers*`, `/teams*`, `/circuits*`, `/compare`,
+`/records` → `muted`. `/seasons/:year/races/:round` → **`off`** (the lap-chart surface from F3; an
+animated field behind a lap-time chart is a legibility defect, and CR-007 says so explicitly). Any
+unrecognised path → `muted`, never `full`: the safe default is the quiet one. `Backdrop` reads
+`useLocation().pathname` and calls it — that is the component's only logic.
+
+**Degradation, in order of severity:**
+
+| Signal | Behaviour |
+|---|---|
+| `intensity === 'off'` | Animated layers are **removed from the DOM**, not paused. A paused compositor layer still holds memory, and this is the case that shares a screen with a lap chart. The static base gradient stays. |
+| `intensity === 'muted'` | Fewer layers, lower opacity, longer periods — values from the Design Spec. Still composited-only. |
+| `prefers-reduced-motion: reduce` | Chokepoint 1 stops every layer dead. The gradient remains visible and static — reduced *motion*, not reduced *design*. |
+| tab hidden | MR-3 pauses it. |
+| no CSS custom-property support / stylesheet fails | The shell renders on `--surface-canvas`; the backdrop simply is not there. There is nothing to fall back to because there is no JS involved. |
+
+**Forbidden inside the backdrop, each for a measured reason:** any animated `filter` or
+`backdrop-filter` (re-rasterises per frame — softness comes from wide `radial-gradient` stops instead);
+animating anything other than `transform` and `opacity`; `background-position` loops; any `url(http…)`;
+any image file; more than one static `data:` URI, capped at 2 KB; `will-change` on more than the
+layers that actually move. CT-9 enforces most of this by reading the stylesheet.
+
+###### S.3.6 Navigation, route transition and the component tree
+
+**The nav form is the `designer`'s call** (CR-007 offers a floating dock or a collapsible sidebar).
+Structurally, either shape satisfies the same contract, and the developer implements whichever the
+Design Spec names — file `src/components/layout/Dock.tsx` if it is a dock, `SideNav.tsx` if it is a
+sidebar. `PrimaryNav.tsx` is deleted either way.
+
+The contract, which does not depend on the form:
+
+| Concern | Specification |
+|---|---|
+| Items | `NAV_ITEMS` — a `readonly` array of `{ to: string; label: string; icon: IconName }` in `navItems.ts`. Slugs and literal paths only; **never an integer id**. |
+| Active state | `isActiveNavItem(pathname, to)` — **pure, exported, unit-tested.** `to === '/'` matches **only** exactly `/`; every other `to` matches `pathname === to` or `pathname.startsWith(to + '/')`. Segment-boundary matching, so `/teams` does not light up on `/teamsomething`. `aria-current="page"` on the match — retained from the existing spec. |
+| Active indicator | One element whose position is **measured, not laid out**: `computeIndicatorGeometry(activeRect, containerRect)` → `{ x, scaleX }` against a fixed base width, applied with `transform-origin` at the start edge. Pure and unit-tested. Framer Motion's `layoutId` has no GSAP-core equivalent; `Flip` is the real equivalent and is deferred to F1 (§10 #21), because for one indicator a measured tween is fifteen lines and 9.7 KB gz cheaper. |
+| Reduced motion | The indicator **snaps**: geometry is applied in `settle` (a `gsap.set`), and only the tween between positions lives in `animate`. This is the case §S.3.4's two-builder split exists for. |
+| Keyboard / ARIA | Unchanged from the F0 Design Spec §8 and the tests in `26efa77`. A dock is a `<nav>` with links, not a widget with roving tabindex, unless the Design Spec argues otherwise **and** re-specifies the keyboard model. |
+| Touch | 44 × 44 px minimum on `(pointer: coarse)` — retained. |
+
+**Route transition.** `RootLayout` currently owns it inline; extract `src/routes/RouteTransition.tsx`:
+one `useMotion` with `deps: [pathname]` (hence `revertOnUpdate: true`, R-G3), animating `from` on the
+outlet container. **There is still no exit animation** — that ruling is retained verbatim from T10: a
+route change must never hold the outgoing view, and GSAP gives us no `AnimatePresence` to be tempted
+by. Consequence: the incoming content is in the DOM immediately and readable even if the tween never
+runs (MR-2).
+
+**Component tree delta:**
+
+```
+<QueryClientProvider>
+  <BrowserRouter>
+    <Routes>
+      <Route element={<RootLayout/>}>          ← AppShell(Backdrop, Header, Dock) + RouteTransition + <Outlet/>
+        "/"                            <Landing/>          ← NEW
+        "/seasons"                     <SeasonHub/>        ← NEW entry point, same component
+        "/seasons/:year"               <SeasonHub/>
+        "/seasons/:year/races/:round"  <RaceDeepDive/>
+        … the eight unchanged routes …
+        "*"                            <NotFound/>
+```
+
+| Component | Props |
+|---|---|
+| `Backdrop` | `{}` — reads `useLocation()`, calls `backdropIntensityFor`. No props, so it cannot be misconfigured. |
+| `Dock` / `SideNav` | `{ items: readonly NavItem[] }` |
+| `RouteTransition` | `{ children: ReactNode }` |
+| `Landing` | `{}` — calls `useMeta()`, passes shaped figures down. Presentational children take props (`ARCHITECTURE.md` §3: components never fetch, and `Landing` is the feature boundary here). |
+| everything else | unchanged |
+
+###### S.3.7 Hook signatures and pure selectors
+
+```ts
+// src/lib/motion/useMotion.ts
+export interface MotionCtx<T extends HTMLElement> {
+  root: T;                                     // the scoped container, non-null inside a builder
+  q: (selector: string) => HTMLElement[];      // scoped query — gsap.utils.toArray within root
+  gsap: typeof import('./gsap').gsap;
+}
+export interface MotionSpec<T extends HTMLElement> {
+  /** Runs in BOTH modes, first. gsap.set only — no tween, no duration. */
+  settle?: (ctx: MotionCtx<T>) => void;
+  /** Runs ONLY when motion is allowed. Author as from()/fromTo() (MR-2). */
+  animate?: (ctx: MotionCtx<T> & { tl: gsap.core.Timeline }) => void;
+  deps?: React.DependencyList;
+}
+export interface MotionHandle<T extends HTMLElement> {
+  scope: React.RefObject<T | null>;            // attach to the container — the hook owns it
+  reduced: boolean;
+  /** Context-safe, and a NO-OP under reduced motion. For hover/click tweens. */
+  motionSafe: <F extends (...args: never[]) => void>(fn: F) => F;
+}
+export function useMotion<T extends HTMLElement = HTMLDivElement>(spec: MotionSpec<T>): MotionHandle<T>;
+```
+
+```ts
+// src/lib/motion/reducedMotion.ts — pure, no GSAP import
+export const MOTION_QUERY_REDUCE = '(prefers-reduced-motion: reduce)';
+export function prefersReducedMotion(win?: Pick<Window, 'matchMedia'>): boolean;  // absent matchMedia → false
+```
+
+```ts
+// src/lib/motion/tokens.ts — the ONE source for every timing value
+export const MOTION = {
+  dur:  { instant: 0.08, fast: 0.14, base: 0.2, slow: 0.32, chart: 0.4 },   // seconds; GSAP's unit
+  ease: { enter: 'power2.out', exit: 'power2.in', move: 'power1.inOut', mech: 'circ.out', settle: 'back.out(1.2)' },
+  dist: { …px offsets },
+  stagger: { row: 0.024, card: 0.04, cap: 12 },
+  ambient: { …periods for the CSS layers, mirrored as --anim-* tokens },
+} as const;
+```
+
+**The exact `ease` and `dur` values are the `designer`'s to set in `DESIGN_SYSTEM.md` §4.3** — the
+five names above are the structural slots, and the strings are placeholders until the Design Spec
+lands. Two rules are mine and are not negotiable: **every ease is a GSAP named ease string** (CT-2
+asserts each matches `/^(none|power[1-4]|circ|expo|sine|back|steps)(\.(in|out|inOut))?(\(.*\))?$/`),
+and **`CustomEase` is denylisted** so a cubic-bézier literal cannot re-enter through it. The
+Framer-Motion spring tokens (`visualDuration` + `bounce`) have **no GSAP-core equivalent and are
+retired**; spatial "settle" is `back.out(n)` with a duration, and the `designer` must re-derive
+§4.3's spring table on that basis. The CSS `--dur-*` / `--ease-*` tokens in `tokens.css` stay and must
+keep the same values as `MOTION.dur` / a CSS-equivalent of `MOTION.ease`; CT-3 asserts they agree, so
+the two mechanisms of MR-1 cannot drift apart.
+
+**Pure selectors — where the logic and the tests live:**
+
+| Function | File | Contract |
+|---|---|---|
+| `isActiveNavItem(pathname, to)` | `components/layout/navItems.ts` | §S.3.6 |
+| `computeIndicatorGeometry(activeRect, containerRect, baseWidth)` | `components/layout/navItems.ts` | `{ x, scaleX }`; `baseWidth <= 0` → `{ x: 0, scaleX: 1 }`, never `NaN`/`Infinity` |
+| `backdropIntensityFor(pathname)` | `components/layout/backdrop.ts` | §S.3.5 |
+| `selectHeroFigures(meta)` | `features/landing/selectors.ts` | §S.4 |
+| `prefersReducedMotion(win?)` | `lib/motion/reducedMotion.ts` | §S.3.7 |
+
+###### S.3.8 URL params owned by this CR
+
+**None.** CR-007 introduces no query parameter and no new path param. `/seasons` takes no param and
+resolves the year from `/api/meta`. The invalid-value question therefore does not arise; `:year` and
+the `:*Ref` slugs still belong to F2–F6 and the placeholders still display them unvalidated.
+
+##### S.4 Derived metric definitions
+
+One derived value is added, and it is presentational arithmetic over `/api/meta`, not analysis.
+`selectHeroFigures(meta: Meta): HeroFigures` in `src/features/landing/selectors.ts`:
+
+| Field | Definition | Source |
+|---|---|---|
+| `seasonSpan` | `` `${seasons.firstYear}–${seasons.latestYear}` `` | `/api/meta` |
+| `seasonCount` | `seasons.count` verbatim. **Never `latestYear − firstYear + 1`** — that assumes an unbroken run of seasons, which is an assumption about the data and not a fact we have checked. | `/api/meta` |
+| `roundProgress` | `{ completed: latestSeason.completedRounds, scheduled: latestSeason.scheduledRounds }`, rendered as "Round *c* of *s*". `scheduledRounds` **already excludes cancelled rounds** (trap 15, mitigated in `Q_LATEST_SEASON_PROGRESS`); the landing must not add `cancelledRounds` back in. | `/api/meta` |
+| `latestRound` | `latestCompletedRound` verbatim, or `null` | `/api/meta` |
+| `nextRound` | `nextScheduledRound` verbatim, or `null` | `/api/meta` |
+| `state` | `'preseason'` when `completedRounds === 0` · `'complete'` when `latestSeason.isComplete` · else `'inSeason'`. Drives which copy the hero shows. | derived |
+
+**Cross-era normalisation (`REQUIREMENTS.md` §5.2): N/A, and deliberately so.** Nothing here sums or
+compares points, positions or any per-era quantity. **A landing hero must not acquire an "all-time
+points" or "most wins" figure in this CR** — that is precisely the class of number that is invalid to
+sum across 24 point systems, and it would need `driver_championship` and a rate metric, i.e. a query,
+i.e. out of scope. If the Design Spec asks for a headline statistic beyond the table above, the answer
+is no until F2 specifies it properly.
+
+##### S.5 Edge cases — decided
+
+**Motion and preference:**
+
+| Case | Behaviour |
+|---|---|
+| `prefers-reduced-motion: reduce` at load | No tween is created; every CSS animation is `none`; the backdrop is a static gradient; the nav indicator is positioned by `settle`. Content is fully readable. |
+| Preference toggled mid-session | `gsap.matchMedia()` reverts and re-runs the affected builders; the CSS block re-evaluates. No reload, no listener code of ours. |
+| `window.matchMedia` absent (jsdom without a stub) | `prefersReducedMotion()` returns `false`; `gsap.matchMedia()` degrades to running the non-reduce branch. Tests must stub it explicitly — CT-4 covers both. |
+| Tab hidden mid-animation | Loops pause (MR-3); GSAP one-shots complete when the tab returns. Neither leaves a half-applied transform, because `revertOnUpdate`/context revert restores inline styles. |
+| Route changed while an entrance tween is mid-flight | The context reverts on unmount and the tween is killed; the outgoing DOM is already gone. No orphan. |
+| JS fails or a chunk stalls | MR-2 guarantees resting CSS is the readable state, so the page is usable without motion. |
+
+**Data and route:**
+
+| Case | Behaviour |
+|---|---|
+| `/api/meta` loading | Landing hero renders the existing `LoadingState` skeletons in the hero's exact geometry, so nothing reflows when the response lands (the `--size-skeleton-vintage-*` precedent). |
+| `/api/meta` → 503 (no database — the fresh-clone case) | The landing renders `DataUnavailableState` **in place of the figures only**; the hero, the backdrop, the nav and the theme toggle all still work. A missing database must not produce a blank first impression, and it must not produce a stack trace or an absolute path (S-6). |
+| `latestCompletedRound === null` (a season with no completed round) | `state: 'preseason'`; the "last race" figure is omitted, not rendered as "—" beside a label that promises a race. |
+| `nextScheduledRound === null` (season over) | `state: 'complete'`; the "next race" figure is omitted. |
+| `isComplete === true` | Round progress reads *c* of *c*; no "next" line. |
+| `cancelledRounds > 0` (2026 has 2) | Not shown on the landing. It is already surfaced correctly by the coverage popover; repeating it in a hero would need a sentence the hero has no room for, and a bare "24" would contradict `scheduledRounds`. |
+| Direct entry on `/seasons` | Renders the hub for the latest season from `/api/meta`. No redirect to `/seasons/2026` — the canonical URL for "current" is `/seasons`. |
+| Direct entry on `/` | Landing. No redirect. |
+| `/seasons/1954` (before lap/quali/pit coverage) | Unchanged from F0: the placeholder echoes its params. The coverage-boundary states are F2's. |
+| Deep link to a route with `intensity: 'off'` | The backdrop mounts with no animated layer at all; it never animates and then stops. |
+| Four-entity comparison / single-entity comparison / duplicate selection | N/A — `/compare` is still a placeholder in F0 and this CR adds no comparison logic. |
+| No `primary_color` on a team (202 of 214) | N/A — F0 renders no team. The accent colour CR-007 asks for is a **product** accent from `tokens.css`, not a team colour, and it must not be sourced from `team.primary_color`. |
+| Pre-1996 laps / pre-2011 pit stops / pre-1994 qualifying | N/A in F0; the coverage popover already states the windows and is retained. |
+
+##### S.6 Performance plan
+
+###### S.6.1 Budget and projection
+
+The binding budget is `ARCHITECTURE.md` §8: **initial JS < 250 KB gzipped**. Baseline at `792b4c9`:
+**147.46 KB gz JS + 5.84 KB CSS**, of which `framer-motion` is **40.84 KB gz** (T13, measured).
+
+| Step | Δ gz | Running total | Basis |
+|---|---|---|---|
+| Baseline `792b4c9` | — | **147.5 KB** | measured, T13 |
+| − `framer-motion` | −40.8 | 106.6 KB | measured, T13 |
+| + `gsap` + `@gsap/react` | +28.1 | **134.7 KB** | measured here (esbuild, method calibrated to ±2 KB against T13) |
+| + `Backdrop` component | +0.4 | 135.1 KB | estimate — it is one component with no logic beyond a lookup |
+| + `Landing` + selectors + hero | +3.0 | 138.1 KB | estimate — the whole of `src/` is 7.6 KB gz today |
+| + nav/indicator/`useMotion`/`RouteTransition` | +2.0 | **≈140 KB** | estimate |
+| **Projected, without ScrollTrigger** | | **≈140 KB gz — 56 % of budget, 110 KB headroom** | |
+| + `ScrollTrigger`, **if** the Design Spec needs scroll-driven motion | +17.4 | **≈157 KB gz — 63 % of budget, 93 KB headroom** | measured here |
+| + `SplitText`, **if** the Design Spec needs a per-character headline | +3.0 | ≈160 KB gz | measured here |
+
+**Verdict: the background does not put the budget at risk, because it contains no JavaScript** — that
+is the main reason §10 #24 chose CSS. The one figure I will flag rather than bless: **`framer-motion`
+out and `gsap` in is a ~13 KB gz saving, but `gsap` + `ScrollTrigger` in is a ~4.6 KB gz net *increase*
+over today.** The CR entry claims "the bundle goes down"; that is true only without ScrollTrigger, and
+the corrected numbers are in `ARCHITECTURE.md` §10 #21. Either outcome is comfortably inside budget, so
+this changes documentation, not the decision.
+
+**CSS is outside the JS budget but on the same critical path.** Cap: `backdrop.css` + `motion.css`
+together add **no more than 4 KB gz**, taking the CSS artefact from 5.84 to ≤ 10 KB gz. C7-8 measures
+and records both figures; over the cap, layers get cut rather than the cap raised.
+
+###### S.6.2 CPU cost of an always-running animation
+
+The reason the mechanism split (§10 #22) is a performance decision and not a style one:
+
+- **CSS `transform`/`opacity` keyframes** on 2–4 layers: main-thread cost at steady state is **zero**;
+  the compositor interpolates. Paused by the browser on a hidden tab, and by MR-3 explicitly.
+- **A GSAP `repeat: -1` tween** on the same layers: identical visual result, but a `rAF` callback every
+  frame for the life of the session, on the thread that also has to service the §8 "<100 ms chart
+  interaction" budget from F2 onward.
+- **The compositor is not free either**, which is why layer count is capped by the Design Spec, why
+  `intensity: 'off'` **unmounts** rather than pauses, and why `filter` is forbidden in the backdrop —
+  a blurred layer re-rasterises per frame and is the one way to make a CSS background expensive.
+
+###### S.6.3 Code splitting
+
+Unchanged in principle from §6.4: **F0 still introduces no route-level splitting.** But the landing
+page changes where the boundary will fall, so it is fixed here so F1 does not invent one:
+
+- **Initial chunk, permanently:** `AppShell`, `Backdrop`, nav, `RouteTransition`, `lib/*`,
+  `features/meta/*`, `features/landing/*`, router, TanStack Query, `gsap` core.
+- **From F1, `React.lazy` per analytical route.** The landing stays eager: it *is* the first paint.
+- **`ScrollTrigger` decision rule.** If the Design Spec uses scroll-driven motion **only** on the
+  landing, it may still be statically imported in `lib/motion/gsap.ts` — the landing is eager, so a
+  dynamic import would buy nothing but a waterfall. If it is used **only** on a route that is lazy from
+  F1, it must be imported inside that route's module instead. Do not split it out of the initial chunk
+  while the landing needs it, and do not add it "for later" if the Design Spec does not use it.
+- **`recharts` must not appear in the initial chunk; `visx` loads only on the race deep dive** —
+  unchanged.
+- If `ScrollTrigger` lands: `ScrollTrigger.refresh()` once after the route transition commits, because
+  route content changes document height. `ScrollSmoother` and `normalizeScroll` are denylisted.
+
+##### S.7 Unit test list
+
+Vitest. Numbered `CT-*` so they cannot be confused with tests 1–69 above, which stand except where
+noted. **The priority is the pure functions and the reduced-motion mechanism** — visual result is
+Rishabh's at gate 6, and this project has no E2E gate any more (CR-006), which makes the mechanical
+assertions below the only automated guard on motion behaviour.
+
+**`src/lib/motion/tokens.test.ts`**
+1. **CT-1** — every `MOTION.dur` value is a finite number in seconds, `> 0`, and `<= 0.4` except the
+   explicitly ambient entries (`DESIGN_SYSTEM.md` §4.2: nothing on an interaction path exceeds ~400 ms)
+2. **CT-2** — every `MOTION.ease` value matches the GSAP named-ease pattern; **no `cubic-bezier(`, no
+   `CustomEase`, no numeric array** appears anywhere in the module (read the file as text)
+3. **CT-3** — `MOTION.dur` agrees with the `--dur-*` values in `tokens.css`, parsed from the file, so JS
+   and CSS timings cannot drift apart
+
+**`src/lib/motion/reducedMotion.test.ts`**
+4. **CT-4** — `prefersReducedMotion()` is `true` when `matchMedia` reports a match, `false` when it does
+   not, and `false` (not a throw) when `matchMedia` is absent
+
+**`src/lib/motion/useMotion.test.ts`** (jsdom, `matchMedia` stubbed per test)
+5. **CT-5** — under reduce, `settle` **is** called and `animate` is **never** called
+6. **CT-6** — under no-preference, `settle` runs before `animate`, and both receive a `root` equal to the
+   returned ref's element
+7. **CT-7** — no leak across dependency changes: after three dep changes,
+   `gsap.globalTimeline.getChildren().length` is back to its pre-mount value and the target carries no
+   leftover inline `transform`. This is the R-G3 regression test and the most valuable test in the list
+8. **CT-8** — `motionSafe(fn)` invokes `fn` under no-preference and is a **no-op** under reduce
+
+**`src/styles/motion.css.test.ts` / `backdrop.css.test.ts`** — stylesheet assertions, read as text.
+Cheap, and they are what makes "cannot be forgotten" true rather than hoped for.
+9. **CT-9** — in `backdrop.css`: every property animated inside a `@keyframes` block is `transform` or
+   `opacity` and nothing else; no `filter:` or `backdrop-filter:` occurs inside any `@keyframes`; no
+   `url(http` occurs anywhere; at most one `data:` URI and it is under 2 KB
+10. **CT-10** — `motion.css` contains a `@media (prefers-reduced-motion: reduce)` block whose selector
+    includes `*` and which sets both `animation: none` and `transition: none`; and every
+    `animation-name` identifier used in `backdrop.css` has a matching `@keyframes`
+
+**`src/components/layout/navItems.test.ts`**
+11. **CT-11** — `isActiveNavItem`: `/` matches `/` only, and **not** `/seasons`, `/drivers`, `/records`;
+    `/seasons` matches `/seasons`, `/seasons/2024`, `/seasons/2024/races/3` and **not** `/seasonsomething`;
+    trailing slash on `pathname` behaves like no trailing slash
+12. **CT-12** — `computeIndicatorGeometry`: correct `x`/`scaleX` for the first and last item; a
+    container scrolled or offset from the viewport origin; and `baseWidth <= 0` → `{ x: 0, scaleX: 1 }`
+    with no `NaN` and no `Infinity`
+
+**`src/components/layout/backdrop.test.ts`**
+13. **CT-13** — `backdropIntensityFor`: `/` → `full`; `/seasons` and `/seasons/2024` → `muted`;
+    `/seasons/2024/races/3` → `off`; `/nonsense` → `muted` (never `full`)
+
+**`src/features/landing/selectors.test.ts`**
+14. **CT-14** — `selectHeroFigures` over the §2.2 verified body returns the expected strings/objects;
+    **and `Landing.tsx` contains no digit sequence of three or more** (read the file as text) — the
+    hard-coded-statistic guard from §S.1 rule 2
+15. **CT-15** — `completedRounds === 0` → `state: 'preseason'` and no last-race figure
+16. **CT-16** — `isComplete: true` with `nextScheduledRound: null` → `state: 'complete'` and no
+    next-race figure
+17. **CT-17** — `seasonCount` comes from `seasons.count` and is **not** recomputed from the year range
+    (assert with a fixture where `count !== latestYear − firstYear + 1`)
+
+**Component tests (jsdom)**
+18. **CT-18** — `Backdrop` renders zero elements carrying an animated layer class when
+    `backdropIntensityFor` returns `off`, and is `aria-hidden` with `pointer-events: none` in every mode
+19. **CT-19** — the nav renders one link per `NAV_ITEMS` entry and exactly one `aria-current="page"`
+20. **CT-20** — `Landing` renders the skeleton while `useMeta` is pending, `DataUnavailableState` on a
+    503, and the figures on success — reusing the existing state components, not new ones
+
+**Tests 1–69 above:** 1–48 and 56–63 are untouched (server + data layer). **49–55, 64, 66–69**
+(`theme` + `ThemeToggle`) must keep passing; a change to any of them needs a justification in the
+commit message. **65** (`LoadingState` pulse under reduced motion) is **rewritten** as part of CT-10,
+because the pulse becomes CSS. Any test asserting a `framer-motion` prop is deleted with its call site.
+
+##### S.8 Task breakdown — supersedes T8's motion clauses, T10, T11, T12
+
+Eight tasks, ordered, each independently committable and ≤ half a day. **Every task ends green:**
+`typecheck`, `lint`, `format:check`, `test`, `build`. A red intermediate state is not an acceptable
+commit, which is why the dependency swap is split across C7-1 and C7-2.
+
+| # | Task | Acceptance |
+|---|---|---|
+| **C7-1** | **Motion foundation, alongside `framer-motion`.** Add `gsap@^3.15.0` and `@gsap/react@^2.1.2`. Create `src/lib/motion/{tokens,gsap,reducedMotion,useMotion}.ts` and their tests. Nothing consumes them yet; `framer-motion` is still installed and still in use. | `npm audit` → **`found 0 vulnerabilities`** (S-7, no exception); zero `EBADENGINE`; CT-1…CT-8 pass; `gsap.ts` is the only file in the repo importing `gsap` or `@gsap/react` (`grep -rn "from 'gsap" src/`); all five checks green. |
+| **C7-2** | **Migrate every call site and remove `framer-motion`.** Port `AppShell`, `Header`, `PrimaryNav`, `ThemeToggle`, `Button`, `DataVintage`, `LoadingState`, `RootLayout` to `useMotion`. Add `src/styles/motion.css` with the §S.3.4 chokepoint-1 block, the `@keyframes` for the skeleton pulse, and MR-3's pause rule; **delete** the four per-component `@media (prefers-reduced-motion)` blocks in `index.css` and `src/lib/motion.ts`. `npm uninstall framer-motion`. Add the §S.3.3 ESLint `no-restricted-imports` rule. | `grep -rniE "framer|motionconfig|animatepresence|layoutid" src/ server/ package.json package-lock.json` → **no match**; `npm ls framer-motion` → empty; test 65 rewritten; CT-10 passes; **an import of `gsap` added to any file outside `src/lib/motion/` fails `npm run lint`** — paste the failure output as evidence; bundle re-measured (expect ≈135 KB gz); all five checks green. |
+| **C7-3** | **The route split.** `src/routes/Landing.tsx` (structure only — a heading and the hero slots, no motion yet) at `/`; `SeasonHub` at `/seasons` **and** `/seasons/:year`; `components/layout/navItems.ts` with `NAV_ITEMS`, `isActiveNavItem`, `computeIndicatorGeometry`. Amend `ARCHITECTURE.md` §5 (already done by me — **verify, do not re-edit**) and make the `REQUIREMENTS.md` §4.8 NV-3 edit in §S.9.1. | Direct entry (not just client navigation) on `/`, `/seasons` and `/seasons/2024` all render; the other nine routes and `*` unchanged; **no redirect exists** in either direction; CT-11, CT-12 pass; `RootLayout.test.tsx` updated for 12 routes. |
+| **C7-4** | **The backdrop.** `Backdrop.tsx`, `backdrop.ts`, `src/styles/backdrop.css`, the z-index token scale, mounted as `AppShell`'s first child with `isolation: isolate` on the shell root. Visual values strictly per the Design Spec. | CT-9, CT-13, CT-18 pass; DevTools shows the backdrop below all content and above nothing focusable; `aria-hidden="true"`, `pointer-events: none`, `contain: strict`, hidden in print; **on `/seasons/2024/races/3` no animated layer exists in the DOM**; **zero network requests attributable to the backdrop** (network panel filtered to `Img`/`Fetch` after a hard reload); CSS gz delta measured and ≤ 4 KB. |
+| **C7-5** | **The nav.** `Dock.tsx` (or `SideNav.tsx` per the Design Spec) replacing `PrimaryNav.tsx`: measured indicator, hover/press via `motionSafe`, the mobile form, `aria-current`, 44 px coarse targets. | CT-19 passes; tests 49–55, 64, 66–69 still pass (any change justified in the commit message); with reduced motion emulated the indicator **snaps** and no tween is created; keyboard traversal and the `:focus-visible` ring unchanged; `PrimaryNav.tsx` deleted. |
+| **C7-6** | **The landing surface.** Hero content from `useMeta()` + `selectHeroFigures`, loading / 503 / preseason / complete states, hero entrance via `useMotion`. `ScrollTrigger` and/or `SplitText` **only if** the Design Spec requires them — if `SplitText` is used: `aria` must be left at its default `"auto"` and **never set to `"none"`** (verified in the 3.15.0 source — `auto` puts the original text in an `aria-label` on the parent and `aria-hidden` on every fragment, which is what keeps a split headline readable to a screen reader and selectable-looking to nobody), and `autoSplit: true` is mandatory **whenever `type` includes `lines`** (also verified in source: `autoSplit` is what registers the `document.fonts` `loadingdone` listener that re-splits, and without it a line split is measured against the fallback font and stays wrong once the vendored `woff2` faces arrive). | CT-14…CT-17, CT-20 pass; with `F1_DB_PATH=/tmp/nope.db` the landing renders `DataUnavailableState` with **no stack trace and no absolute path on screen** and the shell still works; **no three-digit literal in `Landing.tsx`**; if a plugin was added, the bundle figure is re-measured in the same commit. |
+| **C7-7** | **The interaction pass.** Accent colour applied throughout per the Design Spec; hover/press feedback on `Button`, `ThemeToggle`, `StateCard`, `DataVintage`, nav items and any landing affordance, all through `motionSafe`. | No hue is introduced that the Design Spec has not specified, and **none of purple / green / yellow is used as the accent** (reserved F1 timing semantics, `DESIGN_SYSTEM.md` §3.1 — this is a correctness check, not taste); with reduced motion emulated, hover still gives non-motion feedback (the CSS colour/surface step) and no tween is created; all five checks green. |
+| **C7-8** | **Re-measure, re-verify, re-document.** Record the real gzipped JS + CSS figures in §S.6.1 beside the projection. Verify zero CSP violations in **both** consoles (`npm run dev` and `npm run build && npm run start`), then **remove `styleSrcAttr: 'unsafe-inline'`** from `server/app.ts` and §2.4 and re-verify both — the §2.4 open item this CR is finally in a position to close. Confirm `ARCHITECTURE.md` §2/§5/§10 match the code. | Both console observations recorded (the pair is not discharged by one); the measured JS figure is inside 250 KB gz and inside 10 % of the §S.6.1 projection, or the discrepancy is explained; if `styleSrcAttr` removal breaks the dev console only, the **dev server** is adjusted and the policy is not; `npm audit` still `found 0 vulnerabilities`. |
+
+**Ordering note.** C7-1 → C7-2 is a hard sequence (the app must never be red). C7-3 is independent of
+C7-4/C7-5/C7-6 and can land at any point after C7-2. C7-4 → C7-6 is soft: the landing reads better
+against the finished backdrop, but neither blocks the other. **C7-8 is last and is not optional** — the
+Definition of Done (§2.5) requires a measured bundle figure, and half of this CR's risk is in numbers
+nobody re-measured.
+
+##### S.9 Document impact, escalations, and what I think is wrong in the brief
+
+###### S.9.1 Documentation edits — mine already made, the developer's listed exactly
+
+**Already made by me at this gate — verify, do not re-edit:**
+
+| File | Edit |
+|---|---|
+| `docs/ARCHITECTURE.md` §2 | The `Motion` row now reads GSAP 3 + `@gsap/react`, `framer-motion` removed; a new `Looping / ambient motion` row records the CSS-keyframes rule |
+| `docs/ARCHITECTURE.md` §5 | `/` → Landing; new `/seasons` row; a note that there are now **twelve** routes plus `*` and **no redirect** in either direction |
+| `docs/ARCHITECTURE.md` §10 | New decisions **#21** (GSAP replaces Framer Motion, with the corrected measurements and the plugin allow/denylist), **#22** (mechanism split + the two reduced-motion chokepoints), **#23** (landing at `/`, hub at `/seasons`), **#24** (backdrop technology, with the rejected alternatives) |
+
+**The developer makes exactly these, in the same PR as the code (C7-3 unless stated):**
+
+1. **`REQUIREMENTS.md` §4.8, the NV-3 row** — replace its "Feature" cell text with:
+   > **Landing page** at `/` — the entry surface. Current season state, last race, next race. The
+   > season hub is a separate surface at `/seasons` (`ARCHITECTURE.md` §5, §10 #23)
+   and append to the section, after the table:
+   > **NV-3 is split across features.** F0 ships the landing *surface* — chrome, motion, and the
+   > figures available from `GET /api/meta` (season span, round progress, last and next round). Its
+   > standings and race-result content lands with F2. The landing page never renders a statistic that
+   > is not in an API response.
+   Nothing else in `REQUIREMENTS.md` changes. **I have re-read §4.8 and confirm NV-3 already exists at
+   P0**, so the orchestrator's Document Impact verdict of "change — new landing surface" is
+   **corrected: this is a clarification of an existing P0 requirement, not a new one.** That matters —
+   a new requirement would need a priority and an owner; a clarification does not.
+2. **`docs/DATABASE.md`** — **no change.** Confirmed: no query, no view, no coverage constant and no
+   trap text is affected by a client-side redesign. The orchestrator's verdict was right.
+3. **`PLAN.md`** — the superseding markers at §1.1, §3.1, §3.5, §6.4, §7 and §8 are **mine and are
+   already placed**. The developer adds only the measured figures in §S.6.1 (C7-8).
+4. **Not the developer's, and must be routed by the `orchestrator`** — reported here under the
+   standing rule that file ownership restricts who edits, never who reports:
+
+   | File · site | What is stale | Owner |
+   |---|---|---|
+   | `docs/DESIGN_SYSTEM.md` §4 (all of §4.1, §4.3, §4.4) | Every motion cites a Framer Motion page; the API table is Framer's; the **spring tokens have no GSAP-core equivalent and must be retired**; M-3's `layoutId` mechanism no longer exists (`Flip` is the equivalent, deferred to F1); M-7's pulse becomes CSS; `MotionConfig` is gone. §4 needs re-authoring against GSAP, plus a new subsection for the backdrop and the ambient/loop tokens. | `designer` |
+   | `docs/DESIGN_SYSTEM.md` §3.5 line ~389 | "(`layoutId`, §4.4 M-3)" in the selected-state row | `designer` |
+   | `CLAUDE.md` line 12 · line 179 | "heavy but purposeful Framer Motion animation"; the §G.2 R-1 ruling summary | Rishabh / `orchestrator` |
+   | `PLAN.md` §1 line 27 · §2 lines 334, 346 | "animation via Framer Motion"; the gate-2 evidence rule naming Framer Motion citations | `orchestrator` |
+   | `PLAN.md` F0 Design Spec §2.1, §3, §6, §7, §10, §11 and §G.2 ruling R-1 | The whole motion half of the F0 Design Spec, including the M-1…M-11 reference table | `designer` (the CR-007 Design Spec supersedes it; R-1 stays as history) |
+
+###### S.9.2 Class confirmation
+
+**The orchestrator's Class B is confirmed.** It is not Class C: it adds no layer, changes no data flow
+and creates no new surface *type*. It is not Class A: it changes dependencies, a route table and the
+architecture's motion choice, all of which need decision-log entries — which is exactly the B/C line.
+The four §10 entries are what a B produces when it touches architecture; a C would additionally need a
+review of §3's layering rules, and none of them moves.
+
+###### S.9.3 Escalations
+
+1. **Two new dependencies** — `gsap@^3.15.0`, `@gsap/react@^2.1.2`. Recommend approve; reasoning in
+   §10 #21. Needs Rishabh via the `orchestrator` before C7-1 lands.
+2. **The CR entry's bundle claim is wrong and I have corrected it in the decision log rather than
+   quietly working around it.** "Core ≈23 KB gzipped, ≈33 KB with ScrollTrigger" understates both:
+   measured here, core is **27.6 KB gz** and core + ScrollTrigger + hook is **45.5 KB gz**. The
+   conclusion "GSAP replaces `framer-motion`" survives; the sub-claim "and the bundle goes down"
+   survives **only if ScrollTrigger is not shipped**. Nobody needs to re-decide anything, but nobody
+   should quote 23/33 again.
+3. **A landing page changes what `/` means, and `REQUIREMENTS.md` NV-3 is the requirement it satisfies.**
+   Flagged so it is scored against NV-3 at gate 7 rather than treated as unrequirement-ed polish.
+4. **Not escalated, and deliberately declined:** I did **not** specify a Web Worker /
+   `OffscreenCanvas` backdrop, a WebGL shader background, `ScrollSmoother`, or a "wow" hero statistic
+   that would need a new query. Each is refused with a reason in §10 #21/#24, §S.3.5 or §S.4 — so if
+   any of them appears in the Design Spec, the answer is a conversation with me, not an improvisation
+   by the developer.
+
+###### S.9.4 What I think is wrong in the assignment brief
+
+Reported plainly rather than absorbed:
+
+1. **"GSAP is cheaper than what we ship today" is only conditionally true** — see §S.9.3 item 2.
+   Corrected in §10 #21 with measurements and a stated method.
+2. **"Off the main thread where possible" cannot be satisfied by GSAP**, and the brief's instruction
+   to use "GSAP animations wherever possible" (from the CR) pulls against it for the background
+   specifically. I have resolved it against GSAP for the *looping* layer and recorded why (§10 #22,
+   §S.6.2). GSAP still drives the backdrop's entrance and its intensity change; it does not drive its
+   loop. If that reads as under-delivering on "GSAP wherever possible", the honest framing is: GSAP
+   owns everything a user's action causes, and CSS owns the one thing that never stops.
+3. **`ARCHITECTURE.md` §2.4 does not exist.** The brief names it for CSP; the CSP lives in
+   `ARCHITECTURE.md` **§7.3** and, in full, in this Technical Spec **§2.4**. I have read both. No harm
+   done, but a future reader following the brief's citation will not find it.
+4. **The brief says "specify the redirect if any"** — I have specified **no redirect**, which is a
+   decision rather than an omission (§10 #23).
+
+---
+
+#### **Design Spec** — `designer`, 2026-08-04 · ⛔ **SUPERSEDED BY CR-007**
+
+> ## ⛔ SUPERSEDED 2026-08-06 by the **CR-007 Design Spec** below — read that one instead
+>
+> Rishabh ran the shell built to this spec and rejected it: *"too basic and too bland"*, *"too ew"*,
+> *"it should look like wow what a website"*. The rejection is correct and its causes were in **this
+> spec**, not only in the implementation: no accent colour anywhere, a plain full-width top nav bar,
+> motion only on route change, flat unlayered surfaces, and type that stopped at 44px.
+>
+> **What is superseded:** §1 (character), §2 (shell anatomy, responsive, route placeholders), §3
+> (component inventory), §6 (motion — every Framer Motion reference is now a defect), and §9.1's
+> favicon placeholder.
+>
+> **What still stands and is carried forward unchanged:** §5.1 `DataVintage` (design, all four copy
+> lines, pluralisation, the coverage-not-a-fetch-event decision), §5.2 `ThemeToggle`, §7 States and
+> §7.1's database-unavailable copy, §8 Accessibility (except the focus-order rows, which the dock
+> changes), §9.1 fonts and §9.2 icons. The CR-007 spec cites these rather than restating them.
+>
+> Kept in place as the record of what was built and why it was rejected. **Do not implement from it.**
 
 > Every colour, contrast and CVD figure quoted here was **computed** with the validator described in
 > `docs/DESIGN_SYSTEM.md` §9.1 and recorded run-by-run in §9.2 — including a calibration run that
@@ -2335,6 +3131,731 @@ For the **`principal-engineer`**:
 8. **`ThemeToggle` is a 3-option popover, not a binary flip** (§5.2) — consistent with your
    `ThemePreference = 'light' | 'dark' | 'system'`, but worth confirming your test 49–55 expectations
    match a radiogroup rather than a toggle.
+
+---
+
+#### **Design Spec — CR-007** · `designer`, 2026-08-06 · **SUPERSEDES the 2026-08-04 Design Spec**
+
+> **This is the spec to build from.** It replaces §1, §2, §3, §6 and §9.1's favicon placeholder of the
+> 2026-08-04 Design Spec above, and carries forward its §5.1 (`DataVintage`), §5.2 (`ThemeToggle`),
+> §7 (States), §9.1 (fonts) and §9.2 (icons) **unchanged except where stated**.
+>
+> **Companion:** `docs/DESIGN_SYSTEM.md`, amended in the same pass — new **§3.6** (the accent),
+> rewritten **§4** (GSAP, motions G-0…G-24), new **§5.2a/§5.2b** (layering, glass), extended **§5.3**
+> (chrome geometry), new **§7.7** (`AtmosphereField`) and **§7.8** (`CommandDock`), extended **§2.3**
+> (two display steps), and **§9.2.1** (validation runs V-10…V-17). **This spec does not restate token
+> values** — it says which token goes where. If the two disagree, `DESIGN_SYSTEM.md` wins.
+>
+> **Nothing below is from memory.** Every colour figure was computed with the §9.1 validator, which
+> was re-implemented for this CR and **calibrated against every previously recorded figure before it
+> was trusted** (§9.2.1). Every GSAP size was measured by `npm pack` + `gzip -9`. Every GSAP API is
+> cited to its documentation page. The `offset-path` support claim was checked, not assumed.
+
+---
+
+##### 1. The seven answers, up front
+
+Rishabh asked for seven things. Here is what each one is, and why.
+
+| # | Asked for | Decision | Where |
+|---|---|---|---|
+| 1 | A landing page with a wow factor | **`/` becomes a designed landing surface.** The season hub moves to `/seasons/:year`, with `/season` redirecting to the latest season | §2, §3 |
+| 2 | A moving background | **`AtmosphereField`** — six layers: drifting 48px grid, three desynchronised accent orbs, a racing line with a comet running a lap along it, grain, and a contrast plate. `DESIGN_SYSTEM.md` §7.7 | §4 |
+| 3 | A theme | **"Instrument"** — the existing measured neutrals at OkLCh hue 264, now with one accent hue, layered surfaces, glass chrome, and a live background. Dark mode is the designed default impression | §4, §6 |
+| 4 | An accent used throughout | **Signal, OkLCh hue 350** — `#D1018A` light / `#FE02A9` dark, an 11-step ramp, 11 semantic aliases, and a table of surfaces where it is *required*. Chosen by scanning all 360° against 19 reserved colours | §6 |
+| 5 | Richer navigation | **`CommandDock`** — an expanding vertical rail at ≥1024px, a floating bottom dock below. One `nav`, one `main`, working skip link | §5 |
+| 6 | Pervasive interactivity | **G-3, G-7, G-8, G-9, G-10, G-13, G-21** — pointer-tracked spotlights on every card and dock item, a magnetic hero CTA, sweeping link underlines, a moving dock indicator, background parallax | §7 |
+| 7 | GSAP throughout | **GSAP 3.15 replaces `framer-motion` entirely.** Core + ScrollTrigger + SplitText + `@gsap/react`. 23 named motions land in F0 | §7 |
+
+---
+
+##### 2. Decision 1 — the landing page, and where the season hub goes
+
+**Decision: `/` is a new landing surface. The season hub lives at `/seasons/:year`, and `/season`
+redirects to `/seasons/{latestYear}`.**
+
+Four reasons, in order of weight:
+
+1. **The season hub cannot be both the showpiece and the hub.** F2 puts a 22-round calendar, two
+   standings tables and a championship-progression chart on that surface. A hero with 112px display
+   type and a full-bleed animated field is in direct competition with a table of 22 rounds above the
+   fold — and `DESIGN_SYSTEM.md` §7.7.2 requires the background to *attenuate* exactly where dense
+   charts land. Making one surface do both jobs guarantees that one of them is done badly.
+2. **`/` is the only route in the product with no data dependency.** F0 renders no driver, team or race
+   content, so every other route is a placeholder. A landing page is the one surface that can be
+   **genuinely finished in F0** — the wow can land now, from craft, not from content that does not
+   exist. This is the single most important point: it is why this CR is deliverable at all.
+3. **The URL contract already has a canonical home for the hub.** `ARCHITECTURE.md` §5 lists both `/`
+   and `/seasons/:year` as the season hub. Two URLs rendering identical content is a defect waiting to
+   be found; this CR resolves it rather than adding to it.
+4. **A public repository's product needs a front door.** There is currently nothing that says what
+   this is.
+
+**Why `/season` as a redirect rather than the nav computing `/seasons/2026`.** The dock renders before
+`/api/meta` resolves, so a computed href would be `undefined` on first paint and would change under
+the user's pointer when the query lands. A stable year-free href that redirects server-agnostically is
+one router line and removes the whole class of problem. It is also the link a person would type.
+
+> **⚠ For the `principal-engineer`.** This changes `ARCHITECTURE.md` §5's route table (`/` → Landing;
+> `+ /season` → redirect) and `REQUIREMENTS.md` (a new landing surface). Both are already listed in
+> CR-007's Document Impact Assessment. **Design does not ratify a routing change** — please confirm,
+> and decide whether `/season` is a `<Navigate replace>` or a loader-level redirect.
+
+---
+
+##### 3. The landing page — `/`
+
+###### 3.1 Structure
+
+```
+┌ header ── 56px · --surface-glass + --glass-blur · sticky · z-30 ──────────────────────┐
+│ [skip link]  F1 ANALYTICS                                          ● 2026 · R10   ☾   │
+│              ↑ the "1" in --accent-ink        hairline + 96px accent segment on scroll │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+  ┌ 2px --accent-mark scroll-progress bar, scaleX scrubbed (G-14), fixed top:0 ─────────┐
+
+┌ main#main ── z-1 · padding-left 96 (≥1024) / padding-bottom 96 (<1024) ───────────────┐
+│                                                                                       │
+│  ╔═ SECTION A — HERO · min-height max(100svh, 640px) · full-bleed · data-bg="hero" ══╗ │
+│  ║                                                              ╭─ orb A ─╮          ║ │
+│  ║  ── THE ARCHIVE · 1950—2026            ← eyebrow             │         │          ║ │
+│  ║                                                              ╰─────────╯          ║ │
+│  ║  SETTLE                     ← --display-3xl, Archivo 700 wdth 82, caps            ║ │
+│  ║  THE                          split by char, masked by line, revealed G-16        ║ │
+│  ║  ARGUMENT.                  ← last line in --accent-ink                           ║ │
+│  ║                                       ╭ racing line + comet (G-20) ╮              ║ │
+│  ║  77 seasons of Formula 1 — every race result, every                               ║ │
+│  ║  qualifying session, and every lap the record holds.                              ║ │
+│  ║  Compared across eras, and honest about where the                                 ║ │
+│  ║  record stops.                        ← --text-md, --ink-secondary, max 52ch      ║ │
+│  ║                                                                                   ║ │
+│  ║  [ Explore the 2026 season → ]   Compare drivers                                  ║ │
+│  ║    ↑ hero button, magnetic (G-9)   ↑ secondary                                    ║ │
+│  ║                                                                                   ║ │
+│  ║  ─────────────────────────────────────────────────────────────────────            ║ │
+│  ║   77          10          1996            1950–2026                               ║ │
+│  ║   SEASONS     ROUNDS      LAP TIMING      RESULTS COVERAGE                        ║ │
+│  ║               COMPLETE    FROM                                                    ║ │
+│  ║               IN 2026     ↑ mono, --display-lg, count-up G-17                     ║ │
+│  ╚═══════════════════════════════════════════════════════════════════════════════════╝ │
+│                                                                                       │
+│  ╔═ SECTION B — CAPABILITY GRID · .shell-container · reveal G-15 ════════════════════╗ │
+│  ║  ── WHERE TO GO                                                                   ║ │
+│  ║  Six ways into the record          ← --display-sm                                 ║ │
+│  ║  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                                  ║ │
+│  ║  │ 01  IN BUILD│ │ 02  IN BUILD│ │ 03  IN BUILD│  ← 1px --accent-hairline top     ║ │
+│  ║  │ SEASON      │ │ DRIVERS     │ │ TEAMS       │    pointer spotlight G-8         ║ │
+│  ║  │ one line …→ │ │ one line …→ │ │ one line …→ │                                  ║ │
+│  ║  └─────────────┘ └─────────────┘ └─────────────┘                                  ║ │
+│  ║  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                                  ║ │
+│  ║  │ 04 CIRCUITS │ │ 05 COMPARE  │ │ 06 RECORDS  │                                  ║ │
+│  ║  └─────────────┘ └─────────────┘ └─────────────┘                                  ║ │
+│  ╚═══════════════════════════════════════════════════════════════════════════════════╝ │
+│                                                                                       │
+│  ╔═ SECTION C — COVERAGE RULER · .shell-container · reveal G-15 ═════════════════════╗ │
+│  ║  ── THE HONEST PART                                                               ║ │
+│  ║  What the record holds                                                            ║ │
+│  ║  Results              ████████████████████████████████████████████  1950 →        ║ │
+│  ║  Qualifying positions ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░████████████████  1994 →       ║ │
+│  ║  Lap-by-lap timing    ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░██████████████  1996 →      ║ │
+│  ║  Q1 / Q2 / Q3         ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░████████  2006 →      ║ │
+│  ║  Pit stops            ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█████  2011 →      ║ │
+│  ║  Sprint races         ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░██  2021 →      ║ │
+│  ║  1950      1970      1990      2010    2026    ← axis, --text-2xs --ink-tertiary  ║ │
+│  ║  ▸ View as a table                                                                ║ │
+│  ╚═══════════════════════════════════════════════════════════════════════════════════╝ │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+┌ footer ── .shell-container · 1px --border-subtle top ─────────────────────────────────┐
+│  Complete results through 2026 Round 10 · Seasons 1950–2026                            │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+###### 3.2 Section A — the hero, specified exactly
+
+| Element | Spec |
+|---|---|
+| Container | `min-height: max(100svh, var(--size-hero-min))`; full-bleed (no `.shell-container`); inner content in a column of `max-width: 720px`, aligned to the `.shell-container`'s left gutter; vertically centred; `padding-block: 24` (96px) |
+| **Eyebrow** | a 24×2px `--accent-mark` rule, gap `2`, then `THE ARCHIVE · {firstYear}—{latestYear}` at `--text-2xs` uppercase `--ink-tertiary`; the years in `--font-mono`. Em dash (U+2014) between the years |
+| **Headline** | three lines, `<h1>`, Archivo 700 `wdth 82`, uppercase, `--ink-primary`, last line `--accent-ink`. Sizes: `--display-xl` (60) below 768 · `--display-2xl` (80) at 768–1439 · `--display-3xl` (112) at 1440+. Discrete steps, never `clamp()` (`DESIGN_SYSTEM.md` §2.3). Lines: **`SETTLE`** / **`THE`** / **`ARGUMENT.`** Motion **G-16** |
+| **Sub-headline** | `--text-md`, `--ink-secondary`, `max-width: 52ch`, margin-top `6` (24) |
+| **CTA row** | margin-top `8` (32), gap `3`. Primary: `Button` variant **`hero`**, size `lg`, label **"Explore the {latestYear} season"** + trailing `ArrowRight`, href `/season`, motion **G-9** (the only magnetic element in the product). Secondary: `Button` variant `secondary`, size `lg`, label **"Compare drivers"**, href `/compare` |
+| **Stat strip** | margin-top `12` (48); a 1px `--border-subtle` top rule; a 4-column grid at ≥768, 2×2 at <768; gap `6`. Each tile: figure in `--font-mono` `--display-lg` (44) at ≥768 / `--display-md` (32) below, `--ink-primary`, `font-variant-numeric: tabular-nums`; label beneath at `--text-2xs` uppercase `--ink-tertiary`, `max-width: 14ch`. Motion **G-17** |
+| **Orb placement** | orb A anchors top-right, orb B far-left, orb C lower-right — all **outside the 720px text column** by construction, so the composition reads as designed rather than smeared. Contrast under the text is guaranteed by the plate, measured in §9.2 V-17, not by the orbs' placement |
+
+**Why "SETTLE / THE / ARGUMENT."** The product's centre of gravity is cross-era comparison
+(`CLAUDE.md` §1) — which is what F1 fans actually argue about. It is a claim about the product's
+*purpose*, so unlike "every lap" it cannot be falsified by a coverage boundary, and the sub-headline
+immediately tells the truth about those boundaries. Three short words also give a strong left rag at
+112px, which 60px type cannot.
+
+###### 3.3 The stat strip — exactly what it shows, from fields that already exist
+
+Every figure comes from `GET /api/meta`, whose schema (`server/schemas/meta.ts`) already carries all
+four. **No API change is required to ship this section.**
+
+| Tile | Value | Source field | Count-up (G-17)? |
+|---|---|---|---|
+| 1 | `77` | `seasons.count` | yes |
+| 2 | `10` | `latestSeason.completedRounds` | yes |
+| 3 | `1996` | `coverage.laps.from` | **no** — `gsap.set`; counting up to a year is a gimmick and reads as a bug |
+| 4 | `1950–2026` | `seasons.firstYear`–`seasons.latestYear` | no |
+
+| Tile | Label |
+|---|---|
+| 1 | `SEASONS` |
+| 2 | `ROUNDS COMPLETE IN {latestYear}` |
+| 3 | `LAP TIMING FROM` |
+| 4 | `RESULTS COVERAGE` |
+
+> **Optional enhancement, flagged not assumed — `principal-engineer`'s call.** Two more figures would
+> make this strip considerably stronger: **total races** and **total laps**. Both are single indexed
+> `COUNT(*)`s and would be a new `archive: { races, laps }` object on `/api/meta`. If it lands, the
+> strip becomes **six tiles** in a 3×2 grid at ≥768 (labels `RACES` and `LAPS TIMED`, both with
+> count-up). **If it is declined, the four tiles above ship unchanged and nothing else moves.** This is
+> deliberately not a dependency.
+
+###### 3.4 Section B — the capability grid
+
+| Element | Spec |
+|---|---|
+| Section header | eyebrow `WHERE TO GO` (accent rule + `--text-2xs`), then `<h2>` **"Six ways into the record"** at `--display-sm` |
+| Grid | 3 columns at ≥1024, 2 at 768–1023, 1 below; gap `6` (24) |
+| Card | `--surface-raised`, `--elev-1`, `--radius-lg`, padding `6` (16 below 768). A **1px `--accent-hairline` top edge**, inset 0. The whole card is one `<a>` |
+| Card content | index `01`–`06` in `--font-mono` `--display-md` `--accent-ink`, top-left; an `IN BUILD` chip (`Badge` `neutral`, `--text-2xs`) top-right while the destination is a placeholder, **absent** once the feature lands; title at `--display-xs` Archivo `--ink-primary`; body at `--text-sm` `--ink-secondary`; a 16px `ArrowRight` bottom-right in `--ink-tertiary` |
+| Card hover / focus | pointer spotlight **G-8** (`--accent-glow` at 14%), `y: -2` (`m.control`), top edge → `--accent-mark`, arrow → `--accent-ink` and `x: 0→3`. Focus-visible gets the achromatic double ring **and** the same non-pointer states, so a keyboard user is not shown less |
+| Reveal | **G-15**, children staggered `stagger.card`, capped at `stagger.cap` |
+
+Cards, in order, with final copy:
+
+| # | Title | Body | href | Chip until |
+|---|---|---|---|---|
+| 01 | **SEASON** | "The calendar, the standings, and how the championship actually moved round by round." | `/season` | F2 |
+| 02 | **DRIVERS** | "Careers, season-by-season form, and the teammate head-to-heads that decide reputations." | `/drivers` | F4 |
+| 03 | **TEAMS** | "Constructor histories, driver line-ups, and the seasons that defined them." | `/teams` | F5 |
+| 04 | **CIRCUITS** | "Every venue the championship has visited, and what tends to happen there." | `/circuits` | F6 |
+| 05 | **COMPARE** | "Up to four drivers or teams, any season range, one chart that doesn't cheat." | `/compare` | F7 |
+| 06 | **RECORDS** | "Cross-era leaderboards, normalised so a 1954 season and a 2024 season can be read side by side." | `/records` | F8 |
+
+###### 3.5 Section C — the coverage ruler
+
+**This is not a chart, and that is a deliberate, checkable claim.** No Recharts, no visx, no scale
+function, no data fetch beyond `/api/meta`'s `coverage` object, no axis component. It is six
+absolutely-positioned bars inside a CSS-grid row, with `left`/`width` computed by plain arithmetic over
+the fixed domain `firstYear → latestYear`. F0's "no chart and no chart primitive" rule holds.
+
+| Element | Spec |
+|---|---|
+| Section header | eyebrow `THE HONEST PART`; `<h2>` **"What the record holds"** at `--display-sm`; lead paragraph at `--text-md` `--ink-secondary`, `max-width: 68ch` |
+| Row | label column `180px` (`120px` below 768) at `--text-sm` `--ink-primary`; track fills the rest; trailing "from" year at `--font-mono` `--text-xs` `--ink-tertiary`, 64px column |
+| Track | height 10px, `--radius-sm`, `--surface-sunken` for the whole domain; the available span filled `--accent-mark`; **a 2px `--surface-raised` gap** between the unavailable and available spans, per `DESIGN_SYSTEM.md` §3.3 rule 2 |
+| Rows | Results 1950 · Qualifying positions 1994 · Lap-by-lap timing 1996 · Q1 / Q2 / Q3 2006 · Pit stops 2011 · Sprint races 2021 — **all six years read from `meta.coverage`, never hardcoded** |
+| Axis | ticks and labels at 1950, 1970, 1990, 2010, `latestYear`; `--text-2xs` `--ink-tertiary`, `--font-mono`; 1px `--border-subtle` gridlines |
+| Interaction | hover/focus on a row raises it to `--surface-raised` and shows a tooltip with that row's no-coverage sentence from `DESIGN_SYSTEM.md` §7.4. Rows are focusable (`tabindex="0"`, `role="listitem"` inside a `role="list"`) |
+| Table view | a `<details>` disclosure, summary **"View as a table"**, containing a 3-column `<table>`: *Data class* / *Available from* / *Not available before*. Present even though this is not a chart, because §6.2's table-view rule is the right habit and this is the surface that teaches it |
+| Reveal | **G-15**; bars additionally grow `scaleX 0→1` from `transformOrigin: "right"` (they end at the right edge), `dur.chart`, `ease.mech`, `stagger {each: 0.06}` — the axis-anchored growth rule from §6.1, applied to its first real instance |
+
+**Why this section exists on the landing page.** The most-seen state in this whole product is
+"no coverage" (`DESIGN_SYSTEM.md` §7.4). Teaching the boundary once, at the front door, in a form
+that is interesting rather than apologetic, means every later encounter with it is a reminder rather
+than a surprise. It is also the most product-truthful thing we can show while F0 has no content.
+
+###### 3.6 Responsive behaviour
+
+| | 390 (base) | 768 (md) | 1440 (xl) |
+|---|---|---|---|
+| Hero height | `max(100svh, 640px)` | same | same |
+| Headline | `--display-xl` (60) | `--display-2xl` (80) | `--display-3xl` (112) |
+| CTA row | stacked, full-width buttons, gap `3` | inline | inline |
+| Stat strip | 2×2 | 4 columns | 4 columns |
+| Capability grid | 1 column | 2 columns | 3 columns |
+| Coverage ruler | label column 120px, axis ticks 1950/1990/2026 only | 180px, all ticks | 180px, all ticks |
+| Nav | bottom dock, `main` reserves 96px bottom | bottom dock | left rail, `main` reserves 96px left |
+| Orbs | A and B only; C hidden (a 480px blur on a 390px viewport is just a wash) | all three | all three |
+| Racing line | hidden below 768 — at that width it crosses the text column and the SVG's `slice` crop loses the corners that made it read as a circuit | visible | visible |
+| Magnetic CTA (G-9) | not attached (`(pointer: fine)` only) | attached if a fine pointer | attached |
+| `100svh` | **`svh`, not `vh`** — `vh` on iOS Safari is the *largest* viewport, so a `100vh` hero is cropped by the URL bar on first paint. This matters because it is the first thing anyone sees on a phone | | |
+
+---
+
+##### 4. Decision 2 — the moving background
+
+Fully specified in **`docs/DESIGN_SYSTEM.md` §7.7**: six layers, every colour, size, blur radius,
+opacity, anchor offset, loop duration and ease; the three `data-bg` intensity levels; the
+reduced-motion behaviour; the CSP position; and the measurement (§9.2 V-13 / V-17) that forced the
+contrast plate into the design. It is not restated here.
+
+The four points that most often get lost in implementation:
+
+1. **The contrast plate is not decoration.** Without it, `--border-control` measures **2.64:1** and
+   `--ink-tertiary` **4.00:1** over the orb-tinted field — both below their floors (§9.2 V-13).
+   Reducing orb opacity does not fix it. Removing the plate is an accessibility regression, not a
+   simplification.
+2. **`data-bg` defaults to `calm`.** Only `/` sets `hero`. The shell sets the attribute; a route never
+   sets it itself, so a route that forgets still gets a correct, quiet background.
+3. **Reduced motion leaves a composed still image**, not a blank page: grid, orbs, grain, plate and the
+   static racing-line stroke all remain; only the four ambient tweens are never created and the comet
+   is `display: none`.
+4. **The atmosphere is rendered once, in `AppShell`**, at `z-index: 0`, `pointer-events: none`,
+   `aria-hidden="true"`. It is never remounted on navigation and never cross-fades — an animated
+   background that re-enters on every click is a defect you feel on the fifth click.
+
+---
+
+##### 5. Decision 3 — navigation: `CommandDock`
+
+###### 5.1 Why a dock, and why it changes shape at 1024px
+
+Rishabh offered two options: a floating bottom bar or a collapsible sidebar. **Both are right, at
+different widths**, and the deciding constraint is what F1–F7 put on these pages.
+
+| Option | Judged against F1–F7 |
+|---|---|
+| Full-width top nav (what shipped) | **Rejected.** Seven-plus destinations, and the most default chrome there is. Rishabh's diagnosis was correct on sight |
+| Push sidebar (240–280px, always visible) | **Rejected.** F2's standings tables and F3's lap-time charts want horizontal room; charts are sized by *measured width*, so a sidebar permanently costs 260px of plot area, and a *collapsible* one **resizes every chart on the page when a user toggles it**. A chart that reflows because you touched the nav is a defect |
+| Bottom dock at every width | **Rejected at ≥1024.** It wastes the widest axis, and it sits over the bottom of a chart — exactly where a tooltip or an x-axis label lives |
+| **Expanding overlay rail (≥1024) + floating bottom dock (<1024)** | **Chosen.** The rail costs a constant **96px** of gutter whether collapsed or expanded, because it expands **over** content and never reflows `main`. Below 1024 the bottom dock is thumb-reachable, which a top bar never is, and costs zero horizontal width |
+
+This is a collapsible sidebar in its best form and a floating bottom bar in its best form — both of
+Rishabh's suggestions, each used where it actually wins.
+
+###### 5.2 The rail — ≥1024px
+
+| Property | Value |
+|---|---|
+| Position | `fixed; left: var(--size-dock-inset)` (16); `top: 50%; transform: translateY(-50%)`; `z-index: var(--z-dock)` (40) |
+| Width | `var(--size-dock)` (64) collapsed → `var(--size-dock-open)` (232) expanded, **G-4** |
+| Surface | `--surface-glass` + `--glass-blur`, `--radius-2xl` (20), `--elev-2`, 1px `--border-subtle`. `@supports` fallback to `--surface-raised` |
+| Padding | `2` (8) |
+| Item | 48px tall (`--size-dock-item`), `--radius-md`, icon 20px with its centre at x = 32 (so the glyph does not move when the rail expands — the single most noticeable detail if it is got wrong), label `--text-base` Inter 500, `--ink-secondary` |
+| Active item | `--accent-wash` fill, `--ink-primary` label and icon, `aria-current="page"`, plus the indicator: a **2×20px `--accent-mark`** bar at `left: 0`, vertically centred, moved by **G-3** |
+| Hover item | pointer spotlight **G-8** at 14%, icon → `--accent-ink`, label → `--ink-primary` |
+| Expansion triggers | `pointerenter` / `pointerleave` on the rail; `focusin` / `focusout` on any child; the pin toggle |
+| Pin | a 48px row below a 1px `--border-subtle` divider, `Pin` / `PinOff` glyph, `aria-pressed`, label "Keep menu open" / "Collapse menu". Persisted at `localStorage["f1a.dock"]` = `"pinned" \| "auto"`, default `"auto"` |
+| Reduced motion | **permanently expanded at 232px, pin control hidden.** A hover-to-reveal affordance is precisely what a reduced-motion user should not have to chase |
+
+###### 5.3 The bottom dock — <1024px
+
+| Property | Value |
+|---|---|
+| Position | `fixed; bottom: 16px; left: 16px; right: 16px; max-width: 480px; margin-inline: auto; z-index: 40` |
+| Height | `var(--size-dock)` (64) |
+| Surface | as the rail, but `--radius-full` |
+| Slots | **five**, `flex: 1`, each ≥48×48: `Home` · `Season` · `Drivers` · `Compare` · `More` |
+| Slot content | 20px icon above an `--text-2xs` label, centred, gap `0.5` (2) |
+| Active slot | `--accent-wash` pill inset `1` (4), `--radius-full`, `--ink-primary`; indicator = a **2×16px `--accent-mark`** bar at the slot's **top** edge, moved on `x` by **G-3** |
+| `More` | opens the overflow sheet, **G-5**. `aria-expanded`, `aria-haspopup="dialog"` |
+| Overflow sheet | bottom sheet, `left/right: 16`, `bottom: 16`, `--radius-2xl`, `--surface-overlay`, `--elev-2`, padding `2`. A `--text-2xs` uppercase `--ink-tertiary` heading **"Go to"**, then **all seven** destinations as 56px rows (not just the overflow — a user who opened "More" should see the whole map), then a 44px `Close` row. Scrim `rgb(0 0 0 / 0.4)` light / `0.6` dark — the `--scrim` token the previous build flagged as unspecified is hereby **specified**: `--scrim: rgb(0 0 0 / 0.44)` light, `rgb(0 0 0 / 0.62)` dark. Focus trapped; `Esc` closes; focus returns to `More` |
+
+###### 5.4 Destinations, in order, with icons
+
+Icon glyphs are **Lucide geometry** added to `src/components/ui/icons.tsx` (`ARCHITECTURE.md` §2 — one
+inline set, `lucide-react` is not a dependency).
+
+| # | Label | href | Glyph | In bottom dock? | Ships |
+|---|---|---|---|---|---|
+| 1 | Home | `/` | `House` | yes | **F0** |
+| 2 | Season | `/season` | `CalendarDays` | yes | F2 |
+| 3 | Drivers | `/drivers` | `UserRound` | yes | F4 |
+| 4 | Teams | `/teams` | `Users` | sheet only | F5 |
+| 5 | Circuits | `/circuits` | `MapPin` | sheet only | F6 |
+| 6 | Compare | `/compare` | `GitCompareArrows` | yes | F7 |
+| 7 | Records | `/records` | `Trophy` | sheet only | F8 |
+
+**No dead controls.** Global search and the app-wide season selector are F9 and are simply absent, not
+present-and-disabled. Every dock item above resolves to a designed placeholder today.
+
+###### 5.5 The header, now that nav has left it
+
+| Element | Spec |
+|---|---|
+| Header | 56px at every breakpoint; `--surface-glass` + `--glass-blur`; **no bottom border at rest**; `position: sticky; top: 0; z-index: 30`. Inner content in `.shell-container` |
+| Wordmark | `F1 ANALYTICS`, `--display-xs`, Archivo 700 `wdth 82`, `--tracking-wordmark`, `--ink-primary`, **the `1` set in `--accent-ink`**; links to `/`; `aria-label="F1 Analytics — home"` |
+| Right cluster | `DataVintage` then `ThemeToggle`, gap `2` — both **carried forward unchanged** from the 2026-08-04 spec §5.1 / §5.2, including all four copy lines and the pluralisation rules |
+| Hairline | appears on scroll past 24px, **G-13**: 1px `--border-subtle` across the full width, plus a 96px `--accent-mark` segment at the left edge growing `scaleX 0→1` from the left |
+| `main` | **loses its own padding and max-width.** It becomes `flex: 1; position: relative; z-index: var(--z-content)`, with `padding-left: var(--size-rail-clearance)` at ≥1024 and `padding-bottom: var(--size-dock-clearance)` below. Each route wraps its own content in `.shell-container`, which carries the max-width and the page gutters. This is what lets the hero be full-bleed without negative-margin hacks — **a structural change the developer must make in `AppShell`** |
+| `main` still owns | the single `main` landmark and `id="main"`. The skip link still targets it. Nothing else renders a `main` |
+| Footer | inside `.shell-container`; `--text-xs`, `--ink-tertiary`, padding-y `6`, 1px `--border-subtle` top; the coverage echo string, unchanged |
+
+###### 5.6 Route placeholders, refreshed
+
+The 2026-08-04 spec §2.3 anatomy stands, with three changes so a placeholder looks deliberate next to a
+finished landing page:
+
+```
+── SEASON HUB                       ← 24×2px --accent-mark rule + --text-2xs uppercase --ink-tertiary
+2026 Season                         ← <h1>, --display-lg, --ink-primary
+This surface ships in F2.           ← --text-md, --ink-secondary
+year 2026                           ← mono chips, --surface-sunken, --radius-sm, resolved params
+```
+
+1. The eyebrow gains the accent rule.
+2. The placeholder sits on `--surface-raised` at `--elev-1`, `--radius-lg`, padding `6` — so it reads
+   as a panel on the atmosphere rather than as loose text floating on a moving field.
+3. `data-bg` is `calm` on every one of them.
+
+`NotFound` keeps the `404` `StateCard` (`DESIGN_SYSTEM.md` §7.4), not the placeholder shape.
+
+---
+
+##### 6. Decisions 3 and 4 — the theme and the accent
+
+###### 6.1 The theme: "Instrument"
+
+The measured neutrals of `DESIGN_SYSTEM.md` §3.5 are **kept exactly** — every one of them passed
+(§9.2 V-2) and re-passed over the animated background (§9.2 V-17). What changes is everything the
+rejected build was missing around them:
+
+| Ingredient | Was | Now |
+|---|---|---|
+| Accent | none | **Signal**, hue 350, on every surface in `DESIGN_SYSTEM.md` §3.6.4 |
+| Depth | one flat canvas | six-layer atmosphere + glass chrome + a z-index scale |
+| Chrome | opaque bar | translucent, blurred, floating; hairline appears on scroll |
+| Type | topped out at 44px | tops out at **112px**, on one element |
+| Motion | route change only | 23 named motions, seven of them pointer-driven |
+| Texture | none | a 240px grain tile at 2–3.8% — the detail that stops an 80px-blurred orb banding |
+
+**Dark mode is the designed default impression** and is where the accent, the glass and the orbs are
+strongest (orbs at 0.17 vs 0.09; the primary button is hi-vis `#FE02A9` with near-black ink). Light
+mode is designed separately, not inverted, exactly as §3.5 already requires — the accent flips from
+`#FE02A9` to the deeper `#D1018A` precisely because the vivid step only reaches 3.62:1 on white.
+
+###### 6.2 The accent: Signal, OkLCh hue 350
+
+Full ramp, all eleven semantic aliases, every measured figure, and the required-placement table are in
+**`DESIGN_SYSTEM.md` §3.6**. Headline values:
+
+| | Light | Dark |
+|---|---|---|
+| `--accent-ink` / `--accent-fill` | **`#D1018A`** | **`#FE02A9`** |
+| on `--surface-raised` / `canvas` / `sunken` | **5.14 / 4.84 / 4.55** :1 | **4.71 / 5.29 / 5.50** :1 |
+| `--accent-on` (ink on the fill) | `#FFFFFF` at **5.14:1** | `#0E0F13` at **5.29:1** |
+| `--accent-mark` (rules, marks, indicators) | `#FE02A9` at **3.62 / 3.41 / 3.20** :1 (floor 3.0) | `#FE02A9` at **4.71 / 5.29 / 5.50** :1 |
+| `--accent-wash` + `--accent-wash-ink` | `#FFE2EE` + `#A2006A` at **6.33:1** | `#570036` + `#FF98CA` at **7.27:1** |
+| Achromatic focus ring over the accent fill | **3.25:1** (floor 3.0) | **3.37:1** |
+
+**Every contrast floor passes in both themes.** So does every normal-vision separation floor: the
+minimum ΔE to any reserved semantic is **20.09** and to any brand colour **26.00**, against a floor of
+15 (§9.2 V-11, V-15, V-16).
+
+**Why hue 350 and not the obvious choices** — measured, in §9.2 **V-10**, all 360° scanned:
+violet/indigo is **ΔE 1.10 from the reserved timing purple**; blue collides with Red Bull at **2.66**
+and Williams at **5.65**; teal/green collides with the reserved green at **1.74**; amber collides with
+the reserved yellow at **8.31**. Magenta-rose (h 345–20) is the **only** surviving band, and inside it
+h 350 gives the largest separation from Ferrari (**26.0** vs 19.5 at h 0), which matters more than the
+marginal semantic gain h 0 would buy.
+
+**Residual CVD failures are recorded, not hidden** — `DESIGN_SYSTEM.md` §3.6.5 lists all seven with
+figures, and shows that no hue anywhere on the wheel can clear the CVD floor against twenty colours
+(the best is 14.7, at hue 300, inside the forbidden purple band). Mitigation is the structural one
+this system already runs on: **the accent never carries meaning, never carries identity, and is never a
+series colour** — and every status and timing colour it could be confused with already ships with a
+mandatory icon and label.
+
+**Also binding:** the F1 fallback ramp for the 202 colourless teams (§3.1) **must exclude hue
+340–360**, so a colourless team is never painted the interface accent.
+
+---
+
+##### 7. Motion — GSAP, 23 motions in F0
+
+Full specifications — trigger, target, property, duration, ease **by GSAP name**, stagger, reduced-motion
+behaviour, and the GSAP documentation reference for each — are in **`DESIGN_SYSTEM.md` §4.6 (G-0…G-24)**
+and the token set in **§4.3**. This table says only which land in F0 and where.
+
+| ID | Where in F0 | Interaction or ambient? |
+|---|---|---|
+| **G-0** | the root `gsap.matchMedia()` in `src/lib/motion.ts` | mechanism |
+| **G-1** | shell mount — header, then dock container, then dock items | entrance (≤460ms) |
+| **G-2** | route content enter, keyed on `location.pathname`; **no exit tween** | interaction |
+| **G-3** | dock active-item indicator, both orientations | interaction |
+| **G-4** | rail expand / collapse | interaction |
+| **G-5** | bottom-dock overflow sheet + scrim | interaction |
+| **G-6** | `ThemeToggle` and `DataVintage` popovers | interaction |
+| **G-7** | every button, dock item, card, popover row | interaction |
+| **G-8** | pointer spotlight — capability cards, dock items | interaction |
+| **G-9** | magnetic hero CTA — **one element in the product** | interaction |
+| **G-10** | inline link underline sweep | interaction |
+| **G-11** | skeleton pulse (`DataVintage`, stat strip, coverage ruler) | ambient |
+| **G-12** | skeleton → content crossfade | interaction |
+| **G-13** | header hairline + accent segment on scroll | scroll |
+| **G-14** | scroll progress bar — **`/` only** | scroll |
+| **G-15** | landing sections B and C reveal | scroll |
+| **G-16** | landing headline, `SplitText` masked char reveal | entrance (≈880ms) |
+| **G-17** | stat-figure count-up | entrance |
+| **G-18** | atmosphere grid drift | ambient |
+| **G-19** | atmosphere orb drift ×3 | ambient |
+| **G-20** | atmosphere comet along the racing line (`offset-distance`, no plugin) | ambient |
+| **G-21** | atmosphere pointer parallax | interaction |
+| **G-22** | theme colour transition (CSS, not GSAP) | interaction |
+| G-23 | list/grid stagger — **defined, first used F2** | — |
+| G-24 | `Flip` shared element — **defined, first used F4; `Flip` is NOT installed in F0** | — |
+
+**`M-n` → `G-n` mapping**, because the carried-forward `DataVintage` (§5.1) and `ThemeToggle` (§5.2)
+specs above still cite the retired identifiers. Read the right-hand column:
+
+| Retired | Now |
+|---|---|
+| M-1 shell mount | **G-1** |
+| M-2 route enter | **G-2** |
+| M-3 nav active rule | **G-3** (and it moves an accent indicator, not an ink rule) |
+| M-4 mobile nav sheet | **G-5** (the dock overflow sheet) |
+| M-5 popover open | **G-6** |
+| M-6 control gesture | **G-7**, plus **G-8** where a spotlight applies |
+| M-7 skeleton pulse | **G-11** |
+| M-8 skeleton → content | **G-12** |
+| M-9 list/grid reveal | **G-23** (still F2) |
+| M-10 scroll reveal | **G-15** |
+| M-11 theme change | **G-22** |
+
+**Suggested build order**, because 23 motions in one gate needs staging and the value is very
+unevenly distributed: **(a)** G-0, G-22, G-7 — the guard and the baseline feel; **(b)** G-1, G-2, G-3,
+G-4, G-5, G-6 — the chrome; **(c)** G-18, G-19, G-20, G-21 — the atmosphere; **(d)** G-16, G-17, G-13,
+G-14, G-15 — the landing page; **(e)** G-8, G-9, G-10, G-11, G-12 — the polish. Stopping after (d)
+would still be a dramatic improvement on what was rejected; stopping before (c) would not.
+
+**Three things that are defects, not preferences:**
+
+1. **Any `framer-motion` import, `MotionConfig`, `AnimatePresence`, `layoutId`, `whileHover`, or
+   Framer easing string** (`"easeOut"`, `"circOut"`, …). The library is removed. `src/lib/motion.ts` is
+   rewritten, and `src/components/layout/PrimaryNav.tsx` is deleted.
+2. **Any `cubic-bezier()` literal, or any of `back` / `elastic` / `bounce` / `CustomEase`.** Seven named
+   GSAP eases exist in this product (§4.3) and no others.
+3. **Any ambient tween created outside the `no-preference` branch of `gsap.matchMedia()`.** Reduced
+   motion means the tween is never created, not that it runs at `duration: 0`.
+
+**`useGSAP` from `@gsap/react` is mandatory** for anything created in a component: React 19 +
+StrictMode double-invokes effects, and without the hook's `gsap.context()` revert that means duplicated
+conflicting tweens. Handlers created after the hook runs (pointer, click) must be wrapped in its
+`contextSafe()`.
+
+**Bundle** — measured, `npm pack gsap@3.15.0` + `gzip -9` on each UMD `dist` file:
+core **27.7 KB** + ScrollTrigger **17.6 KB** + SplitText **3.6 KB** + `@gsap/react` ≈1 KB =
+**≈49 KB gzipped**, against `framer-motion`'s measured **40.8 KB**. Projected total
+**≈154 KB against the 250 KB ceiling**. `MotionPathPlugin` (9.7 KB) is **avoided** by using native CSS
+`offset-path`; `Flip` (9.7 KB) is deferred to F4; `ScrollSmoother` is **never** installed.
+
+---
+
+##### 8. States
+
+The 2026-08-04 spec §7 and §7.1 are **carried forward**, including the full database-unavailable copy.
+CR-007 adds one rule and the landing page's own states.
+
+> **The hero never depends on data.** Its headline, sub-headline, CTAs and background need no API
+> response, so **no failure of `/api/meta` may blank the landing page**. Loading, error and
+> unavailable states are scoped to the stat strip and the coverage ruler.
+
+| State | Where | Design |
+|---|---|---|
+| **loading** | `DataVintage` | 92×20 skeleton at the resolved chip width, **G-11**, `aria-busy` on the container |
+| **loading** | landing stat strip | four skeleton pairs: a `--display-lg`-height block at 4ch width, plus a `--text-2xs`-height block at 10ch. **The strip holds its full height**, so the CTA row above it never moves when data lands |
+| **loading** | coverage ruler | six full-width `--surface-sunken` tracks at 10px with no fill, labels rendered normally (they are static strings), years replaced by a 4ch skeleton |
+| **loading** | route placeholders | none — they render synchronously |
+| **error (500)** | stat strip | replaced by one line: **"Coverage figures aren't available right now."** at `--text-xs` `--ink-tertiary`. **No error card in a hero** — the failure is already stated below, and an alert tile in the hero is the ugliest possible first impression |
+| **error (500)** | coverage ruler | `ErrorState` filling the section box, `min-height: 240`, holding its height (**G-12**) |
+| **rate-limited (429)** | coverage ruler | `ErrorState`: "Too many requests" / "Wait a moment and try again." / "Try again" + mono `RATE_LIMITED` chip |
+| **database unavailable (503)** | landing | hero renders in full (static); **both** lower sections are replaced by a single `DataUnavailableState` (copy unchanged from §7.1), `max-width: 560`, centred, `min-height: 60vh`. `data-bg` stays `hero`. The header still renders with `DataVintage` in its `unavailable` variant |
+| **database unavailable (503)** | any other route | as the 2026-08-04 spec §7 |
+| **404** | `NotFound` | `StateCard` per `DESIGN_SYSTEM.md` §7.4; `data-bg="calm"` |
+| **empty** | not reachable in F0 | designed, built F1 |
+| **no-coverage** | not reachable in F0 **as a state** — but §3.5's coverage ruler is its F0 *explanation*, and its tooltips use the exact §7.4 sentences, so the vocabulary is established before the first real boundary is met | |
+| **partial data** | stat strip | if `latestSeason.completedRounds === 0`, tile 2 reads `0` with the label `ROUNDS COMPLETE IN {latestYear}` — correct, not empty. If `coverage.laps.from` is null, tile 3 is omitted and the strip renders three tiles |
+
+---
+
+##### 9. Copy — every new string
+
+**Landing hero**
+
+| Slot | String |
+|---|---|
+| Eyebrow | `THE ARCHIVE · {firstYear}—{latestYear}` → **"THE ARCHIVE · 1950—2026"** |
+| Headline | **"SETTLE"** / **"THE"** / **"ARGUMENT."** |
+| Headline accessible name (SplitText `aria: "auto"`) | **"Settle the argument."** |
+| Sub-headline | **"{count} seasons of Formula 1 — every race result, every qualifying session, and every lap the record holds. Compared across eras, and honest about where the record stops."** → "77 seasons of Formula 1 — …" |
+| Primary CTA | **"Explore the {latestYear} season"** → "Explore the 2026 season" |
+| Secondary CTA | **"Compare drivers"** |
+| Stat labels | **"SEASONS"** · **"ROUNDS COMPLETE IN {latestYear}"** · **"LAP TIMING FROM"** · **"RESULTS COVERAGE"** |
+| Stat strip error | **"Coverage figures aren't available right now."** |
+
+**Capability grid** — heading **"Six ways into the record"**, eyebrow **"WHERE TO GO"**, chip
+**"IN BUILD"**, and the six card bodies in §3.4.
+
+**Coverage ruler**
+
+| Slot | String |
+|---|---|
+| Eyebrow | **"THE HONEST PART"** |
+| Heading | **"What the record holds"** |
+| Lead | **"Formula 1's record gets richer the closer you get to now. Rather than hide that, this product states it: wherever a surface depends on data that doesn't exist for the season you're looking at, it will say so — and say what does exist instead."** |
+| Row labels | **"Results"** · **"Qualifying positions"** · **"Lap-by-lap timing"** · **"Q1 / Q2 / Q3"** · **"Pit stops"** · **"Sprint races"** |
+| Trailing year | **"{from} →"** |
+| Closing paragraph | **"Lap-by-lap timing begins in 1996. Before that the record holds full race classifications, starting grids and championship standings — but no lap times, so pace and stint analysis simply aren't available. No race before 1990 has any lap data at all."** _(The 1996 figure is read from `meta.coverage.laps.from`; only "1990" is a static string, and it is true — zero of the 484 races before 1990 carry lap rows.)_ |
+| Table disclosure | **"View as a table"** |
+| Table headers | **"Data class"** · **"Available from"** · **"Not available before"** |
+| Row tooltips | the exact §7.4 no-coverage sentences, e.g. **"Lap-by-lap timing isn't available for 1976. Lap data begins in 1996. 1976 has full race classifications, grids and championship standings."** — with the year taken from the hovered position on the track |
+
+**`CommandDock`**
+
+| Slot | String |
+|---|---|
+| Nav accessible name | **"Primary"** |
+| Item labels | **"Home"** · **"Season"** · **"Drivers"** · **"Teams"** · **"Circuits"** · **"Compare"** · **"Records"** |
+| Pin toggle | label **"Keep menu open"** when unpinned, **"Collapse menu"** when pinned; `aria-pressed` reflects state |
+| `More` trigger | visible label **"More"**, accessible name **"More destinations"** |
+| Overflow sheet heading | **"Go to"** |
+| Sheet close | **"Close"** |
+| Wordmark accessible name | **"F1 Analytics — home"** |
+
+**Route placeholders** — unchanged: `{FEATURE} HUB` eyebrow, `{Title}` `h1`,
+**"This surface ships in F{n}."**, then resolved-param mono chips.
+
+**Pluralisation is part of the copy spec.** Any counted noun ships both grammatical numbers — a string
+that can render `1 seasons` is a copy defect even when the number is right. This applies to the
+sub-headline (`{count} seasons`) and to every `DataVintage` line already specified in §5.1.
+
+---
+
+##### 10. Accessibility
+
+| Concern | Spec |
+|---|---|
+| Skip link | first focusable element, **"Skip to main content"** → `#main`. `z-index: var(--z-skip)` (60) so it appears **above the dock** — at 40 it would be covered by the rail at ≥1024 |
+| Landmarks | `header` → `nav[aria-label="Primary"]` → `main#main` → `footer`, in that **DOM order**, whatever the dock's visual position. Exactly one `main`, exactly one primary `nav` |
+| Headings | one `<h1>` per route. On `/` it is the split headline; sections B and C are `<h2>` |
+| Focus order (≥1024) | skip link → wordmark → `DataVintage` → `ThemeToggle` → dock items 1–7 → pin toggle → main content → footer |
+| Focus order (<1024) | skip link → wordmark → `DataVintage` → `ThemeToggle` → dock slots 1–5 → *(sheet, when open: focus trapped, returns to `More`)* → main → footer |
+| Rail and keyboard | `focusin` on any rail child expands it (**G-4**), so a keyboard user always sees labels; it collapses on `focusout` unless pinned |
+| Focus indicator | the single achromatic double ring, `DESIGN_SYSTEM.md` §3.5.1, **re-measured over the accent: 3.25:1 light / 3.37:1 dark against `--accent-fill`**, floor 3.0 — PASS (§9.2 V-11). Never accent-coloured, never replaced by motion |
+| Hover-only information | none. Every G-8 spotlight, G-9 magnet and G-21 parallax is decorative; every state they express is also expressed by a token change that `:focus-visible` triggers |
+| Current page | `aria-current="page"` on the active dock item — the accent pill and the 2px rule are never the only signal |
+| Split text | `SplitText` runs with its default `aria: "auto"`, which puts an `aria-label` carrying **"Settle the argument."** on the `<h1>` and `aria-hidden="true"` on every generated character |
+| Coverage ruler | `role="list"` / `role="listitem"`, each row `tabindex="0"` with an accessible name combining label + availability; plus the `<details>` table view — the ruler is never the only route to the information |
+| Background | `aria-hidden="true"` + `role="presentation"`, no text, `pointer-events: none` |
+| Contrast | every accent pair measured and passing (§9.2 **V-11**); the glass composite measured and passing (**V-12**); the plated background composite measured and passing (**V-17**), which is what keeps §9.2 V-2's neutral figures true over a moving field |
+| Touch targets | ≥44×44 everywhere; every dock slot ≥48×48 |
+| Reduced motion | `gsap.matchMedia()` per **§4.4** — ambient tweens are **never created**. The reduced state is a **composed still image and a permanently expanded rail**, not a stripped-down page. The scroll progress bar (G-14) is not rendered at all |
+| Colour scheme | `prefers-color-scheme` honoured on first paint and live while the preference is `system`; `theme-init.js` unchanged; `data-bg` is **not** written pre-paint |
+| `100svh` | the hero uses `svh`, not `vh`, so iOS Safari does not crop the headline behind the URL bar |
+| Table view | present for the coverage ruler even though it is not a chart. F0 still ships no chart |
+
+---
+
+##### 11. Assets required
+
+###### 11.1 Developer-produced — not Rishabh's
+
+| Item | Spec |
+|---|---|
+| `public/textures/grain.svg` | 240×240, an `feTurbulence` tile: `baseFrequency="0.82" numOctaves="3" stitchTiles="stitch" type="fractalNoise"`, desaturated with `feColorMatrix type="saturate" values="0"`, applied to a full-bleed `<rect>`. Referenced from CSS as `background-image` (`img-src 'self'` — no `data:` needed, no licence question, generated not sourced). **A CSS-only fallback must exist:** if the file is absent the grain layer is simply omitted and nothing else changes |
+| `src/components/ui/icons.tsx` | ten new glyphs, Lucide geometry under ISC, same 24px grid / 1.5px stroke / `currentColor`: `House`, `CalendarDays`, `UserRound`, `Users`, `MapPin`, `GitCompareArrows`, `Trophy`, `MoreHorizontal`, `Pin`, `PinOff`. No second icon set, ever (`DESIGN_SYSTEM.md` §2.5) |
+| Racing-line path | the `d` attribute of §7.7 layer 3 — authored geometry inside `AtmosphereField`, **not an asset file**, so it can be themed with `currentColor` and duplicated into the comet's `offset-path` from one constant |
+| `public/fonts/*` | unchanged from the 2026-08-04 spec §9.1 — three variable `woff2` plus `OFL.txt` |
+| `scripts/validate-palette.mjs` | see §12 |
+
+###### 11.2 Assigned to **Rishabh** — tracker task `R3`, unchanged in substance
+
+| Item | Spec |
+|---|---|
+| Favicon | `public/favicon.svg` — square, legible at 16px, works on light and dark browser chrome |
+| App icon | `public/apple-touch-icon.png` — 180×180, PNG, opaque |
+| Maskable icon | `public/icon-512.png` — 512×512, PNG, content inside an 80% safe area |
+
+**Placeholder updated by CR-007.** The typographic mark now carries the accent: a `#D1018A`
+(`--signal-600`) rounded square — `--radius-md` scaled to the viewBox — with **`F1`** set in Archivo
+700 `wdth 82` in `#FFFFFF` (measured **5.14:1**, §9.2 V-11). Hand-authored SVG in `public/favicon.svg`.
+`#D1018A` rather than `#FE02A9` because it must also be legible on a **light** browser tab strip.
+
+**Still no F1 logo, no team logo, no photograph anywhere in F0**, and none is needed — F0 renders no
+driver, team or race content. **R1 and R2 remain off F0's critical path.**
+
+---
+
+##### 12. Files the developer creates or rewrites
+
+| File | Change |
+|---|---|
+| `src/styles/tokens.css` | **add** the 11 `--signal-*` steps, the 11 `--accent-*` aliases per theme, `--surface-glass`, `--glass-blur`, `--bg-grid-line`, `--bg-orb-neutral`, `--bg-grain-opacity`, `--bg-plate-alpha`, the `--z-*` scale, `--radius-2xl`, `--text-display-2xl`, `--text-display-3xl`, and the nine `--size-dock*` / `--size-grid-cell` / `--size-hero-min` / `--size-progress` tokens. **Specify `--scrim`** properly: `rgb(0 0 0 / 0.44)` light, `rgb(0 0 0 / 0.62)` dark — the previous build correctly flagged it as unspecified |
+| `src/lib/motion.ts` | **rewritten.** Exports `dur`, `ease`, `m`, `loop`, `stagger` exactly as `DESIGN_SYSTEM.md` §4.3, plus the single shared `gsap.matchMedia()` instance (G-0). No `framer-motion` import, no `spring.*` |
+| `src/lib/gsap.ts` | **new.** One module that imports `gsap`, `ScrollTrigger`, `SplitText`, `useGSAP` and calls `gsap.registerPlugin(...)` once. Nothing else registers plugins |
+| `src/components/layout/AppShell.tsx` | rewritten — renders `AtmosphereField`, the glass header, `CommandDock`, `ScrollProgress`, and a `main` with no padding of its own |
+| `src/components/layout/Header.tsx` | rewritten — glass, accent wordmark, scroll hairline (G-13) |
+| `src/components/layout/PrimaryNav.tsx` | **deleted** |
+| `src/components/layout/CommandDock.tsx`, `DockSheet.tsx` | new — §5 |
+| `src/components/layout/AtmosphereField.tsx` | new — `DESIGN_SYSTEM.md` §7.7 |
+| `src/components/ui/ScrollProgress.tsx` | new — G-14 |
+| `src/components/ui/PageContainer.tsx` | new — the `.shell-container` wrapper each route applies |
+| `src/routes/Landing.tsx` + `HeroSection`, `StatStrip`, `CapabilityGrid`, `CoverageRuler` | new — §3 |
+| `src/routes/SeasonHub.tsx` | the former `/` placeholder, now at `/seasons/:year`; plus a `/season` redirect |
+| `src/components/ui/Button.tsx` | accent recolour + the `hero` variant |
+| `scripts/validate-palette.mjs` + `npm run validate:palette` | **new, and it must land in this PR.** It produced every figure in §9.2.1 and §9.1 requires a re-run on any colour change — which the `reviewer` cannot verify without it. Pure arithmetic, no dependency. It also self-calibrates against the recorded pre-CR-007 figures, so a future regression in the validator itself is caught |
+| `package.json` | **remove** `framer-motion`; **add** `gsap` and `@gsap/react` |
+
+**No hard-coded colour, duration, font-size or spacing value may appear outside `tokens.css` and
+`motion.ts`.** That was already a review criterion; the accent makes it easier to violate, so it is
+restated.
+
+---
+
+##### 13. Open questions, and where I disagree
+
+For **Rishabh** — one real risk and one taste question:
+
+1. **⚠ The accent is magenta, and BWT Alpine's 2026 livery is blue *and pink*.** I checked rather than
+   assumed: Alpine's A526 launch is branded *"Driving Pink Change"*, with BWT's signature pink
+   prominent on the car. So some F1 fans will read a magenta interface as an Alpine reference. My
+   judgement is that it is acceptable — BWT pink is a pale pastel (~`#F596C8`), `--accent-mark` is a
+   fully saturated `#FE02A9`, the accent appears as thin rules and small fills rather than large
+   fields, and **this product renders Alpine as `#00A1E8` blue** because that is the colour in the
+   data, so the two never appear as competing identity claims. But it is your call, and it is a
+   **one-token change**: moving the ramp to hue 0 gives a crimson-rose (`#D50070` / `#FD0487`) with
+   better separation from the timing semantics but worse separation from Ferrari (ΔE **19.5** vs
+   **26.0**). I chose against it because "reads a bit like Ferrari red" is the worse of the two
+   problems in an F1 product. Say the word and it is a re-run of the validator and a token swap.
+2. **"SETTLE / THE / ARGUMENT."** — the headline is a voice decision, not a data one. The alternative I
+   considered and rejected was three lines of huge figures (`77 SEASONS. / 1,127 RACES. / 717,764
+   LAPS.`), which is more impressive and less memorable, needs an API change, and leaves the page with
+   no human sentence anywhere. The composition as specified gets both: words at 112px, figures in the
+   strip below.
+3. Product name and wordmark remain the open trademark question from the 2026-08-04 spec §11.1 —
+   unchanged, and F0 still ships the `package.json` name.
+
+For the **`principal-engineer`**:
+
+4. **Routing:** `/` → Landing, `/seasons/:year` → season hub, **new** `/season` → redirect to
+   `/seasons/{latestYear}`. Changes `ARCHITECTURE.md` §5 and `REQUIREMENTS.md`. Design does not ratify
+   routing — please confirm the shape and whether `/season` is `<Navigate replace>` or a loader
+   redirect.
+5. **`AppShell`'s `main` loses its own padding and max-width** (§5.5). This is a structural change and
+   it touches the component tree, not just styles.
+6. **Optional `/api/meta` addition:** `archive: { races, laps }` — two indexed `COUNT(*)`s — would take
+   the stat strip from four tiles to six. **Explicitly not a dependency**; decline it and nothing in
+   this spec moves.
+7. **Two dependencies:** `gsap@3.15` and `@gsap/react`, and the **removal** of `framer-motion`.
+   `ARCHITECTURE.md` §2's Motion row and §10 both need updating. `MotionPathPlugin`, `Flip` and
+   `ScrollSmoother` are **not** installed in F0 and I would like that recorded as a decision, not left
+   to a later import.
+8. **`scripts/validate-palette.mjs` must land in this PR**, not F1 (§12).
+
+Where I **disagree**, stated plainly:
+
+9. **CR-007's claim that "GSAP is cheaper than what it replaces" is wrong.** Measured:
+   core + ScrollTrigger + SplitText = **47.7 KB gzipped** against `framer-motion`'s measured
+   **40.8 KB**. The swap **costs ≈6.9 KB**. The decision is still correct — the budget has ~95 KB of
+   headroom and GSAP is what makes this design possible — but the CR should not carry a false premise,
+   and `DESIGN_SYSTEM.md` §4.1 now records the correction.
+10. **23 named motions in a single developer gate is a lot**, and if it is going to be cut, I would
+    much rather it be cut deliberately along the build order in §7 than discovered half-done at
+    review. Stopping after stage (d) is a defensible ship; skipping stage (c) is not, because the
+    moving background is item 2 of seven on Rishabh's list.
+11. **I think removing the designer's visual-verification gate (CR-006) was the wrong call for *this*
+    CR specifically.** Everything at stake here — whether 112px type actually lands, whether the orbs
+    read as depth or as smudge, whether the rail's icons stay put as it expands, whether the comet is
+    charming or annoying — is a *perceptual* judgement that a written spec can only approximate. I have
+    compensated by specifying exact values everywhere and by measuring what can be measured, but the
+    honest position is that this spec's aesthetic outcome is unverified until Rishabh runs it. If
+    anything looks wrong on his first look, the most likely causes in order are: the orb blur radii
+    versus his display, the comet's speed, and the headline's line-height at 112px.
 
 ---
 
@@ -3040,6 +4561,21 @@ look like wow what a website"*, *"im leaving the design upto you i want you to w
 `dee4e1c` and their fixes stand as history but their UI is superseded. The server, the data layer,
 the schemas and the query code are **untouched** by this CR.
 
+**Gate 2 delivered, 2026-08-06.** The `designer`'s output is **F0 → "Design Spec — CR-007"** (§4, F0),
+which supersedes the 2026-08-04 Design Spec, plus amendments to `docs/DESIGN_SYSTEM.md` (new §3.6,
+rewritten §4, new §5.2a/§5.2b/§7.7/§7.8, extended §2.3/§5.3, new §9.2.1). Headline decisions, so they
+are findable without reading the spec:
+
+| Item | Decision |
+|---|---|
+| Landing | **`/` becomes a designed landing surface**; season hub moves to `/seasons/:year`; **new `/season` redirect**. Changes `ARCHITECTURE.md` §5 and `REQUIREMENTS.md` — needs the `principal-engineer`'s ratification |
+| Accent | **"Signal", OkLCh hue 350** — `#D1018A` light / `#FE02A9` dark. Chosen by a 360° scan against 19 reserved colours (§9.2 V-10); every contrast floor passes both themes (V-11) |
+| Background | **`AtmosphereField`** — six layers, no canvas, no WebGL, one 240px SVG noise tile. `DESIGN_SYSTEM.md` §7.7 |
+| Nav | **`CommandDock`** — expanding overlay rail ≥1024px, floating bottom dock below. One `main`, one primary `nav`, skip link at `z-index: 60` |
+| Motion | **23 of G-0…G-24 land in F0.** GSAP core + ScrollTrigger + SplitText + `@gsap/react`; `MotionPathPlugin`, `Flip` and `ScrollSmoother` **not** installed |
+| **Correction to this CR's premise** | "GSAP is cheaper than what it replaces" is **false**, measured: **47.7 KB gzipped vs `framer-motion`'s 40.8 KB**, i.e. **+6.9 KB**. The decision still stands — projected total ≈154 KB against a 250 KB ceiling — but the premise is corrected in `DESIGN_SYSTEM.md` §4.1 rather than repeated |
+| Open for Rishabh | the accent is magenta and **BWT Alpine's 2026 livery is blue and pink** (verified, not assumed). Judged acceptable with reasons; a one-token fallback to hue 0 is specified. See the spec's §13 |
+
 ---
 
 #### CR-002 — `REQUIREMENTS.md` origin-characterisation removal · **Class C** · ⛔ **WITHDRAWN**
@@ -3515,3 +5051,4 @@ the mitigation available.
 | 2026-08-04 | **CR-005 step 4b landed (`c364739`) — all CR-005 document changes are now complete.** `CLAUDE.md` §4.1 tombstoned (§4.2/§4.3 unrenumbered) and its stale §8 status paragraph corrected; the obligation removed from all six agent definitions; `reviewer.md`'s `S-12` row and check section removed with `S-13`/`S-14` untouched and **both range citations annotated**. **`S-12` is retired — no verdict is recorded for it at gate 7**, and the earlier warning that a `reviewer` might raise it is discharged. Resolved by the session holding Rishabh's first-hand instruction, so the `orchestrator`'s channel rule was **satisfied, not waived**. Two lessons recorded as ruling 7: an `S-5` staging check was rescued from inside the removed block, and a **case-sensitive grep missed a carrier — use `-i`** | orchestrator |
 | 2026-08-04 | **Attribution corrected** in `ARCHITECTURE.md` §10 entry 20 and `PLAN.md` §5.5: CR-005 was **decided by Rishabh in session, 2026-08-04**, across two messages. An earlier `orchestrator` ruling had added a hedge calling it relayed-not-first-hand and "not his personal countersignature" — **that was wrong and is reversed**; a relay is the normal path for every instruction and does not weaken attribution. Ruling 5 is kept on the record as withdrawn, with the principle: never hedge an instruction's authority on the grounds it came through the coordinating session; if provenance is unclear, **ask**. The step-4b block is unaffected — it rests on a categorical channel rule about `CLAUDE.md` and agent configuration, not on doubt about who decided | orchestrator |
 | 2026-08-04 | **CR-005** opened (Class C) — **supersedes CR-002.** The upstream-attribution constraint and its check are removed from the gate order, the Definition of Done, the F11 checklist and the F0 evidence list; **forward obligation only, historical record kept verbatim** (Technical Spec §9.5, gate record §G.1, CR-002's history, all past commit messages). §2.4 removed with its number retained as a tombstone; §6 risk row removed; §6.1 A-1 and A-2 closed; T2/T14 acceptance cells amended mid-run and the `developer` notified in flight. `docs/DATABASE.md` **no change**. `REQUIREMENTS.md` / `docs/ARCHITECTURE.md` routed to `principal-engineer`, `docs/DESIGN_SYSTEM.md` to `designer`. **`CLAUDE.md` and `.claude/agents/*.md` ⛔ blocked pending Rishabh's own instruction** — an agent-relayed message cannot authorise editing agent configuration, so `S-12` stays live at gate 7 until he speaks | orchestrator |
+| 2026-08-06 | **CR-007 gate 1 — Technical Spec written** into F0 as the **CR-007 supersession** section (§S.0–§S.9, 8 tasks C7-1…C7-8, 20 tests CT-1…CT-20). Superseding markers placed at F0 Technical Spec §1.1, §2.4, §3.1, §3.5, §6.4, §7, §8. `ARCHITECTURE.md` amended: §2 motion rows, §5 route table (12 routes, `/` → Landing, hub → `/seasons`, **no redirect**), §10 decisions **#21–#24**. **The CR entry's GSAP size claim is corrected** — measured here, core is 27.6 KB gz and core + ScrollTrigger + hook is 45.5 KB gz, not 23/33; projected bundle **≈140 KB gz** without ScrollTrigger (≈157 with), against 250 KB. Background specified as **CSS-composited gradient layers**, zero JS, because an always-running `rAF` loop competes with the §8 chart-interaction budget. Reduced motion made structural at two chokepoints. **Escalated: two new dependencies** (`gsap`, `@gsap/react`). **Reported for their owners:** `DESIGN_SYSTEM.md` §3.5/§4, `CLAUDE.md` lines 12/179, `PLAN.md` §1/§2 and the F0 Design Spec all still say Framer Motion | principal-engineer |
