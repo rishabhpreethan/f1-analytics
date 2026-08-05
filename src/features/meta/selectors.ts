@@ -46,6 +46,64 @@ export function selectDataVintage(meta: Meta): DataVintage | null {
 }
 
 /**
+ * The sentences the coverage popover and the footer echo render (Design Spec §5.1).
+ *
+ * They live here rather than in `DataVintage` for the reason every other string in this
+ * file does: copy assembled inside a component is copy nobody can unit-test, and this is
+ * the surface where a wrong number would be least visible and most damaging. The Design
+ * Spec fixes every one of these strings verbatim.
+ *
+ * It is a separate selector from `selectDataVintage` because the two answer different
+ * questions. The vintage is a fact about **one round**; this is a fact about the
+ * **season's coverage** — and it needs `scheduledRounds`, `cancelledRounds`,
+ * `isComplete` and the season range, none of which are on `DataVintage`.
+ */
+export interface CoverageDetail {
+  /** Trigger accessible name — "…, 10 of 22 rounds complete. Show detail." */
+  triggerName: string;
+  /** Line 1: "Complete results through Round 10 of 22 — Belgian Grand Prix, 19 Jul 2026." */
+  coverageLine: string;
+  /** Line 2, or null when the season is complete. */
+  scheduledLine: string | null;
+  /** Line 3, or null when nothing was cancelled. Trap 12, surfaced rather than hidden. */
+  cancelledLine: string | null;
+  /** Line 4: "Seasons available: 1950–2026." */
+  seasonsLine: string;
+  /** The footer echo, so the same facts are reachable without opening anything. */
+  footerEcho: string;
+}
+
+/** null when the data holds no completed round at all (E6) — as `selectDataVintage`. */
+export function selectCoverageDetail(meta: Meta): CoverageDetail | null {
+  const round = meta.latestCompletedRound;
+  if (round === null) return null;
+
+  const { year, scheduledRounds, completedRounds, cancelledRounds, isComplete } = meta.latestSeason;
+  const { firstYear, latestYear } = meta.seasons;
+
+  const seasons = `${String(firstYear)}–${String(latestYear)}`;
+
+  return {
+    triggerName: `Data coverage: ${String(year)} season, ${String(completedRounds)} of ${String(scheduledRounds)} rounds complete. Show detail.`,
+    coverageLine: `Complete results through Round ${String(round.round)} of ${String(scheduledRounds)} — ${round.roundName}, ${formatIsoDate(round.date)}.`,
+    scheduledLine: isComplete
+      ? null
+      : `Rounds ${String(round.round + 1)}–${String(scheduledRounds)} are scheduled and have no results yet.`,
+    // The Design Spec's sentence is written for the plural, which is the live case (2).
+    // A single cancelled round is grammatically different and the plural form would read
+    // as a defect, so the singular is spelled out rather than approximated.
+    cancelledLine:
+      cancelledRounds === 0
+        ? null
+        : cancelledRounds === 1
+          ? `1 round on the ${String(year)} calendar was cancelled.`
+          : `${String(cancelledRounds)} rounds on the ${String(year)} calendar were cancelled.`,
+    seasonsLine: `Seasons available: ${seasons}.`,
+    footerEcho: `Complete results through ${String(round.year)} Round ${String(round.round)} · Seasons ${seasons}`,
+  };
+}
+
+/**
  * Every season present, newest first. Derived from `firstYear`/`latestYear` rather
  * than from a list, which is safe because the year sequence was verified contiguous —
  * there are no gap years to explain in the UI.

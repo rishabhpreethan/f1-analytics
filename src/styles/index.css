@@ -283,8 +283,11 @@
     width: var(--size-popover-theme);
   }
 
+  /* At the base breakpoint the popover is anchored to the trigger and must not run off
+   * the viewport, so the 320 max-width is clamped to the viewport less the 16 gutter on
+   * each side (§2.2). Both terms come from tokens; no length literal appears here. */
   .popover-coverage {
-    max-width: var(--size-popover-coverage);
+    max-width: min(var(--size-popover-coverage), calc(100vw - (var(--spacing) * 8)));
   }
 
   .option-row {
@@ -441,6 +444,52 @@
   .state-card-tile-neutral {
     background-color: var(--surface-sunken);
     color: var(--ink-tertiary);
+  }
+
+  /* The "database not available" block in `main`: vertically centred in 60vh so the
+   * first thing a contributor sees on a fresh clone is not pinned to the top edge
+   * (Design Spec §7). */
+  .state-block {
+    display: flex;
+    min-height: var(--size-state-block);
+    align-items: center;
+  }
+
+  /* ------------------------------------------------------------- Skeletons §7.5
+   * Built from --surface-sunken blocks at --radius-sm. Geometry is per-site and comes
+   * from a token, never from an inline dimension. The pulse itself is M-7 and is applied
+   * by Framer Motion in LoadingState, because it must stop — not slow — under a
+   * reduced-motion preference.
+   */
+  .skeleton {
+    display: block;
+    background-color: var(--surface-sunken);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Exactly the width of the resolved DataVintage chip, so the header does not reflow
+   * when /api/meta answers (§5.1). */
+  .skeleton-vintage {
+    width: var(--size-skeleton-vintage-w);
+    height: var(--size-skeleton-vintage-h);
+  }
+
+  /* ----------------------------------------------------- DataVintage dot §5.1 / §7.3
+   * Static in every variant. §4.5 forbids this indicator from pulsing or blinking: in a
+   * header, motion reads as an alert.
+   */
+  .vintage-dot {
+    flex: none;
+    width: var(--size-dot);
+    height: var(--size-dot);
+    border-radius: var(--radius-full);
+    background-color: var(--ink-tertiary);
+  }
+
+  /* No error colour: at header scale a red dot reads as a site-wide fault, and the real
+   * failure is already stated in `main`. */
+  .vintage-dot-unavailable {
+    background-color: var(--border-control);
   }
 
   /* Offsets are multiples of Tailwind's own `--spacing` step (§5.1's 4px scale), so

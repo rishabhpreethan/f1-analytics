@@ -2,12 +2,14 @@ import {
   META_CLOSED_COVERAGE,
   META_NO_COMPLETED_ROUND,
   META_REAL,
+  META_SEASON_COMPLETE,
   META_ZERO_SCHEDULED,
 } from '@schemas/meta.fixture';
 import type { Meta } from '@schemas/meta';
 import { describe, expect, it } from 'vitest';
 import {
   isSeasonInCoverage,
+  selectCoverageDetail,
   selectCoverageNotice,
   selectDataVintage,
   selectDefaultSeason,
@@ -43,6 +45,58 @@ describe('selectDataVintage', () => {
 
   it('returns null when nothing has been completed', () => {
     expect(selectDataVintage(META_NO_COMPLETED_ROUND)).toBeNull();
+  });
+});
+
+describe('selectCoverageDetail', () => {
+  it('states coverage of the calendar, verbatim per the Design Spec', () => {
+    const detail = selectCoverageDetail(META_REAL);
+    expect(detail?.triggerName).toBe(
+      'Data coverage: 2026 season, 10 of 22 rounds complete. Show detail.',
+    );
+    expect(detail?.coverageLine).toBe(
+      'Complete results through Round 10 of 22 — Belgian Grand Prix, 19 Jul 2026.',
+    );
+    expect(detail?.scheduledLine).toBe('Rounds 11–22 are scheduled and have no results yet.');
+    expect(detail?.cancelledLine).toBe('2 rounds on the 2026 calendar were cancelled.');
+    expect(detail?.seasonsLine).toBe('Seasons available: 1950–2026.');
+    expect(detail?.footerEcho).toBe('Complete results through 2026 Round 10 · Seasons 1950–2026');
+  });
+
+  it('omits the scheduled and cancelled lines when they do not apply (E7)', () => {
+    const detail = selectCoverageDetail(META_SEASON_COMPLETE);
+    expect(detail?.scheduledLine).toBeNull();
+    expect(detail?.cancelledLine).toBeNull();
+    expect(detail?.coverageLine).toBe(
+      'Complete results through Round 24 of 24 — Abu Dhabi Grand Prix, 7 Dec 2025.',
+    );
+  });
+
+  it('reads grammatically when exactly one round was cancelled', () => {
+    const one: Meta = {
+      ...META_REAL,
+      latestSeason: { ...META_REAL.latestSeason, cancelledRounds: 1 },
+    };
+    expect(selectCoverageDetail(one)?.cancelledLine).toBe(
+      '1 round on the 2026 calendar was cancelled.',
+    );
+  });
+
+  it('returns null when nothing has been completed (E6)', () => {
+    expect(selectCoverageDetail(META_NO_COMPLETED_ROUND)).toBeNull();
+  });
+
+  it('names no origin for the data, in any line', () => {
+    const detail = selectCoverageDetail(META_REAL);
+    expect(detail).not.toBeNull();
+    const prose = Object.values(detail ?? {})
+      .join(' ')
+      .toLowerCase();
+    // The vocabulary is coverage / complete / scheduled / available. A word for a
+    // refresh, an import or a fetch event has no place in it (Design Spec §5.1).
+    for (const banned of ['updated', 'update', 'refresh', 'import', 'fetched', 'sync', 'ago']) {
+      expect(prose).not.toContain(banned);
+    }
   });
 });
 
@@ -134,6 +188,7 @@ describe('purity', () => {
 
     expect(() => {
       selectDataVintage(frozen);
+      selectCoverageDetail(frozen);
       selectSeasonOptions(frozen);
       selectDefaultSeason(frozen);
       isSeasonInCoverage(frozen, 'laps', 1996);

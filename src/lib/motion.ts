@@ -1,4 +1,4 @@
-import type { Transition, Variants } from 'framer-motion';
+import type { TargetAndTransition, Transition, Variants } from 'framer-motion';
 
 /**
  * Motion tokens and the F0 variants, copied from `docs/DESIGN_SYSTEM.md` §4.3–§4.5.
@@ -127,15 +127,15 @@ export const control = {
  * loop. `MotionConfig reducedMotion="user"` does **not** stop an opacity loop, so the
  * caller must branch on `useReducedMotion()` and use `skeletonPulseReduced`.
  */
-export const skeletonPulse = {
+export const skeletonPulse: { animate: TargetAndTransition; transition: Transition } = {
   animate: { opacity: [0.55, 1, 0.55] },
   transition: { duration: 1.2, ease: 'linear', repeat: Infinity },
-} as const;
+};
 
 /** M-7 reduced variant: static, not merely slower. */
-export const skeletonPulseReduced = {
+export const skeletonPulseReduced: { animate: TargetAndTransition } = {
   animate: { opacity: 0.7 },
-} as const;
+};
 
 /**
  * M-8 — skeleton → content crossfade. The container holds its height so nothing
