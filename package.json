@@ -22,10 +22,12 @@
     "db:sql": "sqlite3 -readonly data/f1.db"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@hono/node-server": "^2.1.0",
     "@tanstack/react-query": "^5.101.4",
     "better-sqlite3": "^12.11.1",
     "framer-motion": "^12.43.0",
+    "gsap": "^3.15.0",
     "hono": "^4.13.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

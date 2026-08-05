@@ -40,5 +40,16 @@ export default defineConfig({
     // docblock, which keeps the fast path fast.
     environment: 'node',
     include: ['{src,server}/**/*.test.{ts,tsx}'],
+
+    /*
+     * Vitest replaces every CSS import with an empty string by default, and it does so
+     * even for an explicit `?raw` request. Three test files assert *on the stylesheet
+     * text* — CT-3 (JS and CSS durations cannot drift), CT-9 (nothing but transform and
+     * opacity is animated in the backdrop) and CT-10 (the reduced-motion chokepoint
+     * exists) — so those three files, and only those three, are exempted. `index.css` is
+     * deliberately not listed: processing it would run the whole Tailwind pipeline in
+     * every test run for no assertion.
+     */
+    css: { include: [/tokens\.css/, /motion\.css/, /backdrop\.css/] },
   },
 });

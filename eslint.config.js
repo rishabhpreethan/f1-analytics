@@ -27,6 +27,38 @@ export default tseslint.config(
     },
   },
 
+  // One animation library, and one place it is imported from.
+  //
+  // `src/lib/motion/gsap.ts` is the only registration site (ARCHITECTURE.md §10 #21):
+  // `gsap.registerPlugin` binds a plugin to a core instance, so a second import site is
+  // a second chance to register per mount and to miss the shared defaults. Making that a
+  // lint error rather than a convention is the difference between a rule and a hope.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'gsap',
+              message:
+                'Import from @/lib/motion/gsap — one registration site (ARCHITECTURE §10 #21).',
+            },
+            { name: '@gsap/react', message: 'Import from @/lib/motion/gsap.' },
+          ],
+          patterns: ['gsap/*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/lib/motion/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': 'off',
+    },
+  },
+
   // Client — React rules and browser globals.
   {
     files: ['src/**/*.{ts,tsx}'],

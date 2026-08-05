@@ -99,20 +99,26 @@
   --breakpoint-xl: 90rem; /* 1440 */
 
   /* ---------------------------------------------------------------- durations
-   * §4.3. The same figures are mirrored in src/lib/motion.ts for Framer Motion,
-   * which takes seconds. These are the CSS-side values, used by M-11 and by
-   * :focus-visible-adjacent transitions.
+   * §4.3. The same figures are mirrored in `src/lib/motion/tokens.ts`, which states
+   * them in seconds because that is GSAP's unit. **CT-3 parses this file and asserts
+   * the two agree**, so the CSS and JS halves of the mechanism split (MR-1) cannot
+   * drift apart.
+   *
+   * `dur.pointer` has no entry here on purpose: it is the `gsap.quickTo` catch-up
+   * constant, not a transition duration, so there is no CSS transition it could drive.
    */
   --dur-instant: 80ms;
   --dur-fast: 140ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
   --dur-chart: 400ms;
+  --dur-reveal: 720ms;
 
-  /* Easings are CSS keywords that correspond exactly to Framer Motion's own string
-   * presets (`easeOut`, `easeIn`, `easeInOut`). No cubic-bézier literal exists
-   * anywhere in this product. `ease.mech` ("circOut") has no CSS keyword and has no
-   * CSS use in F0, so it is not defined here. */
+  /* Easings for CSS transitions. They are keywords, never a `cubic-bezier()` literal —
+   * §4.3 forbids one anywhere in this product. GSAP's `power2.*` curves have no exact
+   * CSS keyword, so these are the nearest keyword equivalents and are used only for the
+   * colour/surface transitions of G-22 and G-7; every spatial curve is GSAP's, named
+   * from `MOTION.ease`. */
   --ease-enter: ease-out;
   --ease-exit: ease-in;
   --ease-move: ease-in-out;
