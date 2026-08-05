@@ -1533,6 +1533,56 @@ waterfall for no gain. The boundary is fixed here so F1/F3 do not invent one:
   today's data, fetched by exactly one page in the product. Both figures are already known from the
   vendored files; T13's job is to confirm the built app requests only the `latin` three.
 
+**✅ Measured baseline — recorded by the `developer` at T13, 2026-08-05.** `npm run build` on Node
+v22.23.2, Vite 8.2.0, at commit `dee4e1c` (T12 complete). These are the figures F10 measures against.
+
+| Artefact | Raw | **Gzipped** | Share of the 250 KB budget |
+|---|---|---|---|
+| `dist/assets/index-*.js` — **the initial chunk** | 473.99 kB | **147.46 kB** | **59.0 %** — inside budget, 102.5 kB of headroom |
+| `dist/assets/index-*.css` | 25.56 kB | 5.83 kB | outside the JS budget |
+| `dist/index.html` | 1.42 kB | 0.72 kB | outside the JS budget |
+
+**`framer-motion`'s share: 125.36 kB raw / ~40.8 kB gzipped — 26.5 % of the raw initial chunk and
+~28 % of its gzipped weight.** Obtained from a **measurement-only** build (a throwaway config that
+splits each dependency into its own chunk; not committed, since §6.4 deliberately keeps them in the
+initial chunk). Full composition, isolated-chunk figures:
+
+| Module group | Raw | Gzipped |
+|---|---|---|
+| `react-dom` + `react` | 181.71 kB | 57.16 kB |
+| **`framer-motion`** | **125.36 kB** | **~40.84 kB** |
+| `zod` | 64.59 kB | 17.36 kB |
+| `@tanstack/react-query` | 41.23 kB | 12.68 kB |
+| `react-router` | 35.95 kB | 13.00 kB |
+| this project's own code | 23.78 kB | 7.60 kB |
+| rolldown runtime | 0.90 kB | 0.51 kB |
+
+Two honest caveats about the gzipped column: **gzip is context-dependent**, so a split chunk
+compresses slightly worse than the same bytes inside one chunk — the parts sum to 149.15 kB against
+the real 147.46 kB, a 1.1 % overhead, which is the accuracy of the per-module gzip figures. The raw
+column has no such caveat and is exact. Second, **`zod` and `@tanstack/react-query` entered the
+initial chunk at T12, not before**: until `Header` called `useMeta`, nothing in the render graph
+imported `metaSchema`, so tree-shaking dropped both. A pre-T12 measurement of the same repository is
+therefore not a regression baseline — it was measuring an app with no data path.
+
+**Fonts — ✅ the built app references exactly the six vendored faces from this origin and nothing
+else.** Verified mechanically in the built artefact rather than in a network panel (see the T13
+evidence note below): all six `@font-face` `src` values are root-relative `url(/fonts/*.woff2)`, all
+**six carry their `unicode-range`**, so the three `latin-ext` faces stay off the first-paint path, and
+`dist/index.html` preloads exactly two faces, both `latin`. No font host, no CDN, no absolute URL.
+
+**⛔ The `styleSrcAttr` allowance in §2.4 has NOT been removed, and this is not an omission.** The
+spec permits its removal on **one** kind of evidence — zero CSP violations in the *production-preview
+browser console* — and the `developer` at T13 had no browser automation available in its session, so
+that evidence does not exist yet. What was verified mechanically on the real artefact: `dist/index.html`
+contains **no inline `<style>` block, no inline `<script>` body and no `style=` attribute**, the
+stylesheet is an external `/assets/*.css`, and `<script src="/theme-init.js"></script>` survives the
+build with no `defer`, no `async` and no `type="module"`. That is consistent with the allowance being
+unnecessary — React and Framer Motion both mutate style through the CSSOM, which CSP does not govern —
+but it is **not** the specified evidence, so the allowance stays. **Open item for gate 4 or gate 9:**
+load the production preview, confirm zero violations, then remove `styleSrcAttr` and re-verify **both**
+consoles per the §2.4 table.
+
 ---
 
 ##### 7. Unit test list

@@ -29,3 +29,10 @@ export const RATE_LIMIT = {
 export const META_CACHE_TTL_MS = 300_000;
 
 export const IS_TEST = process.env.NODE_ENV === 'test';
+
+/**
+ * Production serves the built client and the API from one origin (`npm run start`).
+ * Development serves the client from Vite and proxies `/api`, which is the same origin
+ * as far as the browser is concerned — so same-origin holds in both.
+ */
+export const IS_PRODUCTION = process.env.NODE_ENV === 'production';
