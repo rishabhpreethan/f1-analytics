@@ -286,7 +286,10 @@ Implement these **once** in the query layer. Feature code must not re-derive joi
 
 ### 6.1 Recommended views
 
-Create as SQL views (or as the single source-of-truth query builders):
+Created as **`CREATE TEMP VIEW`** at connection bootstrap (`server/views.ts`), because the
+connection is opened read-only. The DDL below is the authority; the code mirrors it verbatim.
+After the views are created the connection latches `PRAGMA query_only = 1`. See
+`ARCHITECTURE.md` §10 #7.
 
 ```sql
 -- v_entry: session_entry flattened to human-meaningful columns.
@@ -458,6 +461,7 @@ lap time inflates beyond a threshold, and **label them inferred** — never as f
 | 12 | `is_cancelled` rounds | Not a data gap; render distinctly |
 | 13 | Future rounds in the current season | Not missing data; render as scheduled |
 | 14 | Undocumented enums (`role`, `eligibility`, `adjustment_type`) | Do not display |
+| 15 | Cancelled rounds have `round.number IS NULL` | All `is_cancelled = 1` rounds (2 rows, both 2026) carry a NULL `number`, so `ORDER BY r.number` sorts them **first** and they are not addressable by round number. Every round-number query needs `AND r.number IS NOT NULL`. A season's numbered-round count is `max(number)`, not `count(*)` — 2026 has 24 `round` rows but 22 numbered rounds. **On the data as it stands the equivalence is exact in both directions** — 0 rounds are cancelled-and-numbered, 0 are uncancelled-and-unnumbered, and `is_cancelled` is non-NULL on all 1,173 rows — so `AND r.number IS NOT NULL` excludes **exactly** the cancelled rounds and a redundant `AND r.is_cancelled = 0` is unnecessary. **Nothing in the schema enforces this**, so verify it after every refresh (§9) before relying on the number filter alone. |
 
 ---
 
@@ -481,3 +485,17 @@ After any database refresh:
 2. Re-verify the coverage tables in §2.3 and §4, and the `status` decode in §3.
 3. Update the row counts in this document and `REQUIREMENTS.md` §2.1.
 4. Confirm the data-vintage indicator (NV-9) reflects the new snapshot.
+5. Re-verify `server/coverage.ts` against §4.
+6. Re-verify **trap 15 in both directions** — a NULL count alone is not enough, because it cannot
+   detect a *numbered* cancelled round appearing, which would silently downgrade
+   `AND r.number IS NOT NULL` from a complete filter to a partial one:
+
+   ```sql
+   SELECT (SELECT count(*) FROM round WHERE is_cancelled = 1 AND number IS NOT NULL) AS cancelled_but_numbered,
+          (SELECT count(*) FROM round WHERE is_cancelled = 0 AND number IS NULL)      AS numbered_gap,
+          (SELECT count(*) FROM round WHERE is_cancelled IS NULL)                     AS cancelled_unknown;
+   ```
+
+   **All three must be 0.** The third is not optional: if `is_cancelled` were ever NULL, the second
+   count would skip those rows and appear to pass. If any is non-zero, every round-number query
+   must add `AND r.is_cancelled = 0` and trap 15's text must be corrected before shipping.
