@@ -7,14 +7,16 @@ import {
   type DockPreference,
 } from '@/components/layout/dockPreference';
 import {
+  INDICATOR_LENGTH,
   computeIndicatorGeometry,
   isActiveNavItem,
+  type IndicatorGeometry,
   type NavItem,
 } from '@/components/layout/navItems';
 import { ICONS } from '@/components/ui/iconRegistry';
 import { MoreHorizontal, Pin, PinOff } from '@/components/ui/icons';
 import { useSpotlight } from '@/lib/motion/interactions';
-import { dockMount, sheetEnter, sheetExit } from '@/lib/motion/surfaces';
+import { dockMount, indicatorTravel, sheetEnter, sheetExit } from '@/lib/motion/surfaces';
 import { useDisclosure } from '@/lib/motion/useDisclosure';
 import { useMotion } from '@/lib/motion/useMotion';
 import { useMediaQuery } from '@/lib/useMediaQuery';
@@ -44,14 +46,34 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
  *
  * Every other motion is as specified: **G-1**'s dock half via `dockMount`, **G-3**'s measured
  * indicator, **G-5**'s sheet, **G-7** and **G-8** on the items.
+ *
+ * **G-1 and G-3 are two `useMotion` calls, on two nodes, and that separation is the fix for a
+ * real defect rather than tidiness.** They shared one hook, and because R-G3 hard-codes
+ * `revertOnUpdate: true`, G-3's dependency array made G-1's 460ms entrance replay on every
+ * navigation and — since `expanded` is in that array — on every `pointerenter` on the rail.
+ * G-1 now has no dependencies at all, and G-3 lives on the indicator element itself, so its
+ * scope is one node and it can re-measure as often as it likes.
  */
 
 /** ≥1024px is the rail. The same figure as `--breakpoint-lg`; see `useMediaQuery` on why
  * this is the one place a breakpoint is also a JavaScript value. */
 const RAIL_QUERY = '(min-width: 64rem)';
 
-/** The indicator is authored at this length and scaled to the active item (G-3). */
-const INDICATOR_BASE = 20;
+/**
+ * Where a dock indicator is travelling **from** and **to**, keyed by the element. Written by
+ * `settle`, which runs first and in both modes; read by `animate`, which runs second and only
+ * when motion is allowed. `from: null` is first paint.
+ *
+ * **A `WeakMap`, not a `useRef`, and for the same reason `POINTER_SETTERS` is one.** This is
+ * written by a motion builder and read by another; a ref written from a builder is exactly the
+ * pattern `react-hooks/refs` refuses, because it cannot prove the builder is not called during
+ * render. Keying on the DOM node has no such ambiguity and holds nothing alive after the node
+ * is collected.
+ *
+ * It cannot be an inline style read back off the element instead: `revertOnUpdate: true`
+ * (R-G3) strips the previous run's inline transform *before* the next run measures.
+ */
+const INDICATOR_TRAVEL = new WeakMap<HTMLElement, { from: number | null; to: number }>();
 
 export interface CommandDockProps {
   items: readonly NavItem[];
@@ -91,27 +113,53 @@ export function CommandDock({ items }: CommandDockProps) {
   const activeIndex = items.findIndex((item) => isActiveNavItem(pathname, item.to));
 
   /**
-   * **G-1's dock half, and G-3's indicator.** Both live here because both depend on the same
-   * measured geometry, and `settle` / `animate` is exactly the split they need: the indicator's
-   * *position* is applied in both modes with a `gsap.set` — under `reduce` it **snaps**, which
-   * §4.6 records as correct and intended — while only the *travel* between positions is a tween.
+   * **G-1's dock half — and it has NO dependency array, deliberately.**
    *
-   * Deps include `expanded` because expanding the rail changes item widths, and `isRail` because
-   * it changes which axis the indicator travels on.
+   * §4.6 specifies G-1 as once per hard load. This and G-3 used to share one `useMotion`, and
+   * because R-G3 hard-codes `revertOnUpdate: true`, every dependency change re-ran `animate` —
+   * so the 460ms entrance replayed on every navigation *and* on every `pointerenter`, because
+   * `expanded` was in the array. With no deps the entrance is built once and never rebuilt.
+   *
+   * `isRail` is therefore read at mount. That is correct for an entrance: the axis a dock
+   * arrived along is not something a later resize can retrospectively change.
    */
   const { scope: navScope } = useMotion<HTMLElement>({
-    settle: ({ q, gsap: g }) => {
-      const geometry = measureIndicator(listScope.current, activeIndex, isRail);
-      if (geometry === null) return;
-      const axis = isRail ? 'y' : 'x';
-      const scaleAxis = isRail ? 'scaleY' : 'scaleX';
-      g.set(q('[data-motion="dock-indicator"]'), {
-        [axis]: geometry.x,
-        [scaleAxis]: geometry.scaleX,
-      });
-    },
     animate: (ctx) => {
       dockMount(ctx, isRail);
+    },
+  });
+
+  /**
+   * **G-3's indicator**, on its own node and its own dependency array — so it re-measures on
+   * every navigation without dragging G-1 along with it.
+   *
+   * `settle` / `animate` is exactly the split G-3 needs: the *position* is applied in both
+   * modes with a `gsap.set`, so under `reduce` the bar **snaps**, which §4.6 records as correct
+   * and intended; only the *travel* between positions is a tween.
+   *
+   * Deps include `expanded` because expanding the rail changes item widths, and `isRail`
+   * because it changes which axis the indicator travels on. A re-measure that lands on the same
+   * offset builds no tween at all, which is what keeps a rail hover from replaying the
+   * flourish.
+   */
+  const { scope: indicatorScope } = useMotion<HTMLLIElement>({
+    settle: ({ root, gsap: g }) => {
+      const geometry = measureIndicator(listScope.current, activeIndex, isRail);
+      // `null` is "leave it alone" — nothing to measure, or a `display: none` slot below
+      // 1024px. Writing zero here would park the bar in the top-left corner.
+      if (geometry === null) return;
+      INDICATOR_TRAVEL.set(root, {
+        from: INDICATOR_TRAVEL.get(root)?.to ?? null,
+        to: geometry.offset,
+      });
+      g.set(root, { [isRail ? 'y' : 'x']: geometry.offset });
+    },
+    animate: (ctx) => {
+      const travel = INDICATOR_TRAVEL.get(ctx.root);
+      // Nothing measured, or a re-measure that landed on the same offset — which is what
+      // every rail hover is, and it must not replay the flourish.
+      if (travel === undefined || travel.from === travel.to) return;
+      indicatorTravel(ctx, travel, isRail);
     },
     deps: [pathname, isRail, expanded, activeIndex],
   });
@@ -194,8 +242,9 @@ export function CommandDock({ items }: CommandDockProps) {
         </li>
 
         {/* G-3. One element that travels, rather than one per item that appears — which is what
-         * makes it read as a single object moving. Positioned by measurement, never by layout. */}
-        <li className="dock-indicator" data-motion="dock-indicator" aria-hidden="true" />
+         * makes it read as a single object moving. Positioned by measurement, never by layout;
+         * a **fixed** 20px (rail) / 16px (bottom dock) long, per Design Spec §5.2 and §5.3. */}
+        <li ref={indicatorScope} className="dock-indicator" aria-hidden="true" />
       </ul>
 
       {/*
@@ -238,14 +287,16 @@ export function CommandDock({ items }: CommandDockProps) {
  * The active item's geometry along the dock's main axis, from `getBoundingClientRect()`.
  *
  * Kept out of the builder so the builder reads as a statement of what moves. Returns `null`
- * when there is nothing to measure — no active item, or a list that has not laid out yet —
- * because `settle` must then leave the indicator alone rather than move it to zero.
+ * when there is nothing to measure — no active item, a list that has not laid out yet, or a
+ * slot that is `display: none` (which is the case on `/teams`, `/circuits` and `/records`
+ * below 1024px, where those three destinations live in the overflow sheet). `settle` must then
+ * leave the indicator alone rather than move it to zero.
  */
 function measureIndicator(
   list: HTMLUListElement | null,
   activeIndex: number,
   isRail: boolean,
-): { x: number; scaleX: number } | null {
+): IndicatorGeometry | null {
   if (list === null || activeIndex < 0) return null;
   const slots = list.querySelectorAll<HTMLElement>('[data-motion="dock-item"]');
   const slot = slots[activeIndex];
@@ -257,6 +308,6 @@ function measureIndicator(
   return computeIndicatorGeometry(
     isRail ? { start: item.top, size: item.height } : { start: item.left, size: item.width },
     { start: isRail ? container.top : container.left },
-    INDICATOR_BASE,
+    isRail ? INDICATOR_LENGTH.rail : INDICATOR_LENGTH.dock,
   );
 }

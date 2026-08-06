@@ -347,18 +347,23 @@
     text-transform: uppercase;
   }
 
-  /* G-3. Authored 20px along the main axis and scaled to the active item, so one element
-   * travels rather than one per item appearing. `transform-origin` is the start edge, which is
-   * what makes `scaleX`/`scaleY` grow from the leading corner rather than from the centre. */
+  /* G-3. **A fixed 2×16px bar at the slot's top edge** (Design Spec §5.3), translated on `x` to
+   * the centre of the active slot — one element that travels rather than one per item that
+   * appears. It is never scaled to the item's width: the Technical Spec's `scaleX` reading
+   * produced a full-slot bar, and §S.3.6 now records the Design Spec as governing.
+   *
+   * `transform-origin` is the centre, because the only scale G-3 applies is the rule's
+   * `0.4 → 1` growth along its own length, which must grow about its middle rather than drag
+   * one end. */
   .dock-indicator {
     position: absolute;
     pointer-events: none;
     background-color: var(--accent-mark);
     top: 0;
     left: 0;
-    width: 20px;
+    width: var(--size-dock-indicator);
     height: var(--size-rule);
-    transform-origin: left top;
+    transform-origin: 50% 50%;
   }
 
   /* The pin row is rail-only. */
@@ -434,10 +439,11 @@
       text-transform: none;
     }
 
+    /* The rail's form: a fixed 2×20px bar at `left: 0`, translated on `y` to the vertical
+     * centre of the active row (Design Spec §5.2). */
     .dock-indicator {
       width: var(--size-rule);
-      height: 20px;
-      transform-origin: left top;
+      height: var(--size-dock-indicator-rail);
     }
 
     .dock-pin-row {

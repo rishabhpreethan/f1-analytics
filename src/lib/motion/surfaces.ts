@@ -67,6 +67,37 @@ export function dockMount<T extends HTMLElement>({ tl, root, q }: Ctx<T>, isRail
 }
 
 /**
+ * **G-3 — the dock indicator's travel.** The half of G-3 that is a *tween*, as opposed to the
+ * half that is a measured `gsap.set`.
+ *
+ * Two tweens at position 0: the bar travels from where it was to where `settle` has already
+ * put it, at `m.indicator` (`dur.slow` / `ease.arrive`), and the 2px rule grows `0.4→1` along
+ * its own length at `dur.fast`. §4.6 G-3 specifies both figures.
+ *
+ * **A `from` tween rather than the `quickTo` §4.6 names, and that is a mechanism deviation
+ * with a reason.** `quickTo` reuses one tween instance across many calls, which is what a
+ * *pointer* setter needs; the indicator moves in response to a React dependency change, and
+ * under R-G3 (`revertOnUpdate: true`) every such change tears the context down and rebuilds
+ * it, so no setter survives to be reused. The remembered previous offset makes the same
+ * motion expressible as `from` — identical duration, identical ease, and authored `from`, so
+ * MR-2 holds: if the tween never runs the bar is already in the right place.
+ *
+ * `travel.from === null` is first paint: there is nowhere to travel from, so only the rule
+ * grows. The caller does not call this at all when the offset has not changed, which is what
+ * stops a rail hover from replaying the flourish.
+ */
+export function indicatorTravel<T extends HTMLElement>(
+  { tl, root }: Ctx<T>,
+  travel: { from: number | null; to: number },
+  isRail: boolean,
+): void {
+  if (travel.from !== null) {
+    tl.from(root, { [isRail ? 'y' : 'x']: travel.from, ...m.indicator }, 0);
+  }
+  tl.from(root, { [isRail ? 'scaleY' : 'scaleX']: 0.4, duration: dur.fast, ease: ease.enter }, 0);
+}
+
+/**
  * **G-12, content half** — the tween vars only, because the target differs at every call
  * site and the builders above all own their own selector. Opacity only, so it is identical
  * under reduced motion by §4.4 rule 1 — and it is still authored `from` (MR-2), so the

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ICONS } from '@/components/ui/iconRegistry';
-import { NAV_ITEMS, computeIndicatorGeometry, isActiveNavItem } from './navItems';
+import { INDICATOR_LENGTH, NAV_ITEMS, computeIndicatorGeometry, isActiveNavItem } from './navItems';
 
 /**
  * CT-11 and CT-12. Both functions fail *quietly* when they fail — a nav item lit on the
@@ -84,43 +84,65 @@ describe('NAV_ITEMS', () => {
 describe('CT-12 — computeIndicatorGeometry', () => {
   const container = { start: 100 };
 
-  it('positions the first and last item correctly', () => {
-    expect(computeIndicatorGeometry({ start: 100, size: 20 }, container, 20)).toEqual({
-      x: 0,
-      scaleX: 1,
+  it('centres a fixed-length bar on the first and last item', () => {
+    // A 48px rail row with a 20px bar: (48 − 20) / 2 = 14px of leading inset.
+    expect(computeIndicatorGeometry({ start: 100, size: 48 }, container, 20)).toEqual({
+      offset: 14,
     });
-    expect(computeIndicatorGeometry({ start: 340, size: 40 }, container, 20)).toEqual({
-      x: 240,
-      scaleX: 2,
+    expect(computeIndicatorGeometry({ start: 340, size: 48 }, container, 20)).toEqual({
+      offset: 254,
     });
+  });
+
+  it('never scales the bar to the item — §S.3.6 resolves that in the Design Spec’s favour', () => {
+    // The regression this exists for: the first implementation returned `scaleX = size / 20`,
+    // which renders a 2×48 bar in a 48px rail row instead of the specified 2×20. Doubling the
+    // item's size must move the bar by exactly half the extra length and change nothing else.
+    const small = computeIndicatorGeometry({ start: 100, size: 40 }, container, 20);
+    const large = computeIndicatorGeometry({ start: 100, size: 80 }, container, 20);
+    expect(small).toEqual({ offset: 10 });
+    expect(large).toEqual({ offset: 30 });
+    expect(Object.keys(large ?? {})).toEqual(['offset']);
   });
 
   it('is unaffected by where the container sits in the viewport', () => {
     // Both rects come from `getBoundingClientRect()`, so both move together when the page
     // is scrolled. The difference is what matters, and it must be scroll-invariant.
-    const unscrolled = computeIndicatorGeometry({ start: 148, size: 20 }, { start: 100 }, 20);
-    const scrolled = computeIndicatorGeometry({ start: -352, size: 20 }, { start: -400 }, 20);
+    const unscrolled = computeIndicatorGeometry({ start: 148, size: 48 }, { start: 100 }, 20);
+    const scrolled = computeIndicatorGeometry({ start: -352, size: 48 }, { start: -400 }, 20);
     expect(scrolled).toEqual(unscrolled);
-    expect(unscrolled).toEqual({ x: 48, scaleX: 1 });
+    expect(unscrolled).toEqual({ offset: 62 });
   });
 
-  it('returns the identity geometry for a degenerate base width, never NaN or Infinity', () => {
-    // `scaleX(Infinity)` renders nothing and logs nothing — the worst kind of failure.
-    for (const baseWidth of [0, -20, Number.NaN, Number.POSITIVE_INFINITY]) {
-      const geometry = computeIndicatorGeometry({ start: 340, size: 40 }, container, baseWidth);
-      expect(geometry, `baseWidth ${String(baseWidth)}`).toEqual({ x: 0, scaleX: 1 });
+  it('returns null for a degenerate indicator length, never NaN or Infinity', () => {
+    // `translateY(NaN)` is ignored silently — the worst kind of failure.
+    for (const length of [0, -20, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(
+        computeIndicatorGeometry({ start: 340, size: 48 }, container, length),
+        `length ${String(length)}`,
+      ).toBeNull();
     }
   });
 
-  it('returns the identity geometry when a rect itself is degenerate', () => {
+  it('returns null for a hidden slot, so the indicator is left alone rather than parked at zero', () => {
+    // Not an edge case: below 1024px the three overflow destinations are `display: none`, so
+    // on `/teams`, `/circuits` and `/records` the active slot measures 0×0. The previous
+    // implementation turned that into `scaleX: 0` and an invisible indicator.
+    expect(computeIndicatorGeometry({ start: 0, size: 0 }, { start: 0 }, 16)).toBeNull();
+    expect(computeIndicatorGeometry({ start: 340, size: 0 }, container, 16)).toBeNull();
+  });
+
+  it('returns null when a rect itself is degenerate', () => {
     // A rect measured before layout can carry NaN. It must not reach a transform.
-    expect(computeIndicatorGeometry({ start: Number.NaN, size: 40 }, container, 20)).toEqual({
-      x: 0,
-      scaleX: 1,
-    });
-    expect(computeIndicatorGeometry({ start: 340, size: Number.NaN }, container, 20)).toEqual({
-      x: 0,
-      scaleX: 1,
-    });
+    expect(computeIndicatorGeometry({ start: Number.NaN, size: 48 }, container, 20)).toBeNull();
+    expect(computeIndicatorGeometry({ start: 340, size: Number.NaN }, container, 20)).toBeNull();
+  });
+});
+
+describe('INDICATOR_LENGTH mirrors the Design Spec, and the stylesheet mirrors it', () => {
+  it('is 20px in the rail and 16px in the bottom dock', () => {
+    // Design Spec §5.2 and §5.3, verbatim. The CSS half of the same pair is checked by
+    // `styles/index.css.test.ts`, which is where the drift would otherwise happen.
+    expect(INDICATOR_LENGTH).toEqual({ rail: 20, dock: 16 });
   });
 });

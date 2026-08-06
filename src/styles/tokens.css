@@ -374,6 +374,14 @@
   --size-dock-item: 3rem; /* 48 — one rail row or one bottom-dock slot */
   --size-dock-sheet-row: 3.5rem; /* 56 — one overflow-sheet row */
   --size-dock-max: 30rem; /* 480 — bottom dock max-width */
+  /* G-3's active-item bar. **px, not rem**, and mirrored by `INDICATOR_LENGTH` in
+   * `navItems.ts`: the bar is centred on the active item by JavaScript arithmetic against
+   * `getBoundingClientRect()`, so a rem length under a non-16px root font size would not
+   * equal the rendered length and the bar would sit off-centre by half the difference.
+   * `index.css.test.ts` proves the two figures agree. Thickness is `--size-rule` in both
+   * orientations. Design Spec §5.2 (2×20 in the rail) and §5.3 (2×16 in the bottom dock). */
+  --size-dock-indicator: 16px;
+  --size-dock-indicator-rail: 20px;
   /* Both 96. `main` reserves this so the dock never covers content and no page needs a
    * bespoke offset. **The rail expands OVER content**, so the reservation is constant
    * whether it is collapsed or expanded — a chart that resized because a user hovered the

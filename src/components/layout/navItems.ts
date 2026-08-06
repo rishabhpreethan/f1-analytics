@@ -6,10 +6,10 @@ import type { IconName } from '@/components/ui/iconRegistry';
  *
  * **Why this is a module and not inline JSX.** Both functions below are the kind that fail
  * quietly. An active-state predicate that uses `startsWith` without a segment boundary
- * lights `Teams` up on `/teamsomething`; an indicator geometry that divides by a zero base
- * width produces `Infinity`, which reaches a `transform` and makes the indicator vanish with
- * no error anywhere. Neither is visible in a screenshot, and there is no E2E gate in this
- * project (CR-006), so a unit test is the only thing that can catch them.
+ * lights `Teams` up on `/teamsomething`; an indicator geometry computed from a `display: none`
+ * slot's all-zero rect reaches a `transform` and makes the indicator vanish with no error
+ * anywhere. Neither is visible in a screenshot, and there is no E2E gate in this project
+ * (CR-006), so a unit test is the only thing that can catch them.
  *
  * Slugs and literal paths only — **never an internal integer id** (trap 11, DL-3).
  */
@@ -67,11 +67,32 @@ export function isActiveNavItem(pathname: string, to: string): boolean {
   return path === to || path.startsWith(`${to}/`);
 }
 
+/**
+ * The indicator's **fixed** length along the dock's main axis, in CSS px.
+ *
+ * Design Spec §5.2 specifies a **2×20px** bar in the rail, vertically centred, and §5.3 a
+ * **2×16px** bar at the top edge of a bottom-dock slot. Both are 2px thick (`--size-rule`);
+ * these are the *lengths*.
+ *
+ * **This resolves a contradiction between the two specs, in the Design Spec's favour** —
+ * recorded in `PLAN.md` §S.3.6. Technical Spec §S.3.6 described the indicator as scaled "to
+ * the active item" against a fixed base width, which the first implementation took literally
+ * and rendered as a full-length 2×48 bar in the rail. On a purely visual matter the Design
+ * Spec governs, so the indicator has a fixed length and only ever **translates**.
+ *
+ * **px, deliberately, and mirrored in `tokens.css` as `--size-dock-indicator*`.** The
+ * centring arithmetic below is done in JavaScript against `getBoundingClientRect()`, so a
+ * `rem` length under a non-16px root font size would not equal the rendered length and the
+ * bar would sit off-centre by half the difference. `index.css.test.ts` proves the two agree.
+ */
+export const INDICATOR_LENGTH = { rail: 20, dock: 16 } as const;
+
 export interface IndicatorGeometry {
-  /** px, along the dock's main axis, relative to the container's leading edge. */
-  x: number;
-  /** Scale applied to an element authored at `baseWidth`. */
-  scaleX: number;
+  /**
+   * px along the dock's main axis, relative to the container's leading edge — the offset
+   * that centres a bar of `indicatorLength` on the active item.
+   */
+  offset: number;
 }
 
 /**
@@ -80,27 +101,31 @@ export interface IndicatorGeometry {
  * The indicator is one element that moves, rather than one per item that appears: that is
  * what makes it read as a single object travelling. Its position therefore cannot come from
  * layout, and must be computed from `getBoundingClientRect()` of the active item and of the
- * container, then applied as a `transform` with `transform-origin` at the start edge.
+ * container, then applied as a `transform`.
  *
  * Pure so it can be tested without a browser, and it takes rectangles rather than elements
  * for the same reason. Both axes use the same function: the caller passes the rects' `x`/
  * `width` for the bottom dock and `y`/`height` for the rail, so there is one piece of
  * arithmetic and not two that can disagree.
  *
- * **Never `NaN`, never `Infinity`.** A non-finite `scaleX` silently removes the indicator
- * from the screen — `transform: scaleX(Infinity)` renders nothing and logs nothing — so a
- * degenerate `baseWidth` returns the identity geometry instead.
+ * **`null` means "leave the indicator where it is", and it is not an edge case** — it is the
+ * common case below 1024px. The three overflow destinations are `display: none` there, so
+ * their slots measure `0 × 0`; on `/teams`, `/circuits` and `/records` the active slot is one
+ * of those, and an all-zero rect previously produced `scaleX: 0` and an invisible indicator.
+ * A non-finite offset returns `null` for the same reason: `transform: translateY(NaN)` is
+ * ignored silently, which is the worst kind of failure.
  */
 export function computeIndicatorGeometry(
   activeRect: { start: number; size: number },
   containerRect: { start: number },
-  baseWidth: number,
-): IndicatorGeometry {
-  if (!Number.isFinite(baseWidth) || baseWidth <= 0) return { x: 0, scaleX: 1 };
+  indicatorLength: number,
+): IndicatorGeometry | null {
+  if (!Number.isFinite(indicatorLength) || indicatorLength <= 0) return null;
+  // A hidden slot measures zero. There is nothing to centre on, and zero is not a position.
+  if (!Number.isFinite(activeRect.size) || activeRect.size <= 0) return null;
 
-  const x = activeRect.start - containerRect.start;
-  const scaleX = activeRect.size / baseWidth;
+  const offset = activeRect.start - containerRect.start + (activeRect.size - indicatorLength) / 2;
 
-  if (!Number.isFinite(x) || !Number.isFinite(scaleX)) return { x: 0, scaleX: 1 };
-  return { x, scaleX };
+  if (!Number.isFinite(offset)) return null;
+  return { offset };
 }
