@@ -39,6 +39,48 @@ describe('G-3 — the indicator length agrees between tokens.css and navItems.ts
   });
 });
 
+describe('§3.4 — the capability card lifts on hover and on focus, and not under `reduce`', () => {
+  /**
+   * The gap this exists for: §3.4 specifies `y: -2` at `m.control` on card hover, it was never
+   * implemented, and nothing failed. A lift is invisible in a diff and, with no visual gate
+   * (CR-006), invisible until someone hovers the card in a browser.
+   *
+   * The lift is a CSS transition rather than a tween because §3.4 requires `:focus-visible` to
+   * get the same states — see the reasoning in `index.css`. So this is where it is provable.
+   */
+  it('declares the distance as a token, at the 2px §3.4 specifies', () => {
+    expect(TOKENS).toMatch(/--size-card-lift:\s*2px;/);
+  });
+
+  it('applies it on hover and on focus-visible alike, from the token', () => {
+    const rule = /\.capability-card:hover,\s*\.capability-card:focus-visible\s*\{([^}]*)\}/.exec(
+      INDEX,
+    );
+    expect(rule, 'the hover/focus rule for .capability-card is missing').not.toBeNull();
+    // One selector list for both states is what makes "a keyboard user is not shown less"
+    // structural rather than a thing two rules have to remember to agree on.
+    expect(rule?.[1]).toContain('transform: translateY(calc(-1 * var(--size-card-lift)))');
+  });
+
+  it('transitions the transform at `m.control` — `dur.fast` and `ease.enter`', () => {
+    // `m.control` is `{ duration: dur.fast, ease: ease.enter }`. A lift on `--ease-move`, the
+    // ease the colour half uses, would be a different curve from the one §3.4 names.
+    expect(INDEX).toContain('transform var(--dur-fast) var(--ease-enter);');
+  });
+
+  it('removes the lift under `prefers-reduced-motion: reduce`, not merely its transition', () => {
+    // §4.6 G-7's reduced column: "token/colour change only — no `y`, no `scale`". The global
+    // chokepoint in `motion.css` sets `transition: none`, which would leave the lift *snapping*
+    // into place. Suppressing the transform is the only thing that satisfies the clause.
+    const block =
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*\.capability-card:hover,\s*\.capability-card:focus-visible\s*\{([^}]*)\}/.exec(
+        INDEX,
+      );
+    expect(block, 'no reduced-motion override for the capability-card lift').not.toBeNull();
+    expect(block?.[1]).toContain('transform: none');
+  });
+});
+
 describe('the coverage ruler’s axis shares its column template with its rows', () => {
   it('drives both from one custom property, and nothing relies on the dead grid-column', () => {
     // The bug this exists for: `.ruler-axis` carried `grid-column: 1 / -1` inside a flex

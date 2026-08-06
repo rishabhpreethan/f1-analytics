@@ -116,11 +116,12 @@ const stagger = {
  * Distances, px. Small on purpose — every entrance here is a settle, not an arrival
  * from off-screen.
  *
- * **Every entry has a call site.** Two did not and are gone: `hairline` (1), which described a
- * card-hover nudge that is a CSS transition and never was a tween; and `spotlight` (220), which
- * duplicated `--size-spotlight` in `tokens.css` — the gradient radius is read by CSS, never by
- * JavaScript, so a second copy here could only ever drift out of agreement with the one that
- * renders.
+ * **Every entry has a call site.** Two did not and are gone: `hairline` (1), which described the
+ * capability card's hover lift — a CSS transition, never a tween, and 1px where Design Spec §3.4
+ * says 2, so it lives as `--size-card-lift` in `tokens.css` beside the rule that applies it; and
+ * `spotlight` (220), which duplicated `--size-spotlight` for the same reason. Both figures are
+ * read by CSS and never by JavaScript, so a copy here could only ever drift out of agreement
+ * with the one that renders.
  */
 const dist = {
   nudge: 6, // shell mount, dock item entrance

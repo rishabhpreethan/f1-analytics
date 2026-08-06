@@ -946,11 +946,27 @@
     --px: 0px;
     --py: 0px;
     --spotlight: 0;
-    /* G-7's non-motion half — the surface and edge step. This is also what a reduced-motion
-     * user gets, because it is a CSS transition rather than a tween. */
+    /*
+     * G-7 on a card: the surface and edge step, **and** the `y` lift of Design Spec §3.4.
+     *
+     * **CSS, not GSAP, and that is a decision.** §3.4 requires `:focus-visible` to get every
+     * non-pointer hover state, "so a keyboard user is not shown less". A GSAP `pointerenter`
+     * tween cannot deliver that: `:focus-visible` is a browser heuristic with no reliable DOM
+     * event, and `useSpotlight` — the one hook already on this element — is additionally gated
+     * to `(pointer: fine)`, so a tween wired beside it would never fire for the keyboard user
+     * the clause exists for. Two further reasons: the arrow's `x: 0→3` half of the *same*
+     * gesture is already a CSS transition, and running the two halves on different clocks is
+     * how a hover comes apart; and GSAP writing `transform` on this element would sit beside
+     * `useSpotlight`'s `--px`/`--py` writes inside one `useGSAP` context, where a revert on a
+     * dependency change strips inline styles mid-hover. Same reasoning as G-4 and G-10.
+     *
+     * The transform uses `--dur-fast`/`--ease-enter` because §3.4 specifies `m.control`, which
+     * is `{ duration: dur.fast, ease: ease.enter }`.
+     */
     transition:
       background-color var(--dur-fast) var(--ease-move),
-      border-color var(--dur-fast) var(--ease-move);
+      border-color var(--dur-fast) var(--ease-move),
+      transform var(--dur-fast) var(--ease-enter);
   }
 
   @media (min-width: 48rem) {
@@ -987,6 +1003,21 @@
   .capability-card:hover,
   .capability-card:focus-visible {
     background-color: var(--surface-overlay);
+    /* §3.4's `y: -2`. Negated from a positive token so the token itself reads as a distance
+     * rather than a direction — the same figure would lift a card up or push it down. */
+    transform: translateY(calc(-1 * var(--size-card-lift)));
+  }
+
+  /* §4.6 G-7's reduced column is explicit: under `reduce` a control gets the "token/colour
+   * change only — no `y`, no `scale`". `motion.css`'s global chokepoint kills the *transition*
+   * but not the transform, so the lift would still snap into place, which is movement without
+   * the softening. The lift is therefore removed outright, exactly as G-4 removes the
+   * hover-to-reveal rail above. The surface and edge steps survive, so the card still responds. */
+  @media (prefers-reduced-motion: reduce) {
+    .capability-card:hover,
+    .capability-card:focus-visible {
+      transform: none;
+    }
   }
 
   .capability-card:hover .capability-edge,
