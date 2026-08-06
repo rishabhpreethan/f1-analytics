@@ -18,6 +18,23 @@ const INDEX = CODE(INDEX_CSS);
 const TOKENS = CODE(TOKENS_CSS);
 
 /**
+ * **Two figures this file cannot derive from its own sources, both measured in Chromium** at
+ * 1440×900 against the built stylesheet, in the pass that diagnosed fault 7. They are constants
+ * here because neither is reachable: `--spacing` is Tailwind's token, and importing
+ * `tailwindcss/theme.css?raw` returns an **empty string** (the Tailwind Vite plugin claims `.css`
+ * imports from the package), while reading it with `node:fs` does not typecheck — the client
+ * project carries no node types, and a client test reaching the filesystem would be the wrong fix
+ * for that.
+ *
+ * Stated limitation: if Tailwind's `--spacing` ever moves off `0.25rem`, `SPACING_UNIT` goes stale
+ * and the budget below is computed against the wrong gap. The *multiplier* is still read from
+ * `index.css`, so only the unit is exposed, and the failure mode is a figure to re-measure rather
+ * than a silent pass — the budget has 1px of slack, so any change to the unit breaks it.
+ */
+const SPACING_UNIT = 4; // Tailwind v4's `--spacing: 0.25rem`; the rail's resolved gap measured 12px
+const SHORTEST_LABEL_WIDTH = 39; // `Home` at --text-base/500. The longest, `Keep menu open`, is 110.44
+
+/**
  * The whole `@media (min-width: 64rem)` rail block, brace-balanced. Module scope, because both
  * the collapsed and the expanded suite below read it — and the pin, which only exists in the rail.
  */
@@ -38,6 +55,20 @@ function railBlock(): string {
 const RAIL = railBlock();
 
 /**
+ * Everything in `index.css` **before** the rail media query — i.e. the rules that also apply to the
+ * bottom dock. An invariant that must hold in both orientations has to be declared here, and a test
+ * that only looked at `RAIL` would pass on a rule that protects one orientation and not the other.
+ */
+const BASE = INDEX.slice(0, INDEX.indexOf(RAIL));
+
+/** A plain `--name: <n>px;` or `--name: <n>rem;` length, resolved to px at the 16px root. */
+function len(css: string, name: string): number {
+  const match = new RegExp(`${name}:\\s*([\\d.]+)(px|rem);`).exec(css);
+  expect(match, `${name} is missing, or is not a plain px/rem length`).not.toBeNull();
+  return Number(match?.[1]) * (match?.[2] === 'rem' ? 16 : 1);
+}
+
+/**
  * The body of one rule inside the rail block, selected by a declaration it must contain. Selecting
  * by name alone is not enough: `.dock-item` appears twice in the rail — once on its own and once
  * grouped with `.dock-slot` — and matching the first is how a test ends up asserting against the
@@ -49,6 +80,19 @@ function railRule(selector: string, contains: string): string {
   const body = bodies.find((candidate) => candidate.includes(contains));
   expect(body, `no \`${selector}\` rule in the rail block declaring \`${contains}\``).toBeDefined();
   return body ?? '';
+}
+
+/**
+ * The grouped `.dock-slot, .dock-item` rule. It needs its own extractor because `railRule` matches
+ * a single selector on one line, and this is the only rule in the rail whose selector list wraps.
+ */
+function groupedSlotItemRule(): string {
+  const match = /\n {4}\.dock-slot,\n {4}\.dock-item \{([^}]*)\}/.exec(RAIL);
+  expect(
+    match,
+    'the grouped `.dock-slot, .dock-item` rule is missing from the rail',
+  ).not.toBeNull();
+  return match?.[1] ?? '';
 }
 
 describe('G-3 — the indicator length agrees between tokens.css and navItems.ts', () => {
@@ -138,27 +182,31 @@ describe('§7.8 — the collapsed rail: the faults Rishabh reported', () => {
      * clipped by the dock's `overflow: hidden` to look edge-to-edge.
      *
      * Two declarations fix it and both are load-bearing: `width: 100%` takes the box off
-     * `max-content`, and `min-width: 0` defeats the base rule's `min-width: --size-dock-item`
-     * (48), which exceeds the 46px lane and would leave a 1px overflow on each side.
+     * `max-content`, and `min-width: 0` defeats the base `min-width: --size-dock-item` (48), which
+     * exceeds the 46px lane. The second one **moved** to the grouped rule — see fault 8 below,
+     * which is the 2px this test could not see because it only looked at the item.
      */
     const item = railRule('.dock-item', 'padding-left');
     expect(item).toContain('width: 100%;');
-    expect(item).toContain('min-width: 0;');
   });
 
-  it('fault 5 — the glyph centre resolves to exactly half the rail, as numbers', () => {
+  it('fault 5 — the glyph centre resolves to half the COLLAPSED rail, as numbers', () => {
     /*
      * The string assertions above prove the *shape* of the arithmetic; this one resolves it. If
      * any term of the lane changes — the rail width, its padding, its border, the glyph — this
      * fails, which is the point: the rail's horizontal centring has now been wrong three times
      * (a 22px literal, then a 48px lane, then a label-sized box) and each time nothing failed.
+     *
+     * **This test's title used to say "half the rail" without qualification, and that was a false
+     * claim about the expanded state** — measured in Chromium, the expanded glyph centre is 32px
+     * from a 232px rail's left edge, i.e. nowhere near its midpoint. The design invariant is that
+     * the centre does not *move* between states (which holds, because `padding-left` derives from
+     * the collapsed lane token); coinciding with the rail's midpoint is a collapsed-only accident.
+     *
+     * It is also **not** the invariant that fault 7 broke. This arithmetic was correct throughout,
+     * and the glyph was invisible anyway — see the fault 7 suite below for the property that
+     * actually failed.
      */
-    const len = (css: string, name: string): number => {
-      const match = new RegExp(`${name}:\\s*([\\d.]+)(px|rem);`).exec(css);
-      expect(match, `${name} is missing, or is not a plain px/rem length`).not.toBeNull();
-      return Number(match?.[1]) * (match?.[2] === 'rem' ? 16 : 1);
-    };
-
     const dock = len(TOKENS, '--size-dock'); // 64 — the collapsed rail's outer width
     const pad = len(TOKENS, '--size-dock-pad'); // 8
     const hairline = len(TOKENS, '--size-dock-hairline'); // 1
@@ -207,6 +255,138 @@ describe('§7.8 — the collapsed rail: the faults Rishabh reported', () => {
     const item = Number(/--size-dock-item:\s*([\d.]+)rem;/.exec(TOKENS)?.[1] ?? '0') * 16;
     expect(dock - pad * 2).toBe(item);
     expect(dock - pad * 2 - hairline * 2).toBe(item - 2);
+  });
+});
+
+/**
+ * **Fault 7 — the collapsed lane must not be able to evict the glyph.**
+ *
+ * Reported 2026-08-06: *"in the collapsed rail, every nav glyph is now invisible."* Fault 5's fix
+ * caused it, and the four tests written alongside that fix all passed while it shipped, because
+ * **they asserted the glyph's centre and not the glyph's existence**. The arithmetic was right and
+ * the outcome was wrong: measured in Chromium at 1440×900 against the built stylesheet, every
+ * collapsed `<svg>` was `width: 0, height: 20`, so the rail painted two empty rounded boxes.
+ *
+ * Sizing the item to its 46px lane created a flex deficit where `max-content` had left none, and
+ * the algorithm resolved it entirely against the glyph: `white-space: nowrap` floors the label's
+ * `min-width: auto` at its full text width so it cannot yield, while an inline `<svg>` with a
+ * `viewBox` and no intrinsic dimensions has a min-content size of **0** and can yield everything.
+ *
+ * These tests therefore assert the property that failed — that what the lane cannot shrink still
+ * fits inside the lane, and that the glyph is the rigid participant — rather than the offsets that
+ * held. They are source-and-arithmetic assertions because jsdom performs no layout; they were
+ * verified to **fail** against `02d6568`'s `index.css` before being committed.
+ */
+describe('§7.8 fault 7 — the collapsed lane cannot evict the glyph', () => {
+  it('gives the glyph `flex: none`, in the BASE block so it holds in both orientations', () => {
+    /*
+     * `flex: none` is the only fix that makes the glyph's size independent of the *label's
+     * content*. Widening the item or shortening the label would leave the glyph's width a function
+     * of how long a destination happens to be called — the same coupling as fault 5.
+     *
+     * It must be in the base block, not the rail: the bottom dock's axis is vertical and has slack
+     * today, and a rule that guarded only the orientation which has already failed is a rule
+     * waiting to fail in the other.
+     */
+    expect(BASE).toMatch(/\.dock-item > svg \{\s*flex: none;\s*\}/);
+  });
+
+  it('couples `white-space: nowrap` to a label that is able to yield the lane', () => {
+    /*
+     * The implication, not the two facts. `white-space: nowrap` is what turns the label's automatic
+     * minimum size into its entire text width; `min-width: 0` is the only thing that unmakes that.
+     * Stated as `nowrap → yields` this stays correct if a later change drops `nowrap` (the hazard
+     * goes with it) and fails the moment `nowrap` returns without the escape valve.
+     */
+    const item = railRule('.dock-item', 'padding-left');
+    const label = railRule('.dock-label', 'font-size: var(--text-base)');
+    const nowrap = item.includes('white-space: nowrap;');
+    const yields = label.includes('min-width: 0;') && label.includes('overflow: hidden;');
+
+    expect(
+      !nowrap || yields,
+      '`white-space: nowrap` on `.dock-item` makes the label unshrinkable, so the rail `.dock-label` ' +
+        'must declare BOTH `min-width: 0` (to unfloor its automatic minimum size) and ' +
+        '`overflow: hidden` (so it truncates rather than overflowing the lane). Without them the ' +
+        'label claims the whole lane and the glyph is squeezed to width 0 — fault 7.',
+    ).toBe(true);
+  });
+
+  it('the collapsed lane budget: everything rigid fits the lane, as numbers', () => {
+    /*
+     * **This is the test that fault 7 would have failed.** It does not measure — jsdom cannot — it
+     * classifies each contributor as rigid or yielding *from the declarations that ship*, and then
+     * checks that the rigid ones fit.
+     *
+     * Against `02d6568`: the glyph was not rigid and the label was, so the rigid total was
+     * 13 + 12 + 39 = 64 against a 46px lane. Today: 13 + 12 + 20 = 45 ≤ 46.
+     */
+    const lane =
+      len(TOKENS, '--size-dock') -
+      len(TOKENS, '--size-dock-hairline') * 2 -
+      len(TOKENS, '--size-dock-pad') * 2;
+    const glyph = len(TOKENS, '--size-dock-glyph');
+    const paddingLeft = (lane - glyph) / 2;
+
+    // The flex `gap`. Its *multiplier* comes from `index.css`, so a change to the rail's own gap is
+    // caught here; only Tailwind's `--spacing` unit is a constant, for the reason recorded at
+    // `SPACING_UNIT`.
+    const item = railRule('.dock-item', 'padding-left');
+    const gapMultiplier = Number(
+      /gap:\s*calc\(var\(--spacing\) \* ([\d.]+)\);/.exec(item)?.[1] ?? NaN,
+    );
+    expect(
+      gapMultiplier,
+      'the rail `.dock-item` gap is not `calc(var(--spacing) * N)`',
+    ).not.toBeNaN();
+    const gap = SPACING_UNIT * gapMultiplier;
+    expect(gap).toBe(12);
+
+    // `gap` and `padding` are never distributed by `flex-shrink`, so they are rigid unconditionally.
+    // The two children are rigid only if the CSS says so.
+    const glyphIsRigid = /\.dock-item > svg \{\s*flex: none;\s*\}/.test(BASE);
+    const labelYields = railRule('.dock-label', 'font-size: var(--text-base)').includes(
+      'min-width: 0;',
+    );
+
+    const rigid =
+      paddingLeft + gap + (glyphIsRigid ? glyph : 0) + (labelYields ? 0 : SHORTEST_LABEL_WIDTH);
+
+    expect(
+      rigid,
+      `the collapsed lane is ${lane}px and its unshrinkable content is ${rigid}px. Whatever cannot ` +
+        'shrink is what a flex deficit destroys instead — fault 7 destroyed the glyph.',
+    ).toBeLessThanOrEqual(lane);
+
+    // …and the glyph specifically must be the rigid one. A lane that balanced by making the *label*
+    // rigid and the glyph flexible is exactly what shipped, and it satisfies no requirement.
+    expect(glyphIsRigid, 'the glyph must be the rigid participant in the lane, not the label').toBe(
+      true,
+    );
+    expect(rigid).toBe(45);
+  });
+
+  it('fault 8 — nothing in the rail lane keeps a min-width wider than the lane', () => {
+    /*
+     * Found while measuring fault 7 and never reported, because it is 2px. `min-width: 0` was on
+     * `.dock-item` only, and the item is `width: 100%` of the **slot** — whose base
+     * `min-width: --size-dock-item` (48) still applied. Measured: the item resolved to 48 and ran
+     * x = 25…73 while the rail's content box ends at 71, so 2px of the active pill's right edge was
+     * clipped by `overflow: hidden`, and the pill was 2px wider than `.dock-pin` (a plain `div`
+     * child, never subject to the slot's floor, and correctly 46).
+     *
+     * The glyph centre was unaffected, which is why every centring test passed.
+     */
+    const grouped = groupedSlotItemRule();
+    expect(grouped).toContain('min-width: 0;');
+
+    // The floor being reset, stated as the inequality that makes the reset necessary.
+    const lane =
+      len(TOKENS, '--size-dock') -
+      len(TOKENS, '--size-dock-hairline') * 2 -
+      len(TOKENS, '--size-dock-pad') * 2;
+    expect(len(TOKENS, '--size-dock-item')).toBeGreaterThan(lane);
+    expect(BASE).toContain('min-width: var(--size-dock-item);');
   });
 });
 

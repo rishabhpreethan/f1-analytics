@@ -88,9 +88,14 @@ npm run validate:palette # whenever colour moves
 
 **F0 is built and unpushed** on `feat/foundation`: server, `/api/meta`, data layer, 12 routes, landing
 page, `CommandDock`, theme, GSAP motion. **281 tests.** The background replacement, the coverage chip's
-legibility, the capability-card hover and both rounds of the rail's formatting are all landed.
-Outstanding: nothing from Rishabh's run of the CR-007 build. Not yet seen by him: the rail's second
-round (header clearance, glyph lane, pin affordance) — see `DESIGN_SYSTEM.md` §7.8.0 faults 4–6.
+legibility, the capability-card hover and all three rounds of the rail's formatting are landed.
+Outstanding: nothing from Rishabh's run of the CR-007 build. Not yet seen by him: the rail's **third**
+round — `flex: none` on the glyph, after the second round's lane sizing squeezed every collapsed glyph
+to `width: 0` and blanked the rail. `DESIGN_SYSTEM.md` §7.8.0 faults 7–8.
+
+**A screenshot of the collapsed rail at ≥1024px is the check worth asking for.** Fault 7 was invisible
+to the whole test suite and visible instantly in a screenshot, and its predecessor was reasoned about
+correctly and still regressed.
 
 ## 7. Changes
 
@@ -108,3 +113,6 @@ Decisions worth remembering, with their reasoning archived:
 | ~~Accent is magenta~~ **Accent is monochrome** | Superseded 2026-08-06 at Rishabh's request — *"no purple accent, i want the accent to be a color of white/black"*. It is now the pole of the neutral scale: `#08090C` light / `#FFFFFF` dark, and the whole `--signal-*` hue-350 ramp is deleted from the product. Emphasis is carried by inversion, absolute contrast, weight and motion, which measure 3.6–5.5× more separation than the magenta they replace (`DESIGN_SYSTEM.md` §3.6, §9.2.2 V-18). The magenta derivation is kept in §9 V-10…V-17 for the record only. |
 | Background is CSS-composited | No canvas, no WebGL — the main thread must stay free for F2's charts. |
 | The rail starts **below** the header | Not at the viewport top, and not fixed by a z-index swap. It expands to 248px over content, so a full-height rail with a padded header would lose the wordmark every time it opened; `top: calc(--size-header + --size-dock-inset)` is the only geometry that holds at every rail width. `DESIGN_SYSTEM.md` §7.8.3. |
+| A glyph is **never** a flexible box | `flex: none` on `.dock-item > svg`. An inline `<svg>` with a `viewBox` has a min-content size of **0**, so it absorbs an entire flex deficit and paints nothing — while a `nowrap` label beside it cannot shrink at all. Sizing a container to a lane creates exactly that deficit, which is how the second rail round blanked the collapsed rail. `DESIGN_SYSTEM.md` §7.8.1. |
+| Assert budgets, not offsets | Fault 5's four tests asserted the glyph's centre arithmetic and passed while the glyph was invisible. A test must assert what a change could **destroy**, not only what it positions. `DESIGN_SYSTEM.md` §7.8.0. |
+| The rail's pin clips below ~530px of viewport height — **accepted** | Rishabh's call, 2026-08-06. 1024×768 is the floor we support and it is fine there; a scrollbar inside the glass is worse than a clipped optional control at a viewport height nobody uses. `DESIGN_SYSTEM.md` §7.8.4. |

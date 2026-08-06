@@ -22,6 +22,10 @@ playwright-report/
 test-results/
 blob-report/
 .playwright/
+# Playwright MCP's session output — screenshots, page snapshots, console logs. Written whenever
+# Rishabh drives the built UI to review it. Prettier's default ignore path includes .gitignore, so
+# listing it here is also what keeps `format:check` from failing on a `.yml` snapshot nobody authored.
+.playwright-mcp/
 
 # misc
 *.log

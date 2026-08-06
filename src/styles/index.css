@@ -313,6 +313,23 @@
    *      the lane is now a single token (`--size-dock-lane`) with the whole subtraction in it.
    *   6. **The pin read as an empty box rather than a control**; see `.dock-pin`.
    *
+   * **Amended a third time 2026-08-06** — *"in the collapsed rail, every nav glyph is now
+   * invisible"*. Fault 5's fix was a regression: sizing the item to the lane created a deficit
+   * inside a box that had none before, and the flex algorithm resolved it by collapsing the glyph
+   * to **width 0** rather than by clipping the label. Diagnosed by measuring the built stylesheet
+   * in Chromium at 1440×900, not from the intent:
+   *
+   *   7. **The collapsed glyph laid out at zero width**; the full mechanism is at `.dock-item >
+   *      svg` in the base block, and its second half at the rail's `.dock-label`.
+   *   8. **The slot kept a 48px floor inside a 46px lane**, so the active pill was 2px overwide
+   *      and clipped, and 2px wider than the pin; see the grouped `.dock-slot, .dock-item` rule.
+   *
+   * **Accepted limitation, Rishabh's decision 2026-08-06.** Below roughly 530px of viewport
+   * height the rail's content exceeds its box and `.dock-pin-row` is clipped by the
+   * `overflow: hidden` below. It is not fixed and no machinery is added for it: 1024×768 is the
+   * supported floor and the pin is fully visible there, and a scrollbar inside the glass is a
+   * worse outcome than a clipped control at a viewport height nobody uses.
+   *
    * **The expansion is now driven by CSS `:hover` / `:focus-within`, not by React state**, and
    * that is a deliberate removal of a mechanism rather than a style preference. The previous
    * build expanded on a `data-expanded` attribute written from three pieces of React state.
@@ -423,6 +440,44 @@
   .dock-item-active:hover {
     background-color: var(--accent-fill-hover);
     color: var(--accent-on);
+  }
+
+  /*
+   * **The glyph is never a flexible box.** Fault 7, reported 2026-08-06 — *"in the collapsed rail,
+   * every nav glyph is now invisible"* — and it was a regression introduced by fault 5's own fix.
+   *
+   * Measured in Chromium against the built stylesheet at 1440×900, not reasoned about: collapsed,
+   * every destination's `<svg>` laid out at **width 0, height 20**, and the label kept its full
+   * text width (39px for `Home`, 110.44px for `Keep menu open`). The rail therefore painted two
+   * empty rounded boxes — the inverted active pill and the pin compartment — and nothing else,
+   * because an `<svg>` root has a UA `overflow: hidden`, so a zero-width viewport paints none of
+   * its geometry. Before fault 5's fix the glyphs were merely misplaced; after it they were gone.
+   *
+   * The mechanism, from the resolved box model rather than from the intent:
+   *
+   *   - the collapsed item's content box is the lane less its own `padding-left` — 46 − 13 = 33px;
+   *   - its two children want 20 (glyph) + 12 (gap) + 39…110 (label) = 71…142px;
+   *   - both children carry the default `flex-shrink: 1`, so the ~40…110px deficit is distributed;
+   *   - the label **cannot absorb any of it**: `white-space: nowrap` on `.dock-item` makes the
+   *     label's min-content size its entire text width, and `min-width: auto` floors a flex item
+   *     there. It freezes at its full width and drops out of the distribution;
+   *   - so the whole deficit lands on the glyph, whose automatic minimum size is **0** — an inline
+   *     `<svg>` with a `viewBox` and no intrinsic dimensions has a min-content size of zero, and
+   *     `min-width: auto` resolves to `min(specified, content)` = `min(20px, 0)`.
+   *
+   * `flex: none` removes the glyph from the distribution altogether, which is the only fix that
+   * makes the glyph's size independent of the label's *content*. Sizing the label differently
+   * would leave the glyph's width a function of how long a destination happens to be called —
+   * which is the same class of coupling as fault 5, and fault 5 is what produced this.
+   *
+   * It is a structural selector and deliberately not a `.dock-glyph` class: the invariant belongs
+   * to the lane, so it must hold for any glyph a later change drops into a dock item, including
+   * one whose author never reads this comment. It applies in the bottom dock too, where the axis
+   * is vertical and there is currently slack — a rule that only held in the orientation that has
+   * already failed would be a rule waiting to fail in the other.
+   */
+  .dock-item > svg {
+    flex: none;
   }
 
   /*
@@ -563,10 +618,26 @@
       display: none;
     }
 
+    /*
+     * `min-width: 0` belongs on **both**, and it was on only one — fault 8, found while measuring
+     * fault 7 and never reported, because it is 2px.
+     *
+     * The base `.dock-slot` and base `.dock-item` each declare `min-width: var(--size-dock-item)`
+     * (48), which is 2px wider than the 46px lane. Fault 5's fix reset it on the item only, and
+     * the item is `width: 100%` of the *slot* — so the slot stayed at 48, the item resolved to 48,
+     * and the measured pill ran x = 25…73 while the rail's content box ends at 71. Two pixels of
+     * the active pill's right edge were clipped by the dock's `overflow: hidden`, which is why the
+     * pill looked flush to the rail's inner edge rather than inset, and why it was 2px wider than
+     * `.dock-pin` — a plain `div` child, so never subject to the slot's floor, and correctly 46.
+     *
+     * The glyph's centre was unaffected (`padding-left` derives from the lane token, not from the
+     * box), which is exactly why nothing caught it: the centring tests all passed.
+     */
     .dock-slot,
     .dock-item {
       height: var(--size-dock-item);
       flex: none;
+      min-width: 0;
     }
 
     .dock-item {
@@ -588,20 +659,28 @@
        * destination glyph at x ≈ 105 while `.dock-pin` (which does set `width: 100%`) sat
        * correctly at 49, so the pin never lined up with the menu above it.
        *
-       * `width: 100%` + `min-width: 0` (the base rule's `min-width: --size-dock-item`, 48, is
-       * larger than the 46px lane and would reintroduce a 1px overflow) makes the box exactly the
-       * lane, in both states.
+       * `width: 100%` takes the box off `max-content` and makes it exactly the lane in both
+       * states. It needs `min-width: 0` to do so, which now lives on the grouped
+       * `.dock-slot, .dock-item` rule above, because it was needed on the slot as well — fault 8.
        *
-       * **The glyph's centre then sits at exactly half the rail's width in both states** — the
-       * single most noticeable detail if it is got wrong, because a glyph that shifts as the rail
-       * expands makes the whole panel look like it is sliding. Centring a `--size-dock-glyph`
-       * (20) in `--size-dock-lane` (46) is (46 − 20) / 2 = 13, which puts the centre at
-       * 16 + 1 + 8 + 13 + 10 = 48 = the rail's own centre. The lane is 46 and not 48 because
-       * `border-box` takes the dock's two 1px borders out of `--size-dock` as well; the previous
-       * rule subtracted only the padding and was 1px right even before the label sizing.
+       * **The glyph's centre then sits at a constant 32px from the rail's left edge in both
+       * states** — the single most noticeable detail if it is got wrong, because a glyph that
+       * shifts as the rail expands makes the whole panel look like it is sliding. Centring a
+       * `--size-dock-glyph` (20) in `--size-dock-lane` (46) is (46 − 20) / 2 = 13, which puts the
+       * centre at 16 + 1 + 8 + 13 + 10 = 48 in viewport coordinates. It does not move on expansion
+       * because `padding-left` derives from the *collapsed* lane token, not from the box.
+       *
+       * **A correction to what this comment used to claim**, which measurement disproved: it said
+       * the centre sits at "exactly half the rail's width in **both** states". It does not — that
+       * is true only collapsed, where the rail is `--size-dock` (64) wide and 32 is half of it.
+       * Expanded the rail is 232 wide and the glyph stays at 32, i.e. deliberately *not* centred.
+       * The invariant is constancy, and the coincidence with the rail's midpoint is collapsed-only.
+       *
+       * The lane is 46 and not 48 because `border-box` takes the dock's two 1px borders out of
+       * `--size-dock` as well; the previous rule subtracted only the padding and was 1px right
+       * even before the label sizing.
        */
       width: 100%;
-      min-width: 0;
       padding-left: calc((var(--size-dock-lane) - var(--size-dock-glyph)) / 2);
       gap: calc(var(--spacing) * 3);
       border-radius: var(--radius-md);
@@ -619,6 +698,20 @@
      *
      * Collapsing carries **no** delay — `transition-delay: 0` on the closed state — because a
      * staggered *disappearance* reads as lag rather than as sequence.
+     *
+     * **`min-width: 0` and `overflow: hidden` are the second half of fault 7's fix and are not
+     * cosmetic.** `flex: none` on the glyph is what guarantees the glyph 20px; these two are what
+     * stop the label from *needing* the rest of the lane in the first place. Without them the
+     * label's automatic minimum size is its full text width (`white-space: nowrap` on the item),
+     * so a 110px `Keep menu open` overflows a 46px lane by 77px and survives only because
+     * `opacity: 0` paints nothing and the dock clips it — i.e. the layout is wrong and the result
+     * merely looks right, which is precisely the reasoning that shipped fault 7. With them the
+     * lane is self-consistent: 13 (padding) + 20 (glyph) + 12 (gap) = 45 ≤ 46, and the label takes
+     * the 1px that is left and clips itself.
+     *
+     * It also fixes the failure *direction* for a future long label: it truncates rather than
+     * evicting the glyph. `overflow: hidden` is safe vertically here because the label's box is a
+     * 20px line box around 14px text, with ample room for descenders.
      */
     .dock-label {
       font-size: var(--text-base);
@@ -626,6 +719,8 @@
       letter-spacing: normal;
       font-weight: 500;
       text-transform: none;
+      min-width: 0;
+      overflow: hidden;
       transition:
         opacity var(--dur-fast) var(--ease-enter),
         transform var(--dur-fast) var(--ease-enter);

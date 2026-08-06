@@ -3,7 +3,10 @@
 **Status: FOUNDATIONS COMPLETE (F0), REVISED BY CR-007, THEN BY THE MONOCHROME SWITCH OF
 2026-08-06.** Owned by the `designer`.
 
-> ### ⚠ 2026-08-06 — five changes Rishabh asked for, and what each one moved
+> ### ⚠ 2026-08-06 — seven changes Rishabh asked for, and what each one moved
+>
+> _The count was "five" against six rows before this revision: the "menu bar is still broken" row was
+> appended without updating it. Seven rows, seven changes._
 >
 > | His words | What changed | Sections |
 > |---|---|---|
@@ -11,6 +14,7 @@
 > | *"i didnt like the moving background … i want the application to feel alive"* | **`AtmosphereField` rebuilt.** The three gradient orbs, the 48px grid and the contrast plate are gone. A two-pitch dot lattice, a **pointer lamp** that lights the dots under the cursor, a vignette and a solved **luminance corridor** replace them | **§7.7** (rewritten), **§4.6 G-18…G-21**, **§9.2.2 V-21** |
 > | *"the sidebar, its broken … when its closed and when its open both"* | **The rail is full-height with stated offsets, icon-only when collapsed, and expanded by CSS `:hover` / `:focus-within` rather than by React state.** Three defects fixed, one of them a glyph-centring arithmetic error that had been documented as correct | **§7.8**, **§4.6 G-4** |
 > | *"the menu bar is still broken … please fix that side bar, its really broken"* | **Three more, all of them consequences of the full-height geometry above.** The rail started 16px from the viewport top — inside the header band — and hid the wordmark, so its `top` is now derived from `--size-header`; every collapsed glyph sat at an x set by the length of its own `opacity: 0` label, so a rail item now fills `--size-dock-lane` (**46**, not 48 — `border-box` eats the dock's own borders too); and the pin gained a resting ring so it reads as a control rather than an empty box | **§7.8.0 faults 4–6**, **§7.8.1**, **§7.8.3** (new), **§5.3** tokens |
+> | *"in the collapsed rail, every nav glyph is now invisible"* | **A regression from the row above, and the most instructive entry in this table.** Fault 5's fix sized the rail item to its 46px lane, which created a flex deficit the previous `max-content` box had never had — and the deficit landed entirely on the glyph, because a nowrap label cannot shrink below its text width while an inline `<svg>` can shrink to **zero**. Measured in Chromium: `width: 0, height: 20` on every collapsed glyph. Fixed by `flex: none` on `.dock-item > svg` plus `min-width: 0` / `overflow: hidden` on the label, and **the tests changed shape**: they now assert the lane's *budget* — what cannot shrink must fit — rather than the glyph's offset, which was correct the whole time | **§7.8.0 faults 7–8**, **§7.8.1**, **§7.8.2**, **§7.8.4** (new) |
 > | *"the button up here: 2026 … i dont really know what its for"* | **`DataVintage` states its purpose visibly** — a label, a completeness meter, a control boundary and a disclosure chevron | **§7.3** |
 > | *"even the hover effects for these cards … i dont really like them either"* | **`CapabilityCard`'s four polite effects replaced by two committed ones**: a perspective tilt toward the pointer with real elevation, and a perimeter traced in one stroke. G-8's pointer spotlight is **retired from the product** | **§4.6 G-7 / G-25 / G-26**, **§3.5.2** |
 
@@ -1391,12 +1395,20 @@ Rishabh: *"the sidebar, its broken the way its layout is isnt great"* — and ea
 closed and when its open both"*. Then, after the rebuild: *"the menu bar is still broken … please
 fix that side bar, its really broken."*
 
-**Faults 4–6 are all consequences of the full-height geometry fault 3 introduced**, which is worth
-stating plainly: fixing a geometry moved the rail into two collisions the old accidental position had
-been hiding. Faults 1–3 were found by reading the CSS; 4–6 were found by reading a screenshot of the
-built shell, which is the only way any of them could have been found — jsdom performs no layout, so
-every one of them is invisible to a unit test until it is expressed as arithmetic over the tokens.
-That is what the assertions in `index.css.test.ts` now do for each.
+**Faults 4–6 are all consequences of the full-height geometry fault 3 introduced, and fault 7 is a
+consequence of fault 5's fix.** That progression is the point of recording all eight: each fix moved
+the rail into a collision the previous accident had been hiding. Faults 1–3 were found by reading the
+CSS; 4–6 by reading a screenshot of the built shell; **7 and 8 by measuring the resolved box model in
+Chromium against the built stylesheet** — because 7's own predecessor was diagnosed correctly from
+intent and still regressed. jsdom performs no layout, so none of these is visible to a unit test until
+it is expressed as arithmetic over the tokens, which is what `index.css.test.ts` now does for each.
+
+**The lesson fault 7 carries, and it is a general one.** The four tests written for fault 5 asserted
+the glyph's *centre* and passed while the glyph was invisible: the arithmetic was right and the
+outcome was wrong. **Assert what a change could destroy, not only what it positions.** The invariant
+now under test is that the collapsed lane's *unshrinkable* content fits the lane, and that the glyph
+is the rigid participant — a budget, not an offset. Against the regressed stylesheet it reports
+`the collapsed lane is 46px and its unshrinkable content is 64px`.
 
 | Fault | Diagnosis | Fix |
 |---|---|---|
@@ -1407,6 +1419,8 @@ That is what the assertions in `index.css.test.ts` now do for each.
 | **4. The rail painted over the header and hid the wordmark** — collapsed, the header read "ANALYTICS" with the `F1` badge buried under the active pill; expanded, the wordmark was gone entirely | **Definite, and a direct consequence of fault 3's fix.** `top: --size-dock-inset` puts the rail 16px from the viewport's top, i.e. *inside* the 56px header band, at `--z-dock` (40) over `--z-header` (30). The previous content-height box escaped this only by accident, because it happened to start at ~235px | **`top: calc(--size-header + --size-dock-inset)`** — the rail begins one inset below the header band and the header keeps its full width with the wordmark at the far left. See §7.8.3 for the alternative resolution and why it cannot hold |
 | **5. Every collapsed glyph sat at a different x, set by the length of its own hidden label** — and the active pill was ~100px wide inside a 64px rail, clipped to look edge-to-edge with no inset. Reported as *"the active pill's glyph looks a few px right of the other icons' column"* | **Definite, and it made fault 2's fix inoperative.** `.dock-slot` is `justify-content: center` and `.dock-item` was `flex: none`, so the item's width was `max-content` = padding + glyph + gap + **label**. A collapsed label is `opacity: 0`, which paints nothing and **lays out fully**, so each item was as wide as its own text, overflowed the 46px lane, and was then centred in it: a different negative left offset per destination. `Home` sat furthest right, `Compare` and `Records` furthest left. Two silent consequences: expanded, every destination glyph sat at x ≈ 105 while `.dock-pin` (which does set `width: 100%`) sat correctly at 49, so the pin never lined up with the menu above it; and the G-3 indicator at x = 21 was *underneath* the overflowing pill, i.e. `--accent-mark` on `--accent-fill` — invisible, exactly the failure §7.8.1 claims putting it outside the pill prevents | **`width: 100%` + `min-width: 0`** on the rail item, and the centring divisor becomes **`--size-dock-lane` (46), not 48**: `border-box` takes the dock's two 1px borders out of `--size-dock` as well as its padding, so the previous divisor was 2px too wide and 1px off even before the label sizing. `min-width: 0` is load-bearing — the base rule's `min-width: --size-dock-item` (48) exceeds the lane and would leave a 1px overflow each side |
 | **6. Collapsed, the pin read as an almost-empty rounded box** rather than a control | Contrast is **not** the cause, and raising the ink would have been the wrong fix: `--ink-secondary` over the glass composite is ~8.6:1 dark / ~7.4:1 light. What the compartment lacks is ink **area** — a 20px glyph at `stroke-width: 1.5` is ~60px² of mark in a 46 × 48 box, below a divider, with no label and nothing else near it | **The box becomes the affordance:** a resting `--border-subtle` hairline ring, so the target has an edge without adding a second loud object to the rail. `box-shadow: inset`, never `border` — a border is drawn *inside* the box under `border-box` and would push the glyph 1px off the lane the seven destinations share |
+| **7. Collapsed, EVERY nav glyph was invisible** — the rail painted two empty rounded boxes, the active pill and the pin compartment, and nothing else. Reported as *"a regression, and it is the state Rishabh sees on load"* | **Fault 5's fix caused it.** Sizing the item to its 46px lane created a flex deficit where `max-content` had left none, and the algorithm resolved the whole deficit against the glyph. Measured in Chromium at 1440×900 against the built stylesheet: every collapsed `<svg>` was **`width: 0, height: 20`**, and an `<svg>` root carries a UA `overflow: hidden`, so a zero-width viewport paints none of its geometry. The distribution is forced: the collapsed item's content box is 46 − 13 = **33px** and its children want 20 + 12 + 39…110; `white-space: nowrap` floors the label's `min-width: auto` at its **entire text width** so it cannot yield, while an inline `<svg>` with a `viewBox` and no intrinsic dimensions has a min-content size of **0** and yields everything | **`flex: none` on the glyph**, declared as `.dock-item > svg` in the **base** block. It is the only fix that makes the glyph's size independent of the *label's content* — widening the item or shortening a label would leave the glyph a function of how long a destination happens to be called, which is fault 5's coupling again. Its second half is `min-width: 0` + `overflow: hidden` on the rail label, so the lane is genuinely self-consistent (13 + 20 + 12 = **45 ≤ 46**) rather than merely looking right because `opacity: 0` paints nothing over a clipped overflow |
+| **8. The slot kept a 48px floor inside a 46px lane** — the active pill was 2px overwide, its right edge clipped, and 2px wider than the pin below it | **Found while measuring fault 7, never reported, because it is 2px.** Fault 5 put `min-width: 0` on `.dock-item` only, and the item is `width: 100%` of the **slot**, whose base `min-width: --size-dock-item` (48) still applied. Measured: the item resolved to **48** and ran x = 25…73 while the rail's content box ends at 71. `.dock-pin` is a plain `div` child, never subject to the slot's floor, and was correctly 46 — so the pill and the pin compartment were never the same width | **`min-width: 0` on the grouped `.dock-slot, .dock-item` rule**, i.e. on both. Both measure 46 now, and the pill's 9px inset is symmetric. **The glyph centre was unaffected** — `padding-left` derives from the lane *token*, not from the box — which is exactly why every centring assertion passed |
 
 #### 7.8.1 The design-system-level rules
 
@@ -1432,9 +1446,25 @@ That is what the assertions in `index.css.test.ts` now do for each.
   well. The rail's horizontal centring has now been wrong three times — a 22px literal, then a 48px
   divisor, then a box the hidden label was silently sizing — so the whole subtraction lives in one
   token and `index.css.test.ts` resolves it to a number.
-- **A rail item fills its lane**: `width: 100%` and `min-width: 0`. Never `max-content`, because a
-  collapsed label is `opacity: 0` — it paints nothing and lays out fully, so a `max-content` item is
-  as wide as its own text (§7.8.0 fault 5).
+- **A rail item fills its lane**: `width: 100%`, and `min-width: 0` on **both the item and its slot**
+  (the item is `width: 100%` *of the slot*, so resetting one without the other leaves the base 48px
+  floor in force — §7.8.0 fault 8). Never `max-content`, because a collapsed label is `opacity: 0` —
+  it paints nothing and lays out fully, so a `max-content` item is as wide as its own text (fault 5).
+- **A glyph is never a flexible box: `flex: none` on `.dock-item > svg`, in the base block.** This is
+  a system-level rule, not a rail patch. Sizing a container to a lane creates a flex deficit, and the
+  deficit lands on whichever child *can* yield — which for an inline `<svg>` with a `viewBox` is its
+  entire width, because its min-content size is 0 and `min-width: auto` therefore floors it at 0. A
+  glyph squeezed to `width: 0` paints nothing at all (`<svg>` has a UA `overflow: hidden`) and throws
+  no error. It is a structural selector rather than a `.dock-glyph` class deliberately: the invariant
+  belongs to the lane, so it must hold for any glyph a later change drops in, including one whose
+  author never reads this section.
+- **Anything in a lane that carries `white-space: nowrap` must be able to yield it.** `nowrap` makes
+  an element's automatic minimum size its full text width, so a nowrap label in a 46px lane is
+  unshrinkable at 39–110px and evicts everything else. The rail label therefore declares
+  `min-width: 0` **and** `overflow: hidden` — the second so a future long label *truncates* rather
+  than pushing the glyph out. Relying on `opacity: 0` and the container's `overflow: hidden` to hide
+  the overflow is not sufficient: that leaves the layout wrong and merely looking right, which is
+  precisely the reasoning that shipped fault 7.
 - **Active item:** an **inverted pill** — `--accent-fill` with `--accent-on` type, 19.91:1 — plus
   `aria-current="page"`, plus the 2px `--accent-mark` indicator (G-3). It was an `--accent-wash`
   pill; a wash is not enough emphasis for "where you are" once hue is gone (§3.6.4). It also solves
@@ -1466,9 +1496,11 @@ That is what the assertions in `index.css.test.ts` now do for each.
 | label x | `−--size-dock-label-shift` (−6px) | 0 | `--dock-label-x`, same duration and ease |
 | label reveal order | — | staggered | `transition-delay: calc(var(--dock-index) * var(--stagger-dock-label))` — **18ms**, so 7 labels × 18 + 140 = **266ms**, inside §4.2's 400ms ceiling. `stagger.nav`'s 35ms would reach 490 and break it |
 | label collapse order | simultaneous | — | `transition-delay: 0ms` on the collapsed state. **A staggered disappearance reads as lag rather than as sequence**, so only the reveal staggers |
-| glyph position | centre **32px from the rail's own left edge** — x = 48 in viewport coordinates, at the rail's 16px inset | identical | **unchanged, deliberately.** A glyph that shifts as the rail expands makes the whole panel look like it is sliding — the single most noticeable detail if it is got wrong. It held only for `.dock-pin` until fault 5 was fixed; the seven destinations moved with their label lengths |
-| item width | `--size-dock-lane` (46) | the expanded lane (214) | `width: 100%` + `min-width: 0`. **Never `max-content`** — see §7.8.0 fault 5 |
-| item gap / padding | `padding-left` **13px**, `gap` 12px | identical | nothing about the item's box changes except its width; the glyph's offset within it does not |
+| glyph position | centre **32px from the rail's own left edge** — x = 48 in viewport coordinates, at the rail's 16px inset | identical, 32px — **measured at x = 432 on a rail at x = 400** | **unchanged, deliberately.** A glyph that shifts as the rail expands makes the whole panel look like it is sliding — the single most noticeable detail if it is got wrong. It held only for `.dock-pin` until fault 5 was fixed. **The invariant is constancy, not centredness:** 32 is half of the collapsed rail's 64 and that coincidence is collapsed-only — expanded, the rail is 232 wide and the glyph is deliberately nowhere near its midpoint. This table and two code comments previously claimed "half the rail's width in both states", which measurement disproved |
+| glyph size | **20 × 20, laid out** — not merely positioned | identical | `flex: none` on `.dock-item > svg`. Between `02d6568` and the fault 7 fix this measured **0 × 20** and the whole rail was blank; the position was right throughout |
+| item width | `--size-dock-lane` (46) | the expanded lane (214) | `width: 100%` + `min-width: 0` **on the slot as well** (fault 8). **Never `max-content`** — see fault 5 |
+| item gap / padding | `padding-left` **13px**, `gap` 12px | identical | nothing about the item's box changes except its width; the glyph's offset within it does not. 13 + 20 + 12 = **45 ≤ 46**, so the collapsed lane closes with 1px of slack |
+| label width | **1px, clipped** (`min-width: 0` + `overflow: hidden`) at `opacity: 0` | its text width, 39–110px | the label is the lane's *yielding* participant, by design. It must never be the rigid one — fault 7 |
 
 **Every open-state value routes through a custom property**, and that is the mechanism rather than a
 style: G-4's reduced variant is "permanently expanded, pin hidden", and with the open state written
@@ -1501,6 +1533,19 @@ The rail stays above the header in the stacking order (`tokens.css.test.ts` stil
 `--z-skip` > `--z-dock`); it simply no longer reaches it. `index.css.test.ts` pins the derivation from
 `--size-header`, because a token drifting — a taller header — is now the only way this can break, and
 nothing else would notice.
+
+#### 7.8.4 Accepted limitation — the pin clips below ~530px of viewport height
+
+**Rishabh's decision, 2026-08-06: leave it.** The rail is full-height between the header and the
+viewport's foot, and its contents are a fixed 7 × 48 of destinations plus a 48px pin compartment with
+its divider and padding. Below roughly 530px of viewport height that content exceeds the box and
+`.dock-pin-row` is clipped by the rail's `overflow: hidden`.
+
+No machinery is added for it, and the reasoning is recorded so it is not re-raised as a finding:
+**1024 × 768 is the supported floor and the pin is fully visible there**, and a scrollbar inside the
+glass — the obvious alternative — is a worse outcome than a clipped preference control at a viewport
+height nobody uses. The pin is also the only *optional* control in the rail: every destination it
+could displace stays reachable, and the preference it toggles has a persisted default.
 
 ---
 
