@@ -283,10 +283,11 @@
     align-items: center;
     height: 100%;
     padding: calc(var(--spacing) * 1);
-    /* G-8's spotlight coordinates. Declared here, not in the tween, so the resting state is a
-     * spotlight of zero strength at the element's origin — never a flash at 0,0 on first move. */
-    --px: 50%;
-    --py: 50%;
+    /* G-8's spotlight coordinates. **`px`, and the unit is load-bearing** — see the note on
+     * `.capability-card`. `--spotlight: 0` is what prevents a flash before the first
+     * `pointermove`; the coordinates only have to carry the right unit. */
+    --px: 0px;
+    --py: 0px;
     --spotlight: 0;
   }
 
@@ -930,12 +931,23 @@
     background-color: var(--surface-raised);
     border: 1px solid var(--border-subtle);
     box-shadow: var(--elev-1-shadow);
-    /* G-8's spotlight coordinates rest at the centre with zero strength, so the first
-     * `pointermove` cannot produce a flash at the card's origin. */
-    --px: 50%;
-    --py: 50%;
+    /*
+     * G-8's spotlight coordinates. **The `px` unit here is load-bearing, and `%` was a defect.**
+     * GSAP's CSSPlugin reads the *current* value of a custom property to learn its unit and
+     * appends that unit to an end value that has none. `useSpotlight` writes element-relative
+     * **pixels** from `getBoundingClientRect()`, so with a resting `50%` a pointer at the centre
+     * of a 400px card produced `--px: 200%` — 800px, outside the card — and the highlight never
+     * appeared under the cursor at all. Verified both ways in jsdom: rest `50%` → GSAP writes
+     * `123%`; rest `0px` → `123px`. `interactions.test.ts` keeps that assertion live.
+     *
+     * Nothing is lost. The flash-at-the-origin the `50%` was justified by is prevented by
+     * `--spotlight: 0`, which is the opacity the gradient is painted at.
+     */
+    --px: 0px;
+    --py: 0px;
     --spotlight: 0;
-    /* G-7's non-motion half. The `y` lift is GSAP's; this is what a reduced-motion user gets. */
+    /* G-7's non-motion half — the surface and edge step. This is also what a reduced-motion
+     * user gets, because it is a CSS transition rather than a tween. */
     transition:
       background-color var(--dur-fast) var(--ease-move),
       border-color var(--dur-fast) var(--ease-move);

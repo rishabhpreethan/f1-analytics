@@ -78,6 +78,12 @@ export interface SpotlightMotion<T extends HTMLElement> {
  * as a `::before` layer under the content. The component never writes a duration, an ease or a
  * colour — it asks for the behaviour and attaches two handlers.
  *
+ * ⚠ **The resting values in `index.css` must be declared in `px`, not `%`.** GSAP's CSSPlugin
+ * reads the property's current value to learn its unit and appends that unit to an end value
+ * that has none — so with a resting `50%` the pixel figures written below rendered as
+ * percentages and the highlight landed off the element entirely. `index.css.test.ts` asserts
+ * the declaration and `interactions.test.ts` asserts the rendered value.
+ *
  * Three properties that are decisions:
  *
  *   - **`quickTo`, not `gsap.to` per event.** `quickTo` reuses one tween instance and is
