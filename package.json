@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "validate:palette": "node scripts/validate-palette.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:sql": "sqlite3 -readonly data/f1.db"

@@ -63,6 +63,6 @@ describe('an unknown address', () => {
     expect(mains[0]?.getAttribute('id')).toBe('main');
 
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toBeDefined();
-    expect(screen.getByRole('link', { name: 'Go to the current season' })).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Go to the home page' })).toBeDefined();
   });
 });

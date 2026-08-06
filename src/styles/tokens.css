@@ -73,6 +73,22 @@
   --text-display-xl--letter-spacing: -0.02em;
   --text-display-xl--font-weight: 700;
 
+  /* CR-007 (§2.3). The two largest steps exist because the rejected build topped out at
+   * 44px and nothing on screen was big enough to be a moment. **They are reserved for one
+   * element** — the landing headline — and are not available to any other surface without
+   * a design-system amendment. The headline switches between xl / 2xl / 3xl at the §5.3
+   * breakpoints: discrete steps, never `clamp()` and never a `vw` unit, because those
+   * produce sizes that are not on the scale. */
+  --text-display-2xl: 5rem; /* 80 */
+  --text-display-2xl--line-height: 4.5rem; /* 72 */
+  --text-display-2xl--letter-spacing: -0.025em;
+  --text-display-2xl--font-weight: 700;
+
+  --text-display-3xl: 7rem; /* 112 */
+  --text-display-3xl--line-height: 6rem; /* 96 */
+  --text-display-3xl--letter-spacing: -0.032em;
+  --text-display-3xl--font-weight: 700;
+
   /* §2.1 sets the wordmark at --display-xs but with its own tracking, which is the one
    * place a display step is not used exactly as the scale defines it. */
   --tracking-wordmark: 0.02em;
@@ -90,6 +106,9 @@
   --radius-lg: 8px;
   --radius-xl: 12px;
   --radius-full: 9999px;
+  /* CR-007 — the only radius above 12, reserved for the two floating chrome elements (the
+   * dock rail and the dock's overflow sheet) so they read as objects rather than panels. */
+  --radius-2xl: 20px;
 
   /* ---------------------------------------------------------------- breakpoints
    * §5.3 — design and verification breakpoints are 390 / 768 / 1440.
@@ -164,6 +183,20 @@
   --color-status-caution-wash: var(--status-caution-wash);
   --color-status-critical-ink: var(--status-critical-ink);
   --color-status-critical-wash: var(--status-critical-wash);
+
+  /* CR-007 — the interface accent, as Tailwind utilities. The **semantic aliases only**:
+   * §3.6.2 is explicit that a component consumes an alias and never a raw `--signal-*`
+   * step, and there is no utility for a raw step so that cannot be done by accident. */
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-ink-strong: var(--accent-ink-strong);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-fill-hover: var(--accent-fill-hover);
+  --color-accent-on: var(--accent-on);
+  --color-accent-mark: var(--accent-mark);
+  --color-accent-border: var(--accent-border);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-wash-ink: var(--accent-wash-ink);
+  --color-accent-glow: var(--accent-glow);
 }
 
 /*
@@ -203,11 +236,96 @@
   --elev-2-shadow: 0 8px 24px rgb(0 0 0 / 0.1);
   --elev-2-border: var(--border-subtle);
 
-  /* ⚠ NOT IN THE DESIGN SYSTEM. M-4 specifies a scrim that animates `opacity 0→1`
-   * behind the mobile nav sheet, but §3.5 and §5.4 define no scrim colour. This is the
-   * minimal achromatic choice that keeps the rule achromatic (§1.1) and is **flagged for
-   * the `designer` at gate 4** rather than treated as settled. */
-  --scrim: rgb(0 0 0 / 0.4);
+  /* Specified by CR-007 (Design Spec §5.3), which closes the open item the previous build
+   * correctly flagged: §3.5 and §5.4 defined no scrim colour, so this token used to be a
+   * developer's guess. It is now design's, and it stays achromatic (§1.1). */
+  --scrim: rgb(0 0 0 / 0.44);
+
+  /* ---------------------------------------------------------------- the accent, light
+   * §3.6.3. Every figure below was measured by `scripts/validate-palette.mjs`
+   * (§9.2.1 V-11) — 5.14 / 4.84 / 4.55:1 for `--accent-ink` on raised / canvas / sunken
+   * against a floor of 4.5, and 3.62 / 3.41 / 3.20 for `--accent-mark` against 3.0.
+   *
+   * `--accent-wash` gets its **own ink**: `--accent-ink` on the wash measures 4.25:1, which
+   * FAILS, and `--accent-wash-ink` at 6.33:1 is the fix (V-11a). This is the same ink/wash
+   * pattern §3.4.1 already uses for the timing colours.
+   */
+  --accent-ink: var(--signal-600);
+  --accent-ink-strong: var(--signal-700);
+  --accent-fill: var(--signal-600);
+  --accent-fill-hover: var(--signal-700);
+  --accent-on: #ffffff;
+  --accent-mark: var(--signal-500);
+  --accent-border: var(--signal-500);
+  --accent-wash: var(--signal-100);
+  --accent-wash-ink: var(--signal-700);
+  --accent-glow: var(--signal-500);
+  /* Decorative 1px accent rules — the eyebrow rule, a card's top edge. No contrast floor
+   * applies, which is exactly why it is a separate token from `--accent-mark`: a component
+   * cannot reach for the decorative value where a measured one is required. */
+  --accent-hairline: rgb(209 1 138 / 0.28);
+
+  /* ---------------------------------------------------------------- glass, light — §5.2b
+   * The header and the dock are translucent so the atmosphere is visible moving behind
+   * them. Measured over the worst-case composite (canvas + orb + grain + glass): the
+   * result is `#FCF5FB` and every token still clears its floor — `--ink-tertiary` 4.83:1,
+   * `--accent-ink` 4.80:1 (§9.2.1 V-12). The `@supports` fallback in index.css is
+   * **mandatory**: an unblurred 72% white over a moving field is unreadable.
+   */
+  --surface-glass: rgb(255 255 255 / 0.72);
+  --glass-blur: blur(12px) saturate(118%);
+
+  /* ---------------------------------------------------- atmosphere, light — §7.7 layer 1–5 */
+  --bg-grid-line: rgb(27 30 36 / 0.05);
+  --bg-orb-neutral: #b9bcc3;
+  --bg-orb-alpha: 0.09;
+  --bg-orb-neutral-alpha: 0.28;
+  --bg-grain-opacity: 0.02;
+  /* The `calm` value. `[data-bg="hero"]` lowers it to 0.86 in backdrop.css — the default is
+   * the quieter one, so a route that never sets the attribute still gets a legible field.
+   * **This is not decoration**: unplated, `--border-control` measures 2.64:1 and
+   * `--ink-tertiary` 4.00:1 over the orb-tinted field, both below their floors (V-13).
+   * Lowering the orb opacity does not fix it; the plate does (V-17). */
+  --bg-plate-alpha: 0.92;
+}
+
+/*
+ * The Signal ramp — §3.6.2. **Theme-independent**, so it is declared once: the semantic
+ * aliases above choose *which* step each theme uses, and the steps themselves do not move.
+ * Generated in OkLCh at hue 350 with chroma taken to the sRGB gamut boundary at each
+ * lightness. Hue 350 was chosen by scanning all 360° against 19 reserved colours (§9.2.1
+ * V-10) — it is the only surviving band, and inside it 350 gives the largest separation
+ * from Ferrari (ΔE 26.0).
+ *
+ * **A component never consumes a raw step.** Use an `--accent-*` alias (§3.6.3).
+ */
+:root {
+  --signal-50: #fef1f7;
+  --signal-100: #ffe2ee;
+  --signal-200: #ffc4de;
+  --signal-300: #ff98ca;
+  --signal-400: #ff61b7;
+  --signal-500: #fe02a9; /* the hi-vis step: marks, borders, glow, dark-mode fill */
+  --signal-600: #d1018a; /* light-mode ink and fill */
+  --signal-700: #a2006a; /* light-mode hover and wash ink */
+  --signal-800: #700148;
+  --signal-850: #570036; /* dark-mode wash */
+  --signal-900: #270016;
+}
+
+/*
+ * Layering — §5.2a. **One scale, and nothing off it.** A fixed animated background makes
+ * stacking order load-bearing: the atmosphere must sit under everything, and the skip link
+ * must sit over the dock or a keyboard user cannot see it at ≥1024px. These are the only
+ * permitted values, and `index.css` consumes them so no component writes a z-index.
+ */
+:root {
+  --z-atmosphere: 0;
+  --z-content: 1;
+  --z-header: 30;
+  --z-dock: 40;
+  --z-overlay: 50;
+  --z-skip: 60;
 }
 
 /*
@@ -243,6 +361,33 @@
 
   --size-skeleton-vintage-w: 5.75rem; /* 92 — same width as the resolved chip */
   --size-skeleton-vintage-h: 1.25rem; /* 20 */
+
+  /* ------------------------------------------------- chrome geometry — CR-007, §5.3
+   * Fixed dimensions, named here so they are not invented in a component. They are
+   * deliberately **not** on §5.1's permitted spacing subset, which is precisely why they
+   * are tokens: §5.1 restricts spacing utilities, not named dimensions.
+   */
+  --size-dock: 4rem; /* 64 — rail width collapsed AND bottom-dock height, the same
+                      * number on purpose, so the two orientations feel like one object */
+  --size-dock-open: 14.5rem; /* 232 — rail width expanded (G-4) */
+  --size-dock-inset: 1rem; /* 16 — gap to the viewport edge, every breakpoint */
+  --size-dock-item: 3rem; /* 48 — one rail row or one bottom-dock slot */
+  --size-dock-sheet-row: 3.5rem; /* 56 — one overflow-sheet row */
+  --size-dock-max: 30rem; /* 480 — bottom dock max-width */
+  /* Both 96. `main` reserves this so the dock never covers content and no page needs a
+   * bespoke offset. **The rail expands OVER content**, so the reservation is constant
+   * whether it is collapsed or expanded — a chart that resized because a user hovered the
+   * nav would be a defect, and that is the whole reason the design chose an overlay rail
+   * rather than a push sidebar (§5.3). */
+  --size-dock-clearance: 6rem; /* 96 — bottom padding on `main` below 1024 */
+  --size-rail-clearance: 6rem; /* 96 — left padding on `main` at ≥1024 */
+
+  --size-grid-cell: 48px; /* the atmosphere grid cell (§7.7 layer 1) — px, because the
+                           * loop's 48px translation must match it exactly or the tile
+                           * seams become visible */
+  --size-hero-min: 40rem; /* 640 — minimum hero height, so a short landscape viewport
+                           * does not crush the headline */
+  --size-progress: 2px; /* the scroll progress bar (G-14) */
 }
 
 [data-theme='dark'] {
@@ -279,7 +424,39 @@
   --elev-2-border: var(--border-strong);
 
   /* Deeper in dark mode for the same reason overlays carry the only dark shadow: the
-   * canvas is already near-black, so a light scrim would not read. See the light-mode
-   * note — this token is flagged for the `designer`. */
-  --scrim: rgb(0 0 0 / 0.6);
+   * canvas is already near-black, so a light scrim would not read. */
+  --scrim: rgb(0 0 0 / 0.62);
+
+  /* ---------------------------------------------------------------- the accent, dark
+   * §3.6.3, and **designed rather than inverted** (§3.5). The vivid `--signal-500` step
+   * only reaches 3.62:1 on white, which is why light mode uses the deeper `--signal-600`
+   * for ink and fill and dark mode does not: on dark surfaces `--signal-500` measures
+   * 4.71 / 5.29 / 5.50:1 (§9.2.1 V-11). The ink **on** the fill flips from white to
+   * near-black for the same reason — 5.29:1 rather than an unreadable pale-on-vivid.
+   */
+  --accent-ink: var(--signal-500);
+  --accent-ink-strong: var(--signal-400);
+  --accent-fill: var(--signal-500);
+  --accent-fill-hover: var(--signal-400);
+  --accent-on: #0e0f13;
+  --accent-mark: var(--signal-500); /* one value, both themes — §3.6.3 */
+  --accent-border: var(--signal-500);
+  /* `--signal-850`, not a darker step: `#46002B` fails its ink at 4.47:1 and `#370021`
+   * passes the ink but is only 1.04:1 against `--surface-raised`, i.e. not a visible field
+   * at all. 850 clears both — 1.18:1 vs raised and 7.27:1 with its ink (V-11b). */
+  --accent-wash: var(--signal-850);
+  --accent-wash-ink: var(--signal-300);
+  --accent-glow: var(--signal-500);
+  --accent-hairline: rgb(254 2 169 / 0.34);
+
+  /* glass, dark — §5.2b. Composite measures `#261A27`; ink-tertiary 4.75:1. */
+  --surface-glass: rgb(26 28 32 / 0.68);
+
+  /* atmosphere, dark — §7.7. The orbs and the grain are both stronger here, because dark
+   * mode is where the depth reads: a 0.09 orb on near-black is invisible. */
+  --bg-grid-line: rgb(245 247 249 / 0.055);
+  --bg-orb-neutral: #2f3237;
+  --bg-orb-alpha: 0.17;
+  --bg-orb-neutral-alpha: 0.6;
+  --bg-grain-opacity: 0.038;
 }

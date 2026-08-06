@@ -1,0 +1,334 @@
+/*
+ * `AtmosphereField` — the moving background (`DESIGN_SYSTEM.md` §7.7, Technical Spec §S.3.5).
+ *
+ * **Technology: CSS-composited gradient layers. Zero JavaScript.** Canvas 2D, WebGL and
+ * animated filters were all rejected, with the reasoning in `ARCHITECTURE.md` §10 #24. The
+ * short version: this thing runs for the entire session, and a `requestAnimationFrame`
+ * callback that never stops competes with the §8 "<100 ms chart interaction" budget on the
+ * same thread that runs React and, from F2, the charts. A CSS animation on `transform` and
+ * `opacity` is handed to the compositor and costs the main thread nothing at steady state.
+ *
+ * That is also MR-1, which is binding beyond this file: **looping motion is CSS `@keyframes`;
+ * one-shot and interaction motion is GSAP. There is no third mechanism.** G-18, G-19 and
+ * G-20 are therefore authored here rather than as the `repeat: -1` tweens §4.6 describes;
+ * G-21 (pointer parallax) is a one-shot response to input and stays GSAP's.
+ *
+ * **Every resting state below is the authored composition** (MR-2). Each `@keyframes` starts
+ * at `transform: none`, so the reduced-motion chokepoint in `motion.css` leaves a *composed
+ * still image* rather than an arbitrary frame or a blank page — which §7.7.3 requires
+ * explicitly: reduced *motion*, not reduced *design*.
+ *
+ * Not in a Tailwind `@layer`, for the same reason `motion.css` is not: these rules must not
+ * be overridable from a component.
+ */
+
+/* ------------------------------------------------------------------ the container
+ * `contain: strict` so nothing here can affect layout or paint outside itself, and so the
+ * browser may skip it entirely when off-screen. `aria-hidden` and `role="presentation"` are
+ * on the element in `AtmosphereField.tsx`; `pointer-events: none` is here because it is a
+ * property of the layer, not of the component.
+ */
+.atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-atmosphere);
+  pointer-events: none;
+  contain: strict;
+  overflow: hidden;
+  background-color: var(--surface-canvas);
+}
+
+/* A moving background is meaningless on paper and expensive to render. */
+@media print {
+  .atmosphere {
+    display: none;
+  }
+}
+
+.atmosphere-layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ------------------------------------------------------------------ layer 1 — the grid
+ * A 48px cell in both axes. The element is sized `calc(100% + 96px)` and offset by one cell
+ * in each direction, so the drift below has somewhere to travel; the mask fades it out
+ * toward the bottom and the corners so it never reads as a wireframe.
+ *
+ * The loop translates by **exactly one cell**, which is why `--size-grid-cell` is declared in
+ * px rather than rem: a rem cell under a non-16px root font size would not equal the
+ * translation, and the seam would become visible on every cycle.
+ */
+.atmosphere-grid {
+  inset: calc(-1 * var(--size-grid-cell)) auto auto calc(-1 * var(--size-grid-cell));
+  width: calc(100% + var(--size-grid-cell) * 2);
+  height: calc(100% + var(--size-grid-cell) * 2);
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      var(--bg-grid-line) 0,
+      var(--bg-grid-line) 1px,
+      transparent 1px,
+      transparent var(--size-grid-cell)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--bg-grid-line) 0,
+      var(--bg-grid-line) 1px,
+      transparent 1px,
+      transparent var(--size-grid-cell)
+    );
+  mask-image: radial-gradient(130% 100% at 50% 0%, #000 0%, #000 42%, transparent 88%);
+  will-change: transform;
+  animation: atmosphere-grid-drift var(--anim-grid) linear infinite;
+}
+
+/* G-18. 48px per 24s cycle → 2 px/s. Seamless because the translation is exactly one cell,
+ * so no `yoyo` is needed and the loop has no visible seam. */
+@keyframes atmosphere-grid-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--size-grid-cell), var(--size-grid-cell), 0);
+  }
+}
+
+/* ------------------------------------------------------------------ layer 2 — the orbs
+ * Three blurred radial gradients. The blur is **static** — it is rasterised once and the
+ * compositor reuses the texture as the layer is transformed — which is the distinction §S.3.5
+ * draws when it forbids an *animated* `filter`. §7.7.4 records why it is safe here: these
+ * elements have no text and no children, so the blur can never force a text repaint.
+ *
+ * `will-change: transform` is on this layer and on the grid **only**, never on the grain or
+ * the plate, which do not move.
+ */
+.atmosphere-orbs {
+  will-change: transform;
+}
+
+.atmosphere-orb {
+  position: absolute;
+  border-radius: var(--radius-full);
+  opacity: var(--bg-orb-alpha);
+}
+
+.atmosphere-orb-a {
+  width: 720px;
+  height: 720px;
+  top: -180px;
+  right: -140px;
+  background: radial-gradient(circle at 50% 50%, var(--accent-glow) 0%, transparent 70%);
+  filter: blur(80px);
+  animation: atmosphere-orb-a var(--anim-orb-a) ease-in-out infinite alternate;
+}
+
+.atmosphere-orb-b {
+  width: 560px;
+  height: 560px;
+  top: 34%;
+  left: -160px;
+  background: radial-gradient(circle at 50% 50%, var(--accent-glow) 0%, transparent 70%);
+  filter: blur(100px);
+  /* The negative delay desynchronises the three so the field never pulses in unison — which
+   * is the difference between "alive" and "breathing at you". */
+  animation: atmosphere-orb-b var(--anim-orb-b) ease-in-out -6s infinite alternate;
+}
+
+.atmosphere-orb-c {
+  width: 480px;
+  height: 480px;
+  top: 62%;
+  right: 18%;
+  background: radial-gradient(circle at 50% 50%, var(--bg-orb-neutral) 0%, transparent 70%);
+  filter: blur(90px);
+  opacity: var(--bg-orb-neutral-alpha);
+  animation: atmosphere-orb-c var(--anim-orb-c) ease-in-out -11s infinite alternate;
+}
+
+/* G-19 — `sine.inOut`'s CSS equivalent is `ease-in-out`, the one easing permitted in a yoyo
+ * loop (§4.3 `ease.drift`). Each starts at `none`, so the resting composition is the
+ * authored anchor arrangement. */
+@keyframes atmosphere-orb-a {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-64px, 44px, 0);
+  }
+}
+
+@keyframes atmosphere-orb-b {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(88px, -56px, 0);
+  }
+}
+
+@keyframes atmosphere-orb-c {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-40px, -72px, 0);
+  }
+}
+
+/* ------------------------------------------------------------- layer 3 — the racing line
+ * One open path reading as a circuit sector, with a comet running a lap along it. Rendered
+ * **only** under `data-bg="hero"`; `AtmosphereField` does not put it in the DOM otherwise.
+ */
+.atmosphere-line {
+  width: 100%;
+  height: 100%;
+  color: var(--accent-mark);
+}
+
+.atmosphere-line-stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.34;
+}
+
+/*
+ * G-20. The comet follows the same path via CSS `offset-path` — **deliberately not
+ * `MotionPathPlugin`**, which would cost 9.7 KB gz for an effect native CSS has had since
+ * 2022 and composites for free.
+ *
+ * `offset-distance` is the **one documented exception** to "animate transform and opacity
+ * only" (§4.2): it is composited and triggers no layout. `backdrop.css.test.ts` allows
+ * exactly this property and nothing else beyond transform and opacity.
+ *
+ * **The comet is an SVG element, inside the same `<svg>` as the stroke.** That is a
+ * correction to the Design Spec's "a 30×3px div beside it": `offset-path: path()` resolves in
+ * the element's own coordinate space, so a `div` in CSS pixels and a stroke in a
+ * `xMidYMid slice`-cropped `viewBox` would drift apart at every viewport size except the one
+ * they were checked at. Inside the SVG both are in user space and they cannot disagree.
+ *
+ * `transform-box: fill-box` is what makes `offset-anchor`'s default centre the element on the
+ * path rather than pinning its corner to it.
+ */
+.atmosphere-comet {
+  offset-path: var(--atmosphere-line-path);
+  offset-rotate: auto;
+  offset-distance: 0%;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: atmosphere-comet var(--anim-comet) linear infinite;
+}
+
+.atmosphere-comet-head {
+  fill: var(--accent-mark);
+}
+
+/*
+ * The trail, and the glow. Both are **geometry, not a filter**: the Design Spec asked for
+ * `box-shadow: 0 0 18px 4px` on the head and `filter: blur(4px)` on the trail, and a static
+ * filter on an element that moves every frame is the one thing §7.7.5 rules out — it
+ * re-rasterises per frame, which is precisely the cost §10 #24 chose CSS to avoid. A wider
+ * translucent rect and a radial-gradient ellipse give the same read for nothing.
+ */
+.atmosphere-comet-trail {
+  fill: var(--accent-mark);
+  opacity: 0.5;
+  /* Three percent of the lap behind the head, per the Design Spec's 40px offset. */
+  animation-delay: -0.33s;
+}
+
+.atmosphere-comet-glow {
+  fill: url('#atmosphere-comet-glow');
+}
+
+@keyframes atmosphere-comet {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
+  }
+}
+
+/*
+ * The comet is absent under reduced motion — **by CSS, not by JavaScript**, so it never
+ * exists rather than being removed after first paint. The static stroke remains, which is
+ * §7.7.3's intended still image: a composed picture, not a blank field.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .atmosphere-comet {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ layer 4 — the grain
+ * A file, not a `data:` URI: it keeps the 240px tile out of the CSS artefact, which is on the
+ * critical path, and `img-src 'self'` already permits it. **If the file is absent the layer
+ * simply is not there** and nothing else changes — no broken-image box, because a
+ * `background-image` that 404s renders nothing.
+ */
+.atmosphere-grain {
+  background-image: url('/textures/grain.svg');
+  background-repeat: repeat;
+  background-size: 240px 240px;
+  mix-blend-mode: overlay;
+  opacity: var(--bg-grain-opacity);
+}
+
+/* --------------------------------------------------------- layer 5 — the contrast plate
+ * **This layer is not decoration.** Over the orb-tinted field `--border-control` measures
+ * 2.64:1 and `--ink-tertiary` 4.00:1, both below their floors, and lowering the orb opacity
+ * does not fix it — it only makes the background invisible before it makes the text legible
+ * (§9.2.1 V-13). Plated, every token clears its floor again (V-17), which is what keeps
+ * §9.2 V-2's neutral figures true over a moving field.
+ *
+ * It doubles as the attenuation control: its alpha is what `data-bg` actually changes.
+ * **Its opacity is never tweened** — a background that cross-fades on every navigation is
+ * perceptible on the fifth click (§7.7.5).
+ */
+.atmosphere-plate {
+  background: radial-gradient(
+    120% 92% at 34% 44%,
+    var(--surface-canvas) 0%,
+    var(--surface-canvas) 36%,
+    transparent 80%
+  );
+  opacity: var(--bg-plate-alpha);
+}
+
+/* Under `calm` the plate is flat rather than radial: there is no hero composition to reveal,
+ * and a flat 92% plate is what attenuates the field behind dense content. */
+html[data-bg='calm'] .atmosphere-plate {
+  background: var(--surface-canvas);
+}
+
+/* ------------------------------------------------------------------ intensity — §7.7.2
+ * `calm` is the **default**, set by the shell rather than by a route, so a route that never
+ * thinks about it still gets a quiet, legible background.
+ */
+html[data-bg='hero'] .atmosphere-plate {
+  opacity: 0.86;
+}
+
+/* Orbs at 40% of their authored opacity, and the grid drift continues: 2 px/s behind a
+ * 92%-opaque plate is barely perceptible, and it is what stops the page feeling dead. */
+html[data-bg='calm'] .atmosphere-orb {
+  opacity: calc(var(--bg-orb-alpha) * 0.4);
+}
+
+html[data-bg='calm'] .atmosphere-orb-c {
+  opacity: calc(var(--bg-orb-neutral-alpha) * 0.4);
+}
+
+/*
+ * `off` — reserved for a full-screen chart or a print view. Belt and braces only:
+ * `AtmosphereField` renders **no layer at all** in this state, because a paused compositor
+ * layer still holds memory. This rule exists so a layer that somehow reached the DOM would
+ * still not be visible.
+ */
+html[data-bg='off'] .atmosphere-layer {
+  display: none;
+}

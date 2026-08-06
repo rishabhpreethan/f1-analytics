@@ -11,16 +11,20 @@ import { AlertTriangle } from '@/components/ui/icons';
  */
 export function NotFound() {
   return (
-    <StateCard
-      icon={<AlertTriangle />}
-      title="No page at this address"
-      action={
-        <ButtonLink to="/" variant="primary">
-          Go to the current season
-        </ButtonLink>
-      }
-    >
-      <p>The link may be wrong, or the season, driver or team may not exist.</p>
-    </StateCard>
+    // `main` no longer carries the page gutters (Design Spec §5.5).
+    <div className="shell-container px-4 py-6 md:px-6 md:py-8 xl:px-8 xl:py-12">
+      <StateCard
+        icon={<AlertTriangle />}
+        title="No page at this address"
+        action={
+          // `/` is the landing page from CR-007, not the season hub, so the label follows.
+          <ButtonLink to="/" variant="primary">
+            Go to the home page
+          </ButtonLink>
+        }
+      >
+        <p>The link may be wrong, or the season, driver or team may not exist.</p>
+      </StateCard>
+    </div>
   );
 }

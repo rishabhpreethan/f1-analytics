@@ -85,7 +85,15 @@ export function RootLayout() {
   return (
     <AppShell footerNote={detail?.footerEcho ?? null}>
       <div ref={scope}>
-        {error === null ? <Outlet /> : <MetaFailure error={error} onRetry={retry} />}
+        {error === null ? (
+          <Outlet />
+        ) : (
+          // The failure states are not a route, so they have no `.shell-container` of their
+          // own — `main` stopped providing one in C7-4 (Design Spec §5.5).
+          <div className="shell-container px-4 py-6 md:px-6 md:py-8 xl:px-8 xl:py-12">
+            <MetaFailure error={error} onRetry={retry} />
+          </div>
+        )}
       </div>
     </AppShell>
   );

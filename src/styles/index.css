@@ -5,6 +5,7 @@
  * reduced-motion / visibility chokepoints in motion.css cannot be overridden from a
  * component (Technical Spec §S.3.1, §S.3.4). */
 @import './motion.css';
+@import './backdrop.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so
@@ -159,29 +160,84 @@
   }
 
   /* §8 — the skip link is the first focusable element and is visually hidden until
-   * focused, then a legible overlay chip. */
+   * focused, then a legible overlay chip.
+   *
+   * `--z-skip` (60) and **not** the old literal 50: at ≥1024px the dock's rail sits at 40 and
+   * overlaps the top-left corner, so a skip link below it would be announced and then
+   * covered. That is the one z-index in the product that has to beat the chrome. */
   .skip-link {
     position: absolute;
     left: -9999px;
     top: 0;
-    z-index: 50;
+    z-index: var(--z-skip);
   }
 
-  /* ------------------------------------------------------------- Shell §2.1 / §2.2
+  /* ------------------------------------------------------------- Shell §5.5
    * Header height is 56px at every breakpoint and 14 is not a permitted spacing step
    * (§5.1 names it explicitly), so the height comes from a token rather than `h-14`.
    */
+  .shell-root {
+    position: relative;
+    /* So the grain layer's `mix-blend-mode: overlay` cannot escape the shell and blend
+     * against the page's root stacking context (§S.3.5). */
+    isolation: isolate;
+  }
+
   .shell-container {
     width: 100%;
     max-width: var(--size-shell-max);
     margin-inline: auto;
   }
 
+  /*
+   * `main` owns no max-width and no padding of its own (Design Spec §5.5). It reserves the
+   * dock's clearance — a constant 96px whether the rail is collapsed or expanded, because the
+   * rail expands *over* content and must never reflow `main` — and each route wraps its own
+   * content in `.shell-container`. That is what lets the landing hero be full-bleed.
+   */
+  .shell-main {
+    position: relative;
+    z-index: var(--z-content);
+    padding-bottom: var(--size-dock-clearance);
+  }
+
+  @media (min-width: 64rem) {
+    .shell-main {
+      padding-bottom: 0;
+      padding-left: var(--size-rail-clearance);
+    }
+  }
+
+  .shell-footer {
+    position: relative;
+    z-index: var(--z-content);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  @media (min-width: 64rem) {
+    .shell-footer {
+      padding-left: var(--size-rail-clearance);
+    }
+  }
+
+  /*
+   * The glass header — §5.2b. Translucent so the atmosphere is visible moving behind it, and
+   * **no bottom border at rest**: the hairline appears on scroll (G-13, C7-7).
+   *
+   * The `@supports` fallback is mandatory, not defensive: an unblurred 72% white over a moving
+   * field is unreadable, so a browser without `backdrop-filter` gets the opaque surface
+   * instead. Declared in that order so the fallback is what a non-supporting browser keeps.
+   */
   .shell-header {
+    z-index: var(--z-header);
     background-color: var(--surface-raised);
-    border-bottom: 1px solid var(--border-subtle);
-    /* --elev-1, and §2.1 is explicit that the header carries no shadow in either
-     * theme — so the surface step and the border are the whole treatment. */
+  }
+
+  @supports (backdrop-filter: blur(1px)) {
+    .shell-header {
+      background-color: var(--surface-glass);
+      backdrop-filter: var(--glass-blur);
+    }
   }
 
   .shell-bar {
@@ -210,13 +266,13 @@
     background-color: var(--ink-primary);
   }
 
-  /* M-4 — the sheet drops from under the header, full width. */
+  /* G-5 — the sheet drops from under the header, full width. */
   .nav-sheet {
     position: fixed;
     left: 0;
     right: 0;
     top: var(--size-header);
-    z-index: 40;
+    z-index: var(--z-overlay);
     background-color: var(--surface-overlay);
     border-bottom: 1px solid var(--elev-2-border);
     box-shadow: var(--elev-2-shadow);
@@ -225,7 +281,7 @@
   .nav-scrim {
     position: fixed;
     inset: 0;
-    z-index: 20;
+    z-index: var(--z-overlay);
     background-color: var(--scrim);
   }
 
@@ -263,14 +319,14 @@
   }
 
   /* ---------------------------------------------------------------- Popovers §5.2
-   * M-5's transform-origin is the trigger corner; the popover is anchored to the
+   * G-6's transform-origin is the trigger corner; the popover is anchored to the
    * trigger's right edge, so that is the top-right.
    */
   .popover-panel {
     position: absolute;
     right: 0;
     top: calc(100% + var(--spacing));
-    z-index: 40;
+    z-index: var(--z-overlay);
     transform-origin: top right;
     border-radius: var(--radius-xl);
     background-color: var(--surface-overlay);
@@ -442,6 +498,27 @@
     display: flex;
     min-height: var(--size-state-block);
     align-items: center;
+  }
+
+  /* ------------------------------------------------- Route placeholder §5.6 (CR-007)
+   * A panel on the atmosphere rather than loose text floating on a moving field. Placeholders
+   * are permanent infrastructure (§7.6), so this is not throwaway styling.
+   */
+  .route-placeholder {
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--elev-1-shadow);
+  }
+
+  /* The eyebrow rule — 24×2px in `--accent-mark` (§3.6.4). Decorative, so it is
+   * `aria-hidden` at every call site and never the only signal for anything. */
+  .accent-rule {
+    display: inline-block;
+    flex: none;
+    width: calc(var(--spacing) * 6);
+    height: var(--size-rule);
+    background-color: var(--accent-mark);
   }
 
   /* ------------------------------------------------------------- Skeletons §7.5
