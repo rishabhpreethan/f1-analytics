@@ -2,9 +2,12 @@ import { useParams } from 'react-router';
 import { RoutePlaceholder } from '@/components/ui/RoutePlaceholder';
 
 /**
- * `/` and `/seasons/:year`. The bare `/` cannot name a year without asking the server,
- * and a placeholder fetches nothing, so it says "Current season" rather than guessing.
- * F2 resolves the default year from `/api/meta`.
+ * `/seasons` and `/seasons/:year` — one surface, two entry points (`ARCHITECTURE.md` §5).
+ *
+ * Bare `/seasons` cannot name a year without asking the server, and a placeholder fetches
+ * nothing, so it says "Current season" rather than guessing. F2 resolves the default year
+ * from `/api/meta`. **`/seasons` is the canonical URL for "current"** — there is no redirect
+ * to `/seasons/2026` and none from `/` (§10 #23).
  */
 export function SeasonHub() {
   const { year } = useParams();

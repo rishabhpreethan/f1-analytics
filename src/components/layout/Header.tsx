@@ -1,7 +1,8 @@
 import { Link } from 'react-router';
 import { selectCoverageDetail, selectDataVintage } from '@/features/meta/selectors';
 import { useMeta } from '@/features/meta/useMeta';
-import { PrimaryNav, PrimaryNavSheet, type NavItem } from '@/components/layout/PrimaryNav';
+import { NAV_ITEMS } from '@/components/layout/navItems';
+import { PrimaryNav, PrimaryNavSheet } from '@/components/layout/PrimaryNav';
 import { DataVintage } from '@/components/ui/DataVintage';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -17,20 +18,13 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
  * `display: none`, giving wordmark → cluster → menu button. `AppShell` owns the `header`
  * landmark itself, and with it M-1.
  *
- * Nav order is the route order, and there is no entry for `/seasons/:year` or
- * `/seasons/:year/races/:round` — those are reached from Season. There are no dead
+ * The item list is now `navItems.ts`'s `NAV_ITEMS` — the same array `CommandDock` consumes
+ * from C7-5, so the two can never disagree about where a destination lives. There is no
+ * entry for `/seasons/:year` or `/seasons/:year/races/:round`: those are reached from Season,
+ * and `isActiveNavItem` keeps Season lit while you are inside them. There are no dead
  * controls: the global search and the app-wide season selector are F9, so they are
  * **absent** rather than present-and-disabled.
  */
-
-const NAV_ITEMS: ReadonlyArray<NavItem> = [
-  { to: '/', label: 'Season' },
-  { to: '/drivers', label: 'Drivers' },
-  { to: '/teams', label: 'Teams' },
-  { to: '/circuits', label: 'Circuits' },
-  { to: '/compare', label: 'Compare' },
-  { to: '/records', label: 'Records' },
-];
 
 export function Header() {
   const { data, isPending } = useMeta();

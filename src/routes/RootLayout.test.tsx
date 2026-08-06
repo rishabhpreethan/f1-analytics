@@ -97,11 +97,70 @@ describe('when /api/meta is unavailable', () => {
         }),
     );
 
-    // `/` cannot name a year without asking the server, and a placeholder fetches
-    // nothing, so the F0 surface says "Current season" (F2 resolves the default year).
-    expect(await screen.findByRole('heading', { level: 1, name: 'Current season' })).toBeDefined();
+    // `/` is the landing page from CR-007 (§10 #23), not the season hub.
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Settle the argument.' }),
+    ).toBeDefined();
     expect(
       await screen.findByText('Complete results through 2026 Round 10 · Seasons 1950–2026'),
     ).toBeDefined();
+  });
+});
+
+describe('the route table', () => {
+  /**
+   * Twelve routes plus the catch-all (`ARCHITECTURE.md` §5). Asserted by **direct entry**,
+   * not by client navigation: a route that only resolves after a link click is a route a
+   * shared URL cannot reach, and every analytical state in this product is meant to be
+   * addressable.
+   */
+  const ROUTES: ReadonlyArray<[path: string, heading: string]> = [
+    ['/', 'Settle the argument.'],
+    ['/seasons', 'Current season'],
+    ['/seasons/2024', '2024 Season'],
+    ['/seasons/2024/races/3', 'Round 3'],
+    ['/drivers', 'Drivers'],
+    ['/drivers/max_verstappen', 'Driver'],
+    ['/teams', 'Teams'],
+    ['/teams/ferrari', 'Team'],
+    ['/circuits', 'Circuits'],
+    ['/circuits/spa', 'Circuit'],
+    ['/compare', 'Compare'],
+    ['/records', 'Records'],
+    ['/not-a-real-route', 'No page at this address'],
+  ];
+
+  it.each(ROUTES)('resolves %s on direct entry', async (path, heading) => {
+    window.history.pushState({}, '', path);
+    renderApp(
+      () =>
+        new Response(JSON.stringify(META_REAL), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeDefined();
+  });
+
+  it('has no redirect in either direction between / and /seasons', async () => {
+    // §10 #23: `/` changed meaning rather than moving, so neither URL rewrites the other.
+    // A redirect would be visible here as the wrong heading, or as a changed pathname.
+    for (const [path, heading] of [
+      ['/', 'Settle the argument.'],
+      ['/seasons', 'Current season'],
+    ] as const) {
+      window.history.pushState({}, '', path);
+      renderApp(
+        () =>
+          new Response(JSON.stringify(META_REAL), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeDefined();
+      expect(window.location.pathname).toBe(path);
+      cleanup();
+      vi.unstubAllGlobals();
+    }
   });
 });

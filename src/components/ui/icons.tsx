@@ -28,7 +28,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * ---------------------------------------------------------------------------
- * Eight of the eleven glyphs below — AlertTriangle, ArrowRight, Check,
+ * Eight of the glyphs below — AlertTriangle, ArrowRight, Check,
  * ChevronDown, Database, Monitor, Moon and X — are listed by Lucide as derived
  * from the Feather project, which carries a second notice that must travel with
  * the copies as well:
@@ -200,6 +200,122 @@ export function ArrowRight(props: IconProps) {
     <Icon {...props}>
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
+    </Icon>
+  );
+}
+
+/* --------------------------------------------------------------------------
+ * Added by CR-007 — the ten `CommandDock` glyphs (Design Spec §11.1). Same
+ * source (`lucide-static@1.28.0`), same verbatim rule, same 1.5px stroke.
+ */
+
+export function House(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+      <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </Icon>
+  );
+}
+
+export function CalendarDays(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M8 2v3" />
+      <path d="M16 2v3" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M8 13h.01" />
+      <path d="M12 13h.01" />
+      <path d="M16 13h.01" />
+      <path d="M8 17h.01" />
+      <path d="M12 17h.01" />
+      <path d="M16 17h.01" />
+    </Icon>
+  );
+}
+
+export function UserRound(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="8" r="5" />
+      <path d="M20 21a8 8 0 0 0-16 0" />
+    </Icon>
+  );
+}
+
+export function Users(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <circle cx="9" cy="7" r="4" />
+    </Icon>
+  );
+}
+
+export function MapPin(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+      <circle cx="12" cy="10" r="3" />
+    </Icon>
+  );
+}
+
+export function GitCompareArrows(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="5" cy="6" r="3" />
+      <path d="M12 6h5a2 2 0 0 1 2 2v7" />
+      <path d="m15 9-3-3 3-3" />
+      <circle cx="19" cy="18" r="3" />
+      <path d="M12 18H7a2 2 0 0 1-2-2V9" />
+      <path d="m9 15 3 3-3 3" />
+    </Icon>
+  );
+}
+
+export function Trophy(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2" />
+      <path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2" />
+      <path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3" />
+      <path d="M4 22h16" />
+      <path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z" />
+      <path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3" />
+    </Icon>
+  );
+}
+
+export function MoreHorizontal(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+      <circle cx="5" cy="12" r="1" />
+    </Icon>
+  );
+}
+
+export function Pin(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </Icon>
+  );
+}
+
+export function PinOff(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 17v5" />
+      <path d="M15 9.34V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H7.89" />
+      <path d="m2 2 20 20" />
+      <path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11" />
     </Icon>
   );
 }

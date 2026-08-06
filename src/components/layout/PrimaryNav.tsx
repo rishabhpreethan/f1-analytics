@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router';
+import { isActiveNavItem } from '@/components/layout/navItems';
 import { Menu, X } from '@/components/ui/icons';
 import { usePressMotion } from '@/lib/motion/interactions';
 import { sheetEnter, sheetExit } from '@/lib/motion/surfaces';
@@ -32,23 +33,17 @@ import { useDisclosure } from '@/lib/motion/useDisclosure';
  * never the only signal (§8).
  */
 
-export interface NavItem {
-  to: string;
-  label: string;
-}
-
 export interface PrimaryNavProps {
-  items: ReadonlyArray<NavItem>;
+  items: ReadonlyArray<{ to: string; label: string }>;
 }
 
 /**
- * `/seasons/:year` and `/seasons/:year/races/:round` have no nav entry of their own —
- * they are reached from Season — so Season stays active while you are inside them.
+ * The active-state predicate is `isActiveNavItem` from `navItems.ts` — pure and unit-tested
+ * (CT-11). The inline version this file used to carry deliberately let `/` also match
+ * `/seasons*`, which was correct while the hub lived at `/` and is wrong now that `/` is the
+ * landing page (§10 #23).
  */
-function isActive(pathname: string, to: string): boolean {
-  if (to === '/') return pathname === '/' || pathname.startsWith('/seasons');
-  return pathname === to || pathname.startsWith(`${to}/`);
-}
+const isActive = isActiveNavItem;
 
 export function PrimaryNav({ items }: PrimaryNavProps) {
   const { pathname } = useLocation();

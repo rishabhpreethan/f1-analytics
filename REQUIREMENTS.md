@@ -359,12 +359,17 @@ and should be prominent.
 |---|---|---|---|---|
 | NV-1 | **Global search** — drivers, constructors, circuits, races | all entities | — | **P0** |
 | NV-2 | **Season/round selector** available app-wide | `seasons` + `races` | — | **P0** |
-| NV-3 | **Landing page** — current season state, last race, next race | standings + races | — | **P0** |
+| NV-3 | **Landing page** at `/` — the entry surface. Current season state, last race, next race. The season hub is a separate surface at `/seasons` (`ARCHITECTURE.md` §5, §10 #23) | standings + races | — | **P0** |
 | NV-4 | **Deep-linkable URLs** — every view addressable and shareable | — | — | **P0** |
 | NV-5 | **Responsive** — charts usable on mobile | — | — | **P0** |
 | NV-6 | **Light/dark theme** | — | — | **P1** |
 | NV-7 | **Chart export** as PNG | — | — | **P2** |
 | NV-8 | **Coverage-aware controls** — disable + explain when data is outside its window (§2.4) | — | — | **P0** |
+
+**NV-3 is split across features.** F0 ships the landing *surface* — chrome, motion, and the
+figures available from `GET /api/meta` (season span, round progress, last and next round). Its
+standings and race-result content lands with F2. The landing page never renders a statistic that
+is not in an API response.
 
 ---
 
