@@ -13,9 +13,10 @@ Status: `todo` · `doing` · `done`
 |---|---|---|---|
 | 1 | F0 foundation — server, data layer, API, routing, tests | doing | — |
 | 2 | F0 frontend — landing page, dock, theme, motion (GSAP) | doing | — |
-| 3 | Replace the landing background | todo | — |
-| 4 | Fix the dock rail — labels clip when collapsed, hover does nothing | todo | — |
-| 5 | Make the `2026 · R10` coverage chip explain itself | todo | — |
+| 3 | Switch to a monochrome theme — accent becomes white/black, no colour hue | todo | — |
+| 4 | Rebuild the background so the app feels alive, monochrome | todo | — |
+| 5 | Fix the dock rail — labels clip when collapsed, hover does nothing, geometry is off | todo | — |
+| 6 | Make the `2026 · R10` coverage chip explain itself, and work | todo | — |
 
 ## Next
 
