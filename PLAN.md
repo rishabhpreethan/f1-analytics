@@ -64,11 +64,34 @@ claude mcp add playwright -- npx -y @playwright/mcp@latest
 
 ```
 1. principal-engineer  → Technical Spec into this file
-2. designer            → Design Spec into this file          (1 ‖ 2 may run in parallel)
-3. developer           → implement on feat/<slug> + unit tests + self-check
+2. designer            → Design Spec into this file, AND builds the visual layer
+3. developer           → builds everything non-visual: server, data layer,
+                         selectors, schemas, queries        (2 ‖ 3 where they don't collide)
 4. Rishabh             → reviews the running frontend himself
 5. orchestrator        → verify gates → approve → merge
 ```
+
+**⚠ CR-010, 2026-08-06 — the `designer` now implements its own work.** Rishabh: *"make the designer
+agent itself to make all the design changes, so that its much better rather than giving it to the dev
+agent."*
+
+**The reasoning, and it is evidence-based.** CR-007's review returned five blocking findings and **most
+were translation losses**, not design errors and not coding errors: G-8's spotlight written in `%` where
+the spec meant px, so the highlight rendered outside the card; G-21 never implemented while a comment
+claimed it was; the dock indicator snapping because its travel was built in the wrong builder; the
+coverage ruler's axis given `grid-column` inside a flex parent, so it silently did nothing and sat
+130 px out of line. Each is a gap between design intent and someone else's reading of it. Removing the
+handoff removes the gap.
+
+**Division of labour from here:** the `designer` owns `src/styles/**`, presentational components, its
+own surfaces, `src/lib/motion/**` and `docs/DESIGN_SYSTEM.md`, **and writes tests for what it builds.**
+The `developer` owns `server/**`, `src/features/meta/**`, `src/lib/api.ts`, schemas, queries and routing
+structure. A design need that requires a new selector or API field is **reported, not built** — a
+selector is exactly where a data trap gets violated silently, and those rulings are the
+`principal-engineer`'s.
+
+**A spec is still mandatory.** It is how a decision survives past the session that made it, and how
+Rishabh can see what was intended versus what shipped. It is simply no longer a handoff document.
 
 **⚠ CR-009, 2026-08-06 — the `reviewer` gate is removed too, on Rishabh's instruction:** *"in our
 plan please remove the reviewer step, we dont need that right now."* Five gates now. The `reviewer`
@@ -4670,6 +4693,7 @@ spends more than the work is worth.
 
 | CR-008 | 2026-08-06 | **Replace the landing background.** Rishabh: *"im not a fan of the background thats there currently for the landing page"*, suggesting a dot-grid background, then *"or anything else that you like more than this, im leaving it in your hands, i just dont like the current one"*. Design delegated to Claude again | B | `PLAN.md` (F0 Design Spec §7.7 + the atmosphere task rows), `docs/DESIGN_SYSTEM.md` §7.7/§4.6 · **`docs/ARCHITECTURE.md` §10 #24: no change if the mechanism stays CSS-composited** · **`REQUIREMENTS.md`, `docs/DATABASE.md`: no change** | folded into `feat/foundation` (F0) | Design spec in progress | — |
 
+| CR-010 | 2026-08-06 | **The `designer` implements its own design work.** Rishabh: *"make the designer agent itself to make all the design changes, so that its much better rather than giving it to the dev agent."* Removes the spec→developer handoff, which is where most of CR-007's five blocking defects originated. The `designer` gains `src/styles/**`, presentational components, its surfaces and `src/lib/motion/**`, and must test what it builds; `server/**`, `features/meta/**`, `api.ts`, schemas, queries and routing stay the `developer`'s | C | `PLAN.md` §2.3/§5.4, `CLAUDE.md` §3, `.claude/agents/designer.md`, `.claude/agents/developer.md` · **`REQUIREMENTS.md`, `docs/*`: no change** | folded into `feat/foundation` (F0) | Doc changes landing now; CR-008 is the first CR to run this way | — |
 | CR-009 | 2026-08-06 | **Remove the `reviewer` gate.** Rishabh: *"in our plan please remove the reviewer step, we dont need that right now."* Five gates. S-4/S-6/S-7/S-10 move into the `developer`'s self-check; `reviewer.md` goes dormant, not deleted | C | `PLAN.md` §2.3/§2.5/§3/§5.4, `CLAUDE.md` §3, `.claude/agents/reviewer.md`, `.claude/agents/developer.md`, `.claude/agents/orchestrator.md` · **`REQUIREMENTS.md`, `docs/*`: no change** | folded into `feat/foundation` (F0) | Doc changes landing now | — |
 
 ---

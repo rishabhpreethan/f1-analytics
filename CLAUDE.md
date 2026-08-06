@@ -49,11 +49,26 @@ directory**.
 
 ```
 1. principal-engineer  → Technical Spec into PLAN.md
-2. designer            → Design Spec into PLAN.md        (1 ‖ 2 in parallel)
-3. developer           → implement on the feature branch + self-check
+2. designer            → Design Spec into PLAN.md, AND builds the visual layer
+3. developer           → builds everything non-visual: server, data layer, schemas, queries
 4. Rishabh             → reviews the running frontend himself
 5. orchestrator        → verify gates → approve → merge
 ```
+
+**The `designer` implements its own work (CR-010, 2026-08-06).** It no longer hands a spec to the
+`developer` — that handoff is where **most of CR-007's five blocking defects came from**: a spotlight
+written in `%` where the spec meant px, a motion never implemented while a comment claimed it was, an
+indicator built in the wrong place so it snapped, an axis given `grid-column` inside a flex parent. Those
+are translation losses, not design or coding errors.
+
+| Agent | Owns in code |
+|---|---|
+| `designer` | `src/styles/**`, presentational components, its own surfaces, `src/lib/motion/**`, `docs/DESIGN_SYSTEM.md` — **and tests for what it builds** |
+| `developer` | `server/**`, `src/features/meta/**`, `src/lib/api.ts`, schemas, queries, routing structure |
+
+A design need requiring a new selector or API field is **reported, not built** — that is where a data
+trap gets violated silently. A Design Spec is still mandatory: it is how a decision outlives the session
+that made it, not a handoff.
 
 **Gone, across CR-006 and CR-009:** `designer` visual verification, the separate security audit, the
 `qa` E2E gate, and — as of 2026-08-06 — **the `reviewer` gate itself.** `reviewer` and `qa` are both
