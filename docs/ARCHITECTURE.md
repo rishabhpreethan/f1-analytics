@@ -324,21 +324,85 @@ Scope discipline, so this stays one allowance rather than a habit:
 
 ## 8. Performance budget
 
-| Target | Budget |
-|---|---|
-| Season hub — first contentful paint | < 1.5 s |
-| Race deep dive — interactive with lap chart | < 2.0 s |
-| Chart interaction (hover, series toggle) | < 100 ms, no network |
-| API p95 for any non-lap endpoint | < 50 ms |
-| API p95 for a lap endpoint | < 200 ms |
-| Initial JS bundle (gzipped) | < 250 KB |
+| Target | Budget | Enforced by |
+|---|---|---|
+| Season hub — first contentful paint | < 1.5 s | nothing automated — needs a browser |
+| Race deep dive — interactive with lap chart | < 2.0 s | nothing automated — needs a browser |
+| Chart interaction (hover, series toggle) | < 100 ms, no network | nothing automated — needs a browser |
+| API p95 for any non-lap endpoint | < 50 ms | nothing automated |
+| API p95 for a lap endpoint | < 200 ms | nothing automated |
+| **Initial module JS, gzipped** | **≤ 250 KB** | `npm run check:budget` |
+| **Render-blocking CSS, gzipped** | **≤ 25 KB** | `npm run check:budget` |
+| **Parser-blocking `<script src>` in `<head>`, gzipped** | **≤ 2 KB** | `npm run check:budget` |
+
+The first five rows are **aspirations with no mechanism**, and they are marked that way rather
+than left to read as guarantees: none of them is observable without a browser, and there is no
+browser in this pipeline (§10 #25). The last three are gated — see §8.1.
 
 **Techniques**
-- Route-level code splitting; visx and lap charts load only on the race deep dive.
+- Route-level code splitting; the lap-scale chart kit loads only on the race deep dive.
 - Server-side downsampling for the position chart when lap count is large.
 - Precomputed aggregate tables for career/all-time surfaces, refreshed with the database.
 - TanStack Query cache with a long `staleTime` — the data is immutable between refreshes.
 - Virtualise long tables.
+
+### 8.1 The three gated budgets — §10 #27
+
+`npm run check:budget` runs as the last step of `npm run build`, so it fires on the machine
+where a change was written and not only in CI. `npm run build:unchecked` skips it, and the
+failure output names that hatch — otherwise the first person who needs a build while over
+budget deletes the gate instead of using it. Exit codes match the palette validator: `0` pass,
+`1` over budget, `2` nothing to measure.
+
+**"Initial" is derived, never listed.** The gate reads the built `dist/index.html` and counts
+what the browser must fetch before it can paint: the parser-blocking classic `<script src>`, the
+`<script type="module">` entry plus every `<link rel="modulepreload">`, and every
+`<link rel="stylesheet">`. Summing "every `.js` in `dist/`" would have been simpler and starts
+over-counting the day route-level splitting lands — and a gate that fails for a reason that is
+not a regression is a gate that gets switched off.
+
+| Bucket | Budget | Ceiling its basis supports | Basis |
+|---|---|---|---|
+| `js-initial` | 250 KB | 250 KB | **Inherited, and its basis is written down here for the first time — honestly.** 250 KB is a conventional ceiling for initial JavaScript, **not** a derivation from the 1.5 s FCP row above: at the reference link below, 250 KB alone is 1.25 s of transfer, which does not fit inside 1.5 s. The two rows are reconciled by code splitting, which is also why the gate measures the initial set rather than all of `dist/`. If the initial set approaches 250 KB the honest fix is splitting, not a larger number. |
+| `css-blocking` | **25 KB** | 25 KB | **New.** §8 carried no CSS budget at all before 2026-08-07; the 10 KB the `designer` was being held to was a remembered number with no basis, and it had 0.15 KB left. Set from two independent derivations that agree: **(A) proportion** — styling is a support layer, and if it costs more than a tenth of the shipped application it has stopped being one; 10 % of 250 KB = **25 KB**. The ratio is chosen policy, not measurement. **(B) render-blocking transfer time** — a stylesheet blocks first paint, so allot it ≤ 10 % of the 1.5 s FCP target in transfer: 0.15 s × 200 000 B/s = **30 KB**. The tighter is enforced. |
+| `js-blocking` | 2 KB | 2 KB | **New**, and separate from `js-initial` on purpose: a synchronous script in `<head>` delays paint by its whole fetch + parse + execute, where a module chunk is deferred by specification. A byte here is worth more than a byte there, so one 250 KB bucket would hide the growth that matters. Holds `public/theme-init.js`, which sets one attribute before first paint. The cap sits close to the current figure deliberately — this is the bucket where growth is the signal. |
+
+**Reference link, for the two derivations that price bytes in milliseconds: 1.6 Mbit/s
+downlink = 200 000 bytes/s.** That is an assumption of the calculation, not a measurement of
+anyone's connection. If it is wrong, every ceiling derived from it moves in proportion — which
+is why the arithmetic is written out here and in `scripts/budget-core.mjs` rather than only the
+answer.
+
+**Changing a number.** Each bucket carries a `max` the gate enforces and a `ceiling` its
+recorded basis supports. Raising `max` toward `ceiling` is a local edit in
+`scripts/budget-core.mjs` plus a line in that bucket's `changes` array saying who asked and
+why. Raising `max` **past** `ceiling` is not a local edit: the basis no longer supports the
+number, so it needs a new §10 entry supplying a different one. The failure mode of a budget is
+not being exceeded — it is being quietly raised until it constrains nothing.
+
+**One gzip figure, and this gate owns it.** Five gzip encoders were measured on the same
+497,715-byte chunk of one build and span 1.3 % — Node zlib level 9 160,247 · Node zlib level 6
+160,584 · GNU `gzip -9` 159,904 · GNU `gzip -6` 160,252 · Rolldown's Rust deflate 162,060. A
+budget therefore cannot usefully be specified to better than about a percent, and what a gate
+needs is a number that does not move for reasons unrelated to the code. The gate uses Node zlib
+at an explicit level 9; `build.reportCompressedSize` is **off** in `vite.config.ts` so
+`npm run build` cannot print a second, different size for the same file. **KB means 1000 bytes
+throughout**, matching Vite and DevTools — at this scale the other convention is worth 6 KB of
+budget.
+
+**What is measured but deliberately not gated**, each reported by the gate so the figure is
+visible rather than forgotten:
+
+- **Lazily loaded chunks** — any `.js`/`.css` in `dist/` the built HTML does not reference.
+  Not on the first-paint path, so not gated; growth there is still worth seeing, and nothing
+  else reports it now that Vite's size report is off.
+- **Preloaded fonts — 163.02 KB today** (`inter-latin.woff2` 72.92 + `archivo-latin.woff2`
+  90.10), which is 6.5× the whole CSS budget and the largest single item on the first-paint
+  path after the JS. Not gated because `woff2` is already compressed and the set is fixed by
+  §10 #17 rather than by code, so a budget could only ever fire on a deliberate addition. It is
+  named here because a CSS-budget conversation that ignores 163 KB of fonts is looking at the
+  wrong number; whether both faces need preloading is the `designer`'s call to make with the
+  figure in front of it.
 
 ---
 
@@ -350,6 +414,9 @@ rather than believed.
 ```
 f1-analytics/
 ├── .claude/agents/          designer + developer; four retired definitions kept behind banners
+├── .github/workflows/ci.yml typecheck · lint · format · build (+ §8 budget gate) · test ·
+│                            validate:palette, plus a separate `npm audit` job. Every action
+│                            pinned to a full commit SHA, never a tag (S-14)
 ├── CLAUDE.md                session context
 ├── PLAN.md                  agents, flow, non-negotiables — short by design
 ├── TASKS.md                 Rishabh's tracker; a line moves to Done only when pushed
@@ -393,7 +460,12 @@ f1-analytics/
 │   └── styles/              tokens.css, index.css, motion.css, backdrop.css,
 │                            fonts.css (the @font-face block, §10 #17)
 ├── scripts/                 repo tooling, zero-dependency ESM run by Node directly
-│   └── validate-palette.mjs colour-gate validator (§10 #19)
+│   ├── validate-palette.mjs colour-gate validator (§10 #19) — the designer's
+│   ├── budget-core.mjs      §8 budget gate, pure half: what counts, and the arithmetic
+│   └── check-budget.mjs     §8 budget gate, I/O half: reads dist/, gzips, exits 0/1/2
+├── vite.config.ts           build + vitest config; `reportCompressedSize: false` (§8.1)
+├── vitest.reporter.ts       prints what the run did **not** test — a conditionally skipped
+│                            suite must not look like a green one
 ├── public/
 │   ├── theme-init.js        pre-paint theme application (external — CSP, §7.3)
 │   ├── favicon.svg          typographic placeholder until R3 lands
@@ -445,3 +517,4 @@ the top of this file. Nothing is deleted; a superseded entry is marked, not remo
 | 24 | 2026-08-06 | **The moving background is CSS-composited gradient layers. Canvas 2D, WebGL and animated SVG filters are all rejected.** | Judged on bundle cost, main-thread cost and failure mode. **WebGL** — `three` is ≈150 KB gz and even a micro-renderer like `ogl` is ≈10 KB gz plus shader source, for decoration, on a page whose budget exists to protect charts; it also needs a context-loss path and a no-WebGL fallback, i.e. two implementations. **Canvas 2D** — cheap in bytes (~1 KB) but pays continuous main-thread CPU for every frame of an animation that runs for the entire session; `OffscreenCanvas` in a worker would fix the thread but adds a worker build target, a message protocol, and a fallback for the non-transferable case. **Animated `filter`/`backdrop-filter`** — forces a re-rasterisation per frame, which is the most expensive thing a decorative layer can do. **CSS gradient layers animated only on `transform` and `opacity`** cost **zero JavaScript**, are composited off the main thread, are paused by the browser when the tab is hidden, and degrade to a static gradient with one media query. Softness comes from wide `radial-gradient` colour stops, **not** `filter: blur()`, so nothing re-rasterises; grain comes from a static `data:image/svg+xml` `background-image`, which `img-src 'self' data:` already permits and which involves no network. Intensity is a pure function of the route (`full` on the landing, `muted` on data surfaces, `off` where dense charts land from F2/F3), and at `off` the animated layers are **removed from the DOM** rather than paused, because a paused compositor layer still holds memory. |
 | 25 | 2026-08-06 | **The five-agent workflow is retired. Two agents remain — `designer` (the visual layer) and `developer`, a senior software engineer (everything else). Architecture ownership, and this document, move to the senior engineer.** The spec gate, the code-review gate, the security-audit gate and the E2E/QA gate are all removed. `PLAN.md` is cut from 5285 lines to ~107 and archived verbatim at `docs/archive/PLAN-F0-archive.md`. Decided by Rishabh in session. | Recorded here because it changes **who decides what this file says**, which is an architectural fact about the project, not a process preference. Two measured reasons. **(a) Handoff loss dominated defect count.** Of CR-007's five blocking defects, four were translation losses at an agent boundary rather than errors in anyone's own work — a spotlight authored in `%` where the spec meant `px`, a motion a comment claimed existed but nothing implemented, an indicator built in the wrong element so it snapped, a chart axis given `grid-column` inside a flex parent. Fewer boundaries, fewer of that class. **(b) Every dispatched agent paid for 5285 lines of plan** before doing any work, and the plan's growth was itself driven by the handoff format. **What is genuinely lost, stated rather than papered over:** the removed review gate is what *caught* those five defects, and 236 passing unit tests did not. jsdom performs no layout and no compositing, so position, size, timing and visual composition are **untested by construction** — the builder must name what it has not seen work, and Rishabh's eyes are now the acceptance criterion. **Consequences that are binding here:** the S-1…S-14 audit becomes a per-change self-check of S-4, S-6, S-7 and S-10 plus any item the diff genuinely touches (§7); a documentation edit named by a change ships in the same commit as the code, because no reviewer will notice a stale doc; and there is **no E2E layer at all** (§2), which is a stated absence, not an omission to be quietly filled. **Not changed:** every layering rule (§3), the chart constraints (§4), the URL contract (§5), the API conventions (§6), the security controls themselves (§7) and the performance budget (§8). Removing gates did not relax any of them — it moved who enforces them onto the person writing the code. |
 | 26 | 2026-08-06 | **`style-src-attr 'unsafe-inline'` stays in the CSP, and the reason recorded in `server/app.ts` was wrong.** It is **not** merely a precaution against CSSOM writes; there is a concrete, reachable call in `gsap/ScrollTrigger.js` that uses the attribute form CSP governs. Removal still requires the one piece of evidence §7.4 names — zero CSP violations in a production-preview browser console — which nobody has yet gathered. | The previous comment read "React and GSAP both mutate styles through the CSSOM, which CSP does not govern, so this may well be unnecessary". The first clause is true and the conclusion does not follow. Read from the installed source: `ScrollTrigger.js` line ~2108, inside the block reached from `ScrollTrigger.enable()` ← `ScrollTrigger.register()` ← `gsap.registerPlugin(ScrollTrigger)`, executes `_body.setAttribute("style", "")` followed by `_body.removeAttribute("style")`, guarded by `if (!bodyHasStyle)`. Three facts make it load-bearing: `gsap.registerPlugin(useGSAP, ScrollTrigger, SplitText)` runs at **module evaluation** of `src/lib/motion/gsap.ts`, so the path is reached on **every page load** rather than only when a trigger is created; `setAttribute('style', …)` is the inline-style-attribute form that `style-src-attr` governs, unlike `element.style.x = y`; and our `<body>` carries no `style` attribute, so the guard is satisfied and the call runs. What is **verified statically** (and asserted by `server/app.test.ts`): the authored `index.html` and the built `dist/index.html` both contain no inline `<style>`, no inline `<script>` body and no `style=` attribute, so nothing *we* write needs the allowance; and the ScrollTrigger call **survives minification into `dist/assets/*.js`**, quoted with backticks and an empty value — the risk is in the shipped artefact, not only in `node_modules`. (`gsap/Flip.js` uses the same attribute form, but it is not imported: §10 #21 defers `Flip` to F4, and that is a reason to re-read this entry then rather than a current exposure.) What is **not** verifiable in Node: whether a browser reports a violation for an **empty** attribute value, since jsdom implements no CSP enforcement at all. Rejected alternatives — removing the directive on the static argument alone (exactly what §7.4 forbids, and it would break real behaviour if the violation is reported); forcing `<body>` to carry a `style` attribute so the guard short-circuits (an inline attribute in markup is itself governed, and a CSSOM trick to create the attribute relies on unspecified serialisation timing); dropping `ScrollTrigger` (four named motions depend on it). Instead the allowance is **narrowed to `style-src-attr` only** — `style-src` and `script-src` stay `'self'` — and `server/app.test.ts` pins the whole header so widening it is a test failure, with a canary that fails when the GSAP call disappears on upgrade so the directive is re-evaluated rather than inherited forever. |
+| 27 | 2026-08-07 | **The performance budget becomes three enforced numbers with written derivations, gated by `npm run check:budget` at the end of every build. A render-blocking CSS budget of 25 KB gzipped is introduced; the unwritten 10 KB the `designer` was being held to is retired.** Vite's own compressed-size report is turned off in the same change. | Asked for by Rishabh, who noticed the 10 KB figure appears **nowhere in this document** — it was a remembered number, and the `designer` had 0.15 KB of room left with F1's chart CSS still to write. Three decisions, each for a stated reason. **(a) A basis, not a figure.** Each bucket carries the derivation that produced its number: `css-blocking` from two independent routes that agree — 10 % of the 250 KB JS budget (25 KB), and ≤ 10 % of the 1.5 s FCP target spent on transfer at a stated 1.6 Mbit/s reference link (30 KB) — with the tighter enforced. The 250 KB JS row's basis is written down for the first time and it is **not** a derivation from the FCP row: 250 KB is 1.25 s of transfer at that link, so the two rows are reconciled by code splitting and this is said out loud rather than left to look rigorous. **(b) `max` versus `ceiling`.** Every bucket declares both. Raising `max` toward `ceiling` is a local edit plus a logged reason; raising it past `ceiling` needs a new entry here, because the basis no longer supports the number. The failure mode of a budget is not being exceeded — it is being quietly raised until it constrains nothing — and this makes the quiet raise structurally impossible while keeping the deliberate raise cheap. **(c) "Initial" is derived from the built `index.html`, never a maintained list**: the parser-blocking classic script, the module entry plus every `modulepreload`, and every stylesheet. Rejected: summing every `.js` in `dist/`, which is simpler and begins over-counting the day route-level splitting lands (§8) — a gate that fails for something that is not a regression gets switched off, so the definition had to be right before the splitting rather than after. **Parser-blocking `<script src>` is its own 2 KB bucket** rather than part of the 250 KB, because a byte in front of first paint costs more than a byte in a deferred module and one bucket would hide the growth that matters. **The gate is inside `npm run build`**, not only a CI step, so it fires on the machine where the change was written; `npm run build:unchecked` is the hatch and the failure output names it, because an unnamed hatch gets replaced by deleting the gate. Exit `0` pass (a WARN at 80–85 % still passes) / `1` over budget / `2` nothing to measure — **`2` rather than `0` is load-bearing**: a gate that cannot find `dist/`, reports 0.00 KB and exits 0 is indistinguishable from a very small bundle, which is the exact shape of the `npx tsc --noEmit` false green this project already paid for. **One gzip authority.** Five encoders measured on the same 497,715-byte chunk span 1.3 % — Node zlib L9 160,247 · Node zlib L6 160,584 · GNU `gzip -9` 159,904 · GNU `gzip -6` 160,252 · **Rolldown's Rust deflate 162,060**, the outlier and the one `npm run build` was printing. So `build.reportCompressedSize` is off and the gate's Node-zlib-L9 figure is the only gzipped size the project reports; nothing is lost, because the gate prints a per-asset table including the lazy chunks Vite was reporting. A budget cannot usefully be specified to better than about a percent, which is also why the gate never compares against a stored measurement — an encoder change on a Node upgrade must not be able to produce a failure. **Not gated, and named in §8.1 rather than omitted: 163.02 KB of preloaded fonts** — 6.5× the entire CSS budget, and the largest first-paint item after the JS. Left ungated because `woff2` is already compressed and the set is fixed by #17 rather than by code, but recorded because a CSS-budget conversation that ignores it is looking at the wrong number. |
