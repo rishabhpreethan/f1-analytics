@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useMagnet, usePressMotion } from '@/lib/motion/interactions';
+import { useMergedScope } from '@/lib/motion/useMergedScope';
 
 /**
  * `DESIGN_SYSTEM.md` §7.1. F0 needs `primary`, `secondary`, `ghost` and — added by
@@ -86,14 +87,32 @@ export function ButtonLink({
   magnetic = false,
 }: ButtonLinkProps) {
   const { scope: pressScope, press } = usePressMotion<HTMLAnchorElement>();
-  const { scope: magnetScope, handlers: magnetHandlers } = useMagnet<HTMLAnchorElement>();
+  const { scope: magnetScope, handlers: magnetHandlers } = useMagnet<HTMLAnchorElement>(magnetic);
 
-  // Two hooks, two scopes, one node — so the ref is **chosen**, not merged. Every link gets G-7's
-  // press feedback; the magnet replaces it on the one element that has it, because G-9's `quickTo`
-  // on `x`/`y` and G-7's `scale` are both transforms on the same target, and `overwrite: 'auto'`
-  // would have them fight over it.
-  const scope = magnetic ? magnetScope : pressScope;
-  const handlers = magnetic ? magnetHandlers : press;
+  /**
+   * **Two hooks, one node — merged, not chosen.** Choosing dropped G-7 from the hero CTA, which
+   * is the most-clicked element on the landing page, on the reasoning that `overwrite: 'auto'`
+   * would make G-9 and G-7 fight. That reasoning was wrong: auto-overwrite kills conflicting
+   * tweens **of the same property**, and G-9 writes `x`/`y` while G-7 writes `scale` — distinct
+   * properties of the same transform, which GSAP composes rather than contests.
+   */
+  const scope = useMergedScope(pressScope, magnetScope);
+
+  /**
+   * Both affordances, composed by hand rather than spread — because both define
+   * `onPointerLeave` and a spread would silently drop one of them. The magnet must return to
+   * zero *and* the press must release.
+   */
+  const handlers = magnetic
+    ? {
+        ...press,
+        onPointerMove: magnetHandlers.onPointerMove,
+        onPointerLeave: () => {
+          magnetHandlers.onPointerLeave();
+          press.onPointerLeave();
+        },
+      }
+    : press;
 
   return (
     <Link ref={scope} to={to} className={classesFor(variant, size, className)} {...handlers}>

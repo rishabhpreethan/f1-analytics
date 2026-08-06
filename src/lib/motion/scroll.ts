@@ -33,7 +33,7 @@ import { useMotion, type MotionHandle } from './useMotion';
  */
 export function useHeaderHairline<T extends HTMLElement = HTMLElement>(): MotionHandle<T> {
   return useMotion<T>({
-    animate: ({ root, q, tl }) => {
+    animate: ({ q, tl }) => {
       tl.fromTo(
         q('[data-motion="hairline"]'),
         { opacity: 0 },
@@ -45,8 +45,20 @@ export function useHeaderHairline<T extends HTMLElement = HTMLElement>(): Motion
         0,
       );
 
+      /**
+       * **The trigger is the document, not `root`.** `start: '24px top'` means "24px down the
+       * trigger element has reached the top of the viewport", so it only reads as a scroll
+       * threshold when the trigger is the document. `root` here is a 1px child of a
+       * `position: sticky` header, which never leaves the top of the viewport — the threshold
+       * then resolved against the header's own height instead of the scroll position, at some
+       * value near 79px rather than 24px.
+       *
+       * `useScrollState` uses the same 24px figure for the reduced-motion path, and the two
+       * must agree or the hairline appears at two different places depending on the
+       * preference.
+       */
       ScrollTrigger.create({
-        trigger: root,
+        trigger: document.documentElement,
         start: '24px top',
         animation: tl,
         toggleActions: 'play none none reverse',

@@ -109,9 +109,14 @@ const stagger = {
 /**
  * Distances, px. Small on purpose — every entrance here is a settle, not an arrival
  * from off-screen.
+ *
+ * **Every entry has a call site.** Two did not and are gone: `hairline` (1), which described a
+ * card-hover nudge that is a CSS transition and never was a tween; and `spotlight` (220), which
+ * duplicated `--size-spotlight` in `tokens.css` — the gradient radius is read by CSS, never by
+ * JavaScript, so a second copy here could only ever drift out of agreement with the one that
+ * renders.
  */
 const dist = {
-  hairline: 1, // the y-nudge on a hovered card
   nudge: 6, // shell mount, dock item entrance
   step: 8, // rows, popover rows
   rise: 10, // route content enter
@@ -120,7 +125,6 @@ const dist = {
   sheet: 24, // the bottom sheet's travel
   parallax: 14, // G-21 clamp
   magnet: 6, // G-9 clamp
-  spotlight: 220, // G-8 spotlight radius
 } as const;
 
 export const MOTION = { dur, ease, m, loop, stagger, dist } as const;

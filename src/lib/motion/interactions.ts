@@ -185,12 +185,20 @@ function matchesFinePointer(): boolean {
  * **Applied to exactly one element in the product** — the landing hero's primary action. A page
  * of magnetic buttons is a toy, and §4.6 says so; the clamp is what keeps it a suggestion of
  * weight rather than a button that runs away from the cursor.
+ *
+ * `enabled` exists because `ButtonLink` renders one component for every link and only one link
+ * is magnetic. Hooks cannot be called conditionally, so the *behaviour* is gated instead: with
+ * `enabled: false` no `quickTo` is constructed and no entry is put in `POINTER_SETTERS`, which
+ * matters because every `ButtonLink` in the product calls this.
  */
 const MAGNET_RATIO = 0.14;
 
-export function useMagnet<T extends HTMLElement = HTMLAnchorElement>(): SpotlightMotion<T> {
+export function useMagnet<T extends HTMLElement = HTMLAnchorElement>(
+  enabled = true,
+): SpotlightMotion<T> {
   const { scope, motionSafe } = useMotion<T>({
     animate: ({ root, gsap: g }) => {
+      if (!enabled) return undefined;
       POINTER_SETTERS.set(root, {
         x: voidSetter(g.quickTo(root, 'x', { ...m.pointer })),
         y: voidSetter(g.quickTo(root, 'y', { ...m.pointer })),
@@ -199,6 +207,7 @@ export function useMagnet<T extends HTMLElement = HTMLAnchorElement>(): Spotligh
         POINTER_SETTERS.delete(root);
       };
     },
+    deps: [enabled],
   });
 
   const fine = matchesFinePointer();

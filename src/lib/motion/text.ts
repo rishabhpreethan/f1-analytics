@@ -1,5 +1,5 @@
 import { SplitText } from './gsap';
-import { dur, m, stagger } from './tokens';
+import { dur, ease, m, stagger } from './tokens';
 import { useMotion, type MotionHandle } from './useMotion';
 
 /**
@@ -90,7 +90,9 @@ export function useCountUp<T extends HTMLElement = HTMLDivElement>(
           {
             value: target,
             duration: dur.reveal,
-            ease: 'power2.out',
+            // `ease.enter` *is* `power2.out`. The literal was the same curve by coincidence,
+            // which is the failure mode `tokens.ts` exists to remove.
+            ease: ease.enter,
             snap: { value: 1 },
             onUpdate: () => {
               element.textContent = String(proxy.value);
