@@ -2511,6 +2511,55 @@ this changes documentation, not the decision.
 together add **no more than 4 KB gz**, taking the CSS artefact from 5.84 to ≤ 10 KB gz. C7-8 measures
 and records both figures; over the cap, layers get cut rather than the cap raised.
 
+###### S.6.1a Measured, C7-8 — `developer`, 2026-08-06
+
+`npm run build`, `vite build`'s own gzip figures, at commit `63583f2` (C7-7 complete).
+
+| Artefact | Measured gz | Budget | |
+|---|---|---|---|
+| **initial JS** | **161.33 KB** | 250 KB (§8) | **65 % of budget, 89 KB headroom — PASS** |
+| **CSS** | **9.26 KB** | ≤ 10 KB (above) | **PASS.** Delta from the 5.84 KB baseline is **+3.42 KB**, inside the +4 KB cap |
+| initial JS, raw | 495.17 KB | — | |
+| `index.html` | 0.72 KB | — | |
+
+**Against the projection: 161.33 KB measured versus ≈157 KB projected with ScrollTrigger — 2.8 %
+over, inside the 10 % tolerance §S.8 sets.** The overshoot is accounted for: the projection had no
+`SplitText` (+3.0) and estimated `Landing` + selectors at 3.0 KB for what became five components,
+three sections and a coverage ruler.
+
+**GSAP's share, broken out.** Measured with §10 #21's method — `esbuild --bundle --minify
+--format=esm`, `react`/`react-dom` external, then `gzip -9`:
+
+| Import surface | raw | **gzip** |
+|---|---|---|
+| `gsap` + `@gsap/react` | 71,773 B | **28,052 B (27.4 KB)** |
+| + `ScrollTrigger` | 116,273 B | **45,508 B (44.4 KB)** |
+| + `SplitText` — **what this product ships** | 124,643 B | **49,004 B (47.9 KB)** |
+
+So the animation library is **47.9 KB gz of the 161.33 KB initial chunk — 30 % of it**, and the swap
+from the retired library's measured 40.8 KB **costs ≈7.1 KB gz**. That reproduces the `designer`'s
+figure (§4.1: 47.7 KB, "the swap costs ≈6.9 KB") to within 0.2 KB and confirms the correction in
+§10 #21: the CR's "the bundle goes down" is **false** as shipped, and true only without ScrollTrigger.
+The decision stands on the headroom, not on the claim.
+
+**`npm audit` → `found 0 vulnerabilities`** (S-7, no exception).
+
+> ⛔ **The `styleSrcAttr` half of C7-8 is NOT discharged, and `server/app.ts` is unchanged.**
+> §2.4 permits removal on exactly one evidence: **zero CSP violations in the production-preview
+> console**, re-verified in both consoles after removal. That evidence requires a browser, and the
+> agent that ran C7-1…C7-8 has none — there is no QA gate any more (CR-006) and no Playwright step in
+> this CR's gate order. Removing the allowance on a *static* argument would be exactly the
+> reasoning §2.4 refuses ("T13 settles it against the production build, not by reasoning").
+>
+> What **was** checked statically, and is offered as input rather than as discharge: no inline
+> `<script>` and no inline `<style>` exists in `index.html` or in the built output; the three places
+> this CR sets a CSS custom property from JavaScript (`AtmosphereField`'s `--atmosphere-line-path`,
+> `CoverageRuler`'s two band variables) go through React's `style` prop, which React applies via
+> `style.setProperty` — CSSOM, which CSP does not govern; and GSAP writes exclusively through
+> `element.style`, with no `document.createElement("style")` anywhere in the shipped ESM source of
+> `gsap`, `ScrollTrigger` or `SplitText`. **The expectation is therefore that removal is safe. It
+> still needs the two console observations, and they belong to whoever next opens a browser.**
+
 ###### S.6.2 CPU cost of an always-running animation
 
 The reason the mechanism split (§10 #22) is a performance decision and not a style one:
