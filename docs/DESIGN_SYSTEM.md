@@ -760,7 +760,26 @@ The old `M-1 … M-11` identifiers are **retired**. Any code comment or spec cit
 | **G-0** | Root reduced-motion guard | `gsap.matchMedia()` | app mount | one `gsap.matchMedia()` created in `src/lib/motion.ts`, exported; every ambient and spatial tween registers through it | — (this *is* the mechanism) |
 | **G-1** | Shell mount — header, dock | `gsap.timeline`, Eases | once per hard load | timeline: header `opacity 0→1, y −6→0`, `dur.base`, `ease.enter`; then dock container `opacity 0→1, x −12→0` (rail) / `y 12→0` (bottom dock) at `-=0.10`; then dock items `opacity 0→1, x −6→0`, `dur.fast`, `stagger.nav`. Total **≤460ms** | opacity only, `dur.fast`, no stagger, no transform |
 | **G-2** | Route content enter | `gsap.fromTo`, Eases | `location.pathname` change | `main > *`: `opacity 0→1, y 10→0`, `dur.base`, `ease.enter`. **No exit tween** — an exit would add its duration to every perceived navigation | opacity only, `dur.fast` |
-| **G-3** | Dock active-item indicator | `gsap.quickTo`, Eases | active route change, and rail resize | one absolutely-positioned indicator element. Rail: `quickTo(el,"y")` to the active item's `offsetTop`, `dur.slow`, `ease.arrive`; the 2px `--accent-mark` edge rule tweens `scaleY 0.4→1` over `dur.fast`. Bottom dock: `quickTo(el,"x")` to `offsetLeft`, same timing | **not created** — the indicator is positioned by a single `gsap.set()`. It snaps. Correct and intended |
+| **G-3** | Dock active-item indicator | `gsap.from` + Eases | active route change, and rail resize | one absolutely-positioned indicator element, a **fixed 2×20px** bar (2×16 in the bottom dock) **vertically centred** on the active item. Rail: tweens `y` to `offsetTop + (height − 20) / 2`, `dur.slow`, `ease.arrive`; the 2px `--accent-mark` edge rule tweens `scaleY 0.4→1` over `dur.fast`. Bottom dock: the same on `x`, same timing | **not created** — the indicator is positioned by a single `gsap.set()`. It snaps. Correct and intended |
+
+> **G-3 — two corrections landed 2026-08-06, after the build (CR-007 gates 4–5).** This row
+> previously read `quickTo(el,"y")` to the active item's bare `offsetTop`, and did not state a fixed
+> indicator length.
+>
+> 1. **`gsap.from`, not `quickTo`.** `quickTo` reuses a single tween instance, and `useMotion`
+>    hard-codes `revertOnUpdate: true`, so no instance survives a dependency change — the setter
+>    would be rebuilt from the current position on every route change and the travel would be lost.
+>    The previous offset is carried in a `WeakMap` keyed by the element instead, the same pattern
+>    `POINTER_SETTERS` uses. Duration and ease are unchanged.
+> 2. **A fixed 2×20 / 2×16 bar, centred** — resolving a conflict between this file and Technical
+>    Spec §S.3.6, whose `computeIndicatorGeometry` returned a scale factor and produced a bar as
+>    long as the item (2×48 in the rail). On a purely visual matter this file governs; the resolution
+>    is recorded in `PLAN.md` §S.3.6 and the function now returns `{ offset } | null` with no scale.
+>    The lengths live in `tokens.css` in **px** — a `rem` length would not equal the JS centring
+>    arithmetic — mirrored by `INDICATOR_LENGTH` and tied together by `index.css.test.ts`.
+>
+> Recorded by the coordinating session rather than the `designer`, as a factual correction to bring
+> this row in line with shipped, reviewed code; no design intent was changed.
 | **G-4** | Dock rail expand / collapse (≥1024) | `gsap.timeline`, Eases | `pointerenter` / `pointerleave` on the rail; `focusin` / `focusout`; the pin toggle | rail `width 64→232`, `dur.slow`, `ease.arrive`; labels `opacity 0→1, x −8→0`, `dur.fast`, `ease.enter`, `stagger {each:0.02}`, starting at `+=0.06`. Collapse reverses at `dur.base`, `ease.exit`. **`width` is animated here and this is the one permitted case** — it is a discrete user-initiated transition, not a loop, the rail is `position: fixed` so it triggers no layout in `main`, and the alternative (`scaleX`) would distort the glyphs | **not created.** Under `reduce` the rail is **permanently expanded at 232px** and the pin control is hidden — a hover-to-reveal affordance is exactly what reduced-motion users should not have to chase |
 | **G-5** | Dock overflow sheet (<1024) | `gsap.timeline` | "More" tap | scrim `opacity 0→1`, `dur.fast`, `ease.enter`; panel `y 24→0` + `opacity 0→1`, `dur.slow`, `ease.arrive`; rows `opacity 0→1, y 8→0`, `dur.fast`, `stagger.nav`. Close reverses at `dur.base`, `ease.exit` | opacity only on scrim and panel, `dur.fast`, no stagger |
 | **G-6** | Popover open / close (theme, coverage) | `gsap.fromTo` | trigger click / `Esc` / outside click | `opacity 0→1`, `scale 0.96→1`, `dur.fast`, `ease.enter`, `transformOrigin` at the trigger corner. Close: `opacity→0`, `scale→0.98`, `dur.instant`, `ease.exit` | opacity only, `dur.fast`, no `scale` |
