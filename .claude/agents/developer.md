@@ -123,16 +123,30 @@ reaches a human or it reaches nobody.
 
 ## Self-check before handing off
 
+**You are now the last automated gate (CR-009).** There is no `reviewer` and no `qa` — after you, the
+next thing that happens is **Rishabh looking at the running app.** Nothing catches a mistake between
+your hand-off and a human's eyes.
+
 Run these and paste real output to the orchestrator. **Do not claim it passes — show it.**
 
 ```bash
-npx tsc --noEmit
+npm run typecheck          # tsc -b --noEmit — NOT bare `npx tsc --noEmit`, see below
 npm run lint
+npm run format:check
 npm test
-npm run build
+npm run build              # report the gzipped figure against the budget
+npm run validate:palette   # if the change touches colour
+npm audit --audit-level=high
 git status --short          # nothing unexpected staged
 git log --oneline main..HEAD
 ```
+
+**⚠ Never use bare `npx tsc --noEmit`.** The root `tsconfig.json` is a solution file with
+`"files": []`, so it compiles **nothing** and always exits 0. It produced a false green during CR-007
+that hid 12 real errors. Always `npm run typecheck`.
+
+**Run the full suite at least 3 times** and show every result line. CR-007 shipped a suite that passed
+once and failed the next run; a single green run is not evidence.
 
 Then confirm by hand:
 - [ ] Every requirement ID in scope is implemented
@@ -140,6 +154,36 @@ Then confirm by hand:
 - [ ] All five data states implemented on every data-driven surface
 - [ ] No `any`, no `@ts-ignore` without justification
 - [ ] No database file, no `.env`, no seed artefact staged
+- [ ] Bundle inside the gzipped budget, **measured**
+
+### The four security checks — yours now (CR-009), verdict required on each
+
+Inherited from the retired `reviewer` gate. State a verdict on all four; a hand-off without them is
+incomplete. Each guards something a code change can actually break:
+
+| ID | Check |
+|---|---|
+| **S-4** | Every route and query param Zod-parsed before use; rejects rather than coerces; `limit` bounded |
+| **S-6** | No stack trace, SQL text or absolute path in any response body **or on screen** |
+| **S-7** | `npm audit` clean of high/critical; lockfile committed; no unvetted dependency added |
+| **S-10** | Lap-scale queries bounded; no unbounded scan reachable from a request |
+
+The other S-items cannot fail in a read-only app with no auth and are not re-verified per feature —
+but if your diff genuinely touches one (a new query, a header, a filesystem path, a new dependency),
+**check it and say you did.**
+
+### What green checks do not tell you
+
+Typecheck, lint and unit tests all passed on CR-007 while five user-visible defects sat in the code: a
+pointer effect writing `%` where it needed `px` so it rendered outside its element, an entrance
+animation replaying on every hover, a motion a comment claimed existed but nothing implemented, an
+indicator that snapped instead of moving, and a chart axis 130 px out of line. jsdom performs no layout
+and no compositing, so **anything about position, size, timing or visual composition is untested by
+construction.**
+
+Therefore: **name explicitly, in your report, every behaviour you could not verify** and say it needs a
+browser. Do not write "works" about something you have not seen work. An honest "this needs eyes" is
+worth more than a confident claim that fails at gate 4.
 
 ## Reporting
 

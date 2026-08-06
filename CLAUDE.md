@@ -50,19 +50,28 @@ directory**.
 ```
 1. principal-engineer  → Technical Spec into PLAN.md
 2. designer            → Design Spec into PLAN.md        (1 ‖ 2 in parallel)
-3. developer           → implement on the feature branch
-4. reviewer            → ONE pass: code review + S-4/S-6/S-7/S-10
-5. developer           → fix blocking findings            (loop 4–5)
-6. Rishabh             → reviews the running frontend himself
-7. orchestrator        → verify gates → approve → merge
+3. developer           → implement on the feature branch + self-check
+4. Rishabh             → reviews the running frontend himself
+5. orchestrator        → verify gates → approve → merge
 ```
 
-**Gone:** `designer` visual verification, the separate security audit, and the `qa` E2E gate. The
-`designer` still writes the Design Spec — only the after-the-fact screenshot pass is removed. The
-four S-items that a code change can actually break (**S-4** input validation, **S-6** error hygiene,
-**S-7** `npm audit`/lockfile, **S-10** query-cost bounds) fold into gate 4 as a blocking checklist;
-the rest cannot fail in a read-only app with no auth and are not re-verified per feature. `qa` is
-dormant, not deleted. Full rationale and the accepted loss of assurance: `PLAN.md` §2.3.
+**Gone, across CR-006 and CR-009:** `designer` visual verification, the separate security audit, the
+`qa` E2E gate, and — as of 2026-08-06 — **the `reviewer` gate itself.** `reviewer` and `qa` are both
+**dormant: do not dispatch them.** The `designer` still writes the Design Spec; only its screenshot
+pass is gone.
+
+**The four S-items that a code change can actually break are now the `developer`'s own self-check**,
+and it must state a verdict on each before hand-off: **S-4** input validation, **S-6** error hygiene,
+**S-7** `npm audit`/lockfile/no unvetted dependency, **S-10** query-cost bounds. The rest cannot fail
+in a read-only app with no auth.
+
+**Know what this trades away.** The `reviewer` was removed straight after catching **five blocking
+CR-007 defects that 210 passing tests missed** — a pointer spotlight rendering `%` instead of `px` so
+it landed outside the card, the dock replaying its whole entrance on every hover, a motion a comment
+claimed existed but nothing implemented, an indicator that snapped instead of travelling, and a chart
+axis 130 px out of line. **Green tests plus clean types no longer imply the screen is right.** Gate 4
+is a human looking at it, and it is the only thing standing where that gate stood. Do not tell Rishabh
+something works on screen unless it has been seen working. Full record: `PLAN.md` §2.3.
 
 Step 3 cannot start without specs from 1 and 2. Nobody but the `orchestrator` writes `✅ Done`.
 **Evidence, not assertions** — reject any completion claim without file paths or command output.

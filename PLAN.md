@@ -65,16 +65,36 @@ claude mcp add playwright -- npx -y @playwright/mcp@latest
 ```
 1. principal-engineer  → Technical Spec into this file
 2. designer            → Design Spec into this file          (1 ‖ 2 may run in parallel)
-3. developer           → implement on feat/<slug> + unit tests
-4. reviewer            → ONE pass: code review + the S-checklist folded in
-5. developer           → fix blocking findings                (loop 4–5)
-6. Rishabh             → reviews the running frontend himself
-7. orchestrator        → verify gates → approve → merge
+3. developer           → implement on feat/<slug> + unit tests + self-check
+4. Rishabh             → reviews the running frontend himself
+5. orchestrator        → verify gates → approve → merge
 ```
 
-**Reduced from eleven gates to seven by CR-006 (§5.5), 2026-08-05 — Rishabh's decision.** Development
-was taking too long and consuming too many credits. What was removed, and what happens to its
-concerns:
+**⚠ CR-009, 2026-08-06 — the `reviewer` gate is removed too, on Rishabh's instruction:** *"in our
+plan please remove the reviewer step, we dont need that right now."* Five gates now. The `reviewer`
+agent is **dormant, not deleted** — "right now" was his wording, so this is reversible by a CR.
+
+**What that costs, recorded so the decision is legible later.** The gate was removed immediately
+after the single most productive run in this project's history: on CR-007 it returned **FAIL with five
+blocking findings**, every one invisible to the 210-test suite and every one user-visible on first
+contact — G-8's pointer spotlight writing `%` instead of `px` so the highlight landed *outside* the
+card; the dock replaying its entire 460 ms entrance on every hover and every navigation; G-21 pointer
+parallax never implemented while a comment claimed it was; the dock indicator snapping instead of
+travelling; and the coverage ruler's axis misaligned by ~130 px so every year label sat under the
+wrong bar. **That class of defect — correct-looking code, green tests, wrong on screen — now reaches
+Rishabh at gate 4 or reaches nobody.** He has since found two more of the same class himself (the
+clipped rail labels and the unexplained vintage chip, CR-008), which is the mechanism working as he
+intends it to.
+
+**The four security checks do not vanish.** S-4 (input validation), S-6 (error hygiene), S-7
+(`npm audit` / lockfile / no unvetted dependency) and S-10 (query-cost bounds) move into the
+**`developer`'s own self-check** before hand-off. They cost minutes and each guards something a code
+change can actually break. A `developer` that cannot state a verdict on all four has not finished.
+
+---
+
+**Previously, CR-006, 2026-08-05 — eleven gates to seven.** Development was taking too long and
+consuming too many credits. What was removed then, and what happened to its concerns:
 
 | Removed gate | Was | Now |
 |---|---|---|
@@ -118,7 +138,7 @@ A feature is Done only when **all** hold:
 
 - [ ] Every requirement ID in scope implemented, or deferred with a recorded reason
 - [ ] Technical Spec and Design Spec both present in this file
-- [ ] `CODE REVIEW: PASS` — including verdicts on **S-4, S-6, S-7, S-10** (§2.3)
+- [ ] `developer` **self-check** signed off, with an explicit verdict on **S-4, S-6, S-7, S-10** (§2.3). **`CODE REVIEW: PASS` was removed by CR-009** — there is no `reviewer` gate
 - [ ] Typecheck, lint, format, unit tests, build all clean
 - [ ] Bundle inside the gzipped budget, **measured**
 - [ ] **Rishabh has reviewed the running frontend**
@@ -133,7 +153,7 @@ A feature is Done only when **all** hold:
 ## 3. Master tracker
 
 Status vocabulary (CR-006 reduced this with the gate order): `Not started` · `Spec in progress` ·
-`Design in progress` · `Ready for dev` · `In development` · `In review` · `Fixing findings` ·
+`Design in progress` · `Ready for dev` · `In development` · `Fixing findings` ·
 `Rishabh review` · `Awaiting approval` · `✅ Done`
 
 | ID | Feature | Branch | Depends on | Status | Approved |
@@ -2830,7 +2850,8 @@ review of §3's layering rules, and none of them moves.
    survives **only if ScrollTrigger is not shipped**. Nobody needs to re-decide anything, but nobody
    should quote 23/33 again.
 3. **A landing page changes what `/` means, and `REQUIREMENTS.md` NV-3 is the requirement it satisfies.**
-   Flagged so it is scored against NV-3 at gate 7 rather than treated as unrequirement-ed polish.
+   Flagged so it is scored against NV-3 at Rishabh's review gate rather than treated as
+   unrequirement-ed polish. (Originally written as "gate 7"; the gate order is now five steps — CR-009.)
 4. **Not escalated, and deliberately declined:** I did **not** specify a Web Worker /
    `OffscreenCanvas` backdrop, a WebGL shader background, `ScrollSmoother`, or a "wow" hero statistic
    that would need a new query. Each is refused with a reason in §10 #21/#24, §S.3.5 or §S.4 — so if
@@ -4610,16 +4631,18 @@ Identical to a feature. Branch: `change/CR-<id>-<slug>`.
 1. orchestrator        → CR entry, triage, class, Document Impact Assessment
 2. principal-engineer  → technical spec + confirms/corrects the doc impact
 3. designer            → design spec (skip only if the CR touches no UI — recorded explicitly)
-4. developer           → implement on change/CR-<id>-<slug>, including doc updates
-5. reviewer            → code review + S-4/S-6/S-7/S-10 + verifies doc updates landed
-6. developer           → fix blocking findings                     (loop 5–6)
-7. Rishabh             → reviews the running frontend if the CR touched UI
-8. orchestrator        → verify gates → approve → merge
+4. developer           → implement on change/CR-<id>-<slug>, including doc updates,
+                         + self-check with verdicts on S-4/S-6/S-7/S-10, and confirms
+                         the doc updates actually landed
+5. Rishabh             → reviews the running frontend if the CR touched UI
+6. orchestrator        → verify gates → approve → merge
 ```
 
-Reduced from twelve steps to eight by **CR-006** (§5.5), in step with §2.3. Step 3 may be skipped
-**only** when the CR provably touches no UI, and the `orchestrator` records that decision and its
-reason in the CR entry.
+Twelve steps → eight (**CR-006**) → **six (CR-009**, which removed the `reviewer` gate), in step with
+§2.3. Step 3 may be skipped **only** when the CR provably touches no UI, and the `orchestrator` records
+that decision and its reason in the CR entry. **Step 4 absorbed the `reviewer`'s obligations**: the
+`developer` verifies its own conformance to the docs, self-checks the four S-items, and confirms the
+Document Impact Assessment was honoured rather than merely written.
 
 **Efficiency rules, added by CR-006 — these bind every agent.** The gate reduction alone does not
 control cost; re-reading this file does. This file is over 200 KB, and an agent that opens it whole
@@ -4644,6 +4667,56 @@ spends more than the work is worth.
 | CR-005 | 2026-08-04 | Remove the upstream-attribution constraint and its check from the gate order entirely — not downgrade it. Forward obligation only; the historical record stays. **Supersedes CR-002** | C | `PLAN.md`, `REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN_SYSTEM.md`, `CLAUDE.md`, `.claude/agents/*.md` · **`docs/DATABASE.md` and `.gitignore`: no change** | folded into `feat/foundation` (F0) — deviation recorded below | **All doc changes landed** | — |
 | CR-006 | 2026-08-05 | **Cut the gate count.** Drop `designer` visual verification, the separate security audit, and the `qa` E2E gate. The `reviewer` just reviews code; Rishabh reviews the frontend himself. Development was too slow and consumed too many credits | C | `PLAN.md` §2.3/§2.5/§3/§5.4, `CLAUDE.md` §3, `.claude/agents/reviewer.md`, `.claude/agents/qa.md`, `.claude/agents/designer.md`, `.claude/agents/orchestrator.md` · **`REQUIREMENTS.md`, `docs/DATABASE.md`: no change** | folded into `feat/foundation` (F0) | Doc changes landing now | — |
 | CR-007 | 2026-08-05 | **Redo the F0 frontend.** The shell is "too basic, too bland, too ew". Wanted: a landing page with a wow factor, a moving background matching the vibe, a real accent colour used throughout, a richer nav (floating dock or collapsible sidebar) with strong animation, pervasive hover/interaction feedback, and **GSAP** as the animation library. Design delegated to Claude — "I want you to wow me" | **B** | `PLAN.md` (F0 Design Spec + Technical Spec), `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md` (§2 dependencies, §10 decision log) · **`REQUIREMENTS.md`: change — new landing surface** · **`docs/DATABASE.md`: no change** | folded into `feat/foundation` (F0) | Specs in progress | — |
+
+| CR-008 | 2026-08-06 | **Replace the landing background.** Rishabh: *"im not a fan of the background thats there currently for the landing page"*, suggesting a dot-grid background, then *"or anything else that you like more than this, im leaving it in your hands, i just dont like the current one"*. Design delegated to Claude again | B | `PLAN.md` (F0 Design Spec §7.7 + the atmosphere task rows), `docs/DESIGN_SYSTEM.md` §7.7/§4.6 · **`docs/ARCHITECTURE.md` §10 #24: no change if the mechanism stays CSS-composited** · **`REQUIREMENTS.md`, `docs/DATABASE.md`: no change** | folded into `feat/foundation` (F0) | Design spec in progress | — |
+
+| CR-009 | 2026-08-06 | **Remove the `reviewer` gate.** Rishabh: *"in our plan please remove the reviewer step, we dont need that right now."* Five gates. S-4/S-6/S-7/S-10 move into the `developer`'s self-check; `reviewer.md` goes dormant, not deleted | C | `PLAN.md` §2.3/§2.5/§3/§5.4, `CLAUDE.md` §3, `.claude/agents/reviewer.md`, `.claude/agents/developer.md`, `.claude/agents/orchestrator.md` · **`REQUIREMENTS.md`, `docs/*`: no change** | folded into `feat/foundation` (F0) | Doc changes landing now | — |
+
+---
+
+#### CR-008 — replace the landing background · **Class B** · design delegated
+
+**What is there now**, and being replaced: six layers in `src/styles/backdrop.css` — a drifting 48px
+grid, **three soft gradient orbs** (`atmosphere-orb-a/b/c`), a **comet** on an SVG racing line
+(head/trail/glow), a static grain tile, and the contrast plate.
+
+**The likely culprit, and it was predicted.** The `designer` itself named "whether the orbs read as
+depth or smudge" as the single most likely first-look failure (Design Spec §13 item 11), and the
+`reviewer` and both build agents all flagged it as unverifiable without a display. It was the one
+part of the design that no measurement could settle, and it is the part that failed.
+
+**On the referenced Framer marketplace component.** Not adoptable, for two independent reasons — the
+idea is fine, the artefact is not:
+
+1. **It is a Framer-platform component**, authored for Framer's own runtime, not a library this app
+   can import. `framer-motion` was removed from this project by CR-007; re-introducing anything
+   Framer-shaped to obtain a background would reverse that for decoration.
+2. **The page could not be read** — it is client-rendered, so its licence terms, price and
+   configurable properties are not visible to a fetch. Adopting a third-party component whose licence
+   has not been read is not something this project does.
+
+**A dot grid is a good instinct and is cheap to build natively** — a tiled `radial-gradient`
+needs no DOM per dot, no canvas, no library, and no asset. It also reads as *instrumentation* rather
+than atmosphere, which suits a timing-and-telemetry product better than soft orbs do.
+
+**Constraints carried over unchanged from CR-007** — the background may not be re-litigated on these:
+
+- **CSS-composited only** (`ARCHITECTURE.md` §10 #24). No canvas, no WebGL, no per-frame main-thread
+  work — the §8 sub-100 ms chart-interaction budget from F2 depends on that thread staying free.
+- **CSP is `script-src 'self'` / `style-src 'self'`** with no inline script or style, so nothing may
+  depend on either.
+- **Looping motion is CSS `@keyframes`, never GSAP** (MR-1, §10 #22). Pointer-driven response stays
+  GSAP's, via the existing `quickTo` plumbing.
+- **Reduced motion must produce a genuinely static composed image** — stopped, not slowed, and every
+  `@keyframes` must start from `transform: none`.
+- **Contrast must be re-measured, not assumed.** The **contrast plate exists** because text over the
+  orb field fell to 2.64:1 on `--border-control` and 4.00:1 on `--ink-tertiary`. A different field
+  changes those numbers in *both* directions — the plate may become unnecessary, or may need to stay.
+  `scripts/validate-palette.mjs` is committed; use it and report the figures.
+- **Intensity stays a pure function of the route** (`backdropIntensityFor`), `off` on the
+  chart-dominant surfaces F3 will build.
+- **CSS budget:** currently 9.34 KB gzipped against a ≤10 KB cap; the atmosphere's own delta is
+  +3.50 KB against a +4 KB cap (§S.6.1a). A replacement should ideally *reclaim* space.
 
 ---
 

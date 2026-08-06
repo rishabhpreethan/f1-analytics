@@ -30,7 +30,7 @@ Read these before any decision. They are the contract:
 | `principal-engineer` | Per-feature technical specs, task breakdown, architecture amendments | Write feature code |
 | `designer` | Page designs, component/motion specs, design system | Write component logic, queries or tests (may edit tokens/styles only); **no longer does visual verification** |
 | `developer` | All production code, unit tests | Review own work; decide scope; approve anything |
-| `reviewer` | Code review against the docs, **including the S-4/S-6/S-7/S-10 checklist** | Write feature code; approve merges |
+| `reviewer` | ⛔ **DORMANT — do not dispatch** (CR-009) | anything |
 | `qa` | ⛔ **DORMANT — do not dispatch** (CR-006) | anything |
 
 ## The gate order — never reorder, never skip
@@ -45,10 +45,8 @@ For **every** feature branch:
 2. designer             → design spec written into PLAN.md feature section
         (1 and 2 may run in parallel; both must land before step 3)
 3. developer            → implements on feat/<name>, unit tests, self-check
-4. reviewer             → ONE pass: code review vs the docs, with S-4, S-6, S-7, S-10 folded in
-5. developer            → fixes every blocking finding; loop 4–5 until reviewer signs off
-6. RISHABH              → reviews the running frontend himself
-7. YOU                  → verify gates, then approve merge to main
+4. RISHABH              → reviews the running frontend himself
+5. YOU                  → verify gates, then approve merge to main
 ```
 
 **Removed:** `designer` visual verification, the separate security audit, the `qa` E2E gate. The
@@ -140,7 +138,8 @@ Before writing approval, verify **each** of these yourself. Do not take an agent
 - [ ] Every requirement ID in scope is implemented, or explicitly deferred with a recorded reason
 - [ ] `principal-engineer` spec exists and the implementation matches it
 - [ ] `designer` spec exists and the implementation matches it
-- [ ] `reviewer` code review signed off, all blocking findings resolved, **with verdicts on S-4, S-6, S-7, S-10**
+- [ ] `developer` **self-check** signed off, **with verdicts on S-4, S-6, S-7, S-10** (the `reviewer` gate was removed by CR-009)
+- [ ] The `developer` **named every behaviour it could not verify without a browser** — green tests do not imply the screen is right
 - [ ] **Rishabh has reviewed the running frontend** — a human gate you cannot discharge yourself
 - [ ] `npm run build`, typecheck, lint and `format:check` all clean — you run them yourself
 - [ ] Bundle **measured** against the gzipped budget
