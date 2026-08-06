@@ -18,7 +18,7 @@
 export interface LoadingStateProps {
   /**
    * What is loading. Becomes the busy container's accessible name, because a skeleton has
-   * no text of its own.
+   * no text of its own. Ignored when `announce` is `false`, where there is no region to name.
    */
   label?: string;
   /**
@@ -27,10 +27,23 @@ export interface LoadingStateProps {
    * `styles/index.css` — never an inline dimension.
    */
   className?: string;
+  /**
+   * `false` when the **caller** already owns the busy region for the whole group, and this is
+   * one block of several inside it.
+   *
+   * §7.5's rule is "told busy once", and a panel whose skeleton is several blocks breaks it by
+   * default: eight of these in one strip is eight `role="status"` regions with the same name
+   * inside one `aria-busy` container, which is eight announcements of the same fact. The
+   * container is the right place for the region — it is the thing that is loading — so this
+   * renders the geometry alone and nothing else.
+   */
+  announce?: boolean;
 }
 
-export function LoadingState({ label = 'Loading', className }: LoadingStateProps) {
+export function LoadingState({ label = 'Loading', className, announce = true }: LoadingStateProps) {
   const blockClass = ['skeleton', className].filter(Boolean).join(' ');
+
+  if (!announce) return <span aria-hidden="true" className={blockClass} />;
 
   return (
     <span className="inline-flex" role="status" aria-busy="true" aria-label={label}>

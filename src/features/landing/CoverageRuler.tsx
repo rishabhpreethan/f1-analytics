@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { useSectionReveal } from '@/lib/motion/scroll';
+import { useAxisAnchoredBars, useSectionReveal } from '@/lib/motion/scroll';
 import type { CoverageBand } from './selectors';
 
 /**
@@ -108,6 +108,11 @@ function Ruler({
   bands: readonly CoverageBand[];
   ticks: ReadonlyArray<{ year: number; at: number }>;
 }) {
+  // §3.5's `Reveal` row: the bars grow from their right edge, which is the axis they are
+  // anchored to. Mounted here rather than on the section, because the bars only exist once the
+  // data has resolved and G-15's `once: true` trigger has usually fired by then.
+  const { scope } = useAxisAnchoredBars<HTMLDivElement>();
+
   return (
     <>
       {/*
@@ -115,7 +120,7 @@ function Ruler({
        * only by hover. The accessible name combines the label and the availability, because a row
        * that announces only "Lap-by-lap timing" has told a screen-reader user nothing.
        */}
-      <div role="list" className="ruler">
+      <div ref={scope} role="list" className="ruler">
         {bands.map((band) => (
           <div
             key={band.label}
@@ -129,6 +134,7 @@ function Ruler({
             <span className="ruler-track" aria-hidden="true">
               <span
                 className="ruler-fill"
+                data-motion="ruler-bar"
                 style={
                   {
                     '--band-offset': `${String(band.offset * 100)}%`,
@@ -196,7 +202,10 @@ function Ruler({
  */
 function RulerSkeleton() {
   return (
-    <div role="list" className="ruler" aria-busy="true">
+    // One busy region for the whole ruler, for the same reason `StatStrip` has one for the whole
+    // strip: six `role="status"` regions with the same name inside one `aria-busy` container is
+    // six announcements of one fact, and §7.5 asks for one.
+    <div role="list" className="ruler" aria-busy="true" aria-label="Coverage windows">
       {[
         'Results',
         'Qualifying positions',
@@ -209,7 +218,7 @@ function RulerSkeleton() {
           <span className="ruler-label t-sm text-ink-primary">{label}</span>
           <span className="ruler-track" aria-hidden="true" />
           <span className="ruler-from">
-            <LoadingState label="Coverage window" className="skeleton-ruler-year" />
+            <LoadingState announce={false} className="skeleton-ruler-year" />
           </span>
         </div>
       ))}

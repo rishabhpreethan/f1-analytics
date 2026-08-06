@@ -117,7 +117,7 @@ export function useSectionReveal<T extends HTMLElement = HTMLElement>(): MotionH
         stagger: {
           each: stagger.card.each,
           from: stagger.card.from,
-          amount: staggerAmount(targets.length),
+          amount: staggerAmount(targets.length, stagger.card.each),
         },
       });
 
@@ -132,12 +132,66 @@ export function useSectionReveal<T extends HTMLElement = HTMLElement>(): MotionH
 }
 
 /**
+ * **The axis-anchored growth rule (§6.1), on the bars of the coverage ruler** — Design Spec
+ * §3.5's `Reveal` row, and the first real instance of a rule that every chart from F2 onward
+ * inherits.
+ *
+ * `scaleX 0→1` from `transformOrigin: 'right'` at `dur.chart` / `ease.mech`, staggered
+ * `stagger.bar`. **The origin is the right edge because that is where the bars are anchored**:
+ * every coverage window is open-ended, so it ends at "now" and grows leftward into the past.
+ * A bar that grew from the left would animate its *start year* moving, which is the opposite of
+ * what it means.
+ *
+ * `transformOrigin` is in the tween rather than in CSS — unlike `.popover-panel`, where the
+ * origin is a property of where the panel is anchored. Here it is a property of the rule, and
+ * the rule is what F2 will reuse; the resting CSS needs no origin at all, because at `scaleX: 1`
+ * it makes no difference.
+ *
+ * Its own `ScrollTrigger`, not G-15's: the bars only exist once `/api/meta` has resolved, and
+ * G-15's trigger is `once: true` and has usually already fired by then. Mounting this with the
+ * component that renders the bars is what makes the timing correct without giving G-15 a
+ * dependency array that would replay the section's text.
+ *
+ * Authored `from` (MR-2), so a bar whose trigger never fires — reduced motion, a stalled chunk —
+ * is simply at full width and correct.
+ */
+export function useAxisAnchoredBars<T extends HTMLElement = HTMLElement>(): MotionHandle<T> {
+  return useMotion<T>({
+    animate: ({ root, q, tl }) => {
+      const bars = q('[data-motion="ruler-bar"]');
+      if (bars.length === 0) return undefined;
+
+      tl.from(bars, {
+        scaleX: 0,
+        transformOrigin: 'right',
+        duration: dur.chart,
+        ease: ease.mech,
+        stagger: {
+          each: stagger.bar.each,
+          from: stagger.bar.from,
+          amount: staggerAmount(bars.length, stagger.bar.each),
+        },
+      });
+
+      ScrollTrigger.create({
+        trigger: root,
+        start: 'top 88%',
+        once: true,
+        animation: tl,
+      });
+
+      return undefined;
+    },
+  });
+}
+
+/**
  * The `stagger.cap` rule, expressed the way GSAP wants it. `amount` distributes a *total* delay
  * across the targets, so capping the total at `cap × each` gives items past the cap a shrinking
  * share rather than a growing queue — which is what keeps a long list inside the budget.
  */
-function staggerAmount(count: number): number {
-  return Math.min(count, stagger.cap) * stagger.card.each;
+function staggerAmount(count: number, each: number): number {
+  return Math.min(count, stagger.cap) * each;
 }
 
 /**

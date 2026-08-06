@@ -100,6 +100,12 @@ const stagger = {
   row: { each: 0.024, from: 'start' },
   card: { each: 0.045, from: 'start' },
   /**
+   * The axis-anchored growth of data marks (§6.1). Its first real instance is the coverage
+   * ruler's six bars (Design Spec §3.5), and F2's chart marks inherit it — which is the reason
+   * it is a token here rather than a literal at the one call site.
+   */
+  bar: { each: 0.06, from: 'start' },
+  /**
    * Items after the 12th get **zero** delay: a 20-row stagger at 24ms would take 480ms
    * and break the 400ms interaction ceiling.
    */

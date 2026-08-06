@@ -159,6 +159,52 @@ describe('CT-14 — no landing component carries a hard-coded statistic', () => 
   });
 });
 
+describe('the coverage ruler’s axis is responsive, and its bars are reachable by G-15’s sibling', () => {
+  /** Ticks inside the axis, in DOM order. Scoped, because 1950 and 1990 also appear in prose. */
+  async function axisTicks(): Promise<string[]> {
+    return await waitFor(() => {
+      const ticks = document.querySelectorAll('.ruler-axis .ruler-tick');
+      expect(ticks.length).toBeGreaterThan(0);
+      return [...ticks].map((tick) => tick.textContent ?? '');
+    });
+  }
+
+  it('shows three ticks below 768px', async () => {
+    // Design Spec §3.6: `1950 / 1990 / latestYear` at 390px. jsdom's own `matchMedia` answers
+    // `false`, which is the narrow case. **This branch was unreachable in the product before
+    // this change** — `Landing` passed `dense: true` unconditionally, so five 4-digit mono
+    // labels were rendered into the ~170px of track a 390px viewport leaves.
+    renderLanding(() => ok(META_REAL));
+    expect(await axisTicks()).toEqual(['1950', '1990', '2026']);
+  });
+
+  it('shows all five ticks at 768px and above', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((media: string) => ({
+        matches: media === '(min-width: 48rem)',
+        media,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      })),
+    );
+    renderLanding(() => ok(META_REAL));
+    expect(await axisTicks()).toEqual(['1950', '1970', '1990', '2010', '2026']);
+  });
+
+  it('marks every bar for the axis-anchored growth reveal', async () => {
+    // The contract between the markup and `useAxisAnchoredBars`. If the attribute moves, §3.5a's
+    // growth silently stops happening — which is how it came to be missing in the first place.
+    renderLanding(() => ok(META_REAL));
+    await waitFor(() => {
+      expect(document.querySelectorAll('[data-motion="ruler-bar"]')).toHaveLength(6);
+    });
+  });
+});
+
 describe('CT-20 — the landing states', () => {
   it('renders the hero and a skeleton strip while the request is in flight', () => {
     renderLanding(() => ok(META_REAL));
@@ -166,8 +212,14 @@ describe('CT-20 — the landing states', () => {
     // The hero does not wait for data — that is the §8 rule this asserts.
     expect(screen.getByRole('heading', { level: 1, name: 'Settle the argument.' })).toBeDefined();
     expect(screen.getByRole('link', { name: /Compare drivers/ })).toBeDefined();
-    // Four skeleton pairs, and the strip is `aria-busy`, so a screen reader is told once.
-    expect(screen.getAllByRole('status', { name: 'Coverage figures' }).length).toBeGreaterThan(0);
+    // **Exactly one** busy region, on the strip — not one per skeleton block. Eight regions with
+    // the same name inside one `aria-busy` container is eight announcements of one fact, and
+    // §7.5's rule is "told busy once". `toHaveLength(1)` rather than `toBeGreaterThan(0)`,
+    // because the previous assertion passed with all eight.
+    expect(screen.getAllByRole('status', { name: 'Coverage figures' })).toHaveLength(1);
+    // The four tiles' geometry is still there, so the strip holds its height and the CTA row
+    // above it does not move when the data lands.
+    expect(document.querySelectorAll('.skeleton-stat-figure')).toHaveLength(4);
   });
 
   it('renders the instructional state on a 503, with the hero intact and nothing leaked', async () => {

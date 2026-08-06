@@ -9,6 +9,7 @@ import {
 } from '@/features/landing/selectors';
 import { DataUnavailableState } from '@/components/ui/DataUnavailableState';
 import { ScrollProgress } from '@/components/ui/ScrollProgress';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
  * `/` — the landing surface (Design Spec §3, `ARCHITECTURE.md` §10 #23).
@@ -33,13 +34,25 @@ import { ScrollProgress } from '@/components/ui/ScrollProgress';
  * hero paints from cache on every return to `/` and its loading state is seen once per session.
  * Adding a refetch-on-mount to make the hero feel "live" would trade that away for nothing.
  */
+
+/**
+ * ≥768px gets the full axis. The same figure as `--breakpoint-md`, and one of the two places a
+ * breakpoint is legitimately a JavaScript value (see `useMediaQuery`): **which ticks exist** is a
+ * decision about what to render, not how to style it. Five 4-digit mono labels do not fit in the
+ * ~170px of track a 390px viewport leaves, so Design Spec §3.6 drops the axis to three there —
+ * and rendering all five and hiding two in CSS would leave the collision to be discovered by
+ * whoever next changed the label width.
+ */
+const DENSE_AXIS_QUERY = '(min-width: 48rem)';
+
 export function Landing() {
   const { data, error, isPending } = useMeta();
   const retry = useRetryMeta();
+  const denseAxis = useMediaQuery(DENSE_AXIS_QUERY);
 
   const figures = data === undefined ? null : selectHeroFigures(data);
   const bands = data === undefined ? null : selectCoverageBands(data);
-  const ticks = data === undefined ? [] : selectRulerTicks(data, true);
+  const ticks = data === undefined ? [] : selectRulerTicks(data, denseAxis);
 
   // A missing database is the fresh-clone case and gets the instructional state, not an error
   // card. Every other failure is a failure of *this section*, not of the product.

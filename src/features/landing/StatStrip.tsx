@@ -44,11 +44,15 @@ export function StatStrip({ figures, pending, failed }: StatStripProps) {
 
   if (pending || figures === null) {
     return (
-      <div className="stat-strip" aria-busy="true">
+      // **One busy region for the strip, not one per skeleton block.** §7.5's rule is "told busy
+      // once"; eight `role="status"` regions all named "Coverage figures" inside one `aria-busy`
+      // container is eight announcements of one fact. The strip is the thing that is loading, so
+      // the strip carries the region and the blocks are geometry.
+      <div className="stat-strip" role="status" aria-busy="true" aria-label="Coverage figures">
         {[0, 1, 2, 3].map((slot) => (
           <div key={slot} className="stat-tile">
-            <LoadingState label="Coverage figures" className="skeleton-stat-figure" />
-            <LoadingState label="Coverage figures" className="skeleton-stat-label" />
+            <LoadingState announce={false} className="skeleton-stat-figure" />
+            <LoadingState announce={false} className="skeleton-stat-label" />
           </div>
         ))}
       </div>
