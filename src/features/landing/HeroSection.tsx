@@ -57,7 +57,13 @@ export function HeroSection({ figures, pending, failed }: HeroSectionProps) {
         <h1 ref={headlineScope} id="hero-title" className="hero-headline">
           <span className="hero-line">{'Settle '}</span>
           <span className="hero-line">{'the '}</span>
-          <span className="hero-line text-accent-ink">argument.</span>
+          {/*
+           * The final word is **outlined**, not coloured. §3.6.4's "final word in `--accent-ink`"
+           * cannot survive a monochrome accent — `#08090C` beside `--ink-primary` is ΔE ≈ 5 — so
+           * the emphasis becomes a second typographic weight instead of a second hue. The
+           * `@supports` guard on `.hero-line-outline` is what makes that safe.
+           */}
+          <span className="hero-line hero-line-outline">argument.</span>
         </h1>
 
         <p className="t-md text-ink-secondary hero-lead">

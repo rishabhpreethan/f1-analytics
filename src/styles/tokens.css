@@ -184,9 +184,10 @@
   --color-status-critical-ink: var(--status-critical-ink);
   --color-status-critical-wash: var(--status-critical-wash);
 
-  /* CR-007 — the interface accent, as Tailwind utilities. The **semantic aliases only**:
-   * §3.6.2 is explicit that a component consumes an alias and never a raw `--signal-*`
-   * step, and there is no utility for a raw step so that cannot be done by accident. */
+  /* The interface accent, as Tailwind utilities. **Monochrome since 2026-08-06** — the
+   * accent is the extreme end of the neutral scale, not a hue (§3.6). The names are
+   * unchanged on purpose: every one of the ~76 call sites reads a semantic alias, which is
+   * exactly what let the hue be removed without touching a single component. */
   --color-accent-ink: var(--accent-ink);
   --color-accent-ink-strong: var(--accent-ink-strong);
   --color-accent-fill: var(--accent-fill);
@@ -242,28 +243,37 @@
   --scrim: rgb(0 0 0 / 0.44);
 
   /* ---------------------------------------------------------------- the accent, light
-   * §3.6.3. Every figure below was measured by `scripts/validate-palette.mjs`
-   * (§9.2.1 V-11) — 5.14 / 4.84 / 4.55:1 for `--accent-ink` on raised / canvas / sunken
-   * against a floor of 4.5, and 3.62 / 3.41 / 3.20 for `--accent-mark` against 3.0.
+   * §3.6.3, **monochrome**. The accent is the *absolute* end of the neutral scale —
+   * `#08090C` in light, `#FFFFFF` in dark — and its emphasis comes from **contrast,
+   * inversion, weight and motion**, never from hue.
    *
-   * `--accent-wash` gets its **own ink**: `--accent-ink` on the wash measures 4.25:1, which
-   * FAILS, and `--accent-wash-ink` at 6.33:1 is the fix (V-11a). This is the same ink/wash
-   * pattern §3.4.1 already uses for the timing colours.
+   * Every figure below was measured by `scripts/validate-palette.mjs` (§9.2.2 **V-18**):
+   * `--accent-ink` **19.91 / 18.75 / 17.61:1** on raised / canvas / sunken (floor 4.5) and
+   * `--accent-mark` the same figures against a floor of 3.0. The retired magenta reached
+   * 5.14 / 4.84 / 4.55 and 3.62 / 3.41 / 3.20 — so **every accent surface in the product got
+   * between 3.5× and 5.5× more separation from its background**, which is the whole reason a
+   * monochrome accent is not a quieter one.
+   *
+   * `--accent-wash` keeps its own ink token even though `--accent-ink` now clears it easily
+   * (16.07:1): the alias is the API, and a component must not have to know which of the two
+   * happens to work on a given surface.
    */
-  --accent-ink: var(--signal-600);
-  --accent-ink-strong: var(--signal-700);
-  --accent-fill: var(--signal-600);
-  --accent-fill-hover: var(--signal-700);
+  --accent-ink: #08090c;
+  --accent-ink-strong: #000000;
+  --accent-fill: #08090c;
+  /* Hover **recedes one step** rather than deepening, because `--accent-fill` is already the
+   * pole and there is nowhere darker to go. `--accent-on` on it: 11.95:1 (V-18). */
+  --accent-fill-hover: #33373e;
   --accent-on: #ffffff;
-  --accent-mark: var(--signal-500);
-  --accent-border: var(--signal-500);
-  --accent-wash: var(--signal-100);
-  --accent-wash-ink: var(--signal-700);
-  --accent-glow: var(--signal-500);
-  /* Decorative 1px accent rules — the eyebrow rule, a card's top edge. No contrast floor
+  --accent-mark: #08090c;
+  --accent-border: #08090c;
+  --accent-wash: #e4e7ed;
+  --accent-wash-ink: #08090c;
+  --accent-glow: #08090c;
+  /* Decorative 1px accent rules — the eyebrow rule, a card's edge. No contrast floor
    * applies, which is exactly why it is a separate token from `--accent-mark`: a component
    * cannot reach for the decorative value where a measured one is required. */
-  --accent-hairline: rgb(209 1 138 / 0.28);
+  --accent-hairline: rgb(8 9 12 / 0.2);
 
   /* ---------------------------------------------------------------- glass, light — §5.2b
    * The header and the dock are translucent so the atmosphere is visible moving behind
@@ -287,30 +297,6 @@
    * `--ink-tertiary` 4.00:1 over the orb-tinted field, both below their floors (V-13).
    * Lowering the orb opacity does not fix it; the plate does (V-17). */
   --bg-plate-alpha: 0.92;
-}
-
-/*
- * The Signal ramp — §3.6.2. **Theme-independent**, so it is declared once: the semantic
- * aliases above choose *which* step each theme uses, and the steps themselves do not move.
- * Generated in OkLCh at hue 350 with chroma taken to the sRGB gamut boundary at each
- * lightness. Hue 350 was chosen by scanning all 360° against 19 reserved colours (§9.2.1
- * V-10) — it is the only surviving band, and inside it 350 gives the largest separation
- * from Ferrari (ΔE 26.0).
- *
- * **A component never consumes a raw step.** Use an `--accent-*` alias (§3.6.3).
- */
-:root {
-  --signal-50: #fef1f7;
-  --signal-100: #ffe2ee;
-  --signal-200: #ffc4de;
-  --signal-300: #ff98ca;
-  --signal-400: #ff61b7;
-  --signal-500: #fe02a9; /* the hi-vis step: marks, borders, glow, dark-mode fill */
-  --signal-600: #d1018a; /* light-mode ink and fill */
-  --signal-700: #a2006a; /* light-mode hover and wash ink */
-  --signal-800: #700148;
-  --signal-850: #570036; /* dark-mode wash */
-  --signal-900: #270016;
 }
 
 /*
@@ -343,6 +329,15 @@
   --size-shell-max: 90rem; /* 1440 — §5.3 container */
   --size-header: 3.5rem; /* 56 — header height at every breakpoint */
   --size-rule: 2px; /* the nav active rule and the sheet's leading rule */
+
+  /* The landing headline's outlined final word (§2.3, §3.6.5). **px, and it steps at the
+   * §5.3 breakpoints** rather than scaling: a stroke that scaled with the type would be
+   * 1.7px at 60px and hairline-fragile, and a stroke is not on the type scale, so it cannot
+   * be derived from one. `-webkit-text-stroke` is applied behind an `@supports` guard in
+   * `index.css`, because the rule also sets `color: transparent` and a browser that ignored
+   * the stroke would render an invisible word. */
+  --size-headline-stroke: 2px;
+  --size-headline-stroke-xl: 3px;
 
   --size-control-sm: 1.75rem; /* 28 — DataVintage trigger, Button sm */
   --size-control-md: 2.25rem; /* 36 — Button md, theme popover row */
@@ -445,26 +440,29 @@
   --scrim: rgb(0 0 0 / 0.62);
 
   /* ---------------------------------------------------------------- the accent, dark
-   * §3.6.3, and **designed rather than inverted** (§3.5). The vivid `--signal-500` step
-   * only reaches 3.62:1 on white, which is why light mode uses the deeper `--signal-600`
-   * for ink and fill and dark mode does not: on dark surfaces `--signal-500` measures
-   * 4.71 / 5.29 / 5.50:1 (§9.2.1 V-11). The ink **on** the fill flips from white to
-   * near-black for the same reason — 5.29:1 rather than an unreadable pale-on-vivid.
+   * §3.6.3, and **designed rather than inverted** (§3.5). The accent is the pole of the
+   * neutral scale in each theme, so the two themes' values are opposite ends rather than a
+   * flip of one value: pure `#FFFFFF` here, `#08090C` there. Measured (§9.2.2 V-18):
+   * `--accent-ink` **17.06 / 19.15 / 19.91:1** on raised / canvas / sunken.
+   *
+   * `--accent-ink-strong` equals `--accent-ink` here **and that is correct, not an
+   * oversight**: white is the pole and there is nothing stronger. The link-hover signal is
+   * therefore carried by G-10's underline sweep, not by an ink step — recorded in §3.6.3.
    */
-  --accent-ink: var(--signal-500);
-  --accent-ink-strong: var(--signal-400);
-  --accent-fill: var(--signal-500);
-  --accent-fill-hover: var(--signal-400);
-  --accent-on: #0e0f13;
-  --accent-mark: var(--signal-500); /* one value, both themes — §3.6.3 */
-  --accent-border: var(--signal-500);
-  /* `--signal-850`, not a darker step: `#46002B` fails its ink at 4.47:1 and `#370021`
-   * passes the ink but is only 1.04:1 against `--surface-raised`, i.e. not a visible field
-   * at all. 850 clears both — 1.18:1 vs raised and 7.27:1 with its ink (V-11b). */
-  --accent-wash: var(--signal-850);
-  --accent-wash-ink: var(--signal-300);
-  --accent-glow: var(--signal-500);
-  --accent-hairline: rgb(254 2 169 / 0.34);
+  --accent-ink: #ffffff;
+  --accent-ink-strong: #ffffff;
+  --accent-fill: #ffffff;
+  /* Recedes one step, as in light mode. `--accent-on` on it: 12.12:1 (V-18). */
+  --accent-fill-hover: #c6cad2;
+  --accent-on: #08090c;
+  --accent-mark: #ffffff;
+  --accent-border: #ffffff;
+  /* 1.27:1 against `--surface-raised` — a visible field, matched to the timing-wash
+   * precedent of 1.15–1.28 (§3.4.1). Its ink reaches 13.42:1 (V-18). */
+  --accent-wash: #2c2f35;
+  --accent-wash-ink: #ffffff;
+  --accent-glow: #ffffff;
+  --accent-hairline: rgb(255 255 255 / 0.22);
 
   /* glass, dark — §5.2b. Composite measures `#261A27`; ink-tertiary 4.75:1. */
   --surface-glass: rgb(26 28 32 / 0.68);

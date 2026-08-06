@@ -1,6 +1,17 @@
 # Design System
 
-**Status: FOUNDATIONS COMPLETE (F0), REVISED BY CR-007.** Owned by the `designer`.
+**Status: FOUNDATIONS COMPLETE (F0), REVISED BY CR-007, THEN BY THE MONOCHROME SWITCH OF
+2026-08-06.** Owned by the `designer`.
+
+> ### ⚠ 2026-08-06 — five changes Rishabh asked for, and what each one moved
+>
+> | His words | What changed | Sections |
+> |---|---|---|
+> | *"lets switch back to monochrome theme and no purple accent, i want the accent to be a color of white/black"* | **The accent is now the pole of the neutral scale** — `#08090C` light, `#FFFFFF` dark. The `--signal-*` ramp is deleted. Emphasis moved to inversion, absolute contrast, typographic weight and motion, all of which measure **3.6–5.5× more separation** than the magenta they replace | **§1.1 decision 1**, **§3.5.2**, **§3.6** (rewritten), **§9.2.2** |
+> | *"i didnt like the moving background … i want the application to feel alive"* | **`AtmosphereField` rebuilt.** The three gradient orbs, the 48px grid and the contrast plate are gone. A two-pitch dot lattice, a **pointer lamp** that lights the dots under the cursor, a vignette and a solved **luminance corridor** replace them | **§7.7** (rewritten), **§4.6 G-18…G-21**, **§9.2.2 V-21** |
+> | *"the sidebar, its broken … when its closed and when its open both"* | **The rail is full-height with stated offsets, icon-only when collapsed, and expanded by CSS `:hover` / `:focus-within` rather than by React state.** Three defects fixed, one of them a glyph-centring arithmetic error that had been documented as correct | **§7.8**, **§4.6 G-4** |
+> | *"the button up here: 2026 … i dont really know what its for"* | **`DataVintage` states its purpose visibly** — a label, a completeness meter, a control boundary and a disclosure chevron | **§7.3** |
+> | *"even the hover effects for these cards … i dont really like them either"* | **`CapabilityCard`'s four polite effects replaced by two committed ones**: a perspective tilt toward the pointer with real elevation, and a perimeter traced in one stroke. G-8's pointer spotlight is **retired from the product** | **§4.6 G-7 / G-25 / G-26**, **§3.5.2** |
 
 Sections **§1, §2, §3.4, §3.5, §3.6, §4, §5, §7.0–§7.4, §7.7, §8, §9, §10** are authored and binding.
 Sections still marked _TO BE COMPLETED IN F1_ are deliberately deferred: per-chart specifications,
@@ -42,35 +53,51 @@ that a page gains an exception.
 
 Everything else follows from these.
 
-**1. The chrome carries exactly one hue, and it is a hue the sport does not use.** _(Revised by
-CR-007. The previous decision — achromatic chrome, no accent at all — is reversed.)_
+**1. The chrome is monochrome. The only hue on screen belongs to a team.** _(Rishabh's decision,
+2026-08-06. This supersedes CR-007's one-hue accent, which superseded the original no-accent chrome.
+Read all three, because the reasoning is what stops the pendulum swinging again.)_
 
-The original argument was: every usable hue is already some team's identity, therefore the interface
-should have no hue. The first half of that is true and stays true. The conclusion was wrong, and the
-built result proved it: a shell with no accent read as **unfinished**, not as restrained. Restraint
-without a focal point is just absence.
+The sequence matters:
 
-The correct resolution is not "no hue" but **one hue, chosen by measurement to be the one hue the
-sport has not claimed**. That colour is **Signal** — OkLCh hue **350**, a hot magenta-rose (§3.6). It
-was not picked by taste: every hue on the wheel was scanned against the twelve brand colours, the
-three reserved timing semantics and the four status colours (§9.2 **V-10**), and hue 350 is inside
-the only band that clears the **normal-vision ΔE ≥ 15 floor against all nineteen of them at once**.
+| Version | Decision | Outcome |
+|---|---|---|
+| Original F0 | **Achromatic chrome, no accent at all.** Every usable hue is already some team's identity, so the interface should have none. | **Rejected by Rishabh** — *"too basic and too bland"*. Correct diagnosis: it had no focal point, and restraint without a focal point is absence. |
+| CR-007 | **One accent hue — "Signal", OkLCh 350**, a hot magenta-rose, chosen by scanning all 360° against 19 reserved colours. | Fixed the focal point. Rishabh then asked for monochrome: *"i want the accent to be a color of white/black which follows the monochrome theme."* |
+| **Now** | **Monochrome chrome. The accent is the *pole* of the neutral scale** — `#08090C` on light, `#FFFFFF` on dark — and emphasis is carried by **contrast, inversion, weight, scale and motion** instead of hue. | — |
 
-So the hierarchy of colour in this product is now three-layered, and each layer has one job:
+**The thing that makes this different from the rejected first version is not the colour, it is the
+device.** The first build had no accent *and no substitute for one*: no inversion, no maximum-contrast
+mark, no pointer response, no outlined display type, no texture, no layered field. It was flat grey
+with grey text on it. This version removes the hue and **replaces it with the four emphasis devices a
+monochrome system actually has**, each of which is stronger than the magenta it replaces:
+
+| Device | Where | Measured |
+|---|---|---|
+| **Inversion** | primary and hero buttons, the `F1` wordmark badge, the active dock item | `--accent-on` on `--accent-fill`: **19.91:1** light, **19.91:1** dark. The single highest-contrast object available. |
+| **Absolute contrast** | every 2px rule, indicator, underline, coverage bar, header segment | `--accent-mark` on `--surface-raised`: **19.91:1** light / **17.06:1** dark, against a floor of 3.0. The magenta reached **3.62 / 4.71**. So every accent mark in the product gained **3.6–5.5×** separation. |
+| **Typographic weight** | the landing headline's final word, set as a **3px outline** rather than a fill (§2.3) | a second weight, not a second colour |
+| **Motion and light** | the pointer lamp in the background field, the card tilt, the traced card edge (§7.7, §4.6) | in the dark theme, **the only light on screen comes from the cursor** |
+
+So the hierarchy of colour is now two-layered plus a monochrome interface, and the top row got
+*louder* rather than quieter:
 
 | Layer | Colour | Job | Never |
 |---|---|---|---|
 | **Identity** | the twelve brand colours (§3.1) | which team / which driver | never a chart palette on its own (§3.2) |
-| **Semantics** | purple / green / yellow, plus four status colours (§3.4) | what a timing value or a system state *means* | never a series colour, never the accent |
-| **Interface** | **Signal**, one hue (§3.6) | *this responds to you* — interactivity, focus of attention, brand presence | never meaning; never identity; never a series colour |
+| **Semantics** | purple / green / yellow, plus four status colours (§3.4) | what a timing value or a system state *means* | never a series colour |
+| **Interface** | **the neutral scale, and its two poles** (§3.6) | *this responds to you* — interactivity, focus of attention | never meaning; never identity; never a series colour |
 
-Signal marks **the interface's own voice**: the primary action, the active destination, the thing
-under the pointer, the atmosphere behind the product. A team's colour is still the loudest thing in a
-standings table, because Signal never appears inside one — it appears on the chrome around it.
+**And this is the feature, not the compromise: a team colour is now the only hue on screen.** With an
+achromatic chrome, a Ferrari red or a McLaren orange beside a driver's name is the single chromatic
+thing in the viewport. §3.2 measured that brand colours fail as a *palette*; §3.3 keeps them as
+*identity*; and a monochrome chrome makes that identity read louder than it ever did next to a
+magenta interface. It is a property of the system now, deliberately, rather than an accident.
 
-**And the accent must be conspicuous, not homeopathic.** §3.6.4 lists the surfaces where it is
+**The accent must still be conspicuous, not homeopathic.** §3.6.4 lists the surfaces where it is
 *required*. A build in which the accent appears only on a focus ring has failed this decision as
-surely as the neutral build did.
+surely as the first neutral build did — and the specific way to fail it now is to use
+`--accent-ink` where §3.6.4 calls for inversion, because near-black beside `--ink-primary` is
+**ΔE ≈ 5** and reads as one flat block of type.
 
 **2. Figures are set in a monospace and are always tabular.**
 
@@ -418,164 +445,172 @@ box-shadow: 0 0 0 2px var(--surface-raised);   /* the inner separator ring */
 
 Measured worst case across all neutral tokens **and** all eleven brand colours: the better of the two
 rings reaches **4.28:1 (light)** and **4.14:1 (dark)** against the worst adjacent colour — floor 3.0,
-**PASS** (§9.2 V-9).
+**PASS** (§9.2 V-9). **Re-measured against the monochrome `--accent-fill` (§9.2.2 V-19): the outer
+ring reaches only 1.19:1 light / 1.07:1 dark there, and the inner `--surface-raised` ring carries it
+at 19.91 / 17.06:1.** That is the case the doubling exists for; see §3.6.3.
 
 Applied via `:focus-visible` only. Never removed, never replaced per-component, never a `whileFocus`
 motion substitute — motion is not a focus indicator.
 
-#### 3.5.2 Interactive expression without hue
+#### 3.5.2 Interactive expression — the shipped set
+
+_Rewritten 2026-08-06 for the monochrome accent. The two superseded tables (the original achromatic
+set, and CR-007's hue-bearing set) are gone rather than stacked: three versions of one table is how a
+reader ends up implementing the wrong one._
 
 | State | Expression |
 |---|---|
-| Hover | surface steps one level toward `--surface-overlay`; `-1px` translateY on cards only |
-| Active / pressed | `scale(0.985)`; surface steps back down |
-| Selected (nav, tabs, segmented) | `--ink-primary` label + a 2px `--ink-primary` rule (§4.6 G-3) |
-| Selected (chip, toggle) | `--ink-primary` fill + `--ink-inverse` label |
-| Link | `--accent-ink` with a 1px `currentColor` underline at `0.14em` offset; hover sweeps a 2px `--accent-mark` underline in from the left (G-10). _CR-007: was achromatic._ |
+| Hover — surface | surface steps one level toward `--surface-overlay` |
+| Hover — control (button, row, dock item) | plus the §3.6.4 accent expression for that control. **No pointer spotlight** — G-8 is retired (§4.6): a low-opacity achromatic radial over a glass or panel surface reads as a smudge, which is the exact failure the orb field was removed for |
+| Hover — card | **tilt toward the pointer + lift + elevation + a traced perimeter** (G-25, G-26). Supersedes the `y: -1` of the original table, the `y: -2` §3.4 later specified, and the 2px lift that shipped |
+| Active / pressed | `scale(0.985)`, `m.press`; surface steps back down |
+| Selected (nav, dock) | **inverted** — `--accent-fill` + `--accent-on` — plus `aria-current` plus the 2px `--accent-mark` indicator (G-3) |
+| Selected (tabs, segmented, chip, toggle) | `--accent-fill` + `--accent-on` label |
+| Link | `--accent-ink` with a 1px `currentColor` underline at `0.14em` offset; hover sweeps a 2px `--accent-mark` underline in from the left (G-10) |
 | Disabled | `--ink-tertiary` text, `--surface-sunken` fill, `--border-subtle`, `opacity: 1` (never faded — a disabled control must stay readable so its explanation can be read too), `cursor: not-allowed`, `aria-disabled="true"` |
 
-**CR-007 amendment.** Rows 1–4 above are superseded where an accent expression exists in §3.6.4.
-Hue is now *available* for the interface's own states; what remains forbidden is hue as the **only**
-difference between two states, and hue on anything that carries identity or meaning.
-
-| State | Expression (CR-007) |
-|---|---|
-| Hover | surface steps one level toward `--surface-overlay`, **plus** a pointer-tracked `--accent-glow` spotlight at 14% (G-8) on cards and dock items; `-1px` translateY on cards only |
-| Active / pressed | `scale(0.985)`; surface steps back down |
-| Selected (nav, dock, tabs, segmented) | `--accent-wash` fill + `--ink-primary` label + a **2px `--accent-mark` rule** (G-3) |
-| Selected (chip, toggle) | `--accent-fill` + `--accent-on` label |
+**The binding rule that survives every revision:** hue is never the *only* difference between two
+states, and hue never appears on anything that carries identity or meaning. With a monochrome chrome
+the first half is now satisfied by construction.
 
 ---
 
-### 3.6 The interface accent — "Signal", OkLCh hue 350
+### 3.6 The interface accent — monochrome, the poles of the neutral scale
 
-**Added by CR-007.** Every value below was computed, not chosen; the runs are §9.2 **V-10 … V-17**.
+**Rewritten 2026-08-06 at Rishabh's request** (*"lets switch back to monochrome theme and no purple
+accent, i want the accent to be a color of white/black which follows the monochrome theme"*). It
+replaces CR-007's "Signal", OkLCh hue 350. Every value below was measured by
+`scripts/validate-palette.mjs`; the runs are §9.2.2 **V-18 … V-22**.
 
-### 3.6.1 Why hue 350, and why nothing else
+### 3.6.1 What replaced the hue, and why each replacement is stronger
 
-The whole hue wheel was scanned in 5° steps (§9.2 **V-10**). At each hue the validator built the
-maximum-chroma colour that still clears **4.5:1 as text on all three light surfaces**, then measured
-its separation from the twelve brand colours and the seven reserved semantic colours.
+An accent has one job: to say *the interface is speaking now, and it responds to you*. Hue is one way
+to do that. It is not the only way, and in this product it was never the best one — every usable hue
+is either a team's identity or a reserved timing semantic (§3.2, §3.4), which is why CR-007 needed a
+full-wheel scan to find a single survivor.
 
-| Candidate band | Verdict |
-|---|---|
-| **h 30–140** (orange → yellow → yellow-green) | **Rejected.** Normal-vision ΔE to the reserved yellow falls to **8.3** at h 90 and stays under 15 through h 140. This band *is* the reserved yellow/green. |
-| **h 140–195** (green → teal) | **Rejected.** ΔE 1.74 to the reserved green at h 150; Sauber, Aston Martin and Mercedes all live here. |
-| **h 195–215** (dark teal) | **Rejected on judgement, not measurement** — it clears the floors (ΔE 25–30 to semantics, 19–22 to brands) but a dark teal accent is the default of every SaaS dashboard, which is precisely the "looks like a template" failure CR-007 exists to fix. Recorded so the option is not re-discovered as new. |
-| **h 220–265** (blue) | **Rejected.** ΔE 2.66 to Red Bull at h 255, 5.65 to Williams at h 250. Four of twelve teams are blue. |
-| **h 265–340** (violet → orchid → magenta-violet) | **Rejected.** ΔE **1.10** to the reserved timing purple at h 305, and still only 13.19 at h 335 — under the floor. This is the band most dashboards default to, and it is the one band the F1 timing convention absolutely forbids. |
-| **h 345–20** (magenta → rose → crimson) | **The only surviving band.** |
-| **h 350** | **Chosen.** Normal-vision ΔE **20.09** (light) / **21.03** (dark) to the reserved purple, **25.59** / **24.66** to `status-critical`, **≥55** to green and yellow, and **26.0 to Ferrari** — the largest brand-separation figure available anywhere in the surviving band. h 0 scores marginally better against the semantics but drops to **19.5 against Ferrari**, and "reads a bit like Ferrari red" is the one confusion this product can least afford. |
+A monochrome system has four devices instead, and they are used in this order of loudness:
 
-**Signal is not a racing colour, on purpose.** It is the *instrument's* colour — the highlight on a
-piece of test equipment. That is exactly why it can never be mistaken for a team or for a lap time.
+1. **Inversion.** A fill at the *opposite pole* from the surface, with inverse ink. Nothing on a
+   screen is louder. `--accent-on` on `--accent-fill` measures **19.91:1** in both themes.
+2. **Absolute contrast.** Marks — 2px rules, indicators, underlines, bars — are set at the pole
+   rather than at `--ink-primary`, so they read as *harder* than body ink. **19.91:1** light /
+   **17.06:1** dark against `--surface-raised`.
+3. **Typographic weight.** An outline instead of a fill (§2.3, the landing headline's final word), or
+   600 where the surrounding text is 400.
+4. **Light and motion.** The pointer lamp (§7.7 layer 2), the card tilt and traced edge (§4.6 G-25 /
+   G-26). This is where "alive" now lives, because it can no longer live in a colour.
 
-### 3.6.2 The ramp — eleven steps, hue 350, theme-independent
+**The one thing that must not be done** is to reach for `--accent-ink` where §3.6.4 calls for
+inversion. `--accent-ink` `#08090C` beside `--ink-primary` `#1B1E24` is **ΔE ≈ 5** — indistinguishable.
+Two CR-007 placements failed exactly that way and were re-specified rather than kept:
 
-Generated in OkLCh at hue 350 with chroma taken to the sRGB gamut boundary at each lightness.
-`--signal-*` is the **raw scale**; components consume the semantic aliases in §3.6.3, never the raw
-steps.
+| Surface | Was (CR-007) | Now |
+|---|---|---|
+| Header wordmark | the `1` of "F1" in `--accent-ink` | **`F1` as an inverted badge** — `--accent-fill` block, `--accent-on` type, `--radius-sm` |
+| Landing headline | the final word in `--accent-ink` | **the final word outlined** — `color: transparent` + `-webkit-text-stroke` in `--accent-mark`, behind an `@supports` guard |
 
-| Token | Hex | OkLCh L | OkLCh C | Notes |
-|---|---|---|---|---|
-| `--signal-50` | `#FEF1F7` | 0.970 | 0.016 | |
-| `--signal-100` | `#FFE2EE` | 0.940 | 0.035 | light-mode wash |
-| `--signal-200` | `#FFC4DE` | 0.880 | 0.075 | |
-| `--signal-300` | `#FF98CA` | 0.801 | 0.136 | dark-mode wash ink |
-| `--signal-400` | `#FF61B7` | 0.720 | 0.210 | dark-mode hover |
-| `--signal-500` | `#FE02A9` | 0.658 | 0.274 | **the hi-vis step.** Marks, borders, glow, dark-mode fill |
-| `--signal-600` | `#D1018A` | 0.568 | 0.237 | light-mode ink and fill |
-| `--signal-700` | `#A2006A` | 0.470 | 0.196 | light-mode hover and wash ink |
-| `--signal-800` | `#700148` | 0.360 | 0.149 | |
-| `--signal-850` | `#570036` | 0.300 | 0.125 | dark-mode wash |
-| `--signal-900` | `#270016` | 0.180 | 0.075 | |
+### 3.6.2 There is no ramp
+
+CR-007's eleven `--signal-*` steps are **removed from the product**. A `var(--signal-…)` anywhere is
+a defect and resolves to nothing, which paints `transparent` — a mark that is simply not there.
+
+Nothing replaces them: the accent is two values per theme plus a wash, and the §3.5 neutral scale
+already covers everything between. `tokens.css` therefore declares the semantic aliases of §3.6.3
+**directly as hexes**, which also removes the "never consume a raw step" rule, because there is no
+raw step to consume. That reclaimed 13 lines of the CSS artefact.
 
 ### 3.6.3 Semantic aliases — the only tokens a component may use
 
-| Token | Light | Dark | Contract, and the measured figure (§9.2 V-11) |
+| Token | Light | Dark | Contract, and the measured figure (§9.2.2 V-18) |
 |---|---|---|---|
-| `--accent-ink` | `#D1018A` | `#FE02A9` | text / icon on any surface. **5.14 / 4.84 / 4.55** light on raised / canvas / sunken; **4.71 / 5.29 / 5.50** dark. Floor 4.5 — PASS |
-| `--accent-ink-strong` | `#A2006A` | `#FF61B7` | hover state of accent text. 7.65 light / 6.21 dark on raised |
-| `--accent-fill` | `#D1018A` | `#FE02A9` | primary button, selected chip, dock indicator pill |
-| `--accent-on` | `#FFFFFF` | `#0E0F13` | the ink **on** `--accent-fill`. **5.14:1** light, **5.29:1** dark. Floor 4.5 — PASS |
-| `--accent-fill-hover` | `#A2006A` | `#FF61B7` | with `--accent-on`: **7.65:1** light, **6.97:1** dark |
-| `--accent-mark` | `#FE02A9` | `#FE02A9` | 2px rules, indicators, underlines, future chart marks. **3.62 / 3.41 / 3.20** light, **4.71 / 5.29 / 5.50** dark. Floor 3.0 — PASS. One value, both themes |
-| `--accent-border` | `#FE02A9` | `#FE02A9` | interactive boundaries in accent. Same figures — floor 3.0 PASS in both themes |
-| `--accent-wash` | `#FFE2EE` | `#570036` | tinted field: selected dock item, accent chip. **1.21:1** light / **1.18:1** dark against `--surface-raised` — i.e. a visible field, matched to the timing-wash precedent (1.15–1.25, §3.4.1) |
-| `--accent-wash-ink` | `#A2006A` | `#FF98CA` | the ink **on** `--accent-wash`. **6.33:1** light, **7.27:1** dark. Floor 4.5 — PASS. `--ink-primary` on the wash also passes (13.81 / 13.41) |
-| `--accent-glow` | `#FE02A9` | `#FE02A9` | the atmosphere orbs and the pointer spotlight. Always applied through an opacity — see §7.7 |
-| `--accent-hairline` | `rgb(209 1 138 / 0.28)` | `rgb(254 2 169 / 0.34)` | 1px decorative accent rules (eyebrow rule, card top edge). Decorative — no contrast floor |
+| `--accent-ink` | `#08090C` | `#FFFFFF` | text / icon on any surface. **19.91 / 18.75 / 17.61** light on raised / canvas / sunken; **17.06 / 19.15 / 19.91** dark. Floor 4.5 — PASS |
+| `--accent-ink-strong` | `#000000` | `#FFFFFF` | hover state of accent text. **21.00** light / **17.06** dark on raised |
+| `--accent-fill` | `#08090C` | `#FFFFFF` | primary button, hero CTA, wordmark badge, active dock pill |
+| `--accent-on` | `#FFFFFF` | `#08090C` | the ink **on** `--accent-fill`. **19.91:1** in both themes. Floor 4.5 — PASS |
+| `--accent-fill-hover` | `#33373E` | `#C6CAD2` | with `--accent-on`: **11.95:1** light, **12.12:1** dark |
+| `--accent-mark` | `#08090C` | `#FFFFFF` | 2px rules, indicators, underlines, coverage bars, future chart marks. Same figures as `--accent-ink`. Floor 3.0 — PASS by a factor of six |
+| `--accent-border` | `#08090C` | `#FFFFFF` | interactive boundaries in accent. Same figures — PASS |
+| `--accent-wash` | `#E4E7ED` | `#2C2F35` | tinted field: hover on a ghost control, an accent chip. **1.24:1** light / **1.27:1** dark against `--surface-raised` — a visible field, matched to the timing-wash precedent of 1.15–1.28 (§3.4.1) |
+| `--accent-wash-ink` | `#08090C` | `#FFFFFF` | the ink **on** `--accent-wash`. **16.07:1** light, **13.42:1** dark. `--ink-primary` also passes (13.48 / 12.49) |
+| `--accent-glow` | `#08090C` | `#FFFFFF` | the pointer lamp in the background field, and the primary button's hover halo. Always applied through an opacity |
+| `--accent-hairline` | `rgb(8 9 12 / 0.20)` | `rgb(255 255 255 / 0.22)` | 1px decorative accent rules. Decorative — no contrast floor |
 
-**`--accent-ink` is *not* usable as the focus ring.** The focus ring stays the achromatic double ring
-of §3.5.1, and it was re-measured over the accent: **3.25:1 light / 3.37:1 dark** against
-`--accent-fill`, floor 3.0 — PASS (§9.2 **V-11**). A focus ring must be visible over *every* surface
-including team colours; an accent ring cannot promise that, and motion is never a focus indicator.
+**Two properties of this set are deliberate and look like mistakes if you do not read them here.**
+
+1. **`--accent-fill-hover` recedes rather than deepens.** `--accent-fill` is already the pole, so
+   there is nowhere further to go; hover therefore steps *toward* the mid-scale, and the primary
+   button additionally grows a 4px `--accent-glow` halo at 18%. That is the direction §7.1's original
+   pre-CR-007 spec used, and it is the only one available.
+2. **In dark mode `--accent-ink-strong` equals `--accent-ink`.** White is the pole. The link-hover
+   signal is therefore carried entirely by **G-10's underline sweep**, not by an ink step. This is
+   recorded rather than "fixed" because inventing an off-white for a hover state would make the ink
+   step *less* legible than the rest state, which is worse than no ink step.
+
+**`--accent-ink` is still not usable as the focus ring**, and the monochrome accent makes that
+sharper, not softer. The ring stays §3.5.1's achromatic double ring, and it was re-measured over the
+new fill (§9.2.2 **V-19**): the **outer** `--ink-primary` ring reaches only **1.19:1** light /
+**1.07:1** dark against `--accent-fill` — it is essentially invisible there — and the **inner 2px
+`--surface-raised` separator ring** carries the indicator at **19.91 / 17.06:1**. Floor 3.0, PASS.
+**This is the case the doubled ring was designed for; a single-ring "simplification" would make focus
+invisible on every primary button in the product.** `tokens.css.test.ts` asserts it.
 
 ### 3.6.4 Where the accent is REQUIRED
 
-This table is the answer to "the shell had no accent". A surface in the left column without its accent
-expression is an incomplete implementation, not a stylistic choice.
+A surface in the left column without its accent expression is an incomplete implementation, not a
+stylistic choice.
 
 | Surface | Accent expression |
 |---|---|
-| Primary button | `--accent-fill` + `--accent-on`; hover `--accent-fill-hover` plus a `0 0 0 4px` ring in `--accent-glow` at 18%, `dur.fast` |
+| Primary button | `--accent-fill` + `--accent-on`; hover `--accent-fill-hover` plus a `0 0 0 4px` halo in `--accent-glow` at 18%, `dur.fast` |
+| Hero CTA (`hero` variant) | as primary, size `lg`, plus G-9's magnetic follow |
 | Secondary button | `--border-control` at rest; hover border → `--accent-border`, label → `--accent-ink` |
 | Ghost button / icon button | hover: `--accent-wash` fill, `--accent-ink` glyph |
 | Link | `--accent-ink` + underline sweep (G-10) |
-| `CommandDock` — active item | `--accent-wash` pill + `--ink-primary` label + 2px `--accent-mark` edge rule (G-3) |
-| `CommandDock` — hover item | pointer spotlight in `--accent-glow` at 14% (G-8), glyph → `--accent-ink` |
-| Header wordmark | the terminal glyph (the `1` of "F1") set in `--accent-ink` |
+| `CommandDock` — active item | **inverted pill** — `--accent-fill` + `--accent-on` glyph and label — plus `aria-current="page"` plus the 2px `--accent-mark` indicator bar outside the pill (G-3). _Was an `--accent-wash` pill; a wash is not enough emphasis for "where you are" once hue is gone._ |
+| `CommandDock` — hover item | `--accent-wash` fill, glyph → `--accent-ink` |
+| Header wordmark | **`F1` as an inverted badge** (§3.6.1) |
 | Header hairline | `--border-subtle`, with a 96px `--accent-mark` segment at the left, appearing on scroll (G-13) |
 | Scroll progress bar | 2px `--accent-mark`, `scaleX` scrubbed (G-14) |
-| Landing headline | the final word set in `--accent-ink` |
+| Landing headline | **the final word outlined** in `--accent-mark` (§3.6.1) |
 | Landing eyebrow | 24px `--accent-mark` rule preceding the label |
-| Landing stat figures | figure in `--ink-primary`, unit/suffix in `--accent-ink` |
-| `CapabilityCard` | 1px `--accent-hairline` top edge; index number in `--accent-ink`; hover spotlight (G-8) |
+| `CapabilityCard` | 1px `--accent-hairline` perimeter at rest, traced in `--accent-mark` on hover and focus (G-26); index number `--ink-tertiary` → `--accent-ink` on hover |
 | `CoverageRuler` | the "available" span of each bar in `--accent-mark`; the unavailable span in `--surface-sunken` |
+| `DataVintage` | the completeness meter's filled span in `--accent-mark`; `--border-control` boundary on the trigger |
 | Table row hover (F2+) | 2px `--accent-mark` leading edge, `scaleY 0→1` from the row's vertical centre, `dur.instant` |
 | Skeletons | **no accent.** Skeletons stay `--surface-sunken` — an accent-coloured skeleton implies content that is not there |
 | Timing chips, status chips, identity chips | **no accent, ever** (§3.4, §3.3) |
 | Focus ring | **no accent** (§3.5.1) |
-| Any chart series | **no accent** (§6.2). Signal is not a categorical colour |
-| `AtmosphereField` | `--accent-glow` orbs and racing line (§7.7) |
+| Any chart series | **no accent** (§6.2). The accent is not a categorical colour |
+| `AtmosphereField` | the pointer lamp's lit dots, and the racing line's comet (§7.7) |
 
-### 3.6.5 The residual CVD failures, recorded and mitigated
+### 3.6.5 The CVD position: there are no residuals left
 
-Twenty colours now compete for hue space: 12 identity + 3 timing + 4 status + 1 accent. **No hue
-exists that clears the §9.1 CVD floor of ΔE 8 against all nineteen others** — that is a combinatorial
-limit, not a failure of search, and it was verified across the whole wheel (§9.2 V-10: the best
-minimum-CVD-vs-status figure anywhere on the wheel is 14.7, and it occurs at hue 300, inside the
-forbidden purple band).
+This section used to record seven CVD failures and a structural mitigation for each. **All seven are
+gone**, and not by tuning — by construction.
 
-Measured residuals for Signal (§9.2 **V-15 / V-16**), worse of the two CVD models:
+An achromatic colour cannot be confused with a chromatic one under any dichromatic simulation,
+because every CVD model preserves lightness and the accent differs from every reserved colour by
+lightness alone. Measured (§9.2.2 **V-20**), worse of the two §9.1 models:
 
-| Pair | Worst CVD ΔE | Where |
-|---|---|---|
-| `--accent-ink` ↔ `status-info` | **0.46** protanopic | light mode |
-| `--accent-ink` ↔ `status-critical` | **2.97** tritanopic light / **2.31** tritanopic dark | both |
-| `--accent-mark` ↔ Audi `#FF2D00` | **0.80** tritanopic | both |
-| `--accent-mark` ↔ McLaren `#F47600` | **2.18** tritanopic | both |
-| `--accent-mark` ↔ Ferrari `#ED1131` | **3.46** tritanopic | both |
-| `--accent-mark` ↔ Haas `#9C9FA2` | **6.63** deuteranopic | both |
-| `--accent-ink` ↔ `timing-purple` | **11.05** tritanopic dark / 13.56 protanopic light | both — **PASS** |
+| Comparison | Min normal-vision ΔE | Min CVD ΔE | Floor |
+|---|---|---|---|
+| `--accent-ink` ↔ the 7 reserved semantics, light | **28.37** | **24.96** (status-critical) | 15 / 8 |
+| `--accent-ink` ↔ the 7 reserved semantics, dark | **28.11** | **15.05** (status-good) | 15 / 8 |
+| `--accent-mark` ↔ the 12 brand colours, light | **40.23** | **29.41** (Ferrari) | 15 / 8 |
+| `--accent-mark` ↔ the 12 brand colours, dark | **20.03** | **14.87** (Mercedes) | 15 / 8 |
 
-**Normal-vision separation passes everywhere**: the minimum against any reserved semantic is
-**20.09** and against any brand colour **26.00**, both above the floor of 15. So a user with full
-colour vision can never mistake the accent for a lap-time semantic or for a team.
+Compare CR-007's worst figures: `--accent-ink` ↔ `status-info` at **0.46** protanopic, and
+`--accent-mark` ↔ Audi at **0.80** tritanopic. **The monochrome accent is not an accessibility
+compromise; it is a strict accessibility improvement**, and §9.2.1's "no hue exists that clears the
+CVD floor against all nineteen" combinatorial limit no longer applies, because the accent stopped
+competing for hue space.
 
-The mitigation is the one this system already runs on, and it is **structural, not optional**:
-
-1. **The accent never carries meaning.** It marks *interactivity*. Interactivity is always
-   simultaneously signalled by affordance — a button shape, a label, a `role`, a cursor, a focus
-   ring. If a colour-blind user cannot tell the accent from `status-critical`, nothing is lost,
-   because the critical state also carries an icon and a sentence (§3.4.3) and the button also
-   carries a verb.
-2. **The accent never carries identity.** Team colour always sits beside a team name (§3.3).
-3. **The accent is never a series colour** (§6.2), so it never has to be told apart from a brand
-   colour inside a plot.
-4. **Tritanopia is the failing axis in five of the seven residuals.** §9.1 already records that
-   tritan simulation is the least reliable part of either model, which is why the pessimistic value
-   is reported; and tritanopia is the rarest of the three.
+The chroma floor of §9.1 step 5 (**≥ 0.05 for any colour expected to read as a hue**) is **not
+applicable** here and is recorded as such: the accent is expected *not* to read as a hue. Its measured
+chroma is 0.0069 (light) and 0.0000 (dark), and `tokens.css.test.ts` enforces **< 0.02** on every
+alias — a tighter and more useful gate than the retired reserved-hue-band test, because it makes a
+collision impossible rather than merely distant.
 
 ---
 
@@ -1349,17 +1384,46 @@ CVD failures are all against colours that already carry a mandatory icon and lab
 a mandatory adjacent name (§3.3), and the accent is barred from ever carrying meaning or identity
 (§3.6.5). This is the same posture §3.4.2 takes for the timing hues, applied consistently.
 
-**Still to validate in F1:** the derived per-theme chart-safe brand variants (§3.3 rule 6), the
-deterministic fallback ramp for the 202 colourless teams (§3.1) — **which must exclude the Signal hue
-band (h 340–360) so a colourless team is never painted the interface accent** — and the
-collision-detection thresholds (§3.3 rule 4).
+**⚠ V-10 … V-17 describe the RETIRED Signal palette and are kept for the record only.** The accent
+they measure was replaced on 2026-08-06 (§3.6). They are not deleted because V-10's hue scan is the
+evidence that *no* usable hue existed, which is half the argument for going monochrome — and because
+V-13 and V-17 are the measurements that condemned the orb field. The **live** accent and background
+runs are §9.2.2.
 
-**The validator must land in the repository, in the CR-007 PR.** It produced every figure above, and
-§9.1 requires a re-run on any colour change — which the `reviewer` cannot verify without it. It ships
-as `scripts/validate-palette.mjs` with an `npm run validate:palette` script (`PLAN.md` F0 CR-007
-Design Spec §12; the task number is the `principal-engineer`'s to assign). It is pure arithmetic and
-needs no dependency, and it **self-calibrates against the pre-CR-007 recorded figures on every run**,
-so a regression in the validator itself is caught rather than silently trusted.
+#### 9.2.2 The monochrome accent and the rebuilt field, 2026-08-06
+
+Run by `npm run validate:palette`, which now executes `calibrate` **and** `mono` by default, so the
+§9.2.1 calibration block above still gates every run before any new figure is reported. Result line:
+**`PASS — every floor cleared, both themes, no residual CVD failure.`**
+
+| ID | Palette | Mode | Result |
+|---|---|---|---|
+| **V-18** | **Monochrome accent aliases** (§3.6.3), 10 tokens | light | **PASS.** `--accent-ink` `#08090C` **19.91 / 18.75 / 17.61** on raised / canvas / sunken (floor 4.5) · `--accent-mark` the same figures (floor 3.0) · `--accent-on` on `--accent-fill` **19.91** · on `--accent-fill-hover` `#33373E` **11.95** · `--accent-ink-strong` `#000000` **21.00** on raised · `--accent-wash` `#E4E7ED` vs raised **1.24** (visible field, floor 1.10) · `--accent-wash-ink` on wash **16.07** · `--ink-primary` on wash **13.48** · `--ink-secondary` on wash **5.86** |
+| **V-18** | Monochrome accent aliases (§3.6.3) | dark | **PASS.** `--accent-ink` `#FFFFFF` **17.06 / 19.15 / 19.91** · `--accent-mark` the same · `--accent-on` `#08090C` on `--accent-fill` **19.91** · on `--accent-fill-hover` `#C6CAD2` **12.12** · `--accent-wash` `#2C2F35` vs raised **1.27** · wash-ink on wash **13.42** · `--ink-primary` on wash **12.49** · `--ink-secondary` **6.59** |
+| **V-19** | **Achromatic double focus ring over an accent fill** (§3.5.1) | both | **PASS, and it is the doubling that passes.** Outer `--ink-primary` ring vs `--accent-fill`: **1.19:1** light / **1.07:1** dark — effectively invisible. Inner `--surface-raised` separator ring: **19.91:1** / **17.06:1**. Better of the two, floor 3.0 — PASS. Outer ring on its outward side vs `--surface-canvas`: 15.72 / 17.84 |
+| **V-20** | **The accent is achromatic**, and separated from every reserved colour | both | **PASS, with no residuals.** OkLCh chroma **0.0069** light / **0.0000** dark, against an enforced ceiling of 0.02. `--accent-ink` ↔ 7 reserved semantics: min normal ΔE **28.37** light / **28.11** dark, min CVD ΔE **24.96** / **15.05** (floors 15 / 8). `--accent-mark` ↔ 12 brand colours: min normal ΔE **40.23** / **20.03**, min CVD ΔE **29.41** (Ferrari) / **14.87** (Mercedes). **CR-007's seven CVD residuals are all eliminated** — its worst was 0.46 protanopic |
+| **V-21** | **The rebuilt background field** (§7.7) — the luminance corridor, solved rather than tuned | light | **PASS, IN CORRIDOR at both intensities.** Corridor: field relative luminance must stay **≥ 0.8707** (the tighter of `--border-control` at 3:1 → 0.8707 and `--ink-tertiary` at 4.5:1 → 0.8618); canvas is 0.9387. `hero` (veil 0.18): centre **0.9387**, deepest vignette corner **0.8797** → ink-tertiary 4.59, border-control 3.03. `calm` (veil 0.66): centre 0.9387, corner 0.9132. Vignette therefore capped at **`rgb(27 30 36 / 0.04)`** — which lands the corner at almost exactly `--surface-sunken`, i.e. the field's own darkest point is a step the system already owns |
+| **V-21** | The rebuilt background field (§7.7) | dark | **PASS, IN CORRIDOR at both intensities.** Corridor: luminance must stay **≤ 0.0125** (`--border-control`), and **≤ 0.0115** (`--surface-raised`) or the elevation model inverts and a card reads as a hole. `hero`: centre **0.0052**, corner **0.0019** → ink-tertiary 5.11–5.46, border-control 3.20–3.42. `calm`: 0.0048 / 0.0034. Vignette **`rgb(0 0 0 / 0.72)`** — dark mode can darken freely, which is why its depth is far more dramatic than light mode's, by measurement rather than by preference |
+| **V-21a** | **`mix-blend-mode: overlay` modelled properly** — a correction to this validator, not to a colour | both | The first monochrome run modelled the grain tile as a straight-alpha tint at its own opacity and it consumed the **entire** light-mode luminance budget on its own, forcing the vignette down to 0.02. That was a modelling error: `overlay` is `multiply` on a dark backdrop and `screen` on a light one, and the tile is achromatic `feTurbulence` with a mean near 0.5, so it returns almost exactly the backdrop. Measured excursion at the field centre — light: darkest pixel, mean and lightest all round to **`#F7F8FB`**; dark: **`#0D0E12` / `#0E0F13` / `#0F1014`**. **Grain adds texture and moves the mean luminance by nothing.** Every V-21 figure is reported at the worst grain pixel for that theme's ink |
+| **V-21b** | Dot lattice, recorded for the record — decorative, no floor (§3.5) | both | light: minor dot `#DADCDF` **1.29:1** vs canvas, major dot `#C7C8CC` **1.57:1**, lit dot (under the pointer lamp) `#939497` **2.86:1**. dark: `#2C2D31` **1.39**, `#45474A` **2.06**, lit `#737476` **4.09**. Comparable to `--border-subtle` (1.32 / 1.33), i.e. perceptible and recessive — and the lamp roughly doubles it, which is the whole effect |
+| **V-22** | **Glass header / dock over the rebuilt field** (§5.2b) | both | **PASS.** Light composite `#FCFCFD` (field centre) / `#F8F8F9` (vignette corner): `--ink-primary` 16.28 / 15.73 · `--ink-tertiary` **5.05 / 4.88** (floor 4.5) · `--border-control` **3.34 / 3.22** (floor 3.0) · `--accent-ink` 19.42 / 18.76. Dark `#191A1E` / `#16181B`: 16.19 / 16.56 · **4.96 / 5.07** · **3.11 / 3.18** · 17.39 / 17.79. **Every figure improved on V-12's**, because the orb that tinted the composite is gone |
+
+**Verdict on the monochrome palette: ACCEPTED, unconditionally.** Every contrast floor passes in both
+themes, every separation floor passes, the background field is inside a corridor solved from the
+tokens' own floors rather than chosen, and — unlike every previous palette in this document —
+**there is not one residual CVD failure to mitigate.**
+
+**Still to validate in F1:** the derived per-theme chart-safe brand variants (§3.3 rule 6), the
+deterministic fallback ramp for the 202 colourless teams (§3.1), and the collision-detection
+thresholds (§3.3 rule 4). _The old constraint that the fallback ramp must exclude the Signal hue band
+(h 340–360) is **withdrawn** — there is no Signal hue any more. The replacement constraint is that a
+fallback ramp entry must clear OkLCh chroma **0.05**, so a colourless team is never painted something
+that reads as the achromatic interface accent._
+
+**The validator lives at `scripts/validate-palette.mjs`, run by `npm run validate:palette`.** It is
+pure arithmetic, needs no dependency, and **self-calibrates against the pre-CR-007 recorded figures on
+every run** (§9.2.1), so a regression in the validator itself is caught rather than silently trusted.
+It exits non-zero when any floor fails, so it is usable as a gate and not only as a report.
 
 ---
 

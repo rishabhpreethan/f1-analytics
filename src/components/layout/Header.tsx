@@ -17,8 +17,10 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
  * selectors and passes plain values down, so `DataVintage` stays presentational
  * (`ARCHITECTURE.md` §3). It is the only fetch in the shell.
  *
- * The wordmark sets **the `1` of "F1" in `--accent-ink`** (§3.6.4). It is one glyph and it is
- * decorative: the accessible name is on the link, so nothing depends on the colour being seen.
+ * The wordmark sets **`F1` as an inverted badge** — `--accent-fill` with `--accent-on` type
+ * (§3.6.4). It replaces the pre-monochrome "the `1` of F1 in `--accent-ink`", which an achromatic
+ * accent cannot express: `#08090C` beside `--ink-primary` `#1B1E24` is ΔE ≈ 5. The split is purely
+ * visual — the accessible name is on the link, so nothing depends on either half being read.
  */
 export function Header() {
   const { data, isPending } = useMeta();
@@ -42,7 +44,10 @@ export function Header() {
         aria-label="F1 Analytics — home"
         className="shell-wordmark t-display-xs text-ink-primary font-bold"
       >
-        F<span className="text-accent-ink">1</span> ANALYTICS
+        <span className="wordmark-badge" aria-hidden="true">
+          F1
+        </span>
+        <span aria-hidden="true">ANALYTICS</span>
       </Link>
 
       <div className="ml-auto flex items-center gap-2">

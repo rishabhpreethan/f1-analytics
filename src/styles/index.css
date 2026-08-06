@@ -244,8 +244,34 @@
     height: var(--size-header);
   }
 
+  /*
+   * The wordmark. **`F1` is an inverted badge, not a coloured glyph** — and that substitution is
+   * the monochrome system working rather than a decoration.
+   *
+   * §3.6.4 used to put "the `1` of F1" in `--accent-ink`. With an achromatic accent that would be
+   * `#08090C` beside `--ink-primary` `#1B1E24`: ΔE ≈ 5, which is to say invisible. Inversion is
+   * the emphasis device a monochrome system actually has (§3.6.1), so the accent expression here
+   * becomes an `--accent-fill` block with `--accent-on` type — **19.91:1**, the single
+   * highest-contrast object in the header.
+   */
   .shell-wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
     letter-spacing: var(--tracking-wordmark);
+  }
+
+  .wordmark-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(var(--spacing) * 6);
+    padding-inline: calc(var(--spacing) * 1.5);
+    border-radius: var(--radius-sm);
+    background-color: var(--accent-fill);
+    color: var(--accent-on);
+    /* The badge is a fixed box, so its own tracking must not inherit the wordmark's. */
+    letter-spacing: normal;
   }
 
   /* ============================================================ CommandDock §5.2 / §5.3
@@ -817,6 +843,37 @@
   /* The headline's three lines. Block spans, not `<br>` — see `HeroSection.tsx`. */
   .hero-line {
     display: block;
+  }
+
+  /*
+   * The headline's final word, **outlined**. This is the monochrome replacement for §3.6.4's
+   * "the final word set in `--accent-ink`", which an achromatic accent cannot deliver: `#08090C`
+   * beside `--ink-primary` `#1B1E24` is ΔE ≈ 5 and would read as one flat block of type.
+   *
+   * An outline is a *second typographic weight* rather than a second colour, which is exactly the
+   * lever a monochrome system has (§3.6.1). At 112px with a 3px stroke it is the one deliberate
+   * "moment" in the product, and it costs no hue, no asset and no bytes.
+   *
+   * **The `@supports` guard is mandatory, not defensive.** The rule sets `color: transparent`, so
+   * a browser that honoured that and ignored the stroke would render an invisible word — the worst
+   * possible failure on the largest element on the page. Declared inside the guard, an
+   * unsupporting browser keeps the solid `--ink-primary` fill and loses only the effect.
+   *
+   * `-webkit-text-stroke` is inherited, so it survives `SplitText` wrapping each character in its
+   * own span (G-16) — which is why this can be a class on the line rather than something the split
+   * has to reapply.
+   */
+  @supports (-webkit-text-stroke: 1px currentColor) {
+    .hero-line-outline {
+      color: transparent;
+      -webkit-text-stroke: var(--size-headline-stroke) var(--accent-mark);
+    }
+
+    @media (min-width: 90rem) {
+      .hero-line-outline {
+        -webkit-text-stroke-width: var(--size-headline-stroke-xl);
+      }
+    }
   }
 
   .hero-lead {

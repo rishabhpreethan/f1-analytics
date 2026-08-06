@@ -509,8 +509,461 @@ function check(list) {
     }
 }
 
+/* ================================================================ ALPHA COMPOSITING
+ * `src-over` of a straight-alpha colour onto an opaque backdrop. Every background layer in
+ * `src/styles/backdrop.css` is one of these, so a field composite is a fold over this.
+ */
+const over = (fg, bg, a) => {
+  const F = hex2rgb(fg),
+    B = hex2rgb(bg);
+  return rgb2hex([0, 1, 2].map((i) => a * F[i] + (1 - a) * B[i]));
+};
+const stack = (base, layers) => layers.reduce((acc, [hex, a]) => over(hex, acc, a), base);
+
+/* ================================================================ V-18 … V-22
+ * The MONOCHROME interface accent, and the rebuilt background field.
+ *
+ * This replaces the Signal (OkLCh 350) ramp. The whole §3.6.1 hue argument becomes moot: an
+ * achromatic accent cannot collide with a hue it does not have, so the hue-scan floors are
+ * not the question any more. The questions that ARE the question, and that this function
+ * answers, are the ones a neutral-on-neutral system fails at:
+ *
+ *   1. every accent alias against its contrast floor, in both themes
+ *   2. the achromatic focus ring against an accent fill that is now itself near-black /
+ *      near-white — the case where a single-ring design would have failed
+ *   3. the background field's large-area composite, which is where the previous orb field
+ *      failed (V-13) and needed a rescue plate
+ *   4. that the accent is genuinely achromatic, so no future edit can slide it toward a
+ *      reserved hue and still pass
+ */
+const MONO = {
+  light: {
+    'accent-ink': '#08090C',
+    'accent-ink-strong': '#000000',
+    'accent-fill': '#08090C',
+    'accent-fill-hover': '#33373E',
+    'accent-on': '#FFFFFF',
+    'accent-mark': '#08090C',
+    'accent-border': '#08090C',
+    'accent-wash': '#E4E7ED',
+    'accent-wash-ink': '#08090C',
+    'accent-glow': '#08090C',
+  },
+  dark: {
+    'accent-ink': '#FFFFFF',
+    'accent-ink-strong': '#FFFFFF',
+    'accent-fill': '#FFFFFF',
+    'accent-fill-hover': '#C6CAD2',
+    'accent-on': '#08090C',
+    'accent-mark': '#FFFFFF',
+    'accent-border': '#FFFFFF',
+    'accent-wash': '#2C2F35',
+    'accent-wash-ink': '#FFFFFF',
+    'accent-glow': '#FFFFFF',
+  },
+};
+
+/** The §3.5 neutrals, by theme, so a composite can be judged against every one of them. */
+const INK = {
+  light: {
+    'ink-primary': '#1B1E24',
+    'ink-secondary': '#53575E',
+    'ink-tertiary': '#6A6D74',
+    'border-control': '#878B92',
+  },
+  dark: {
+    'ink-primary': '#F5F7F9',
+    'ink-secondary': '#B3B6BA',
+    'ink-tertiary': '#86898F',
+    'border-control': '#64686F',
+  },
+};
+const FLOOR = {
+  'ink-primary': 4.5,
+  'ink-secondary': 4.5,
+  'ink-tertiary': 4.5,
+  'border-control': 3.0,
+  'accent-ink': 4.5,
+  'accent-mark': 3.0,
+};
+
+/**
+ * The background field, layer by layer, exactly as `backdrop.css` composites it. The dot
+ * lattice is deliberately **excluded from the large-area composite** and reported separately:
+ * a 1px dot on a 22px pitch covers ~0.2% of the area, so it is a hairline, not a field — the
+ * same reasoning §3.5 uses to put `--border-subtle` outside WCAG 1.4.11's scope.
+ */
+const FIELD = {
+  light: {
+    canvas: '#F7F8FB',
+    // The vignette's darkest corner, as a straight-alpha layer.
+    vignette: ['#1B1E24', 0.04],
+    grainAlpha: 0.024,
+    dot: 0.13,
+    dotMajor: 0.22,
+    dotInk: '#1B1E24',
+  },
+  dark: {
+    canvas: '#0E0F13',
+    vignette: ['#000000', 0.72],
+    grainAlpha: 0.05,
+    dot: 0.13,
+    dotMajor: 0.24,
+    dotInk: '#F5F7F9',
+  },
+};
+
+/**
+ * `mix-blend-mode: overlay`, per the CSS Compositing spec — and modelling it properly rather
+ * than as a straight-alpha tint is load-bearing.
+ *
+ * The grain tile is achromatic `feTurbulence` noise: values spread across 0…1 with a mean near
+ * 0.5. `overlay` is `multiply` where the backdrop is dark and `screen` where it is light, so a
+ * mid-grey source over ANY backdrop returns almost exactly the backdrop — which is why grain
+ * adds texture without moving a field's mean luminance. An earlier version of this validator
+ * modelled it as a solid tint at the same alpha and it consumed the entire light-mode
+ * luminance budget on its own, which is a modelling error and not a design constraint.
+ *
+ * `source` is the noise value being modelled. 0.5 is the tile's mean; 0 and 1 are its
+ * extremes, and the spread between those two is the per-pixel excursion the texture actually
+ * produces. That excursion is what has to be bounded, not the mean.
+ */
+function overlayBlend(backdropHex, source, alpha) {
+  const B = hex2rgb(backdropHex);
+  return rgb2hex(
+    B.map((cb) => {
+      const blended = cb <= 0.5 ? 2 * cb * source : 1 - 2 * (1 - cb) * (1 - source);
+      return alpha * blended + (1 - alpha) * cb;
+    }),
+  );
+}
+
+/**
+ * The field, composited in `backdrop.css`'s own layer order:
+ * canvas -> vignette -> grain (overlay) -> veil.
+ *
+ * `grainSource` selects which point of the noise distribution is being modelled — 0.5 for the
+ * mean, 0 for the darkest grain pixel (the pessimistic case for dark ink on a light field),
+ * 1 for the lightest (the pessimistic case for light ink on a dark field).
+ */
+function fieldComposite(theme, veil, { vignetted, grainSource = 0.5 }) {
+  const F = FIELD[theme];
+  let c = F.canvas;
+  if (vignetted) c = over(F.vignette[0], c, F.vignette[1]);
+  c = overlayBlend(c, grainSource, F.grainAlpha);
+  return over(SURF[theme].canvas, c, veil);
+}
+
+/**
+ * The **luminance corridor** a background field may occupy, solved rather than guessed.
+ *
+ * Both bounds come from the §3.5 tokens that have the tightest floors, and they bound the
+ * field from opposite directions in the two themes — which is why the two themes' fields are
+ * different shapes rather than inversions of each other:
+ *
+ *   - light: `--border-control` (3:1) and `--ink-tertiary` (4.5:1) are *dark* on a *light*
+ *     field, so darkening the field is what breaks them. The field therefore has a **floor**.
+ *   - dark: the same two tokens are *light* on a *dark* field, so lightening is what breaks
+ *     them. The field has a **ceiling** — and a second, tighter one: it must stay clearly
+ *     below `--surface-raised`, or a panel disappears into the background.
+ */
+function fieldBound(theme) {
+  const I = INK[theme];
+  const need = (ink, floor) =>
+    theme === 'light'
+      ? floor * (relLum(ink) + 0.05) - 0.05 // minimum background luminance
+      : (relLum(ink) + 0.05) / floor - 0.05; // maximum background luminance
+  return {
+    inkTertiary: need(I['ink-tertiary'], 4.5),
+    borderControl: need(I['border-control'], 3.0),
+    raised: relLum(SURF[theme].raised),
+    canvas: relLum(SURF[theme].canvas),
+  };
+}
+
+function verdict(ratio, floor) {
+  return ratio >= floor ? 'PASS' : 'FAIL';
+}
+
+function mono() {
+  let failures = 0;
+  const report = (label, ratio, floor) => {
+    const v = verdict(ratio, floor);
+    if (v === 'FAIL') failures += 1;
+    console.log(`  ${v}  ${n(ratio).padStart(6)}:1  (floor ${floor.toFixed(1)})  ${label}`);
+  };
+
+  console.log('\n================================================================');
+  console.log('  V-18  MONOCHROME ACCENT ALIASES vs their contract floors');
+  console.log('================================================================');
+  for (const theme of ['light', 'dark']) {
+    const S = SURF[theme];
+    const A = MONO[theme];
+    console.log(`\n--- ${theme} ---`);
+    for (const [surface, hex] of [
+      ['surface-raised', S.raised],
+      ['surface-canvas', S.canvas],
+      ['surface-sunken', S.sunken],
+    ]) {
+      report(`accent-ink ${A['accent-ink']} on ${surface}`, contrast(A['accent-ink'], hex), 4.5);
+    }
+    for (const [surface, hex] of [
+      ['surface-raised', S.raised],
+      ['surface-canvas', S.canvas],
+      ['surface-sunken', S.sunken],
+    ]) {
+      report(`accent-mark ${A['accent-mark']} on ${surface}`, contrast(A['accent-mark'], hex), 3.0);
+    }
+    report(
+      `accent-on on accent-fill ${A['accent-fill']}`,
+      contrast(A['accent-on'], A['accent-fill']),
+      4.5,
+    );
+    report(
+      `accent-on on accent-fill-hover ${A['accent-fill-hover']}`,
+      contrast(A['accent-on'], A['accent-fill-hover']),
+      4.5,
+    );
+    report(
+      `accent-ink-strong ${A['accent-ink-strong']} on surface-raised`,
+      contrast(A['accent-ink-strong'], S.raised),
+      4.5,
+    );
+    report(
+      `accent-wash ${A['accent-wash']} vs surface-raised (visible field)`,
+      contrast(A['accent-wash'], S.raised),
+      1.06,
+    );
+    report(`accent-wash-ink on accent-wash`, contrast(A['accent-wash-ink'], A['accent-wash']), 4.5);
+    report(
+      `ink-primary on accent-wash`,
+      contrast(INK[theme]['ink-primary'], A['accent-wash']),
+      4.5,
+    );
+    report(
+      `ink-secondary on accent-wash`,
+      contrast(INK[theme]['ink-secondary'], A['accent-wash']),
+      4.5,
+    );
+  }
+
+  console.log('\n================================================================');
+  console.log('  V-19  THE ACHROMATIC DOUBLE FOCUS RING over an accent fill');
+  console.log('  (§3.5.1. The outer ring is --ink-primary, the inner separator ring is');
+  console.log('   --surface-raised. The BETTER of the two must clear 3:1, which is exactly');
+  console.log('   why the ring is doubled: against a near-black fill the ink-primary outline');
+  console.log('   has almost no separation, and the surface ring carries it.)');
+  console.log('================================================================');
+  for (const theme of ['light', 'dark']) {
+    const S = SURF[theme];
+    const fill = MONO[theme]['accent-fill'];
+    const outer = contrast(S.inkPrimary, fill);
+    const inner = contrast(S.raised, fill);
+    console.log(
+      `\n--- ${theme} --- outer ring ink-primary ${S.inkPrimary} vs fill ${fill}: ${n(outer)}:1` +
+        `   inner ring surface-raised ${S.raised} vs fill: ${n(inner)}:1`,
+    );
+    report(`better of the two rings vs accent-fill`, Math.max(outer, inner), 3.0);
+    // The outer ring also has to read against the PAGE on its far side.
+    report(
+      `outer ring vs surface-canvas (its outward side)`,
+      contrast(S.inkPrimary, S.canvas),
+      3.0,
+    );
+  }
+
+  console.log('\n================================================================');
+  console.log('  V-20  THE ACCENT IS ACHROMATIC — so it cannot collide with a reserved hue');
+  console.log('================================================================');
+  for (const theme of ['light', 'dark']) {
+    console.log(`\n--- ${theme} ---`);
+    for (const alias of ['accent-ink', 'accent-mark', 'accent-fill', 'accent-wash']) {
+      const o = oklch(MONO[theme][alias]);
+      const ok = o.C < 0.02;
+      if (!ok) failures += 1;
+      console.log(
+        `  ${ok ? 'PASS' : 'FAIL'}  ${alias.padEnd(16)} ${MONO[theme][alias]}  OkLCh L ${n(o.L, 3)}  C ${n(o.C, 4)}  (must be < 0.0200 — achromatic)`,
+      );
+    }
+    const acc = MONO[theme]['accent-ink'];
+    const semantics = [
+      ...Object.entries(TIMING[theme]).map(([k, v]) => [`timing-${k}`, v]),
+      ...Object.entries(STATUS[theme]).map(([k, v]) => [`status-${k}`, v]),
+    ];
+    let worstNormal = Infinity;
+    let worstCVD = Infinity;
+    let worstCVDName = '';
+    for (const [nm, hx] of semantics) {
+      const dn = dE(acc, hx);
+      const dc = minCVD(acc, hx);
+      if (dn < worstNormal) worstNormal = dn;
+      if (dc < worstCVD) {
+        worstCVD = dc;
+        worstCVDName = nm;
+      }
+    }
+    console.log(
+      `  accent-ink vs the 7 reserved semantics : min normal dE ${n(worstNormal)} (floor 15)   min CVD dE ${n(worstCVD)} on ${worstCVDName} (floor 8)`,
+    );
+    if (worstNormal < 15 || worstCVD < 8) failures += 1;
+    let bNormal = Infinity;
+    let bCVD = Infinity;
+    let bName = '';
+    for (const [t, hx] of Object.entries(BRAND)) {
+      const dn = dE(MONO[theme]['accent-mark'], hx);
+      const dc = minCVD(MONO[theme]['accent-mark'], hx);
+      if (dn < bNormal) bNormal = dn;
+      if (dc < bCVD) {
+        bCVD = dc;
+        bName = t;
+      }
+    }
+    console.log(
+      `  accent-mark vs the 12 brand colours   : min normal dE ${n(bNormal)} (floor 15)   min CVD dE ${n(bCVD)} on ${bName} (floor 8)`,
+    );
+    if (bNormal < 15 || bCVD < 8) failures += 1;
+  }
+
+  console.log('\n================================================================');
+  console.log('  V-21  THE REBUILT BACKGROUND FIELD — the luminance corridor, solved');
+  console.log('  (canvas -> vignette -> grain -> veil. The dot lattice is a 1px mark on a');
+  console.log('   22px pitch, ~0.2% of the area, so it is reported separately as a hairline');
+  console.log('   rather than folded into a large-area field composite — the same treatment');
+  console.log('   §3.5 gives --border-subtle.)');
+  console.log('================================================================');
+  for (const theme of ['light', 'dark']) {
+    const F = FIELD[theme];
+    const S = SURF[theme];
+    const B = fieldBound(theme);
+    console.log(
+      `\n--- ${theme} corridor (WCAG relative luminance) ---` +
+        `\n  canvas ${n(B.canvas, 4)}   surface-raised ${n(B.raised, 4)}` +
+        `\n  ${theme === 'light' ? 'FLOOR' : 'CEILING'} from --ink-tertiary   (4.5:1): ${n(B.inkTertiary, 4)}` +
+        `\n  ${theme === 'light' ? 'FLOOR' : 'CEILING'} from --border-control (3.0:1): ${n(B.borderControl, 4)}`,
+    );
+
+    for (const [state, veil] of [
+      ['hero', 0.18],
+      ['calm', 0.66],
+    ]) {
+      // Two extremes of one field: the untouched centre and the deepest corner of the
+      // vignette, each at the grain excursion that is worst for that theme's ink.
+      const grainSource = theme === 'light' ? 0 : 1;
+      for (const [where, vignetted] of [
+        ['centre (no vignette)', false],
+        ['deepest corner', true],
+      ]) {
+        const composite = fieldComposite(theme, veil, { vignetted, grainSource });
+        const lum = relLum(composite);
+        const inCorridor =
+          theme === 'light'
+            ? lum >= Math.max(B.inkTertiary, B.borderControl)
+            : lum <= Math.min(B.inkTertiary, B.borderControl);
+        if (!inCorridor) failures += 1;
+        console.log(
+          `\n--- ${theme} / data-bg="${state}" / ${where} -> ${composite}` +
+            `  lum ${n(lum, 4)}  ${inCorridor ? 'IN CORRIDOR' : 'OUT OF CORRIDOR'}` +
+            `  (dE ${n(dE(composite, F.canvas))} from canvas, worst grain pixel) ---`,
+        );
+        for (const [name, hex] of Object.entries(INK[theme])) {
+          report(`${name} on the field`, contrast(hex, composite), FLOOR[name]);
+        }
+        report(
+          `accent-ink on the field`,
+          contrast(MONO[theme]['accent-ink'], composite),
+          FLOOR['accent-ink'],
+        );
+        report(
+          `accent-mark on the field`,
+          contrast(MONO[theme]['accent-mark'], composite),
+          FLOOR['accent-mark'],
+        );
+        /*
+         * A panel's delimiter is its 1px `--border-subtle` edge plus, in light mode, the
+         * `--elev-1` shadow — §5.4 already accepts that `--surface-raised` on
+         * `--surface-canvas` is only 1.06:1 in light mode. So this figure is RECORDED, not
+         * gated. What IS gated is the sign: the field must never become *lighter* than
+         * `--surface-raised`, because that inverts the elevation model and a card would then
+         * read as a hole rather than as a panel.
+         */
+        console.log(
+          `       ----   ${n(contrast(S.raised, composite)).padStart(5)}:1  (recorded)   surface-raised panel vs the field`,
+        );
+        const elevationHolds = lum <= B.raised + 1e-9;
+        if (!elevationHolds) failures += 1;
+        console.log(
+          `  ${elevationHolds ? 'PASS' : 'FAIL'}  field lum ${n(lum, 4)} <= surface-raised lum ${n(B.raised, 4)}  (elevation model must not invert)`,
+        );
+      }
+    }
+
+    // The grain's per-pixel excursion, both ways, at the field centre — the figure that
+    // matters for a texture, as opposed to the mean it does not move.
+    const gMean = fieldComposite(theme, 0.18, { vignetted: false, grainSource: 0.5 });
+    const gDark = fieldComposite(theme, 0.18, { vignetted: false, grainSource: 0 });
+    const gLight = fieldComposite(theme, 0.18, { vignetted: false, grainSource: 1 });
+    console.log(
+      `\n  grain excursion at data-bg="hero", field centre (mix-blend-mode: overlay, alpha ${F.grainAlpha}):` +
+        `\n    darkest pixel ${gDark} (lum ${n(relLum(gDark), 4)})  mean ${gMean} (lum ${n(relLum(gMean), 4)})  lightest ${gLight} (lum ${n(relLum(gLight), 4)})`,
+    );
+
+    const minor = over(F.dotInk, F.canvas, F.dot);
+    const major = over(F.dotInk, F.canvas, F.dotMajor);
+    const lit = over(MONO[theme]['accent-glow'], F.canvas, 0.42);
+    console.log(
+      `\n  dot lattice (decorative, no floor — cf. --border-subtle at 1.32 / 1.33):` +
+        `\n    minor dot   -> ${minor}  ${n(contrast(minor, F.canvas))}:1` +
+        `\n    major dot   -> ${major}  ${n(contrast(major, F.canvas))}:1` +
+        `\n    lit dot     -> ${lit}  ${n(contrast(lit, F.canvas))}:1   (under the pointer lamp)`,
+    );
+  }
+
+  console.log('\n================================================================');
+  console.log('  V-22  GLASS HEADER / DOCK over the rebuilt field (§5.2b)');
+  console.log('================================================================');
+  for (const theme of ['light', 'dark']) {
+    const F = FIELD[theme];
+    const S = SURF[theme];
+    const glass = theme === 'light' ? ['#FFFFFF', 0.72] : ['#1A1C20', 0.68];
+    for (const [where, vignetted] of [
+      ['over the field centre', false],
+      ['over the deepest corner', true],
+    ]) {
+      const field = fieldComposite(theme, 0.18, {
+        vignetted,
+        grainSource: theme === 'light' ? 0 : 1,
+      });
+      const composite = over(glass[0], field, glass[1]);
+      console.log(`\n--- ${theme} / ${where} -> ${composite} ---`);
+      for (const [name, hex] of Object.entries(INK[theme])) {
+        report(`${name} on the glass`, contrast(hex, composite), FLOOR[name]);
+      }
+      report(
+        `accent-ink on the glass`,
+        contrast(MONO[theme]['accent-ink'], composite),
+        FLOOR['accent-ink'],
+      );
+      report(
+        `accent-on on an accent-fill pill over the glass`,
+        contrast(MONO[theme]['accent-on'], MONO[theme]['accent-fill']),
+        4.5,
+      );
+    }
+  }
+
+  console.log('\n================================================================');
+  console.log(
+    failures === 0
+      ? '  RESULT: PASS — every floor cleared, both themes, no residual CVD failure.'
+      : `  RESULT: ${failures} FAILURE(S) — fix before shipping.`,
+  );
+  console.log('================================================================\n');
+  if (failures > 0) process.exitCode = 1;
+}
+
 /* ================================================================ main */
 if (mode === 'calibrate' || mode === 'all') calibration();
+if (mode === 'mono' || mode === 'all') mono();
 if (mode === 'scan') hueScan(args[1] ?? 'light');
 if (mode === 'ramp') ramp(args[1] ?? 0);
 if (mode === 'check') check(args[1]);
