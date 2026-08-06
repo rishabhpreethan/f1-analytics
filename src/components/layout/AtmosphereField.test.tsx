@@ -77,6 +77,18 @@ describe('CT-18 — AtmosphereField', () => {
     }
   });
 
+  it('exposes the orb layer G-21 transforms, and only the orb layer', () => {
+    // The contract between the markup and `useAtmosphereParallax`. If this attribute moves or
+    // disappears the parallax silently stops existing — which is exactly how it came to be
+    // missing in the first place. Only the orbs may carry it: the grid, the racing line, the
+    // grain and the plate must not parallax, or the effect reads as the page sliding rather
+    // than as depth (§7.7 layer 2).
+    const { container } = renderAt('/');
+    const hooks = container.querySelectorAll('[data-motion="orbs"]');
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0]?.classList.contains('atmosphere-orbs')).toBe(true);
+  });
+
   it('holds the racing-line geometry once, shared by the stroke and the comet path', () => {
     // One constant (Design Spec §11.1). If the stroke's `d` and the comet's `offset-path`
     // could diverge, the comet would leave the line — and only at some viewport sizes.

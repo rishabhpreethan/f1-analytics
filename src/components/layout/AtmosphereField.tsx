@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router';
 import { backdropIntensityFor } from '@/components/layout/backdrop';
+import { useAtmosphereParallax } from '@/lib/motion/interactions';
 
 /**
  * The moving background — `DESIGN_SYSTEM.md` §7.7, Technical Spec §S.3.5.
@@ -10,10 +11,16 @@ import { backdropIntensityFor } from '@/components/layout/backdrop';
  * on every click is a defect you feel on the fifth click (§7.7.5). What changes between routes
  * is one attribute on `<html>`, which the shell owns.
  *
- * **There is no JavaScript in the animation.** Every layer is a CSS-composited gradient
- * moving only `transform`, `opacity` or `offset-distance`; `backdrop.css` carries the whole
- * of it and `ARCHITECTURE.md` §10 #24 carries the reasoning. This component's entire job is
- * to decide *which elements exist*, and it takes no props so it cannot be misconfigured.
+ * **No JavaScript runs the loops.** Every layer is a CSS-composited gradient moving only
+ * `transform`, `opacity` or `offset-distance`; `backdrop.css` carries the whole of it and
+ * `ARCHITECTURE.md` §10 #24 carries the reasoning. This component takes no props, so which
+ * elements exist is decided from the URL alone and it cannot be misconfigured.
+ *
+ * **The one exception is G-21**, and it is the MR-1 split working rather than a breach of it:
+ * a pointer parallax is a one-shot response to input, not a loop, so it is GSAP's. It moves
+ * the orb layer only, on `/` only, on a fine pointer only, and is never created under reduced
+ * motion — see `useAtmosphereParallax`. The layer it transforms carries no CSS animation of its
+ * own (the yoyos are on its children), so the two mechanisms cannot fight over `transform`.
  *
  * **At `off` the animated layers are removed from the DOM, not paused.** A paused compositor
  * layer still holds its memory, and `off` is the case that shares a screen with a lap-time
@@ -44,14 +51,18 @@ export function AtmosphereField() {
   const { pathname } = useLocation();
   const intensity = backdropIntensityFor(pathname);
 
+  // G-21. `full` is `/` and nothing else, so the parallax exists on the landing surface and
+  // nowhere else; the hook itself adds the `(pointer: fine)` and reduced-motion gates.
+  const { scope } = useAtmosphereParallax<HTMLDivElement>(intensity === 'full');
+
   // `off` keeps the base surface and nothing else. The plate is dropped too: with no orbs
   // and no grid behind it there is nothing left to attenuate.
   if (intensity === 'off') {
-    return <div className="atmosphere" aria-hidden="true" role="presentation" />;
+    return <div ref={scope} className="atmosphere" aria-hidden="true" role="presentation" />;
   }
 
   return (
-    <div className="atmosphere" aria-hidden="true" role="presentation">
+    <div ref={scope} className="atmosphere" aria-hidden="true" role="presentation">
       <div className="atmosphere-layer atmosphere-grid" />
 
       <div className="atmosphere-layer atmosphere-orbs" data-motion="orbs">

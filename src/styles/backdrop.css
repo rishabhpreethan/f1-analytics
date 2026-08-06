@@ -11,7 +11,10 @@
  * That is also MR-1, which is binding beyond this file: **looping motion is CSS `@keyframes`;
  * one-shot and interaction motion is GSAP. There is no third mechanism.** G-18, G-19 and
  * G-20 are therefore authored here rather than as the `repeat: -1` tweens §4.6 describes;
- * G-21 (pointer parallax) is a one-shot response to input and stays GSAP's.
+ * G-21 (pointer parallax) is a one-shot response to input and is GSAP's — it lives in
+ * `useAtmosphereParallax` and writes `transform` on `.atmosphere-orbs`, which is why **that
+ * element carries no `@keyframes` of its own**: the three yoyos are on its children, so the two
+ * mechanisms own `transform` on different elements and cannot overwrite each other.
  *
  * **Every resting state below is the authored composition** (MR-2). Each `@keyframes` starts
  * at `transform: none`, so the reduced-motion chokepoint in `motion.css` leaves a *composed

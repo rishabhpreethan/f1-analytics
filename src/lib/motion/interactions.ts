@@ -1,6 +1,6 @@
 import { gsap } from './gsap';
 import { dist, dur, ease, m } from './tokens';
-import { useMotion } from './useMotion';
+import { useMotion, type MotionHandle } from './useMotion';
 import { MOTION_QUERY_FINE_POINTER } from './reducedMotion';
 
 /**
@@ -222,4 +222,77 @@ export function useMagnet<T extends HTMLElement = HTMLAnchorElement>(): Spotligh
   });
 
   return { scope, handlers: { onPointerMove, onPointerLeave } };
+}
+
+/**
+ * **G-21 — the atmosphere's pointer parallax.** `quickTo` on `x`/`y` of the orb layer toward
+ * `(pointer − viewportCentre) / 48`, clamped to ±`dist.parallax`, at `m.pointer`.
+ *
+ * Six things about it are decisions rather than incidentals:
+ *
+ *   - **The listener is on `window`, and it has to be.** The atmosphere is
+ *     `pointer-events: none` (it must be — it covers the whole viewport), so it can never
+ *     receive a `pointermove` of its own. That is also why this is the one motion in the
+ *     product that returns a `MotionCleanup`: the listener is not a tween, so the GSAP context
+ *     cannot revert it.
+ *   - **Only the orbs move.** The grid, the racing line, the grain and the plate do not, which
+ *     is what makes the effect read as depth rather than as the page sliding. §7.7 layer 2 says
+ *     so explicitly.
+ *   - **`[data-motion="orbs"]` carries no CSS animation of its own** — the three `@keyframes`
+ *     yoyos of G-19 are on its *children*. So GSAP owning `transform` on the parent and CSS
+ *     owning it on the children cannot collide, and MR-1's split holds: the loop is CSS, the
+ *     pointer response is GSAP.
+ *   - **`/` only.** The caller passes `enabled`, which it derives from the backdrop intensity —
+ *     `full` is `/` and nothing else. A parallax behind dense content is noise, and behind a lap
+ *     chart (F3, `off`) it would be a legibility defect.
+ *   - **`(pointer: fine)` only**, for the same reason as G-8: on a touch screen `pointermove`
+ *     arrives during a scroll, so the field would lurch as a finger dragged.
+ *   - **Not created under reduced motion.** It is built in `animate`, so under `reduce` no
+ *     setter, no listener and no tween exists — and the resting composition is the authored one
+ *     (MR-2), because CSS never places the orbs anywhere else.
+ *
+ * The divisor is the Design Spec's: at 1440px wide the extreme is ±15px, so the ±14px clamp is
+ * what actually bounds it, which is the intent — a suggestion of depth, not a moving background.
+ */
+const PARALLAX_DIVISOR = 48;
+
+/**
+ * G-21's arithmetic, on one axis: the pointer's offset from the viewport centre, divided by
+ * `PARALLAX_DIVISOR` and clamped to ±`dist.parallax`.
+ *
+ * Pure and exported **so the clamp is unit-testable without a browser**. It is the part that
+ * decides whether this reads as depth or as a background that follows the cursor around, and a
+ * clamp that quietly stopped clamping would look like nothing in a diff.
+ */
+export function parallaxOffset(pointer: number, extent: number): number {
+  const raw = (pointer - extent / 2) / PARALLAX_DIVISOR;
+  return Math.max(-dist.parallax, Math.min(dist.parallax, raw));
+}
+
+export function useAtmosphereParallax<T extends HTMLElement = HTMLDivElement>(
+  enabled: boolean,
+): MotionHandle<T> {
+  return useMotion<T>({
+    animate: ({ q, gsap: g }) => {
+      if (!enabled || !matchesFinePointer()) return undefined;
+      const [layer] = q('[data-motion="orbs"]');
+      if (layer === undefined) return undefined;
+
+      const setX = voidSetter(g.quickTo(layer, 'x', { ...m.pointer }));
+      const setY = voidSetter(g.quickTo(layer, 'y', { ...m.pointer }));
+
+      const onPointerMove = (event: PointerEvent) => {
+        setX(parallaxOffset(event.clientX, window.innerWidth));
+        setY(parallaxOffset(event.clientY, window.innerHeight));
+      };
+
+      // `passive` because nothing here calls `preventDefault`, and a non-passive
+      // `pointermove` on `window` is a scroll-performance cost for no reason.
+      window.addEventListener('pointermove', onPointerMove, { passive: true });
+      return () => {
+        window.removeEventListener('pointermove', onPointerMove);
+      };
+    },
+    deps: [enabled],
+  });
 }
