@@ -11,23 +11,17 @@ Status: `todo` · `doing` · `done`
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 1 | F0 foundation — server, data layer, API, routing, tests | doing | — |
-| 2 | F0 frontend — landing page, dock, theme, motion (GSAP) | doing | — |
-| 3 | Switch to a monochrome theme — accent becomes white/black, no colour hue | todo | — |
-| 4 | Rebuild the background so the app feels alive, monochrome | todo | — |
-| 5 | Fix the dock rail — labels clip when collapsed, hover does nothing, geometry is off | todo | — |
-| 6 | Make the `2026 · R10` coverage chip explain itself, and work | todo | — |
+| 7 | F1 design system — chart language, team-colour encoding, palette validator in CI | todo | — |
 
 ## Next
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 6 | F1 design system — team colours, chart language, palette validator in CI | todo | — |
-| 7 | F2 season hub — calendar, standings, championship progression | todo | — |
-| 8 | F3 race page — results, lap charts, pit stops | todo | — |
-| 9 | F4 driver pages · F5 team pages · F6 circuits | todo | — |
-| 10 | F7 compare — up to 4 entities across eras | todo | — |
-| 11 | F8 records — cross-era leaderboards, normalised | todo | — |
+| 8 | F2 season hub — calendar, standings, championship progression | todo | — |
+| 9 | F3 race page — results, lap charts, pit stops | todo | — |
+| 10 | F4 driver pages · F5 team pages · F6 circuits | todo | — |
+| 11 | F7 compare — up to 4 entities across eras | todo | — |
+| 12 | F8 records — cross-era leaderboards, normalised | todo | — |
 
 ## Waiting on Rishabh
 
@@ -37,8 +31,21 @@ Status: `todo` · `doing` · `done`
 | R2 | Team logos | todo |
 | R3 | App icons / favicon (a typographic placeholder ships meanwhile) | todo |
 
+## Open decision
+
+| Item | Needs |
+|---|---|
+| CSS budget | Sitting at **9.85 KB gz against a 10 KB cap** — 0.15 KB left, and the cap is not written in `ARCHITECTURE.md` §8. Raise it with a stated basis, or codify it as-is and accept that CSS work needs a budget conversation each time. |
+
 ---
 
 ## Done
 
-_Nothing yet — nothing has been pushed. `main` holds only the original foundation docs._
+| # | Task | Pushed |
+|---|---|---|
+| 1 | F0 foundation — server, data layer, `/api/meta`, routing, 285 tests | ✅ 2026-08-06 · `471c6a6` |
+| 2 | F0 frontend — landing page, CommandDock, theme, GSAP motion | ✅ 2026-08-06 · `471c6a6` |
+| 3 | Monochrome theme — accent at the neutral poles, no colour hue | ✅ 2026-08-06 · `471c6a6` |
+| 4 | Background rebuilt — dot lattice + pointer lamp, CSS-composited | ✅ 2026-08-06 · `471c6a6` |
+| 5 | Dock rail — header clearance, glyph lane, full-height geometry | ✅ 2026-08-06 · `471c6a6` |
+| 6 | Coverage chip explains itself — noun, boundary, meter, chevron | ✅ 2026-08-06 · `471c6a6` |
