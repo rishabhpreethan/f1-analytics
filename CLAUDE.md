@@ -163,10 +163,11 @@ Also binding:
 | Database | ✅ `data/f1.db` present — 19 tables, 717,764 laps, results through **2026 R10** |
 | Git remote | `github.com/rishabhpreethan/f1-analytics` — **public** |
 | GitHub auth | must be active as `rishabhpreethan`; the `rishabh-zupple` account has read-only access here |
-| **Playwright MCP** | ✅ **registered** 2026-08-04 (local project scope). It only appears in the tool list after a Claude Code restart, so **check for `mcp__playwright__*` tools before gate 4 (`designer`) or gate 9 (`qa`)**. If absent, verify with `claude mcp list` — do not re-add it blindly, and do not work around its absence |
+| **Playwright MCP** | ✅ registered (local project scope), and **available to the main session only.** Its tools are **not propagated into subagent tool sets** — a `designer` run confirmed this: its deferred-tool list held only `WebFetch`/`WebSearch`, and six `ToolSearch` variations returned nothing. So **an agent cannot screenshot anything.** If a visual check is needed, the main session drives the browser, or Rishabh looks. Do not re-add the server; it is registered and connected. |
 
-If Playwright MCP is not in the tool list, `designer` and `qa` must **stop and report** — never work
-around it. Registration having happened does not waive this.
+**Consequence:** no agent can verify anything visual. jsdom performs no layout and no compositing, so
+position, size, timing and composition are untested by construction. An agent must **name what it could
+not see**, and never report a visual behaviour as working on the strength of a passing test.
 
 ---
 
@@ -224,9 +225,12 @@ The upstream-attribution constraint was **removed** 2026-08-04 — §4.1 is a to
 it, re-extend the blocklist, or raise it. Reasoning for any older decision is in
 `docs/archive/PLAN-F0-archive.md`; read a section, never the file.
 
-Two open corrections: 2026 has **22 numbered rounds, not 24** (24 calendar rows, 2 cancelled with NULL
-numbers) — fix wherever 24 still appears. And team logos where brand colours collide is an accepted
-idea for F1.
+**2026 has 22 numbered rounds, not 24** — 24 calendar rows, 2 cancelled carrying `number IS NULL`
+(Bahrain 2026-04-12, Saudi Arabian 2026-04-19). A season's round count is `max(number)`, **never
+`count(*)`** (`docs/DATABASE.md` trap 15). ✅ **Corrected in the docs 2026-08-06** and verified by query;
+the code was always right. Do not "correct" it back.
+
+Still open: team logos where brand colours collide is an accepted idea for F1.
 
 ---
 
