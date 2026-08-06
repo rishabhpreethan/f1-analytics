@@ -1050,7 +1050,7 @@ width does not change. Motion: G-7 (plus G-9 for `hero` only).
 `status-*` (wash + ink + icon + label), `timing-*` (wash + ink + marker glyph, §3.4.2),
 `identity` (colour chip + ink label, §3.3).
 
-### 7.3 Data-currency indicator (NV-9)
+### 7.3 `DataVintage` — the coverage indicator (NV-9) _(respecified 2026-08-06)_
 
 The design decision: **express currency as coverage, never as a fetch event.** "Complete through
 Round 10 of 22" is a fact about the sport's calendar. "Updated 12 days ago" is a fact about a
@@ -1058,21 +1058,87 @@ process. Coverage phrasing is also the more honest of the two — `REQUIREMENTS.
 newest round may lag reality, and coverage phrasing states exactly that without pretending to know
 today's calendar position.
 
+#### 7.3.0 It was not broken. It was undiscoverable — and that is worse
+
+Rishabh: *"the button up here: 2026 it also seems broken and i dont really know what its for."*
+
+**The popover works, and worked before any of this changed.** `DataVintage.test.tsx` clicks the
+trigger, asserts `aria-expanded` flips to `true`, and reads all four coverage sentences out of the
+panel. The wiring — `useDisclosure` with `popoverEnter` / `popoverExit`, `aria-expanded`,
+`aria-controls`, the `Esc` and outside-click dismissals — was complete.
+
+**So this was a pure design failure, and a specific one: the accessible name was excellent and
+nothing visible carried any of it.**
+
+| What existed | What it told a sighted user |
+|---|---|
+| `aria-label="Data coverage: 2026 season, 10 of 22 rounds complete. Show detail."` | nothing — it is not rendered |
+| A `ghost` button: transparent, no border, no shadow | **nothing indicated a control at all.** This is the whole of "i dont really know what its for" |
+| The label `2026 · R10` | two numbers and no noun |
+| A static 8px `--ink-tertiary` dot | nothing. It occupied the space where the fact could have been |
+| No chevron, no caret, no disclosure mark | nothing indicated it opened anything |
+
+He never saw a popover because nothing told him there was one, and a chip that says
+`2026 · R10` with no boundary reads as a status label, not a button. **"Seems broken" is the
+correct reading of an interactive element with no affordance.**
+
+**This element deserves the fix more than most, because it is the one place the product's honesty
+about its own data becomes visible.** `REQUIREMENTS.md` §6 and the six coverage boundaries of §7.4
+are the substance of that honesty; this chip is where a user first meets it.
+
+#### 7.3.1 The four visible changes
+
+| # | Change | Answering |
+|---|---|---|
+| 1 | **A noun.** The eyebrow reads `Coverage` at `--text-2xs` in `--ink-tertiary`, so the chip says what it is *about* before it says a number | "i dont really know what its for" |
+| 2 | **A meter.** 10 of 22 rounds, drawn — a 32×6px track in `--surface-sunken` with a `--accent-mark` fill, deliberately in **`CoverageRuler`'s exact visual language** so the chip and the landing page's ruler are recognisably the same statement at two scales. **It replaces the static dot** | "seems broken" — the dot stated nothing, so the chip looked inert |
+| 3 | **A boundary.** `1px --border-control`, which §3.5 defines as *"boundaries of interactive controls"* and is the one border token measured to clear 3:1. Hover and open add `--accent-wash` and `--accent-border` | "seems broken" — a ghost button is indistinguishable from a label |
+| 4 | **A disclosure affordance.** A 16px `ChevronDown`, rotating 180° on `[data-open='true']` | nothing said it opened |
+
+**Compact form (<768px):** the eyebrow and the year drop; the meter, `R10` and the chevron remain.
+A 56px header beside the wordmark has no room for the noun, and the meter plus the chevron still say
+*coverage, and it opens*.
+
+**The meter is `aria-hidden`, and that is correct rather than lazy.** The button's own name already
+states "10 of 22 rounds complete", so exposing the meter would announce the same fact twice. It is
+redundant reinforcement for sighted users — exactly the role §3.4.2 assigns colour.
+
+**Nothing here animates on its own.** §4.5 keeps this component on the "must never animate" list and
+the meter inherits that from the dot it replaces: in a header, motion reads as an alert, and there is
+nothing to be alarmed about. The chevron's rotation is a **state**, keyed on `[data-open]`, not an
+entrance.
+
+#### 7.3.2 Anatomy
+
 | Element | Spec |
 |---|---|
-| Trigger (≥768px) | `ghost` button, 28px high, containing an 8px `--radius-full` dot in `--ink-tertiary` (**static** — never pulses, §4.5), then `--font-mono` `--text-xs`: `2026 · R10` |
-| Trigger (<768px) | dot + `R10` only |
-| Accessible name | `"Data coverage: 2026 season, 10 of 22 rounds complete. Show detail."` — 22 is the verified 2026 figure (`round` rows with a non-null `number`); the value is read from `GET /api/meta` and never hardcoded |
-| Detail | popover, `--elev-2`, max-width 320, `--radius-xl`, M-5, dismiss on Esc / outside click, focus returns to the trigger |
+| Trigger (≥768px) | `button`, `--size-control-sm` (28) high, `--radius-md`, `1px --border-control`, `padding-inline` 8, `gap` 8. Contents in order: eyebrow `Coverage` (`--text-2xs`, `--ink-tertiary`) · meter · `--font-mono --text-xs` `2026 · R10` in `--ink-primary` · `ChevronDown` 16 in `--ink-tertiary` |
+| Trigger (<768px) | meter · `R10` · chevron |
+| Meter | 32×6, `--radius-full`, `--surface-sunken` track with a `1px --border-subtle` edge, fill `--accent-mark` at `calc(var(--coverage) * 100%)`. `--coverage` is a **unitless ratio** from `selectSeasonProgress`, whose `ratio` is 0 rather than `NaN` when nothing is scheduled — a `NaN` reaching a `width` would collapse the meter silently |
+| Accessible name | `"Data coverage: {year} season, {n} of {total} rounds complete. Show detail."` — read from `GET /api/meta`, never hardcoded. **Unchanged**: the added visible text costs a screen-reader user nothing |
+| Detail | popover, `--elev-2`, max-width 320, `--radius-xl`, **G-6**, dismiss on `Esc` / outside click, focus returns to the trigger |
+| Loading | **the chip's own box** with skeleton blocks inside it, not a slab of a fixed width — see below |
+| Unavailable | the quiet dot survives, and only here. There is no coverage to meter, and a 0%-filled meter would state "nothing is complete", which is a claim about the sport rather than about a failed request. No error colour: at header scale a red dot reads as a site-wide fault, and the real failure is already stated in `main` |
 | Footer echo | the same facts as plain text, so the information is reachable without opening anything |
 
-Copy — every value comes from `GET /api/meta`, nothing hardcoded:
+**The loading state is the chip's own box, and that is a correctness fix rather than a nicety.** §7.5
+requires a skeleton to mirror the geometry of what is coming; here it is also the only way to
+guarantee the header does not reflow on resolve. The chip's width depends on the rendered width of
+"Coverage" and of a mono round label, **neither of which a token can know** — the previous build used
+a single 92px slab with a comment claiming it was "exactly the width of the resolved chip", and with
+an eyebrow, a meter and a chevron added that figure would now be wrong by more than 100px. Reusing
+the box, the gaps and `ch`-sized text blocks makes the two agree **by construction**. The skeleton
+box drops the border: a `--border-control` outline around a loading state reads as a control that is
+present but dead.
 
-- Popover heading: **"Data coverage"** — authored in sentence case and uppercased by `--text-2xs`'s
-  `text-transform`, so assistive technology reads it as a word rather than an initialism
+#### 7.3.3 Copy — every value from `GET /api/meta`, nothing hardcoded
+
+- Popover heading: **"Data coverage"** — authored in sentence case and uppercased by
+  `--text-2xs`'s `text-transform`, so assistive technology reads it as a word rather than an
+  initialism
 - Line 1: **"Complete results through Round {n} of {total} — {roundName}, {date}."**
-- Line 2: **"Rounds {n+1}–{total} are scheduled and have no results yet."** _(omitted when the season
-  is complete)_ — when exactly one round remains, the singular form
+- Line 2: **"Rounds {n+1}–{total} are scheduled and have no results yet."** _(omitted when the
+  season is complete)_ — when exactly one round remains, the singular form
   **"Round {total} is scheduled and has no results yet."**
 - Line 3: **"{cancelledRounds} rounds on the {year} calendar were cancelled."** _(omitted when
   `cancelledRounds === 0`)_ — when exactly one was cancelled, the singular form

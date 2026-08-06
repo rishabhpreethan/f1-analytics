@@ -1,5 +1,9 @@
 import { Link } from 'react-router';
-import { selectCoverageDetail, selectDataVintage } from '@/features/meta/selectors';
+import {
+  selectCoverageDetail,
+  selectDataVintage,
+  selectSeasonProgress,
+} from '@/features/meta/selectors';
 import { useMeta } from '@/features/meta/useMeta';
 import { DataVintage } from '@/components/ui/DataVintage';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -27,6 +31,10 @@ export function Header() {
 
   const vintage = data === undefined ? null : selectDataVintage(data);
   const detail = data === undefined ? null : selectCoverageDetail(data);
+  // The completeness meter's fill. A third selector rather than arithmetic in `DataVintage`,
+  // because a component never computes over a payload (§3) — and `selectSeasonProgress` already
+  // guarantees `ratio` is 0 rather than `NaN` when nothing is scheduled.
+  const progress = data === undefined ? null : selectSeasonProgress(data);
 
   // Three states, and the third is not only the error case: a payload holding no
   // completed round at all (E6) has no coverage to state either, so it renders the same
@@ -51,7 +59,7 @@ export function Header() {
       </Link>
 
       <div className="ml-auto flex items-center gap-2">
-        <DataVintage vintage={vintage} detail={detail} state={vintageState} />
+        <DataVintage vintage={vintage} detail={detail} progress={progress} state={vintageState} />
         <ThemeToggle />
       </div>
     </div>

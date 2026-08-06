@@ -379,9 +379,6 @@
   --size-state-card: 35rem; /* 560 — StateCard standalone max-width (§7.4) */
   --size-state-block: 60vh; /* the DataUnavailableState block in `main` (§7) */
 
-  --size-skeleton-vintage-w: 5.75rem; /* 92 — same width as the resolved chip */
-  --size-skeleton-vintage-h: 1.25rem; /* 20 */
-
   /* ------------------------------------------------- chrome geometry — CR-007, §5.3
    * Fixed dimensions, named here so they are not invented in a component. They are
    * deliberately **not** on §5.1's permitted spacing subset, which is precisely why they

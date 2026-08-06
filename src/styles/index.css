@@ -1467,17 +1467,157 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Exactly the width of the resolved DataVintage chip, so the header does not reflow
-   * when /api/meta answers (§5.1). */
-  .skeleton-vintage {
-    width: var(--size-skeleton-vintage-w);
-    height: var(--size-skeleton-vintage-h);
+  /*
+   * The DataVintage skeleton. **It is the chip's own box with skeleton blocks in it**, not a slab
+   * of a guessed width — which is both §7.5's rule (a skeleton mirrors the geometry of what is
+   * coming) and the only way to guarantee the header does not reflow when `/api/meta` answers: the
+   * chip's width depends on the rendered width of "Coverage" and of a mono round label, neither of
+   * which is knowable from a token. Same box, same gaps, `ch`-sized text blocks — so the two widths
+   * agree by construction. The old single `--size-skeleton-vintage-*` slab is retired with it.
+   *
+   * The skeleton box carries no border: a 1px `--border-control` outline around a loading state
+   * would read as a control that is present but dead.
+   */
+  .vintage-trigger-skeleton {
+    border-color: transparent;
+    cursor: default;
   }
 
-  /* ----------------------------------------------------- DataVintage dot §5.1 / §7.3
-   * Static in every variant. §4.5 forbids this indicator from pulsing or blinking: in a
-   * header, motion reads as an alert.
+  /* `ch` resolves against the element's **own** font, so each block declares the family and size of
+   * the text it stands in for. Without that, a mono round label would be measured in Inter and the
+   * two boxes would differ by a few px on resolve. It is still an approximation — `ch` is the width
+   * of "0" and uppercase letters run wider — but the error is now bounded to one block rather than
+   * to the whole chip. */
+  .skeleton-vintage-eyebrow {
+    display: none;
+    width: 9ch;
+    height: var(--text-2xs--line-height);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+  }
+
+  @media (min-width: 48rem) {
+    .skeleton-vintage-eyebrow {
+      display: block;
+    }
+  }
+
+  .skeleton-vintage-value {
+    width: 10ch;
+    height: var(--text-xs--line-height);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+  }
+
+  /* 16px — the §2.5 icon size the resolved chip renders, so the two boxes stay the same width. */
+  .skeleton-vintage-chevron {
+    width: calc(var(--spacing) * 4);
+    height: calc(var(--spacing) * 4);
+  }
+
+  /* ================================================ DataVintage §7.3 (respecified 2026-08-06)
+   *
+   * Rishabh: *"the button up here: 2026 it also seems broken and i dont really know what its
+   * for."* The popover was never broken — `DataVintage.test.tsx` opens it and reads all four
+   * sentences out of it, and did before any of this changed. **The chip was undiscoverable**, and
+   * these four rules are the fix: a noun, a meter, a boundary and a chevron.
+   *
+   * The boundary is the load-bearing one. It was a `ghost` button — transparent, no border — so it
+   * did not read as a control at all, which is the whole of "i dont really know what its for".
+   * `--border-control` is the one border token measured to clear 3:1 (§3.5), and it exists for
+   * exactly this: *"boundaries of interactive controls"*.
    */
+  .vintage-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    height: var(--size-control-sm);
+    padding-inline: calc(var(--spacing) * 2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-control);
+    background-color: transparent;
+    color: var(--ink-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background-color var(--dur-instant) var(--ease-move),
+      border-color var(--dur-instant) var(--ease-move),
+      color var(--dur-instant) var(--ease-move);
+  }
+
+  .vintage-trigger:hover,
+  .vintage-trigger[data-open='true'] {
+    background-color: var(--accent-wash);
+    border-color: var(--accent-border);
+    color: var(--ink-primary);
+  }
+
+  /* The noun. Dropped below 768 along with the year (§2.2's compact form): a 56px header beside a
+   * wordmark has no room for it, and the meter plus the chevron still say "coverage, and it
+   * opens". */
+  .vintage-eyebrow {
+    display: none;
+    color: var(--ink-tertiary);
+  }
+
+  @media (min-width: 48rem) {
+    .vintage-eyebrow {
+      display: inline;
+    }
+  }
+
+  /*
+   * The completeness meter — deliberately `.ruler-track`'s language at a smaller scale, so the
+   * chip and the landing page's `CoverageRuler` are recognisably the same statement. **It replaces
+   * the static 8px dot**, which occupied the same space and expressed nothing.
+   *
+   * `--coverage` is a unitless ratio written by the component from `selectSeasonProgress`, whose
+   * `ratio` is 0 rather than `NaN` when nothing is scheduled — a `NaN` here would reach a `width`
+   * and silently collapse the meter.
+   *
+   * **Static, in every variant.** §4.5 puts this component on the "must never animate" list and
+   * the meter inherits that from the dot: in a header, motion reads as an alert.
+   */
+  .vintage-meter {
+    position: relative;
+    display: block;
+    flex: none;
+    width: calc(var(--spacing) * 8);
+    height: calc(var(--spacing) * 1.5);
+    border-radius: var(--radius-full);
+    background-color: var(--surface-sunken);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+  }
+
+  .vintage-meter-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--coverage, 0) * 100%);
+    border-radius: var(--radius-full);
+    background-color: var(--accent-mark);
+  }
+
+  .vintage-value {
+    color: var(--ink-primary);
+  }
+
+  /* The disclosure affordance. Rotating on `[data-open]` makes it a **state**, not an entrance
+   * (MR-2) — the resting glyph points down, which is the correct still image for "this opens". */
+  .vintage-chevron {
+    flex: none;
+    color: var(--ink-tertiary);
+    transition: transform var(--dur-fast) var(--ease-enter);
+  }
+
+  .vintage-trigger[data-open='true'] .vintage-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* The unavailable variant keeps the dot: there is no coverage to meter, and a 0%-filled meter
+   * would state "nothing is complete", which is a claim about the sport rather than about a failed
+   * request. No error colour either — at header scale a red dot reads as a site-wide fault, and
+   * the real failure is already stated in `main`. */
   .vintage-dot {
     flex: none;
     width: var(--size-dot);
@@ -1486,8 +1626,6 @@
     background-color: var(--ink-tertiary);
   }
 
-  /* No error colour: at header scale a red dot reads as a site-wide fault, and the real
-   * failure is already stated in `main`. */
   .vintage-dot-unavailable {
     background-color: var(--border-control);
   }
