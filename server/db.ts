@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import { DB_PATH } from './config';
 import { CANONICAL_VIEWS } from './views';
@@ -41,7 +42,26 @@ function sqliteCode(err: unknown): string {
   return '';
 }
 
-function classifyOpenFailure(err: unknown): DatabaseUnavailableReason {
+/**
+ * Ask the filesystem whether the file is there, rather than infer it from the driver's
+ * error.
+ *
+ * `better-sqlite3` reports an absent **file** as `SQLITE_CANTOPEN`, but an absent **parent
+ * directory** as a plain `TypeError` with no `code` property at all ("Cannot open database
+ * because the directory does not exist"). Classifying on the code alone therefore mapped
+ * the second case to `unreadable` — and that case is the fresh clone, because `data/` is
+ * gitignored and git does not create empty directories. So the *most common* missing-database
+ * situation printed "check that <repo>/data is readable and writable by this process",
+ * permissions advice about a directory that does not exist, instead of "f1.db is supplied
+ * separately; place the file at the path above" (CLAUDE.md §4.2 requires the latter).
+ *
+ * One `existsSync` answers the question directly and cannot be broken by a driver changing
+ * its error shape. S-2 is unaffected: `dbPath` is a server constant or the `F1_DB_PATH`
+ * operator variable read once at module load, never anything request-derived, and no path
+ * enters the error message.
+ */
+function classifyOpenFailure(dbPath: string, err: unknown): DatabaseUnavailableReason {
+  if (!existsSync(dbPath)) return 'missing';
   const code = sqliteCode(err);
   if (code === 'SQLITE_CANTOPEN') return 'missing';
   return 'unreadable';
@@ -65,7 +85,7 @@ export function openDatabaseAt(dbPath: string): Database.Database {
   try {
     db = new Database(dbPath, { readonly: true, fileMustExist: true });
   } catch (err) {
-    throw new DatabaseUnavailableError(classifyOpenFailure(err), err);
+    throw new DatabaseUnavailableError(classifyOpenFailure(dbPath, err), err);
   }
 
   try {

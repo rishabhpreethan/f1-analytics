@@ -58,6 +58,29 @@ describe.skipIf(!hasDatabase)('server/db', () => {
 describe('server/db failure mapping', () => {
   const missingPath = path.join(path.dirname(DB_PATH), 'does-not-exist-f0.db');
 
+  /**
+   * The fresh-clone case, and the one CI runs on every push: `data/` is gitignored and git
+   * does not create empty directories, so on a runner the database file is missing *and so
+   * is its parent directory*.
+   *
+   * This is a separate assertion from the one below rather than a variation of it, because
+   * `better-sqlite3` distinguishes the two: an absent file throws `SQLITE_CANTOPEN`, an
+   * absent parent directory throws a plain `TypeError` with no `code` at all. Classifying on
+   * the code alone reported `unreadable` here, which sends a first-time reader to check
+   * directory permissions instead of telling them the file is supplied separately.
+   */
+  it('maps a path whose parent directory is absent to "missing", not "unreadable"', () => {
+    const noSuchDir = path.join(path.dirname(DB_PATH), 'no-such-dir-f1', 'f1.db');
+    expect(existsSync(path.dirname(noSuchDir))).toBe(false);
+    try {
+      openDatabaseAt(noSuchDir);
+      expect.unreachable('should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(DatabaseUnavailableError);
+      expect((err as DatabaseUnavailableError).reason).toBe('missing');
+    }
+  });
+
   it('maps a nonexistent path to reason "missing"', () => {
     expect(() => openDatabaseAt(missingPath)).toThrowError(DatabaseUnavailableError);
     try {
