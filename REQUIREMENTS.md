@@ -1,7 +1,7 @@
 # F1 Analytics — Requirements
 
 **Status:** v2
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-06 — §2.2/§2.5 round count corrected to 22 (was 24)
 
 Defines *what* the product must do and *which data exists to do it with*. Every figure here was
 counted from the loaded database, not estimated.
@@ -13,7 +13,7 @@ Companion documents:
 | `docs/ARCHITECTURE.md` | System architecture and technical decisions |
 | `docs/DATABASE.md` | Full schema reference and query patterns |
 | `docs/DESIGN_SYSTEM.md` | Visual language, motion vocabulary, chart conventions |
-| `PLAN.md` | Feature breakdown, branch strategy, delivery tracker |
+| `PLAN.md` | Feature breakdown, branch strategy, how work flows. **`TASKS.md` is the tracker.** |
 
 **Data foundation.** The application reads a **local, pre-seeded read-only SQLite database**
 (`data/f1.db`, ~66 MB) covering 1950–2026. It is populated offline by a separate local tooling step
@@ -79,11 +79,21 @@ pole, stint, undercut, DNF. Not a beginners' explainer, not a professional strat
 ### 2.2 Data currency
 
 The database is a **point-in-time snapshot**, refreshed by the offline tooling step. At the time of
-writing it holds results through **2026 round 10**, with 24 rounds scheduled.
+writing it holds results through **2026 round 10**, with **22 numbered rounds** scheduled.
+
+**22, not 24 — and the difference is a data trap, not a typo.** The `round` table holds **24** rows
+for 2026, but two of them are cancelled and carry `number IS NULL`: Bahrain (`2026-04-12`) and
+Saudi Arabian (`2026-04-19`). A season's round count is therefore the count of **uncancelled**
+rounds — equivalently `max(number)` — and **never `count(*)`** (`docs/DATABASE.md` §7 trap 15).
+Verified by query on 2026-08-06: for 2026, `count(*) = 24`, `max(number) = 22`,
+`sum(is_cancelled) = 2`, `sum(number IS NULL) = 2`; `GET /api/meta` reports
+`scheduledRounds: 22`, `cancelledRounds: 2`, `completedRounds: 10`.
 
 **Requirements:**
 - The UI must render a **partially complete season** correctly, and must never present a scheduled
   future round as a missing result.
+- Any round count shown to a user is the **uncancelled** count. A cancelled round is never
+  addressable by round number and never counts toward "N of M rounds".
 - The most recent completed round may lag reality by up to ~2 weeks. Any "latest race" surface must
   read the newest round *present in the database*, never assume today's calendar position.
 - A visible data-vintage indicator is required (NV-9).
@@ -151,9 +161,12 @@ outside it — disable the control and explain why, never render a blank chart.
 
 ### 2.5 Current-season liveness
 
-2026 is in progress: 24 rounds scheduled, results through **R10** in the dump (R11 live). The app
-must handle a **partially complete season** as the default view, and must not present a scheduled
-future round as a missing result.
+2026 is in progress: **22 numbered rounds** scheduled — 24 `round` rows of which 2 are cancelled with
+`number IS NULL`, see §2.2 — and results through **R10** (Belgian GP, `2026-07-19`) in the dump. The
+next round with no results is **R11** (Hungarian GP, `2026-07-26`), whose real-world date has already
+passed: that gap *is* the ~2-week lag §2.2 warns about, and it is why no surface may infer the latest
+round from today's date. The app must handle a **partially complete season** as the default view, and
+must not present a scheduled future round as a missing result.
 
 
 ## 3. Verified field inventory
