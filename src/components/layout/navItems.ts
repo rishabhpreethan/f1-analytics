@@ -87,6 +87,20 @@ export function isActiveNavItem(pathname: string, to: string): boolean {
  */
 export const INDICATOR_LENGTH = { rail: 20, dock: 16 } as const;
 
+/**
+ * The glyph size every dock slot renders, in CSS px, mirrored by `--size-dock-glyph`.
+ *
+ * It is a shared constant for one reason, and it is the same reason `INDICATOR_LENGTH` is: the
+ * collapsed rail centres its glyph with `padding-left: (item width − glyph) / 2` **in CSS**, while
+ * the size itself is a **JSX prop**. If the two disagreed the glyph would sit off-centre by half
+ * the difference in the state a user sees most, and nothing would fail.
+ *
+ * That is not hypothetical here. The rule previously read `padding-left: 22px` with a comment
+ * asserting it centred a 20px glyph at x = 32 — arithmetic that forgot the rail's own 8px padding,
+ * so the true centre was 40. `index.css.test.ts` now ties the two figures together.
+ */
+export const DOCK_GLYPH_SIZE = 20;
+
 export interface IndicatorGeometry {
   /**
    * px along the dock's main axis, relative to the container's leading edge — the offset

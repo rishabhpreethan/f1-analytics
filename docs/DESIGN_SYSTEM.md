@@ -812,11 +812,11 @@ The old `M-1 … M-11` identifiers are **retired**. Any code comment or spec cit
 >
 > Recorded by the coordinating session rather than the `designer`, as a factual correction to bring
 > this row in line with shipped, reviewed code; no design intent was changed.
-| **G-4** | Dock rail expand / collapse (≥1024) | `gsap.timeline`, Eases | `pointerenter` / `pointerleave` on the rail; `focusin` / `focusout`; the pin toggle | rail `width 64→232`, `dur.slow`, `ease.arrive`; labels `opacity 0→1, x −8→0`, `dur.fast`, `ease.enter`, `stagger {each:0.02}`, starting at `+=0.06`. Collapse reverses at `dur.base`, `ease.exit`. **`width` is animated here and this is the one permitted case** — it is a discrete user-initiated transition, not a loop, the rail is `position: fixed` so it triggers no layout in `main`, and the alternative (`scaleX`) would distort the glyphs | **not created.** Under `reduce` the rail is **permanently expanded at 232px** and the pin control is hidden — a hover-to-reveal affordance is exactly what reduced-motion users should not have to chase |
+| **G-4** | Dock rail expand / collapse (≥1024) | CSS `transition` + `transition-delay` | `:hover` / `:focus-within` on the rail; the pin toggle | rail `width` `--size-dock`→`--size-dock-open` via `--dock-width`, `dur.slow`, `ease.move`; labels `opacity 0→1` and `x −6→0` via `--dock-label` / `--dock-label-x`, `dur.fast`, `ease.enter`, staggered by `transition-delay: calc(var(--dock-index) * 18ms)` — 7 × 18 + 140 = **266ms**, inside the 400ms ceiling. Collapse carries **no** delay: a staggered disappearance reads as lag. **`width` is animated here and this is the one permitted case** — a discrete user-initiated transition, not a loop, on a `position: fixed` element that triggers no layout in `main`; `scaleX` would distort the glyphs. **CSS rather than GSAP, and rewritten 2026-08-06 to be CSS *throughout*:** `:focus-within` has no reliable DOM event pair, so a tween wired to `pointerenter` would never fire for the keyboard user the clause exists for; and the React state that used to drive it was reported broken, verified working, and removed rather than trusted twice (§7.8.0) | **not created**, and the state is overridden: under `reduce` the rail is **permanently expanded at 232px** and the pin control is hidden — a hover-to-reveal affordance is exactly what reduced-motion users should not have to chase. The override wins at equal specificity by source order, which is why every open-state value is a custom property |
 | **G-5** | Dock overflow sheet (<1024) | `gsap.timeline` | "More" tap | scrim `opacity 0→1`, `dur.fast`, `ease.enter`; panel `y 24→0` + `opacity 0→1`, `dur.slow`, `ease.arrive`; rows `opacity 0→1, y 8→0`, `dur.fast`, `stagger.nav`. Close reverses at `dur.base`, `ease.exit` | opacity only on scrim and panel, `dur.fast`, no stagger |
 | **G-6** | Popover open / close (theme, coverage) | `gsap.fromTo` | trigger click / `Esc` / outside click | `opacity 0→1`, `scale 0.96→1`, `dur.fast`, `ease.enter`, `transformOrigin` at the trigger corner. Close: `opacity→0`, `scale→0.98`, `dur.instant`, `ease.exit` | opacity only, `dur.fast`, no `scale` |
 | **G-7** | Control hover / press | Eases; `gsap.to` | `pointerenter`, `pointerdown` | hover: surface token step + `y −1` (cards only), `m.control`. Press: `scale 0.985`, `m.press`, released on `pointerup`. The focus ring is **CSS `:focus-visible`**, never a tween (§3.5.1) | token/colour change only — no `y`, no `scale`. Runs outside the guard as a CSS transition |
-| **G-8** | **Pointer spotlight** | `gsap.quickTo` (docs: *"cursor-following"* example) | `pointermove` on a `CapabilityCard`, dock item, or panel header | two `quickTo` setters write the CSS variables `--px` / `--py` (in px, element-relative) at `m.pointer`; CSS paints `radial-gradient(220px circle at var(--px) var(--py), var(--accent-glow) 0%, transparent 62%)` at **opacity 0.14** as a `::before` layer under the content. One listener per card, throttled by rAF via GSAP's ticker. Only under `(pointer: fine)` | **not created.** Hover falls back to the flat `--surface-overlay` step of G-7 |
+| ~~**G-8**~~ | ~~Pointer spotlight~~ | — | — | **RETIRED 2026-08-06.** Rishabh on the cards it decorated: *"i dont really like them either."* Two independent reasons it goes rather than gets tuned: (a) with a monochrome accent a 14%-opacity achromatic radial over a panel or a glass surface reads as a **smudge** — the identical failure the atmosphere's orbs were removed for the same day; (b) it was one of four simultaneous polite effects on one element, and one committed gesture beats four polite ones. Its replacements are **G-25** (perspective tilt) and **G-26** (traced perimeter). Its `--px`/`--py` plumbing survives — G-25 reuses it, and so does the atmosphere's lamp. The ID is not reused |
 | **G-9** | **Magnetic CTA** | `gsap.quickTo` | `pointermove` within 96px of the hero's primary button | `quickTo(btn,"x")` / `("y")` to `(pointer − centre) × 0.14`, clamped to **±6px**, `m.pointer`. On `pointerleave`, both return to 0 at `dur.slow`, `ease.arrive`. Applied to **exactly one element in the product** — the hero CTA. A page of magnetic buttons is a toy | **not created** |
 | **G-10** | Link underline sweep | `gsap.to` | `pointerenter` / `focus` on an inline link | a 2px `--accent-mark` pseudo-element, `transformOrigin: "left center"`, `scaleX 0→1`, `dur.fast`, `ease.enter`; reverses `ease.exit`, `dur.instant`. The 1px rest-state underline never disappears, so the link is underlined at all times | CSS-only: the rest underline thickens to 2px instantly. Not a tween |
 | **G-11** | Skeleton pulse | `gsap.to` with `repeat: -1, yoyo: true` | skeleton mount | `opacity 0.55→1`, `loop.skeleton`, `ease.drift`, `repeat: -1`, `yoyo: true`. Opacity only — never `background-position`, never a transform | **not created.** Static `opacity: 0.7`. This is the one case a reader most often gets wrong: an opacity loop is exactly the kind of ambient motion `reduce` is asking to stop |
@@ -1283,23 +1283,68 @@ Under `prefers-reduced-motion: reduce`:
 - Never let GSAP own `transform` on a lattice layer, or CSS own the lamp's position. That is MR-1,
   and here it is enforced by construction: GSAP writes only custom properties, and only on the root.
 
-### 7.8 `CommandDock` — primary navigation _(CR-007, new; replaces `PrimaryNav`)_
+### 7.8 `CommandDock` — primary navigation _(rewritten 2026-08-06)_
 
-One component, two orientations, one `<nav aria-label="Primary">`. Full anatomy, states and copy are
-in `PLAN.md` F0 Design Spec §5. The design-system-level rules:
+One component, two orientations, one `<nav aria-label="Primary">`.
+
+#### 7.8.0 The three faults, and what fixed each
+
+Rishabh: *"the sidebar, its broken the way its layout is isnt great"* — and earlier, *"when its
+closed and when its open both"*.
+
+| Fault | Diagnosis | Fix |
+|---|---|---|
+| **Collapsed, the labels clipped mid-word** — the 64px rail literally read `Hor`, `Seas`, `Driv`, `Tea`, `Circ`, `Com`, `Reco`, `Kee` | **Definite.** `index.css` held exactly two `.dock-label` rules — the base and a ≥1024 size override — and **neither hid anything**. The rail was specified icon-only and nothing implemented it | `--dock-label` / `--dock-label-x`, set on the rail's **collapsed state** and fallback-defaulted to the visible values, so the bottom dock needs no rule and a stylesheet failure cannot hide a label (MR-2) |
+| **The collapsed glyph sat 8px off-centre** | **Definite, and previously documented as correct.** `padding-left: 22px` carried the comment *"32 − half of a 20px glyph = 22"*, which forgot the rail's own 8px padding: the item's box starts at x = 8, so the glyph centre was **40**, not 32 | `padding-left: calc((--size-dock − --size-dock-pad × 2 − --size-dock-glyph) / 2)` = 14px. Stated as arithmetic over the three tokens involved, the error is not expressible — and `index.css.test.ts` asserts both the form and that no literal remains |
+| **Expanded, hover "did nothing"** | **Not reproduced, and that is why the mechanism is gone.** The React path *works* — `data-expanded` flipped to `true` on `pointerenter`, verified with a throwaway jsdom diagnostic — and the built cascade *was* correct: `.dock[data-expanded=true]{width:…}` sat inside the ≥64rem query at higher specificity than `.dock{width:…}`. The most likely explanation is a screenshot captured inside the 320ms width transition | **`:hover` and `:focus-within`, in CSS.** Three pieces of React state became one. Shipping something that had already failed once for a reason nobody could name would be the wrong call; expressing the same two conditions with no state, no re-render and no attribute round-trip removes the failure mode rather than betting against it |
+| **The vertical geometry was an accident** — a content-height box floating at roughly 235→660px in a 900px viewport, neither full-height nor centred, with the active fill clipped by the container's corner | Its position was `top: 50% + translateY(-50%)` on a content-height box, so the geometry was whatever the item count happened to produce | **Full height less `--size-dock-inset` (16px) at both ends.** Destinations at the top, the pin pushed to the foot by `margin-top: auto`, deliberate empty glass between. `padding-block` 12px so no item enters the `--radius-2xl` corner arc |
+
+#### 7.8.1 The design-system-level rules
 
 - **Exactly one `nav[aria-label="Primary"]` in the document**, and it is outside `main`. `AppShell`
   keeps the single `main#main` and the skip link that targets it (§8).
-- **At ≥1024px:** a fixed vertical rail, `left: --size-dock-inset`, vertically centred, `--size-dock`
-  wide collapsed, `--size-dock-open` expanded (G-4), `--radius-2xl`, `--surface-glass` + `--glass-blur`
-  + `--elev-2`. It expands **over** content and never reflows `main` (§5.3).
-- **Below 1024px:** a fixed horizontal dock, `bottom: --size-dock-inset`, centred, `max-width: 480`,
-  `--size-dock` tall, `--radius-full`, same surface treatment. Five slots; the fifth opens the
-  overflow sheet (G-5).
-- **Active item:** `--accent-wash` pill + `--ink-primary` label + 2px `--accent-mark` edge rule, moved
-  by G-3, and `aria-current="page"` — colour is never the only signal.
+- **At ≥1024px:** a fixed vertical rail, `left` / `top` / `bottom` all `--size-dock-inset`,
+  `--size-dock` (64) wide collapsed, `--size-dock-open` (232) expanded, `--radius-2xl`,
+  `--surface-glass` + `--glass-blur` + `--elev-2`. It expands **over** content and never reflows
+  `main` (§5.3).
+- **Below 1024px:** a fixed horizontal dock, `bottom: --size-dock-inset`, centred,
+  `max-width: --size-dock-max` (480), `--size-dock` tall, `--radius-full`, same surface treatment.
+  Five slots; the fifth opens the overflow sheet (G-5).
+- **One padding in both orientations** — `--size-dock-pad` (8px) — which is what makes
+  `--size-dock` (64) less twice it equal `--size-dock-item` (48) exactly. The active pill is
+  therefore inset 8px on every side and can never be clipped by the container's radius, the slot
+  size needs no second figure, and the glyph centring is solved against the same number.
+- **Active item:** an **inverted pill** — `--accent-fill` with `--accent-on` type, 19.91:1 — plus
+  `aria-current="page"`, plus the 2px `--accent-mark` indicator (G-3). It was an `--accent-wash`
+  pill; a wash is not enough emphasis for "where you are" once hue is gone (§3.6.4). It also solves
+  the collapsed rail specifically: with labels hidden, the inverted pill is what tells you which of
+  seven equal-weight glyphs is current.
+- **The indicator sits half the dock's padding *outside* the pill**, and that is required by the
+  inversion: a `--accent-mark` bar on an `--accent-fill` pill is the same colour as the pill.
+- **Hover:** `--accent-wash` fill, `--accent-ink` glyph. **No pointer spotlight** — G-8 is retired
+  (§3.5.2, §4.6): a low-opacity achromatic radial over a glass surface reads as a smudge, which is
+  the same failure the atmosphere's orbs were removed for.
 - `main` reserves `--size-rail-clearance` (≥1024) or `--size-dock-clearance` (below), so the dock
   never covers content and no page needs a bespoke offset.
+
+#### 7.8.2 The collapsed ↔ expanded transition, specified
+
+| Property | Collapsed | Expanded | How it gets there |
+|---|---|---|---|
+| rail width | `--size-dock` (64) | `--size-dock-open` (232) | `--dock-width`, CSS `transition: width --dur-slow --ease-move` (G-4) |
+| label opacity | 0 | 1 | `--dock-label`, `--dur-fast` / `--ease-enter` |
+| label x | `−--size-dock-label-shift` (−6px) | 0 | `--dock-label-x`, same duration and ease |
+| label reveal order | — | staggered | `transition-delay: calc(var(--dock-index) * var(--stagger-dock-label))` — **18ms**, so 7 labels × 18 + 140 = **266ms**, inside §4.2's 400ms ceiling. `stagger.nav`'s 35ms would reach 490 and break it |
+| label collapse order | simultaneous | — | `transition-delay: 0ms` on the collapsed state. **A staggered disappearance reads as lag rather than as sequence**, so only the reveal staggers |
+| glyph position | centre at 32px | centre at 32px | **unchanged, deliberately.** A glyph that shifts as the rail expands makes the whole panel look like it is sliding — the single most noticeable detail if it is got wrong |
+| item gap / padding | `padding-left` 14px, `gap` 12px | identical | nothing about the item's box changes; only the rail's width and the labels' opacity do |
+
+**Every open-state value routes through a custom property**, and that is the mechanism rather than a
+style: G-4's reduced variant is "permanently expanded, pin hidden", and with the open state written
+as declarations on a `:not(:hover):not(:focus-within)` chain the override would have to out-specify
+four classes — `!important` or a longer chain, both worse. As three properties on `.dock`, the
+reduce block wins at **equal specificity by source order**, which is the least surprising cascade
+available. `index.css.test.ts` asserts the ordering.
 
 ---
 

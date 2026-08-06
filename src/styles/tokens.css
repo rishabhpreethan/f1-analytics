@@ -392,6 +392,27 @@
   --size-dock-open: 14.5rem; /* 232 — rail width expanded (G-4) */
   --size-dock-inset: 1rem; /* 16 — gap to the viewport edge, every breakpoint */
   --size-dock-item: 3rem; /* 48 — one rail row or one bottom-dock slot */
+  /* The dock's own inner padding, in **both** orientations — which is what makes
+   * `--size-dock` (64) minus twice this equal `--size-dock-item` (48) exactly, so the pill
+   * inset and the slot size are one arithmetic rather than two that can disagree. It is also
+   * what the collapsed rail's glyph centring is solved against; see `.dock-item` in
+   * `index.css`. px, because that arithmetic is mirrored in JavaScript. */
+  --size-dock-pad: 8px;
+  /* The Lucide glyph the dock renders, mirrored by `DOCK_GLYPH_SIZE` in `navItems.ts` and tied
+   * together by `index.css.test.ts`. It exists as a token for one reason: the collapsed rail's
+   * `padding-left` is `(item width − glyph) / 2`, and if the token and the rendered size ever
+   * disagreed the glyph would sit off-centre by half the difference in the collapsed state and
+   * nothing would fail. That is exactly the class of defect that shipped here once — the old
+   * rule used a literal 22px and a comment claiming it centred the glyph at x = 32, having
+   * forgotten the container's own 8px padding, so the true centre was 40. */
+  --size-dock-glyph: 20px;
+  /* How far a rail label travels as it appears (G-4). Read only by CSS, so it lives here rather
+   * than in `MOTION.dist`, where a copy could only drift from the figure that renders. */
+  --size-dock-label-shift: 6px;
+  /* The rail labels' reveal stagger. **18ms, and the figure is budget-derived**: seven labels
+   * at 18ms is 126ms of stagger plus `--dur-fast` (140) = 266ms, inside §4.2's 400ms
+   * interaction ceiling. `stagger.nav`'s 35ms would reach 350 + 140 = 490 and break it. */
+  --stagger-dock-label: 18ms;
   --size-dock-sheet-row: 3.5rem; /* 56 — one overflow-sheet row */
   --size-dock-max: 30rem; /* 480 — bottom dock max-width */
   /* G-3's active-item bar. **px, not rem**, and mirrored by `INDICATOR_LENGTH` in

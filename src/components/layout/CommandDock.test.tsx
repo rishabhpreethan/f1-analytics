@@ -169,12 +169,40 @@ describe('the pin (Design Spec §5.2)', () => {
     expect(screen.getByRole('button', { name: 'Keep menu open' })).toBeDefined();
   });
 
-  it('expands the rail on focus, so a keyboard user always sees the labels', async () => {
+  it('reflects only the pinned preference as an attribute — hover and focus are CSS', async () => {
+    /*
+     * **This test replaced one that asserted `data-expanded` flipped on focus.** The attribute is
+     * gone: hover and focus now open the rail through `:hover` and `:focus-within` in `index.css`,
+     * with no React state, because Rishabh reported the expanded rail doing nothing at 1440px and
+     * the cause could not be named. The state path *did* work — a throwaway diagnostic confirmed
+     * `data-expanded` flipped to `true` on `pointerenter`, and the built cascade was correct — so
+     * the mechanism was removed rather than trusted a second time.
+     *
+     * What can still be asserted in jsdom is the one piece of state that survived, and that the
+     * retired one has not crept back. **What cannot be asserted here is whether the rail actually
+     * widens**: jsdom applies no stylesheet and performs no layout, so `:hover`, `:focus-within`
+     * and a `width` transition are all untestable by construction. `index.css.test.ts` asserts the
+     * declarations instead; the rendered result reaches Rishabh's review or nobody (CR-006).
+     */
     renderDock('/');
     const nav = screen.getByRole('navigation', { name: 'Primary' });
-    expect(nav.getAttribute('data-expanded')).toBe('false');
+    expect(nav.getAttribute('data-pinned')).toBe('false');
+    expect(nav.hasAttribute('data-expanded')).toBe(false);
 
-    await userEvent.tab();
-    expect(nav.getAttribute('data-expanded')).toBe('true');
+    await userEvent.click(screen.getByRole('button', { name: 'Keep menu open' }));
+    expect(nav.getAttribute('data-pinned')).toBe('true');
+  });
+
+  it('gives every slot its stagger index, so the label reveal is a sequence', () => {
+    // `--dock-index` multiplies `--stagger-dock-label` in a per-item `transition-delay` (G-4). If
+    // it were missing every label would appear at once, which is a different (and duller) design
+    // than the one specified — and it would fail silently, because `var(--dock-index, 0)` falls
+    // back to zero by design.
+    renderDock('/');
+    const slots = [...document.querySelectorAll<HTMLElement>('[data-motion="dock-item"]')];
+    expect(slots).toHaveLength(NAV_ITEMS.length);
+    expect(slots.map((slot) => slot.style.getPropertyValue('--dock-index'))).toEqual(
+      NAV_ITEMS.map((_, index) => String(index)),
+    );
   });
 });

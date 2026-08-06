@@ -7,6 +7,7 @@ import {
   type DockPreference,
 } from '@/components/layout/dockPreference';
 import {
+  DOCK_GLYPH_SIZE,
   INDICATOR_LENGTH,
   computeIndicatorGeometry,
   isActiveNavItem,
@@ -15,69 +16,91 @@ import {
 } from '@/components/layout/navItems';
 import { ICONS } from '@/components/ui/iconRegistry';
 import { MoreHorizontal, Pin, PinOff } from '@/components/ui/icons';
-import { useSpotlight } from '@/lib/motion/interactions';
 import { dockMount, indicatorTravel, sheetEnter, sheetExit } from '@/lib/motion/surfaces';
 import { useDisclosure } from '@/lib/motion/useDisclosure';
 import { useMotion } from '@/lib/motion/useMotion';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
- * Primary navigation — `DESIGN_SYSTEM.md` §7.8, Design Spec §5. **Replaces `PrimaryNav`.**
+ * Primary navigation — `DESIGN_SYSTEM.md` §7.8, and rewritten 2026-08-06.
  *
- * **One `<nav aria-label="Primary">`, one list, two orientations.** An expanding overlay rail
- * at ≥1024px and a floating bottom dock below it, both driven from the same markup: the four
- * bottom-dock destinations are the ones flagged in `NAV_ITEMS`, the other three are
- * `display: none` below 1024 and reachable through the overflow sheet, and the "More" trigger
- * and the pin row are each hidden at the width where they make no sense. Rendering two trees
- * would mean two `nav` landmarks, or one that is duplicated to a screen reader.
+ * **One `<nav aria-label="Primary">`, one list, two orientations.** A full-height expanding overlay
+ * rail at ≥1024px and a floating bottom dock below it, both driven from the same markup: the four
+ * bottom-dock destinations are the ones flagged in `NAV_ITEMS`, the other three are `display: none`
+ * below 1024 and reachable through the overflow sheet, and the "More" trigger and the pin row are
+ * each hidden at the width where they make no sense. Rendering two trees would mean two `nav`
+ * landmarks, or one that is duplicated to a screen reader.
  *
- * **The rail expands over content and never reflows `main`** (§5.3). `main` reserves a constant
- * 96px whether the rail is open or closed, because a chart that resized when a user hovered the
- * nav would be a defect — and that is the entire reason the design chose an overlay rail rather
- * than a push sidebar.
+ * **The rail expands over content and never reflows `main`** (§5.3). `main` reserves a constant 96px
+ * whether the rail is open or closed, because a chart that resized when a user hovered the nav would
+ * be a defect — and that is the entire reason the design chose an overlay rail rather than a push
+ * sidebar.
  *
- * **G-4 is a CSS width transition, not a GSAP timeline** — a deliberate deviation from §4.6.
- * `width` is the one layout property §4.5 permits animating, and here CSS is the *safer*
- * mechanism: if GSAP tweened the width it would leave an inline `width` that `revertOnUpdate`
- * strips on the next dependency change, snapping the rail mid-interaction. CSS owns the width;
- * GSAP owns the labels' staggered entrance, which is the part with a stagger. The reduced-motion
- * outcome is unchanged either way — chokepoint 1 removes the transition, and the rail is
- * permanently expanded with the pin control hidden, per §4.6 G-4.
+ * ---
+ *
+ * **What this component deliberately no longer does: track its own hover and focus.**
+ *
+ * Rishabh reported the rail broken in both states. The collapsed fault was real and definite —
+ * nothing hid `.dock-label`, so a 64px rail read `Hor`, `Seas`, `Driv` — and it is fixed in
+ * `index.css`. The expanded fault was *reported* as "hovering did nothing", and it could not be
+ * reproduced: the previous build's `onPointerEnter` → `setHovered(true)` → `data-expanded` path
+ * flips the attribute correctly (asserted below), and the built cascade put
+ * `.dock[data-expanded=true]{width:…}` inside the right media query at the right specificity. The
+ * most likely explanation is capture timing against a 320ms width transition.
+ *
+ * **Not being able to name the cause is the reason the mechanism is gone rather than kept.**
+ * `:hover` and `:focus-within` express exactly the same two conditions in CSS, with no React state,
+ * no re-render, no attribute round-trip and no dependency array — so there is nothing left to fail
+ * in the same unnameable way, and the rail cannot get stuck open or closed because there is no
+ * state to get stuck. Three pieces of state became one, and the one that survived
+ * (`preference`) is the only one that has to, because it persists.
+ *
+ * A cost, stated: `expanded` is no longer observable from JavaScript, so G-3's indicator can no
+ * longer re-measure when the rail opens. That turns out to be free — expanding the rail changes its
+ * *width*, and the rail's indicator travels on `y`, so no offset it measures can change.
+ *
+ * ---
+ *
+ * **G-4 is a CSS width transition, not a GSAP timeline** — a documented deviation from §4.6.
+ * `width` is the one layout property §4.5 permits animating, and here CSS is the *safer* mechanism:
+ * a GSAP width tween would leave an inline `width` that `revertOnUpdate` strips on the next
+ * dependency change, snapping the rail mid-interaction. The label stagger is a per-item
+ * `transition-delay` for the same reason: `:focus-within` has no reliable DOM event pair, so a
+ * tween wired to `pointerenter` would never fire for the keyboard user it exists for.
  *
  * Every other motion is as specified: **G-1**'s dock half via `dockMount`, **G-3**'s measured
- * indicator, **G-5**'s sheet, **G-7** and **G-8** on the items.
+ * indicator, **G-5**'s sheet, and **G-7**'s colour half as a CSS transition. **G-8's pointer
+ * spotlight is gone** — a low-opacity achromatic radial over glass reads as a smudge, which is the
+ * same failure the atmosphere's orbs were removed for (§3.5.2).
  *
- * **G-1 and G-3 are two `useMotion` calls, on two nodes, and that separation is the fix for a
- * real defect rather than tidiness.** They shared one hook, and because R-G3 hard-codes
+ * **G-1 and G-3 are two `useMotion` calls, on two nodes, and that separation is the fix for a real
+ * defect rather than tidiness.** They shared one hook, and because R-G3 hard-codes
  * `revertOnUpdate: true`, G-3's dependency array made G-1's 460ms entrance replay on every
- * navigation and — since `expanded` is in that array — on every `pointerenter` on the rail.
- * G-1 now has no dependencies at all, and G-3 lives on the indicator element itself, so its
- * scope is one node and it can re-measure as often as it likes.
+ * navigation. G-1 now has no dependencies at all, and G-3 lives on the indicator element itself.
  */
 
-/** ≥1024px is the rail. The same figure as `--breakpoint-lg`; see `useMediaQuery` on why
- * this is the one place a breakpoint is also a JavaScript value. */
+/** ≥1024px is the rail. The same figure as `--breakpoint-lg`; see `useMediaQuery` on why this is
+ * the one place a breakpoint is also a JavaScript value. */
 const RAIL_QUERY = '(min-width: 64rem)';
 
 /**
  * Where a dock indicator is travelling **from** and **to**, keyed by the element. Written by
- * `settle`, which runs first and in both modes; read by `animate`, which runs second and only
- * when motion is allowed. `from: null` is first paint, and `from === to` means "did not move" —
- * which `animate` treats as nothing to build.
+ * `settle`, which runs first and in both modes; read by `animate`, which runs second and only when
+ * motion is allowed. `from: null` is first paint, and `from === to` means "did not move" — which
+ * `animate` treats as nothing to build.
  *
- * **`settle` must write on every run, including the runs where it measures nothing.** If it
- * returned early and left the previous entry in place, `animate` would read a stale pair and
- * replay the flourish for a move that never happened — which is what navigating to `/teams`
- * below 1024px does, since that slot is `display: none` and cannot be measured.
+ * **`settle` must write on every run, including the runs where it measures nothing.** If it returned
+ * early and left the previous entry in place, `animate` would read a stale pair and replay the
+ * flourish for a move that never happened — which is what navigating to `/teams` below 1024px does,
+ * since that slot is `display: none` and cannot be measured.
  *
- * **A `WeakMap`, not a `useRef`, and for the same reason `POINTER_SETTERS` is one.** This is
- * written by a motion builder and read by another; a ref written from a builder is exactly the
- * pattern `react-hooks/refs` refuses, because it cannot prove the builder is not called during
- * render. Keying on the DOM node has no such ambiguity and holds nothing alive after the node
- * is collected.
+ * **A `WeakMap`, not a `useRef`.** This is written by a motion builder and read by another; a ref
+ * written from a builder is exactly the pattern `react-hooks/refs` refuses, because it cannot prove
+ * the builder is not called during render. Keying on the DOM node has no such ambiguity and holds
+ * nothing alive after the node is collected.
  *
- * It cannot be an inline style read back off the element instead: `revertOnUpdate: true`
- * (R-G3) strips the previous run's inline transform *before* the next run measures.
+ * It cannot be an inline style read back off the element instead: `revertOnUpdate: true` (R-G3)
+ * strips the previous run's inline transform *before* the next run measures.
  */
 const INDICATOR_TRAVEL = new WeakMap<HTMLElement, { from: number | null; to: number | null }>();
 
@@ -90,10 +113,11 @@ export function CommandDock({ items }: CommandDockProps) {
   const isRail = useMediaQuery(RAIL_QUERY);
 
   const [preference, setPreference] = useState<DockPreference>(readDockPreference);
-  const [hovered, setHovered] = useState(false);
-  const [focused, setFocused] = useState(false);
 
   const moreRef = useRef<HTMLButtonElement>(null);
+  // The list is measured by G-3 and nothing else, so it is a plain ref. It used to be
+  // `useSpotlight`'s scope; the spotlight is retired (§3.5.2).
+  const listRef = useRef<HTMLUListElement>(null);
 
   const {
     scope: sheetScope,
@@ -101,20 +125,7 @@ export function CommandDock({ items }: CommandDockProps) {
     isOpen: sheetOpen,
     open: openSheet,
     close: closeSheet,
-    reduced,
   } = useDisclosure<HTMLDivElement>({ enter: sheetEnter, exit: sheetExit });
-
-  // The spotlight's scope **is** the list, so it doubles as the element G-3 measures against —
-  // one ref, one node, and no merge needed, because G-3 now scopes to the indicator itself.
-  const { scope: listScope, handlers: spotlightHandlers } = useSpotlight<HTMLUListElement>();
-
-  /**
-   * The rail is expanded when pinned, hovered or focused — **and always under reduced motion**
-   * (§4.6 G-4). A hover-to-reveal affordance is exactly what a reduced-motion user should not
-   * have to chase, so they get the labels permanently and the pin control disappears, because
-   * there is nothing left for it to toggle.
-   */
-  const expanded = reduced || preference === 'pinned' || hovered || focused;
 
   const activeIndex = items.findIndex((item) => isActiveNavItem(pathname, item.to));
 
@@ -122,12 +133,11 @@ export function CommandDock({ items }: CommandDockProps) {
    * **G-1's dock half — and it has NO dependency array, deliberately.**
    *
    * §4.6 specifies G-1 as once per hard load. This and G-3 used to share one `useMotion`, and
-   * because R-G3 hard-codes `revertOnUpdate: true`, every dependency change re-ran `animate` —
-   * so the 460ms entrance replayed on every navigation *and* on every `pointerenter`, because
-   * `expanded` was in the array. With no deps the entrance is built once and never rebuilt.
+   * because R-G3 hard-codes `revertOnUpdate: true`, every dependency change re-ran `animate` — so
+   * the 460ms entrance replayed on every navigation. With no deps the entrance is built once.
    *
-   * `isRail` is therefore read at mount. That is correct for an entrance: the axis a dock
-   * arrived along is not something a later resize can retrospectively change.
+   * `isRail` is therefore read at mount. That is correct for an entrance: the axis a dock arrived
+   * along is not something a later resize can retrospectively change.
    */
   const { scope: navScope } = useMotion<HTMLElement>({
     animate: (ctx) => {
@@ -136,26 +146,26 @@ export function CommandDock({ items }: CommandDockProps) {
   });
 
   /**
-   * **G-3's indicator**, on its own node and its own dependency array — so it re-measures on
-   * every navigation without dragging G-1 along with it.
+   * **G-3's indicator**, on its own node and its own dependency array — so it re-measures on every
+   * navigation without dragging G-1 along with it.
    *
-   * `settle` / `animate` is exactly the split G-3 needs: the *position* is applied in both
-   * modes with a `gsap.set`, so under `reduce` the bar **snaps**, which §4.6 records as correct
-   * and intended; only the *travel* between positions is a tween.
+   * `settle` / `animate` is exactly the split G-3 needs: the *position* is applied in both modes
+   * with a `gsap.set`, so under `reduce` the bar **snaps**, which §4.6 records as correct and
+   * intended; only the *travel* between positions is a tween.
    *
-   * Deps include `expanded` because expanding the rail changes item widths, and `isRail`
-   * because it changes which axis the indicator travels on. A re-measure that lands on the same
-   * offset builds no tween at all, which is what keeps a rail hover from replaying the
-   * flourish.
+   * **`expanded` is no longer a dependency, and cannot be** — the rail's open state is pure CSS
+   * now. That is not a loss: expanding the rail changes its `width`, and the rail's indicator
+   * travels on `y`, so nothing it measures moves. Removing it also removes a re-measure that fired
+   * on every `pointerenter`.
    */
   const { scope: indicatorScope } = useMotion<HTMLLIElement>({
     settle: ({ root, gsap: g }) => {
-      const geometry = measureIndicator(listScope.current, activeIndex, isRail);
+      const geometry = measureIndicator(listRef.current, activeIndex, isRail);
       const previous = INDICATOR_TRAVEL.get(root)?.to ?? null;
 
-      // `null` is "leave it alone" — nothing to measure, or a `display: none` slot below
-      // 1024px. Writing zero would park the bar in the top-left corner; recording
-      // `from === to` is what tells `animate` that nothing moved.
+      // `null` is "leave it alone" — nothing to measure, or a `display: none` slot below 1024px.
+      // Writing zero would park the bar in the top-left corner; recording `from === to` is what
+      // tells `animate` that nothing moved.
       if (geometry === null) {
         INDICATOR_TRAVEL.set(root, { from: previous, to: previous });
         return;
@@ -166,12 +176,11 @@ export function CommandDock({ items }: CommandDockProps) {
     },
     animate: (ctx) => {
       const travel = INDICATOR_TRAVEL.get(ctx.root);
-      // Nothing measured, or a re-measure that landed on the same offset — which is what
-      // every rail hover is, and it must not replay the flourish.
+      // Nothing measured, or a re-measure that landed on the same offset.
       if (travel === undefined || travel.to === null || travel.from === travel.to) return;
       indicatorTravel(ctx, { from: travel.from, to: travel.to }, isRail);
     },
-    deps: [pathname, isRail, expanded, activeIndex],
+    deps: [pathname, isRail, activeIndex],
   });
 
   function togglePin() {
@@ -186,25 +195,14 @@ export function CommandDock({ items }: CommandDockProps) {
       aria-label="Primary"
       className="dock"
       data-motion="dock"
-      data-expanded={expanded ? 'true' : 'false'}
-      // Pointer and focus both expand the rail (§5.2). `focusin`/`focusout` rather than
-      // `focus`/`blur` — React's `onFocus`/`onBlur` already bubble, which is what is wanted:
-      // a keyboard user tabbing into any child must see the labels.
-      onPointerEnter={() => {
-        setHovered(true);
-      }}
-      onPointerLeave={() => {
-        setHovered(false);
-      }}
-      onFocus={() => {
-        setFocused(true);
-      }}
-      onBlur={() => {
-        setFocused(false);
-      }}
+      /*
+       * The **only** state the rail's appearance still reads from React, because it is the only one
+       * that persists. Hover and focus are `:hover` and `:focus-within` in `index.css`.
+       */
+      data-pinned={preference === 'pinned' ? 'true' : 'false'}
     >
-      <ul ref={listScope} className="dock-list" {...spotlightHandlers}>
-        {items.map((item) => {
+      <ul ref={listRef} className="dock-list">
+        {items.map((item, index) => {
           const active = isActiveNavItem(pathname, item.to);
           const Glyph = ICONS[item.icon];
           return (
@@ -213,13 +211,20 @@ export function CommandDock({ items }: CommandDockProps) {
               className="dock-slot"
               data-motion="dock-item"
               data-overflow={item.inBottomDock ? 'false' : 'true'}
+              /*
+               * The label reveal's stagger (G-4), as a per-item `transition-delay` multiplier. An
+               * index is not a design value, which is why it may be an inline style where a
+               * duration or a length may not — and `--stagger-dock-label`, the figure it
+               * multiplies, is a token.
+               */
+              style={{ '--dock-index': index } as React.CSSProperties}
             >
               <Link
                 to={item.to}
                 aria-current={active ? 'page' : undefined}
                 className={`dock-item ${active ? 'dock-item-active' : ''}`}
               >
-                <Glyph size={20} />
+                <Glyph size={DOCK_GLYPH_SIZE} />
                 <span className="dock-label">{item.label}</span>
               </Link>
             </li>
@@ -228,8 +233,8 @@ export function CommandDock({ items }: CommandDockProps) {
 
         {/*
          * The fifth bottom-dock slot. Hidden at ≥1024, where the rail shows all seven, so it is
-         * never a control that does nothing. `aria-haspopup="dialog"` is correct here in a way
-         * it is not on the two popovers: the sheet really is a modal dialog.
+         * never a control that does nothing. `aria-haspopup="dialog"` is correct here in a way it is
+         * not on the two popovers: the sheet really is a modal dialog.
          */}
         <li className="dock-slot dock-slot-more">
           <button
@@ -246,21 +251,23 @@ export function CommandDock({ items }: CommandDockProps) {
               } else openSheet();
             }}
           >
-            <MoreHorizontal size={20} />
+            <MoreHorizontal size={DOCK_GLYPH_SIZE} />
             <span className="dock-label">More</span>
           </button>
         </li>
 
         {/* G-3. One element that travels, rather than one per item that appears — which is what
-         * makes it read as a single object moving. Positioned by measurement, never by layout;
-         * a **fixed** 20px (rail) / 16px (bottom dock) long, per Design Spec §5.2 and §5.3. */}
+         * makes it read as a single object moving. Positioned by measurement, never by layout; a
+         * **fixed** 20px (rail) / 16px (bottom dock) long, and half the dock's padding *outside*
+         * the active pill, because the pill is now an accent fill and a mark on it would be
+         * invisible. */}
         <li ref={indicatorScope} className="dock-indicator" aria-hidden="true" />
       </ul>
 
       {/*
-       * The pin. Rail-only, and hidden under reduced motion where the rail never collapses.
-       * `aria-pressed` carries the state; the label changes to describe the *action*, which is
-       * what a toggle's name should do.
+       * The pin. Rail-only, pushed to the **bottom** of the full-height rail by `margin-top: auto`,
+       * and hidden under reduced motion where the rail never collapses. `aria-pressed` carries the
+       * state; the label changes to describe the *action*, which is what a toggle's name should do.
        */}
       <div className="dock-pin-row">
         <button
@@ -269,7 +276,11 @@ export function CommandDock({ items }: CommandDockProps) {
           aria-pressed={preference === 'pinned'}
           onClick={togglePin}
         >
-          {preference === 'pinned' ? <PinOff size={20} /> : <Pin size={20} />}
+          {preference === 'pinned' ? (
+            <PinOff size={DOCK_GLYPH_SIZE} />
+          ) : (
+            <Pin size={DOCK_GLYPH_SIZE} />
+          )}
           <span className="dock-label">
             {preference === 'pinned' ? 'Collapse menu' : 'Keep menu open'}
           </span>
@@ -296,11 +307,11 @@ export function CommandDock({ items }: CommandDockProps) {
 /**
  * The active item's geometry along the dock's main axis, from `getBoundingClientRect()`.
  *
- * Kept out of the builder so the builder reads as a statement of what moves. Returns `null`
- * when there is nothing to measure — no active item, a list that has not laid out yet, or a
- * slot that is `display: none` (which is the case on `/teams`, `/circuits` and `/records`
- * below 1024px, where those three destinations live in the overflow sheet). `settle` must then
- * leave the indicator alone rather than move it to zero.
+ * Kept out of the builder so the builder reads as a statement of what moves. Returns `null` when
+ * there is nothing to measure — no active item, a list that has not laid out yet, or a slot that is
+ * `display: none` (which is the case on `/teams`, `/circuits` and `/records` below 1024px, where
+ * those three destinations live in the overflow sheet). `settle` must then leave the indicator alone
+ * rather than move it to zero.
  */
 function measureIndicator(
   list: HTMLUListElement | null,

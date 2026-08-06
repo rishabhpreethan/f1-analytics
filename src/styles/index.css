@@ -275,8 +275,35 @@
   }
 
   /* ============================================================ CommandDock §5.2 / §5.3
-   * One component, two orientations, one `<nav>`. Below 1024 it is a floating bottom dock;
-   * at ≥1024 it becomes a vertical rail that expands **over** content.
+   * One component, two orientations, one `<nav>`. Below 1024 it is a floating bottom dock; at
+   * ≥1024 it becomes a **full-height** vertical rail that expands **over** content.
+   *
+   * **Rewritten 2026-08-06.** Rishabh: *"the sidebar, its broken the way its layout is isnt
+   * great"* — *"when its closed and when its open both"*. Three separate faults, and the fixes
+   * are structural rather than cosmetic:
+   *
+   *   1. **Collapsed, the labels rendered at full size and clipped mid-word** — the rail read
+   *      `Hor`, `Seas`, `Driv`, `Tea`. Root cause: nothing hid `.dock-label` in the collapsed
+   *      state. The rail was *specified* icon-only and nothing implemented it. Fixed below by
+   *      `--dock-label`, and keyed on the **state** rather than authored as a base `opacity: 0`,
+   *      per MR-2 — a hidden label is a state, not an entrance.
+   *   2. **The glyph was 8px off-centre when collapsed.** `padding-left: 22px` carried a comment
+   *      asserting it put the glyph centre at x = 32 ("32 − half of a 20px glyph"), which forgot
+   *      the rail's own 8px padding: the true centre was 40. It is now solved from tokens, so
+   *      the arithmetic is visible and `index.css.test.ts` can assert it.
+   *   3. **The vertical geometry was an accident** — a floating box at roughly 235→660px in a
+   *      900px viewport, neither full-height nor centred, with the active item's fill clipped by
+   *      the container's own corner radius. It is now **full height less `--size-dock-inset` at
+   *      both ends**, with the destinations at the top and the pin pushed to the bottom.
+   *
+   * **The expansion is now driven by CSS `:hover` / `:focus-within`, not by React state**, and
+   * that is a deliberate removal of a mechanism rather than a style preference. The previous
+   * build expanded on a `data-expanded` attribute written from three pieces of React state.
+   * Rishabh reported hover doing nothing at 1440px and it could not be reproduced: the attribute
+   * *does* flip on `pointerenter` (asserted in `CommandDock.test.tsx`) and the built cascade
+   * *was* correct. Rather than ship something that had already failed once for a reason nobody
+   * could name, the whole React path is gone — hover, focus and the reduced-motion override are
+   * now pure CSS, and only the *pinned* preference (which must persist) is still state.
    *
    * Both surfaces are glass, with the same mandatory `@supports` fallback as the header: an
    * unblurred translucent panel over a moving field is unreadable.
@@ -284,12 +311,17 @@
   .dock {
     position: fixed;
     z-index: var(--z-dock);
+    display: flex;
     bottom: var(--size-dock-inset);
     left: var(--size-dock-inset);
     right: var(--size-dock-inset);
     max-width: var(--size-dock-max);
     margin-inline: auto;
     height: var(--size-dock);
+    /* One padding in both orientations, which is what makes `--size-dock` (64) minus twice it
+     * equal `--size-dock-item` (48) exactly. The active pill is therefore inset by 8px on every
+     * side and can never be clipped by the container's corner radius — fault 3. */
+    padding: var(--size-dock-pad);
     border-radius: var(--radius-full);
     background-color: var(--surface-raised);
     border: 1px solid var(--border-subtle);
@@ -306,25 +338,18 @@
   .dock-list {
     position: relative;
     display: flex;
+    flex: 1;
     align-items: center;
-    height: 100%;
-    padding: calc(var(--spacing) * 1);
-    /* G-8's spotlight coordinates. **`px`, and the unit is load-bearing** — see the note on
-     * `.capability-card`. `--spotlight: 0` is what prevents a flash before the first
-     * `pointermove`; the coordinates only have to carry the right unit. */
-    --px: 0px;
-    --py: 0px;
-    --spotlight: 0;
+    gap: calc(var(--spacing) * 1);
   }
 
   .dock-slot {
     position: relative;
     flex: 1;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
     min-width: var(--size-dock-item);
-    min-height: var(--size-dock-item);
   }
 
   /* Below 1024 the three overflow destinations live in the sheet, not the dock. `display: none`
@@ -340,9 +365,7 @@
     justify-content: center;
     flex-direction: column;
     gap: calc(var(--spacing) * 0.5);
-    height: 100%;
     min-width: var(--size-dock-item);
-    min-height: var(--size-dock-item);
     border: 0;
     border-radius: var(--radius-full);
     background-color: transparent;
@@ -356,37 +379,65 @@
   }
 
   .dock-item:hover {
+    background-color: var(--accent-wash);
     color: var(--accent-ink);
   }
 
-  /* The active item: an accent wash **plus** `aria-current` **plus** the 2px indicator rule.
-   * Colour is never the only signal (§3.6.4). */
+  /*
+   * The active item is an **inverted pill** — `--accent-fill` with `--accent-on` type, measured
+   * at 19.91:1 (§9.2.2 V-18) — plus `aria-current="page"` plus the 2px indicator bar beside it.
+   * Colour is never the only signal (§3.6.4).
+   *
+   * It was an `--accent-wash` pill before the monochrome switch. A wash is not enough emphasis
+   * for "where you are" once hue is gone, and inversion is the loudest device a monochrome
+   * system has (§3.6.1). It also solves the collapsed rail specifically: with labels hidden, an
+   * inverted pill is what tells you which of seven identical-weight glyphs is current.
+   */
   .dock-item-active {
-    background-color: var(--accent-wash);
-    color: var(--ink-primary);
+    background-color: var(--accent-fill);
+    color: var(--accent-on);
   }
 
+  /* Hover on the item that is already active must not repaint its glyph in the accent, which on
+   * an accent fill would be invisible. */
+  .dock-item-active:hover {
+    background-color: var(--accent-fill-hover);
+    color: var(--accent-on);
+  }
+
+  /*
+   * The label. `--dock-label` and `--dock-label-x` are **fallback-defaulted to the visible
+   * state**, so the bottom dock — which never collapses — needs no rule of its own, and so a
+   * stylesheet that failed to load the rail block cannot hide a label.
+   *
+   * The rail block below is what sets them to the hidden values, keyed on the *collapsed state*
+   * rather than authored as a base `opacity: 0` (MR-2).
+   */
   .dock-label {
     font-size: var(--text-2xs);
     line-height: var(--text-2xs--line-height);
     letter-spacing: var(--text-2xs--letter-spacing);
     font-weight: var(--text-2xs--font-weight);
     text-transform: uppercase;
+    opacity: var(--dock-label, 1);
+    transform: translateX(var(--dock-label-x, 0px));
   }
 
-  /* G-3. **A fixed 2×16px bar at the slot's top edge** (Design Spec §5.3), translated on `x` to
-   * the centre of the active slot — one element that travels rather than one per item that
-   * appears. It is never scaled to the item's width: the Technical Spec's `scaleX` reading
-   * produced a full-slot bar, and §S.3.6 now records the Design Spec as governing.
+  /* G-3. A fixed 2×16px bar (2×20 in the rail), translated along the dock's main axis to the
+   * centre of the active slot — one element that travels rather than one per item that appears.
+   * It is never scaled to the item's width.
    *
-   * `transform-origin` is the centre, because the only scale G-3 applies is the rule's
-   * `0.4 → 1` growth along its own length, which must grow about its middle rather than drag
-   * one end. */
+   * **It sits half the dock's padding *outside* the pill**, which is new and is required by the
+   * inversion above: a `--accent-mark` bar on an `--accent-fill` pill is the same colour as the
+   * pill and would be invisible. Four pixels in from the rail's edge is clear of both.
+   *
+   * `transform-origin` is the centre, because the only scale G-3 applies is the rule's `0.4 → 1`
+   * growth along its own length, which must grow about its middle rather than drag one end. */
   .dock-indicator {
     position: absolute;
     pointer-events: none;
     background-color: var(--accent-mark);
-    top: 0;
+    top: calc(-1 * var(--size-dock-pad) / 2);
     left: 0;
     width: var(--size-dock-indicator);
     height: var(--size-rule);
@@ -398,36 +449,59 @@
     display: none;
   }
 
-  /* ------------------------------------------------------------------ the rail, ≥1024 */
+  /* ------------------------------------------------------------------ the rail, ≥1024
+   *
+   * **Full height, with stated offsets**: `--size-dock-inset` (16px) from the top and the bottom
+   * of the viewport, and the same from the left. That replaces a content-height box floating at
+   * an arbitrary vertical position, which is fault 3 above. A tall object also carries more
+   * confidence than a small one, which is the point of a rail rather than a menu.
+   */
   @media (min-width: 64rem) {
     .dock {
-      top: 50%;
-      bottom: auto;
+      flex-direction: column;
+      top: var(--size-dock-inset);
+      bottom: var(--size-dock-inset);
       right: auto;
       left: var(--size-dock-inset);
-      transform: translateY(-50%);
-      width: var(--size-dock);
-      max-width: none;
       height: auto;
+      max-width: none;
       margin-inline: 0;
+      /* 12px at the top and bottom rather than 8: with a `--radius-2xl` (20px) corner, an item
+       * inset 8px horizontally needs ~4px of vertical clearance before the arc, and 12 gives
+       * margin over that. This is the arithmetic fault 3 was missing. */
+      padding-block: calc(var(--spacing) * 3);
       border-radius: var(--radius-2xl);
-      padding: calc(var(--spacing) * 2);
       overflow: hidden;
-      /* G-4. CSS owns the width; see the note in `CommandDock.tsx` for why this is not a GSAP
-       * tween. Chokepoint 1 removes the transition under reduced motion, and the rule below
-       * makes the rail permanently expanded there — so the reduced state is a rail with labels,
-       * not a rail that a keyboard user has to chase. */
+      /*
+       * G-4. **CSS owns the width.** Every state that opens the rail resolves through
+       * `--dock-width`, which is what lets the reduced-motion override below win by source order
+       * instead of by a specificity fight — a `!important` or a `:not()` chain here would be the
+       * usual alternative and both are worse. Chokepoint 1 in `motion.css` removes the
+       * transition under `reduce`, and the override makes the rail permanently expanded there,
+       * so a reduced-motion user gets a rail *with labels* rather than one to chase.
+       */
+      --dock-width: var(--size-dock);
+      --dock-label: 0;
+      --dock-label-x: calc(-1 * var(--size-dock-label-shift));
+      width: var(--dock-width);
       transition: width var(--dur-slow) var(--ease-move);
     }
 
-    .dock[data-expanded='true'] {
-      width: var(--size-dock-open);
+    /*
+     * The three states that open the rail. `:hover` and `:focus-within` are CSS rather than React
+     * deliberately — see the note at the top of this section. `[data-pinned]` is the one that has
+     * to be state, because the preference persists to `localStorage`.
+     */
+    .dock:is(:hover, :focus-within, [data-pinned='true']) {
+      --dock-width: var(--size-dock-open);
+      --dock-label: 1;
+      --dock-label-x: 0px;
     }
 
     .dock-list {
       flex-direction: column;
       align-items: stretch;
-      padding: 0;
+      flex: none;
     }
 
     /* All seven destinations are in the rail; nothing overflows, so nothing is hidden and the
@@ -449,35 +523,72 @@
     .dock-item {
       flex-direction: row;
       justify-content: flex-start;
-      /* The glyph's centre sits at x = 32 whether the rail is open or closed — the single most
-       * noticeable detail if it is got wrong, because a glyph that shifts as the rail expands
-       * makes the whole panel look like it is sliding. 32 − half of a 20px glyph = 22. */
-      padding-left: 22px;
+      /*
+       * **The glyph's centre sits at exactly half the collapsed rail's width, in both states** —
+       * the single most noticeable detail if it is got wrong, because a glyph that shifts as the
+       * rail expands makes the whole panel look like it is sliding.
+       *
+       * Solved from tokens rather than written as a literal: the item's box is
+       * `--size-dock` less twice `--size-dock-pad` (64 − 16 = 48), so centring a
+       * `--size-dock-glyph` (20) glyph in it needs (48 − 20) / 2 = 14. The previous rule said
+       * `22px` with a comment claiming it centred at 32, having forgotten the padding — the real
+       * centre was 40, i.e. 8px off, in the state the user sees most.
+       */
+      padding-left: calc(
+        (var(--size-dock) - var(--size-dock-pad) * 2 - var(--size-dock-glyph)) / 2
+      );
       gap: calc(var(--spacing) * 3);
       border-radius: var(--radius-md);
       white-space: nowrap;
     }
 
+    /*
+     * The label in the rail: real text, not an uppercase micro-label, and it **fades and slides
+     * in with a staggered delay** so the reveal reads as a sequence rather than a block.
+     *
+     * The stagger is a per-item `transition-delay` from `--dock-index`, which the component sets
+     * on each slot. It is CSS rather than a GSAP stagger for the same reason the width is: the
+     * trigger is `:hover` / `:focus-within`, which have no reliable DOM event pair, and a tween
+     * wired to `pointerenter` would never fire for the keyboard user `:focus-within` exists for.
+     *
+     * Collapsing carries **no** delay — `transition-delay: 0` on the closed state — because a
+     * staggered *disappearance* reads as lag rather than as sequence.
+     */
     .dock-label {
       font-size: var(--text-base);
       line-height: var(--text-base--line-height);
       letter-spacing: normal;
       font-weight: 500;
       text-transform: none;
+      transition:
+        opacity var(--dur-fast) var(--ease-enter),
+        transform var(--dur-fast) var(--ease-enter);
+      transition-delay: 0ms;
     }
 
-    /* The rail's form: a fixed 2×20px bar at `left: 0`, translated on `y` to the vertical
-     * centre of the active row (Design Spec §5.2). */
+    .dock:is(:hover, :focus-within, [data-pinned='true']) .dock-label {
+      transition-delay: calc(var(--dock-index, 0) * var(--stagger-dock-label));
+    }
+
+    /* The rail's form: a fixed 2×20px bar, half the rail's padding in from its left edge and
+     * therefore clear of the inverted active pill, translated on `y` to the vertical centre of
+     * the active row. */
     .dock-indicator {
+      top: 0;
+      left: calc(-1 * var(--size-dock-pad) / 2);
       width: var(--size-rule);
       height: var(--size-dock-indicator-rail);
     }
 
+    /* `margin-top: auto` is what pins the control to the bottom of a full-height rail, which is
+     * the composition the geometry above exists for: destinations at the top, the one preference
+     * control at the foot, and deliberate empty glass between them. */
     .dock-pin-row {
       display: block;
-      margin-top: calc(var(--spacing) * 2);
+      margin-top: auto;
       padding-top: calc(var(--spacing) * 2);
       border-top: 1px solid var(--border-subtle);
+      --dock-index: 7;
     }
 
     .dock-pin {
@@ -487,32 +598,22 @@
   }
 
   /* §4.6 G-4: under `reduce` the rail is permanently expanded and the pin control is hidden. A
-   * hover-to-reveal affordance is precisely what a reduced-motion user should not have to
-   * chase, and with the rail always open the pin has nothing left to toggle. */
+   * hover-to-reveal affordance is precisely what a reduced-motion user should not have to chase,
+   * and with the rail always open the pin has nothing left to toggle.
+   *
+   * This wins by **source order at equal specificity** — `.dock` here against `.dock` above —
+   * which is the whole reason the open state is expressed as three custom properties rather than
+   * as declarations on a `:not()` chain. */
   @media (min-width: 64rem) and (prefers-reduced-motion: reduce) {
     .dock {
-      width: var(--size-dock-open);
+      --dock-width: var(--size-dock-open);
+      --dock-label: 1;
+      --dock-label-x: 0px;
     }
 
     .dock-pin-row {
       display: none;
     }
-  }
-
-  /* G-8 — the pointer spotlight, painted from the two custom properties `useSpotlight` writes.
-   * A `::before` under the content, so it never affects the ink's contrast. 14% per §4.6. */
-  .dock-list::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    border-radius: inherit;
-    opacity: var(--spotlight);
-    background: radial-gradient(
-      var(--size-spotlight) circle at var(--px) var(--py),
-      var(--accent-glow) 0%,
-      transparent 62%
-    );
   }
 
   /* ------------------------------------------------------- the overflow sheet, <1024 (G-5) */
