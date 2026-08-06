@@ -65,8 +65,8 @@ const ease = {
 } as const;
 
 /**
- * Preset pairs — a duration and an ease, together. This replaces the retired
- * Framer-Motion spring set (`visualDuration` + `bounce`), which has no GSAP-core
+ * Preset pairs — a duration and an ease, together. This replaces the retired spring token
+ * set of the previous animation library, whose duration-plus-bounce API has no GSAP-core
  * equivalent (§4.3).
  */
 const m = {

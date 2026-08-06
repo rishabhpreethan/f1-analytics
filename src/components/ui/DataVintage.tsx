@@ -1,8 +1,10 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { CoverageDetail, DataVintage as DataVintageValue } from '@/features/meta/selectors';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { control, crossfade, popover } from '@/lib/motion';
+import { usePressMotion } from '@/lib/motion/interactions';
+import { contentEnter, popoverEnter, popoverExit } from '@/lib/motion/surfaces';
+import { useDisclosure } from '@/lib/motion/useDisclosure';
+import { useMotion } from '@/lib/motion/useMotion';
 
 /**
  * The data-currency indicator, NV-9 (Design Spec §5.1, `DESIGN_SYSTEM.md` §7.3).
@@ -20,8 +22,16 @@ import { control, crossfade, popover } from '@/lib/motion';
  *
  * The dot is **static**. §4.5 puts this component on the "must never animate" list: a
  * pulsing dot in a header reads as an alert, and there is nothing here to be alarmed
- * about. The only motion is M-8's crossfade out of the skeleton, M-5 on the popover and
- * M-6 on the trigger.
+ * about. The motion is **G-12** (the content half — the resolved chip fades in as the
+ * skeleton is replaced), **G-6** on the popover and **G-7** on the trigger.
+ *
+ * **G-12's skeleton-exit half is not implemented, deliberately.** Cross-fading out an
+ * element that has already been replaced means holding it in the DOM after the data it
+ * stood for has arrived, and the retired library's `mode="popLayout"` is what used to take
+ * it out of flow while the two overlapped. GSAP has no equivalent and this product does
+ * not build one for a 20px chip; the property that mattered — the header does not reflow —
+ * is carried by the skeleton being exactly the resolved chip's width
+ * (`--size-skeleton-vintage-*`), not by the fade. Reported at gate 3.
  */
 
 export interface DataVintageProps {
@@ -38,9 +48,26 @@ export interface DataVintageProps {
 const PANEL_ID = 'data-coverage-detail';
 
 export function DataVintage({ vintage, detail, state }: DataVintageProps) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const {
+    scope: panelScope,
+    mounted: panelMounted,
+    isOpen: open,
+    open: openPanel,
+    close: closePanel,
+  } = useDisclosure<HTMLDivElement>({ enter: popoverEnter, exit: popoverExit });
+
+  const { scope: triggerRef, press } = usePressMotion<HTMLButtonElement>();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // G-12, content half. Keyed on `state` so the fade plays when the skeleton is replaced
+  // and never again. Authored as `from` (MR-2): the resting CSS is the readable chip, so
+  // under reduced motion — or if the tween is never built — the chip is simply there.
+  const { scope: swapScope } = useMotion<HTMLSpanElement>({
+    animate: ({ tl, root }) => {
+      tl.from(root, { opacity: 0, ...contentEnter });
+    },
+    deps: [state],
+  });
 
   // Outside click dismisses (§8). Registered only while open, so there is no document
   // listener in the ordinary case.
@@ -49,16 +76,17 @@ export function DataVintage({ vintage, detail, state }: DataVintageProps) {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && containerRef.current?.contains(target) === true) return;
-      setOpen(false);
+      closePanel();
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [open]);
+  }, [open, closePanel]);
 
+  /** Focus returns synchronously; only the panel's pixels wait for the exit tween. */
   function close() {
-    setOpen(false);
+    closePanel();
     triggerRef.current?.focus();
   }
 
@@ -77,25 +105,16 @@ export function DataVintage({ vintage, detail, state }: DataVintageProps) {
       }}
     >
       {/*
-       * M-8. `mode="popLayout"` takes the exiting skeleton out of flow, so the chip does
-       * not shunt sideways while the two overlap — and the skeleton is the width of the
-       * resolved chip, so the header holds its shape either way. `initial={false}`
-       * because this is a swap, not an entrance: the shell's own mount is M-1.
+       * G-12. One wrapper span, always present, so the skeleton and the resolved chip
+       * occupy the same slot and the header cannot reflow between them.
        */}
-      <AnimatePresence initial={false} mode="popLayout">
+      <span ref={swapScope} className="inline-flex">
         {state === 'loading' ? (
-          <motion.span key="loading" className="inline-flex" exit={crossfade.skeletonExit}>
-            <LoadingState label="Data coverage" className="skeleton-vintage" />
-          </motion.span>
+          <LoadingState label="Data coverage" className="skeleton-vintage" />
         ) : (
-          <motion.span
-            key="resolved"
-            className="inline-flex"
-            initial={crossfade.contentEnter.initial}
-            animate={crossfade.contentEnter.animate}
-          >
+          <>
             {resolved ? (
-              <motion.button
+              <button
                 ref={triggerRef}
                 type="button"
                 className="btn btn-ghost btn-sm t-mono t-xs gap-2"
@@ -112,17 +131,16 @@ export function DataVintage({ vintage, detail, state }: DataVintageProps) {
                 aria-label={detail.triggerName}
                 onClick={() => {
                   if (open) close();
-                  else setOpen(true);
+                  else openPanel();
                 }}
-                whileTap={control.whileTap}
-                transition={control.transition}
+                {...press}
               >
                 <span className="vintage-dot" aria-hidden="true" />
                 <span className="text-ink-secondary">
                   {/* At the base breakpoint the chip is the dot and the round only (§2.2). */}
                   <span className="hidden md:inline">{vintage.year} · </span>R{vintage.round}
                 </span>
-              </motion.button>
+              </button>
             ) : (
               /*
                * Deliberately not an error colour: at header scale a red dot reads as a
@@ -134,32 +152,27 @@ export function DataVintage({ vintage, detail, state }: DataVintageProps) {
                 aria-label="Data coverage unavailable"
               />
             )}
-          </motion.span>
+          </>
         )}
-      </AnimatePresence>
+      </span>
 
-      <AnimatePresence>
-        {open && resolved && (
-          <motion.div
-            id={PANEL_ID}
-            className="popover-panel popover-coverage flex flex-col gap-3 p-4"
-            variants={popover}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-          >
-            <p className="t-2xs text-ink-tertiary">Data coverage</p>
-            <p className="t-sm text-ink-primary">{detail.coverageLine}</p>
-            {detail.scheduledLine !== null && (
-              <p className="t-sm text-ink-secondary">{detail.scheduledLine}</p>
-            )}
-            {detail.cancelledLine !== null && (
-              <p className="t-sm text-ink-secondary">{detail.cancelledLine}</p>
-            )}
-            <p className="t-xs text-ink-tertiary">{detail.seasonsLine}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {panelMounted && resolved && (
+        <div
+          ref={panelScope}
+          id={PANEL_ID}
+          className="popover-panel popover-coverage flex flex-col gap-3 p-4"
+        >
+          <p className="t-2xs text-ink-tertiary">Data coverage</p>
+          <p className="t-sm text-ink-primary">{detail.coverageLine}</p>
+          {detail.scheduledLine !== null && (
+            <p className="t-sm text-ink-secondary">{detail.scheduledLine}</p>
+          )}
+          {detail.cancelledLine !== null && (
+            <p className="t-sm text-ink-secondary">{detail.cancelledLine}</p>
+          )}
+          <p className="t-xs text-ink-tertiary">{detail.seasonsLine}</p>
+        </div>
+      )}
     </div>
   );
 }

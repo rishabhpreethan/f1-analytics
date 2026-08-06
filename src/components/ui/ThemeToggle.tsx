@@ -1,7 +1,8 @@
-import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Monitor, Moon, Sun } from '@/components/ui/icons';
-import { control, popover } from '@/lib/motion';
+import { usePressMotion } from '@/lib/motion/interactions';
+import { popoverEnter, popoverExit } from '@/lib/motion/surfaces';
+import { useDisclosure } from '@/lib/motion/useDisclosure';
 import {
   THEME_PREFERENCES,
   type ResolvedTheme,
@@ -48,12 +49,24 @@ export function ThemeToggle() {
   const [resolved, setResolved] = useState<ResolvedTheme>(() =>
     resolveTheme(readThemePreference()),
   );
-  const [open, setOpen] = useState(false);
   // The tentative selection while the popover is open. Arrow keys move it; only a
   // commit turns it into the preference.
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  // G-6, both halves. `useDisclosure` owns the three-phase machine that keeps the panel
+  // in the DOM while its exit tween plays, and it unmounts immediately under reduced
+  // motion because no tween is created there to complete.
+  const {
+    scope: panelScope,
+    mounted: panelMounted,
+    isOpen: open,
+    open: openPanel,
+    close: closePanel,
+  } = useDisclosure<HTMLDivElement>({ enter: popoverEnter, exit: popoverExit });
+
+  // G-7's press half. The hook owns the ref, so the trigger's focus restoration reads
+  // through it rather than keeping a second ref on the same node.
+  const { scope: triggerRef, press } = usePressMotion<HTMLButtonElement>();
   const containerRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -73,13 +86,13 @@ export function ThemeToggle() {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && containerRef.current?.contains(target) === true) return;
-      setOpen(false);
+      closePanel();
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [open]);
+  }, [open, closePanel]);
 
   // Roving tabindex: the tentatively selected option is the one that holds focus.
   useEffect(() => {
@@ -89,11 +102,15 @@ export function ThemeToggle() {
 
   function openPopover() {
     setActiveIndex(THEME_PREFERENCES.indexOf(preference));
-    setOpen(true);
+    openPanel();
   }
 
+  /**
+   * Focus comes back **synchronously**, before any exit tween has finished: a keyboard
+   * user must not be made to wait 80ms for their focus. Only the pixels linger.
+   */
   function closePopover() {
-    setOpen(false);
+    closePanel();
     triggerRef.current?.focus();
   }
 
@@ -145,7 +162,7 @@ export function ThemeToggle() {
         }
       }}
     >
-      <motion.button
+      <button
         ref={triggerRef}
         type="button"
         className="btn btn-ghost btn-icon"
@@ -163,51 +180,45 @@ export function ThemeToggle() {
           if (open) closePopover();
           else openPopover();
         }}
-        whileTap={control.whileTap}
-        transition={control.transition}
+        {...press}
       >
         <PreferenceIcon preference={preference} size={20} />
-      </motion.button>
+      </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            id={PANEL_ID}
-            className="popover-panel popover-theme flex flex-col gap-0 p-1.5"
-            variants={popover}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            role="radiogroup"
-            aria-label="Theme"
-            onKeyDown={onGroupKeyDown}
-          >
-            {THEME_PREFERENCES.map((option, index) => {
-              const selected = index === activeIndex;
-              return (
-                <button
-                  key={option}
-                  ref={(node) => {
-                    optionRefs.current[index] = node;
-                  }}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  tabIndex={selected ? 0 : -1}
-                  className={`option-row t-base gap-2 px-2 ${selected ? 'option-row-selected' : ''}`}
-                  onClick={() => {
-                    commit(option);
-                  }}
-                >
-                  <PreferenceIcon preference={option} size={16} />
-                  <span className="flex-1">{LABELS[option]}</span>
-                  {selected && <Check size={16} />}
-                </button>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {panelMounted && (
+        <div
+          ref={panelScope}
+          id={PANEL_ID}
+          className="popover-panel popover-theme flex flex-col gap-0 p-1.5"
+          role="radiogroup"
+          aria-label="Theme"
+          onKeyDown={onGroupKeyDown}
+        >
+          {THEME_PREFERENCES.map((option, index) => {
+            const selected = index === activeIndex;
+            return (
+              <button
+                key={option}
+                ref={(node) => {
+                  optionRefs.current[index] = node;
+                }}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                tabIndex={selected ? 0 : -1}
+                className={`option-row t-base gap-2 px-2 ${selected ? 'option-row-selected' : ''}`}
+                onClick={() => {
+                  commit(option);
+                }}
+              >
+                <PreferenceIcon preference={option} size={16} />
+                <span className="flex-1">{LABELS[option]}</span>
+                {selected && <Check size={16} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

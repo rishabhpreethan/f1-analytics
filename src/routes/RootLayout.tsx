@@ -1,4 +1,3 @@
-import { motion, useReducedMotion } from 'framer-motion';
 import { Outlet, useLocation } from 'react-router';
 import { selectCoverageDetail } from '@/features/meta/selectors';
 import { useMeta, useRetryMeta } from '@/features/meta/useMeta';
@@ -6,19 +5,29 @@ import { AppShell } from '@/components/layout/AppShell';
 import { DataUnavailableState } from '@/components/ui/DataUnavailableState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import type { ApiRequestError } from '@/lib/api';
-import { routeEnter, routeEnterReduced } from '@/lib/motion';
+import { dist, dur, ease } from '@/lib/motion/tokens';
+import { useMotion } from '@/lib/motion/useMotion';
 
 /**
  * The layout route every surface renders inside.
  *
  * `AppShell` owns the `header`, the **single** `main#main` and the `footer`; this file
- * owns **M-2**, the footer echo, and the decision of what `main` shows when `/api/meta`
- * fails.
+ * owns the **route enter** (G-2), the footer echo, and the decision of what `main`
+ * shows when `/api/meta` fails.
  *
- * M-2 has **no exit variant**, and there is deliberately no `AnimatePresence` here.
- * `mode="wait"` would add the exit duration to every perceived navigation, so a route
- * change must never hold the outgoing view. Keying the wrapper on `location.pathname`
- * remounts it, which replays the enter animation and nothing else.
+ * **The route enter has no exit half, by design.** Holding the outgoing view would add
+ * its duration to every perceived navigation. The retired library's presence wrapper was
+ * deliberately not used here for that reason, and GSAP has no equivalent to be tempted
+ * by — so the property survives the CR-007 migration for free.
+ *
+ * The replay mechanism changed with CR-007, though. It used to be `key={pathname}`,
+ * remounting the wrapper. Now `deps: [pathname]` does it: `useMotion` hard-codes
+ * `revertOnUpdate: true`, so a pathname change reverts the previous tween — clearing its
+ * inline transform rather than layering a second one over it — and rebuilds. The wrapper
+ * stays mounted, which is one fewer subtree remount per navigation.
+ *
+ * Authored as `from` (MR-2): the resting CSS is the readable state, so under reduced
+ * motion, a stalled chunk or a thrown error, the content is simply *there*.
  *
  * **Loading is not one of the states handled here.** F0's route surfaces fetch nothing,
  * so there is nothing for them to wait on — the only in-flight indicator in the shell is
@@ -56,22 +65,28 @@ function MetaFailure({ error, onRetry }: { error: ApiRequestError; onRetry: () =
 
 export function RootLayout() {
   const { pathname } = useLocation();
-  const reduced = useReducedMotion();
   const { data, error } = useMeta();
   const retry = useRetryMeta();
+
+  const { scope } = useMotion<HTMLDivElement>({
+    animate: ({ tl, root }) => {
+      tl.from(root, {
+        opacity: 0,
+        y: dist.rise,
+        duration: dur.base,
+        ease: ease.enter,
+      });
+    },
+    deps: [pathname],
+  });
 
   const detail = data === undefined ? null : selectCoverageDetail(data);
 
   return (
     <AppShell footerNote={detail?.footerEcho ?? null}>
-      <motion.div
-        key={pathname}
-        variants={reduced === true ? routeEnterReduced : routeEnter}
-        initial="hidden"
-        animate="visible"
-      >
+      <div ref={scope}>
         {error === null ? <Outlet /> : <MetaFailure error={error} onRetry={retry} />}
-      </motion.div>
+      </div>
     </AppShell>
   );
 }

@@ -30,5 +30,7 @@
       "@schemas/*": ["server/schemas/*"]
     }
   },
-  "include": ["src", "server/schemas"]
+  // `vitest.setup.ts` is DOM code, so it belongs to this project rather than the Node one
+  // — and it must belong to *some* project, or ESLint's type-aware rules cannot parse it.
+  "include": ["src", "server/schemas", "vitest.setup.ts"]
 }

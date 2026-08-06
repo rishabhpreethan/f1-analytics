@@ -1,6 +1,10 @@
 @import 'tailwindcss';
 @import './tokens.css';
 @import './fonts.css';
+/* After tokens, because both read `--dur-*` / `--anim-*`; and unlayered, so the two
+ * reduced-motion / visibility chokepoints in motion.css cannot be overridden from a
+ * component (Technical Spec §S.3.1, §S.3.4). */
+@import './motion.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so
@@ -21,18 +25,13 @@
     color: var(--ink-primary);
     font-size: var(--text-base);
     line-height: var(--text-base--line-height);
-    /* M-11: the theme change is a colour transition and nothing else. No transform,
-     * no scale, and deliberately no transition on the custom properties themselves. */
+    /* G-22: the theme change is a colour transition and nothing else. No transform,
+     * no scale, and deliberately no transition on the custom properties themselves.
+     * Its reduced variant — the transition removed entirely, not slowed — comes from
+     * chokepoint 1 in motion.css, which is why there is no `@media` block here. */
     transition:
       background-color var(--dur-base) var(--ease-move),
       color var(--dur-base) var(--ease-move);
-  }
-
-  /* M-11 reduced-motion variant: the transition is removed entirely, not slowed. */
-  @media (prefers-reduced-motion: reduce) {
-    body {
-      transition: none;
-    }
   }
 
   /*
@@ -304,12 +303,6 @@
     transition: background-color var(--dur-instant) var(--ease-move);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .option-row {
-      transition: none;
-    }
-  }
-
   .option-row:hover {
     background-color: var(--surface-sunken);
     color: var(--ink-primary);
@@ -322,8 +315,10 @@
   }
 
   /* ------------------------------------------------------------------ Button §7.1
-   * Height, radius and the hue-free interactive expression of §3.5.2. `scale(0.985)`
-   * on press is M-6 and is applied by Framer Motion, not here.
+   * Height, radius and the interactive expression of §3.5.2. `scale(0.985)` on press is
+   * G-7 and is applied by GSAP through `usePressMotion`, not here — but the colour and
+   * surface half **is** a CSS transition, deliberately, so a reduced-motion user still
+   * gets feedback when the tween is never created.
    */
   .btn {
     display: inline-flex;
@@ -339,12 +334,6 @@
       background-color var(--dur-instant) var(--ease-move),
       color var(--dur-instant) var(--ease-move),
       border-color var(--dur-instant) var(--ease-move);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .btn {
-      transition: none;
-    }
   }
 
   .btn-sm {
@@ -457,9 +446,9 @@
 
   /* ------------------------------------------------------------- Skeletons §7.5
    * Built from --surface-sunken blocks at --radius-sm. Geometry is per-site and comes
-   * from a token, never from an inline dimension. The pulse itself is M-7 and is applied
-   * by Framer Motion in LoadingState, because it must stop — not slow — under a
-   * reduced-motion preference.
+   * from a token, never from an inline dimension. The pulse itself is G-11 and, under
+   * MR-1, is a CSS `@keyframes` in motion.css — which is also what makes it *stopped*
+   * rather than slowed under a reduced-motion preference.
    */
   .skeleton {
     display: block;

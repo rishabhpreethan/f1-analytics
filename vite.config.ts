@@ -41,6 +41,10 @@ export default defineConfig({
     environment: 'node',
     include: ['{src,server}/**/*.test.{ts,tsx}'],
 
+    // Runs before the first import of every test file, in that file's environment. It
+    // exists for exactly one reason — see the file.
+    setupFiles: ['./vitest.setup.ts'],
+
     /*
      * Vitest replaces every CSS import with an empty string by default, and it does so
      * even for an explicit `?raw` request. Three test files assert *on the stylesheet

@@ -1,19 +1,20 @@
-import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { control } from '@/lib/motion';
+import { usePressMotion } from '@/lib/motion/interactions';
 
 /**
- * `DESIGN_SYSTEM.md` §7.1. F0 needs `primary`, `secondary` and `ghost` only — `danger`
- * waits for F1, per Design Spec §3.
+ * `DESIGN_SYSTEM.md` §7.1. F0 needs `primary`, `secondary`, `ghost` and — added by
+ * CR-007 — `hero`, the landing page's one oversized primary action. `danger` waits for F1.
  *
  * Every visual value comes from a class in `styles/index.css`, which reads tokens. The
- * only thing this module decides is which class, and the M-6 gesture — `whileTap` at
- * `spring.control`. `whileFocus` is deliberately unused: the focus ring is CSS
+ * only things this module decides are which class, and **G-7**'s press feedback via
+ * `usePressMotion` — which is context-safe and a no-op under reduced motion. The hover
+ * step is a CSS transition on the same element, so a reduced-motion user still gets
+ * feedback. `whileFocus` has no successor and needs none: the focus ring is CSS
  * `:focus-visible` (§3.5.1) and motion is never a focus indicator.
  */
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'hero';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface CommonProps {
@@ -44,18 +45,20 @@ export function Button({
   disabled = false,
   'aria-label': ariaLabel,
 }: ButtonProps) {
+  const { scope, press } = usePressMotion<HTMLButtonElement>();
+
   return (
-    <motion.button
+    <button
+      ref={scope}
       type={type}
       className={classesFor(variant, size, className)}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      {...(disabled ? {} : { whileTap: control.whileTap })}
-      transition={control.transition}
+      {...(disabled ? {} : press)}
     >
       {children}
-    </motion.button>
+    </button>
   );
 }
 
@@ -75,15 +78,11 @@ export function ButtonLink({
   children,
   to,
 }: ButtonLinkProps) {
+  const { scope, press } = usePressMotion<HTMLAnchorElement>();
+
   return (
-    <motion.span
-      whileTap={control.whileTap}
-      transition={control.transition}
-      className="inline-flex"
-    >
-      <Link to={to} className={classesFor(variant, size, className)}>
-        {children}
-      </Link>
-    </motion.span>
+    <Link ref={scope} to={to} className={classesFor(variant, size, className)} {...press}>
+      {children}
+    </Link>
   );
 }

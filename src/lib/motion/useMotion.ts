@@ -107,7 +107,9 @@ export function useMotion<T extends HTMLElement = HTMLDivElement>(
         gsap.utils.toArray<HTMLElement>(selector, root);
       const base: MotionCtx<T> = { root, q, gsap };
 
+      let ran = false;
       const run = (isReduced: boolean): MotionCleanup | undefined => {
+        ran = true;
         // The builders are read from the closure of the render in which the effect last
         // ran, exactly as they would be in a `useEffect`. `deps` — and nothing else —
         // decides when that is.
@@ -143,7 +145,16 @@ export function useMotion<T extends HTMLElement = HTMLDivElement>(
         run(ctx.conditions?.reduce === true),
       );
 
+      // Belt and braces. GSAP only invokes the handler if at least one condition matched;
+      // `all` guarantees that in every real browser, but a partial `matchMedia`
+      // implementation (or a test stub) that answers `false` to `all` would otherwise
+      // leave `settle` unrun — and `settle` is what positions a measured element. Falling
+      // through to the permitted branch matches the "absent means no stated preference"
+      // convention used everywhere else.
+      const fallback = ran ? undefined : run(false);
+
       return () => {
+        fallback?.();
         mm.kill(true);
       };
     },

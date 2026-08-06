@@ -23,9 +23,9 @@ app.use(
       // therefore an external public/theme-init.js, not an inline block.
       scriptSrc: ["'self'"],
       styleSrc: ["'self'"],
-      // Provisional allowance. React and Framer Motion mutate styles through the
-      // CSSOM, which CSP does not govern, so this may well be unnecessary — T13
-      // settles it against the production build, not by reasoning.
+      // Provisional allowance. React and GSAP both mutate styles through the CSSOM,
+      // which CSP does not govern, so this may well be unnecessary — CR-007 task
+      // C7-8 settles it against the production build, not by reasoning.
       styleSrcAttr: ["'unsafe-inline'"],
       imgSrc: ["'self'", 'data:'],
       fontSrc: ["'self'"],

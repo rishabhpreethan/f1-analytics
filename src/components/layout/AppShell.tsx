@@ -1,7 +1,8 @@
-import { motion, useReducedMotion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { Header } from '@/components/layout/Header';
-import { shellMount, shellMountReduced } from '@/lib/motion';
+import { shellMount } from '@/lib/motion/surfaces';
+import { useMotion } from '@/lib/motion/useMotion';
+import { useMotionPause } from '@/lib/motion/useMotionPause';
 
 /**
  * The chrome: skip link, `header`, `main#main`, `footer` (Design Spec §2.1, §8).
@@ -9,8 +10,13 @@ import { shellMount, shellMountReduced } from '@/lib/motion';
  * **This component owns the single `main` landmark and the `#main` id** — the skip link's
  * target. No other component renders a `main`.
  *
- * **M-1** is applied here, to the header, and fires once per hard load rather than per
- * route: the route-level motion is M-2 in `RootLayout`.
+ * **G-1** is applied here, to the header, and fires once per hard load rather than per
+ * route: the route-level motion is G-2 in `RootLayout`. There is no reduced variant to
+ * select between any more — `useMotion` never builds the tween under `reduce`, and the
+ * header's resting CSS is its final state (MR-2), so the reduced outcome is the correct
+ * one by construction rather than by a second set of values.
+ *
+ * It also mounts **MR-3** once, for the whole document.
  *
  * `footerNote` is the §2.1 footer echo, which is a value from `/api/meta`. It arrives as
  * a prop because components never fetch (`ARCHITECTURE.md` §3), and it is `null` until
@@ -23,7 +29,8 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children, footerNote }: AppShellProps) {
-  const reduced = useReducedMotion();
+  useMotionPause();
+  const { scope: headerScope } = useMotion<HTMLElement>({ animate: shellMount });
 
   return (
     <div className="bg-surface-canvas flex min-h-screen flex-col">
@@ -31,14 +38,9 @@ export function AppShell({ children, footerNote }: AppShellProps) {
         Skip to main content
       </a>
 
-      <motion.header
-        className="shell-header sticky top-0 z-30"
-        variants={reduced === true ? shellMountReduced : shellMount}
-        initial="hidden"
-        animate="visible"
-      >
+      <header ref={headerScope} className="shell-header sticky top-0 z-30">
         <Header />
-      </motion.header>
+      </header>
 
       <main id="main" className="shell-container flex-1 px-4 py-6 md:px-6 md:py-8 xl:px-8 xl:py-12">
         {children}

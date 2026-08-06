@@ -40,6 +40,12 @@ export default tseslint.config(
         'error',
         {
           paths: [
+            // Removed by CR-007. Named here so a reinstall-and-import cannot pass review
+            // quietly: the failure is a lint error, not a reviewer noticing a diff.
+            {
+              name: 'framer-motion',
+              message: 'Removed by CR-007. Use @/lib/motion.',
+            },
             {
               name: 'gsap',
               message:

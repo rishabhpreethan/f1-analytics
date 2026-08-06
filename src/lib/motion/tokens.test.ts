@@ -85,7 +85,7 @@ describe('CT-2 — every ease is a GSAP named ease, and no bézier can re-enter'
     expect(code).not.toContain('CustomEase');
     expect(code).not.toContain('CustomBounce');
     expect(code).not.toContain('CustomWiggle');
-    // A numeric array is Framer Motion's bézier form; there is no legitimate one here.
+    // A numeric array is the retired library's bézier form; none is legitimate here.
     expect(code).not.toMatch(/\[\s*-?[\d.]+\s*,/);
   });
 
@@ -124,6 +124,27 @@ describe('CT-3 — MOTION.dur agrees with the --dur-* tokens in tokens.css', () 
       expect(seconds, `--dur-${name} has no MOTION.dur counterpart`).toBeDefined();
       // Compared in milliseconds to keep the assertion free of float noise.
       expect(Math.round(seconds * 1000), `--dur-${name}`).toBe(ms);
+    }
+  });
+
+  it('mirrors every ambient loop period as an --anim-* token', () => {
+    // The same drift guard, one mechanism down. MR-1 puts every loop in CSS, so these
+    // are the figures that actually run and `MOTION.loop` is the mirror — which makes it
+    // the half more likely to rot unnoticed.
+    const cssName: Record<keyof typeof MOTION.loop, string> = {
+      grid: '--anim-grid',
+      orbA: '--anim-orb-a',
+      orbB: '--anim-orb-b',
+      orbC: '--anim-orb-c',
+      comet: '--anim-comet',
+      skeleton: '--anim-skeleton',
+    };
+
+    for (const [name, seconds] of Object.entries(MOTION.loop)) {
+      const token = cssName[name as keyof typeof MOTION.loop];
+      const match = new RegExp(`${token}:\\s*(\\d+)ms;`).exec(TOKENS_CSS);
+      expect(match, `${token} is missing from tokens.css`).not.toBeNull();
+      expect(Number(match?.[1]), token).toBe(Math.round(seconds * 1000));
     }
   });
 

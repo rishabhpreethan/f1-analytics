@@ -1,0 +1,74 @@
+/*
+ * The two global motion chokepoints, and every looping animation in the product.
+ *
+ * MR-1 (binding): **looping motion is CSS `@keyframes`; one-shot and interaction motion
+ * is GSAP.** There is no third mechanism. A `repeat: -1` GSAP tween costs a
+ * `requestAnimationFrame` callback for the life of the session, on the same thread that
+ * has to service the "<100ms chart interaction" budget from F2 onward; a composited CSS
+ * animation on `transform`/`opacity` costs the main thread nothing at steady state.
+ *
+ * MR-2 (binding): **an element's CSS resting state is always its final, readable state.**
+ * Every rule below therefore sets the resting value first and animates *away from* it.
+ * If an animation never runs — reduced motion, a paused tab, a stylesheet that failed —
+ * the content is visible and correct.
+ *
+ * These rules are deliberately **not** inside a Tailwind `@layer`: unlayered declarations
+ * win over layered ones, which is what makes the chokepoints impossible to override from
+ * a component.
+ */
+
+/* ------------------------------------------------------------------ chokepoint 1
+ * Reduced motion, globally, for every loop and every transition.
+ *
+ * It is global on purpose. A per-component reduced variant is a thing you can forget,
+ * and forgetting it is not a cosmetic miss: `DESIGN_SYSTEM.md` §4.4 makes a *stopped*
+ * state a correctness requirement. This is the CSS half; the GSAP half is
+ * `gsap.matchMedia()` in `useMotion`, where a tween under `reduce` is never created at
+ * all rather than created and stopped.
+ *
+ * This single block replaces the four per-component `@media (prefers-reduced-motion)`
+ * blocks the previous build carried, so there is one place rather than four.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ chokepoint 2
+ * MR-3 — nothing animates while the tab is hidden (`DESIGN_SYSTEM.md` §4.5).
+ *
+ * `AppShell` toggles `data-motion-paused` on `<html>` from a `visibilitychange`
+ * subscription. GSAP needs no equivalent: its animations here are short one-shots, and
+ * browsers throttle `requestAnimationFrame` on a hidden tab anyway.
+ */
+html[data-motion-paused] *,
+html[data-motion-paused] *::before,
+html[data-motion-paused] *::after {
+  animation-play-state: paused !important;
+}
+
+/* ------------------------------------------------------------------ G-11
+ * Skeleton pulse. **Opacity only** — never `background-position`, never a transform.
+ *
+ * This was a JavaScript loop with its own `useReducedMotion()` branch. As CSS it needs
+ * neither: `0.7` is the resting opacity G-11 specifies for the reduced state, and
+ * chokepoint 1 stops the animation dead, leaving exactly that value.
+ */
+@keyframes skeleton-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  opacity: 0.7;
+  animation: skeleton-pulse var(--anim-skeleton) var(--ease-move) infinite alternate;
+}

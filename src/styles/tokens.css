@@ -123,6 +123,16 @@
   --ease-exit: ease-in;
   --ease-move: ease-in-out;
 
+  /* Ambient loop periods (§4.3 `loop.*`). These drive the CSS `@keyframes` of MR-1 —
+   * every looping animation in this product is CSS, so these are the figures that
+   * actually run, and `MOTION.loop` is their mirror. CT-3 asserts they agree. */
+  --anim-grid: 24000ms;
+  --anim-orb-a: 18000ms;
+  --anim-orb-b: 24000ms;
+  --anim-orb-c: 30000ms;
+  --anim-comet: 11000ms;
+  --anim-skeleton: 1200ms;
+
   /* ---------------------------------------------------------------- colours
    * Tailwind's default palette is cleared: every colour in this product is either a
    * semantic neutral below or a team's identity, and a stray `bg-blue-500` would

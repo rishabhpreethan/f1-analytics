@@ -50,8 +50,9 @@ function triggerGlyph(): string {
 
 /**
  * `aria-expanded` is the authoritative state and flips at once; the panel itself lingers
- * for M-5's exit (`dur.fast`) before `AnimatePresence` removes it. Both are asserted, in
- * that order, so a test cannot pass on a panel that never leaves the DOM.
+ * in the DOM for G-6's exit tween (`dur.instant`) before `useDisclosure` unmounts it.
+ * Both are asserted, in that order, so a test cannot pass on a panel that never leaves
+ * the DOM.
  */
 async function expectClosed(trigger: HTMLElement): Promise<void> {
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
