@@ -22,20 +22,31 @@ import LANDING_SRC from './Landing.tsx?raw';
  * placeholder, and this is the only thing that can enforce that.
  */
 
+/**
+ * Returns the `fetch` mock, so a test can assert **that** a retry happened rather than
+ * inferring it from having waited long enough for one.
+ *
+ * `retry: false` is not the whole story and reading it as such is how this file became
+ * flaky: `useMeta` sets `retry` per-query, so the default never applies to `/api/meta` —
+ * it retries once, and `retryDelay` is what the default decides. Left at the production
+ * value that is **one real second**, which the failure-state tests below then sat through
+ * inside vitest's 5 s test timeout. `0` removes the sleep and nothing else: the retry
+ * still happens, `useMeta`'s predicate still runs, the error still arrives only once
+ * attempts are exhausted. Nothing here asserts the backoff schedule.
+ */
 function renderLanding(response: () => Response) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve(response())),
-  );
-  return render(
+  const fetchMock = vi.fn(() => Promise.resolve(response()));
+  vi.stubGlobal('fetch', fetchMock);
+  render(
     <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      client={new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } })}
     >
       <MemoryRouter initialEntries={['/']}>
         <Landing />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return fetchMock;
 }
 
 function ok(body: unknown): Response {
@@ -51,9 +62,6 @@ function fail(code: string, status: number): Response {
     headers: { 'Content-Type': 'application/json' },
   });
 }
-
-/** `useMeta` retries; TanStack Query's first backoff is a second. */
-const AFTER_RETRY = { timeout: 4000 };
 
 afterEach(() => {
   cleanup();
@@ -180,28 +188,26 @@ describe('CT-20 — the landing states', () => {
   });
 
   it('keeps the hero and states the failure quietly on a 500', async () => {
-    renderLanding(() => fail('INTERNAL', 500));
+    const fetchMock = renderLanding(() => fail('INTERNAL', 500));
 
     // One line, at `--text-xs`, in the strip's place. **No error card in a hero** (§8) — the
     // failure is already stated below, and an alert tile in the hero is the ugliest possible
     // first impression.
-    // `useMeta` retries everything except `DATABASE_UNAVAILABLE`, and TanStack Query's first
-    // backoff is a second, so the wait is longer than the default.
-    expect(
-      await screen.findByText("Coverage figures aren't available right now.", {}, AFTER_RETRY),
-    ).toBeDefined();
+    expect(await screen.findByText("Coverage figures aren't available right now.")).toBeDefined();
     expect(screen.getByRole('heading', { level: 1, name: 'Settle the argument.' })).toBeDefined();
     // The ruler gets a real error state, because that section *is* the data.
     expect(screen.getByRole('heading', { name: 'Something went wrong' })).toBeDefined();
     expect(screen.getByText('INTERNAL')).toBeDefined();
+    // `useMeta` retries everything except `DATABASE_UNAVAILABLE`, and the state below is the
+    // one that appears *after* attempts are exhausted — not after the first failure.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('distinguishes a rate limit', async () => {
-    renderLanding(() => fail('RATE_LIMITED', 429));
-    expect(
-      await screen.findByRole('heading', { name: 'Too many requests' }, AFTER_RETRY),
-    ).toBeDefined();
+    const fetchMock = renderLanding(() => fail('RATE_LIMITED', 429));
+    expect(await screen.findByRole('heading', { name: 'Too many requests' })).toBeDefined();
     expect(screen.getByText('RATE_LIMITED')).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('renders one h1 and two h2s, in that order', async () => {

@@ -22,18 +22,30 @@ function errorResponse(code: string, message: string, status: number): Response 
   });
 }
 
-function renderApp(response: () => Response): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve(response())),
-  );
+/**
+ * Returns the `fetch` mock, so a test can assert **that** a retry happened rather than
+ * inferring it from having waited long enough for one.
+ *
+ * `retry: false` is not the whole story and reading it as such is how this file became
+ * flaky: `useMeta` sets `retry` per-query, so the default never applies to `/api/meta` —
+ * it retries once, and `retryDelay` is what the default decides. Left at the production
+ * value that is **one real second**, which every failure-state test below then sat
+ * through, twice in one case, inside vitest's 5 s test timeout. `0` removes the sleep and
+ * nothing else: the retry still happens, `useMeta`'s predicate still runs, the error still
+ * arrives only once attempts are exhausted. Nothing here asserts the backoff schedule,
+ * and a unit test is the wrong place to assert it if anything ever needs to.
+ */
+function renderApp(response: () => Response) {
+  const fetchMock = vi.fn(() => Promise.resolve(response()));
+  vi.stubGlobal('fetch', fetchMock);
   render(
     <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      client={new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } })}
     >
       <App />
     </QueryClientProvider>,
   );
+  return fetchMock;
 }
 
 afterEach(() => {
@@ -47,11 +59,16 @@ beforeEach(() => {
 
 describe('when /api/meta is unavailable', () => {
   it('renders the instructional no-database state, and leaks nothing (E1, S-6)', async () => {
-    renderApp(() => errorResponse('DATABASE_UNAVAILABLE', 'The data is not available.', 503));
+    const fetchMock = renderApp(() =>
+      errorResponse('DATABASE_UNAVAILABLE', 'The data is not available.', 503),
+    );
 
     expect(
       await screen.findByRole('heading', { level: 1, name: 'No database found' }),
     ).toBeDefined();
+    // The other half of `useMeta`'s retry contract: this one code is never retried, so on a
+    // fresh clone the instructional state arrives at once instead of after a backoff.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText('DATABASE_UNAVAILABLE')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeDefined();
 
@@ -68,24 +85,26 @@ describe('when /api/meta is unavailable', () => {
   });
 
   // Both of these are retried once before the state settles — `useMeta` retries
-  // everything except `DATABASE_UNAVAILABLE`, and TanStack Query's first backoff is a
-  // second — so the wait is longer than the default.
-  const AFTER_RETRY = { timeout: 4000 };
-
+  // everything except `DATABASE_UNAVAILABLE`. That is asserted on the call count, not on
+  // elapsed time; see `renderApp`.
   it('distinguishes a rate limit from a generic failure (E16, E17)', async () => {
-    renderApp(() => errorResponse('RATE_LIMITED', 'Too many requests. Please slow down.', 429));
+    const rateLimited = renderApp(() =>
+      errorResponse('RATE_LIMITED', 'Too many requests. Please slow down.', 429),
+    );
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Too many requests' }, AFTER_RETRY),
+      await screen.findByRole('heading', { level: 1, name: 'Too many requests' }),
     ).toBeDefined();
     expect(screen.getByText('RATE_LIMITED')).toBeDefined();
+    expect(rateLimited).toHaveBeenCalledTimes(2);
     cleanup();
     vi.unstubAllGlobals();
 
-    renderApp(() => errorResponse('INTERNAL', 'Something went wrong.', 500));
+    const internal = renderApp(() => errorResponse('INTERNAL', 'Something went wrong.', 500));
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Something went wrong' }, AFTER_RETRY),
+      await screen.findByRole('heading', { level: 1, name: 'Something went wrong' }),
     ).toBeDefined();
     expect(screen.getByText('INTERNAL')).toBeDefined();
+    expect(internal).toHaveBeenCalledTimes(2);
   });
 
   it('renders the route surface and the footer echo when the data is there', async () => {
