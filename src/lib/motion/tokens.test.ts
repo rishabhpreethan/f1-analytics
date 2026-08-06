@@ -132,10 +132,7 @@ describe('CT-3 — MOTION.dur agrees with the --dur-* tokens in tokens.css', () 
     // are the figures that actually run and `MOTION.loop` is the mirror — which makes it
     // the half more likely to rot unnoticed.
     const cssName: Record<keyof typeof MOTION.loop, string> = {
-      grid: '--anim-grid',
-      orbA: '--anim-orb-a',
-      orbB: '--anim-orb-b',
-      orbC: '--anim-orb-c',
+      field: '--anim-field',
       comet: '--anim-comet',
       skeleton: '--anim-skeleton',
     };

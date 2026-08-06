@@ -234,72 +234,72 @@ export function useMagnet<T extends HTMLElement = HTMLAnchorElement>(
 }
 
 /**
- * **G-21 — the atmosphere's pointer parallax.** `quickTo` on `x`/`y` of the orb layer toward
- * `(pointer − viewportCentre) / 48`, clamped to ±`dist.parallax`, at `m.pointer`.
+ * **G-21 — the atmosphere's pointer lamp.** Three `quickTo` setters write `--px`, `--py` and
+ * `--lamp` on the atmosphere root at `m.pointer`; `backdrop.css` uses the first two as the centre
+ * of a `mask-image` circle over a copy of the dot lattice drawn at three times its resting alpha,
+ * and the third as the fade-in. **The dots under the cursor harden. Nothing moves toward it.**
+ *
+ * **This replaces the orb parallax of the same ID.** That motion translated three blurred gradient
+ * ellipses by ±14px; with an 80–100px blur on a 720px element the eye could not resolve it, and
+ * once the accent went monochrome the thing being moved was a grey smudge. The lamp is the same
+ * idea — *the background responds to you* — expressed on marks that have an edge, so the response
+ * is actually visible. §7.7 records the removal.
  *
  * Six things about it are decisions rather than incidentals:
  *
- *   - **The listener is on `window`, and it has to be.** The atmosphere is
- *     `pointer-events: none` (it must be — it covers the whole viewport), so it can never
- *     receive a `pointermove` of its own. That is also why this is the one motion in the
- *     product that returns a `MotionCleanup`: the listener is not a tween, so the GSAP context
- *     cannot revert it.
- *   - **Only the orbs move.** The grid, the racing line, the grain and the plate do not, which
- *     is what makes the effect read as depth rather than as the page sliding. §7.7 layer 2 says
- *     so explicitly.
- *   - **`[data-motion="orbs"]` carries no CSS animation of its own** — the three `@keyframes`
- *     yoyos of G-19 are on its *children*. So GSAP owning `transform` on the parent and CSS
- *     owning it on the children cannot collide, and MR-1's split holds: the loop is CSS, the
- *     pointer response is GSAP.
- *   - **`/` only.** The caller passes `enabled`, which it derives from the backdrop intensity —
- *     `full` is `/` and nothing else. A parallax behind dense content is noise, and behind a lap
- *     chart (F3, `off`) it would be a legibility defect.
- *   - **`(pointer: fine)` only**, for the same reason as G-8: on a touch screen `pointermove`
- *     arrives during a scroll, so the field would lurch as a finger dragged.
- *   - **Not created under reduced motion.** It is built in `animate`, so under `reduce` no
- *     setter, no listener and no tween exists — and the resting composition is the authored one
- *     (MR-2), because CSS never places the orbs anywhere else.
- *
- * The divisor is the Design Spec's: at 1440px wide the extreme is ±15px, so the ±14px clamp is
- * what actually bounds it, which is the intent — a suggestion of depth, not a moving background.
+ *   - **The listener is on `window`, and it has to be.** The atmosphere is `pointer-events: none`
+ *     (it must be — it covers the whole viewport), so it can never receive a `pointermove` of its
+ *     own. That is also why this is the one motion in the product that returns a `MotionCleanup`:
+ *     the listener is not a tween, so the GSAP context cannot revert it.
+ *   - **The coordinates are element-relative, from `getBoundingClientRect()`**, not raw
+ *     `clientX`/`clientY`. The atmosphere is `position: fixed; inset: 0`, so the two are equal
+ *     today — and reading the rect is what keeps them equal if that ever changes. The root carries
+ *     no CSS animation of its own (the drift is on its children), so the read cannot force a
+ *     style flush for an in-flight animation.
+ *   - **No clamp, and none is wanted.** The lamp is an absolute position, not an offset from a
+ *     centre; the thing that bounds it is `--size-lamp`, in CSS, beside the gradient that uses it.
+ *   - **Every route except `off`.** The caller enables it from the backdrop intensity, and
+ *     `--bg-lamp-max` is what keeps it from competing on a data surface — 1 on the hero, 0.45
+ *     elsewhere (§7.7.2). A background that only responds on the landing page reads as a landing
+ *     page trick; Rishabh asked for *the application* to feel alive.
+ *   - **`(pointer: fine)` only.** On a touch screen `pointermove` arrives during a scroll, so the
+ *     lamp would smear across the field as a finger dragged.
+ *   - **Not created under reduced motion.** It is built in `animate`, so under `reduce` no setter,
+ *     no listener and no tween exists, `--lamp` stays at its authored `0`, and the field rests as
+ *     the composed still image §7.7.3 requires.
  */
-const PARALLAX_DIVISOR = 48;
-
-/**
- * G-21's arithmetic, on one axis: the pointer's offset from the viewport centre, divided by
- * `PARALLAX_DIVISOR` and clamped to ±`dist.parallax`.
- *
- * Pure and exported **so the clamp is unit-testable without a browser**. It is the part that
- * decides whether this reads as depth or as a background that follows the cursor around, and a
- * clamp that quietly stopped clamping would look like nothing in a diff.
- */
-export function parallaxOffset(pointer: number, extent: number): number {
-  const raw = (pointer - extent / 2) / PARALLAX_DIVISOR;
-  return Math.max(-dist.parallax, Math.min(dist.parallax, raw));
-}
-
-export function useAtmosphereParallax<T extends HTMLElement = HTMLDivElement>(
+export function useAtmosphereLamp<T extends HTMLElement = HTMLDivElement>(
   enabled: boolean,
 ): MotionHandle<T> {
   return useMotion<T>({
-    animate: ({ q, gsap: g }) => {
+    animate: ({ root, gsap: g }) => {
       if (!enabled || !matchesFinePointer()) return undefined;
-      const [layer] = q('[data-motion="orbs"]');
-      if (layer === undefined) return undefined;
 
-      const setX = voidSetter(g.quickTo(layer, 'x', { ...m.pointer }));
-      const setY = voidSetter(g.quickTo(layer, 'y', { ...m.pointer }));
+      const setX = voidSetter(g.quickTo(root, '--px', { ...m.pointer }));
+      const setY = voidSetter(g.quickTo(root, '--py', { ...m.pointer }));
+      const setLamp = voidSetter(g.quickTo(root, '--lamp', { ...m.pointer }));
 
       const onPointerMove = (event: PointerEvent) => {
-        setX(parallaxOffset(event.clientX, window.innerWidth));
-        setY(parallaxOffset(event.clientY, window.innerHeight));
+        const rect = root.getBoundingClientRect();
+        setX(event.clientX - rect.left);
+        setY(event.clientY - rect.top);
+        setLamp(1);
       };
 
-      // `passive` because nothing here calls `preventDefault`, and a non-passive
-      // `pointermove` on `window` is a scroll-performance cost for no reason.
+      // The lamp goes out when the pointer leaves the document rather than staying lit at the
+      // last position — a light with nobody holding it is a decoration, which is the thing this
+      // field was rebuilt to stop being.
+      const onPointerLeave = () => {
+        setLamp(0);
+      };
+
+      // `passive` because nothing here calls `preventDefault`, and a non-passive `pointermove` on
+      // `window` is a scroll-performance cost for no reason.
       window.addEventListener('pointermove', onPointerMove, { passive: true });
+      document.documentElement.addEventListener('pointerleave', onPointerLeave);
       return () => {
         window.removeEventListener('pointermove', onPointerMove);
+        document.documentElement.removeEventListener('pointerleave', onPointerLeave);
       };
     },
     deps: [enabled],

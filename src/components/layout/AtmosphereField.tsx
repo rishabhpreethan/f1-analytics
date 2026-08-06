@@ -1,33 +1,39 @@
 import type { CSSProperties } from 'react';
 import { useLocation } from 'react-router';
 import { backdropIntensityFor } from '@/components/layout/backdrop';
-import { useAtmosphereParallax } from '@/lib/motion/interactions';
+import { useAtmosphereLamp } from '@/lib/motion/interactions';
 
 /**
- * The moving background — `DESIGN_SYSTEM.md` §7.7, Technical Spec §S.3.5.
+ * The background — `DESIGN_SYSTEM.md` §7.7.
+ *
+ * **Rebuilt 2026-08-06.** The three blurred gradient orbs, the 48px grid and the contrast plate
+ * are gone; a two-density dot lattice, a pointer lamp, a vignette and a single attenuation veil
+ * replace them. `backdrop.css` carries the reasoning at length — the short version is that a large
+ * soft gradient has no edge for the eye to register motion against, so it cannot read as alive,
+ * and the plate existed only to undo the contrast damage the orbs caused.
  *
  * **Rendered once, by `AppShell`, as its first child.** It is outside the router outlet, so it
- * never remounts on navigation and never cross-fades: an animated background that re-enters
- * on every click is a defect you feel on the fifth click (§7.7.5). What changes between routes
- * is one attribute on `<html>`, which the shell owns.
+ * never remounts on navigation and never cross-fades: an animated background that re-enters on
+ * every click is a defect you feel on the fifth click (§7.7.5). What changes between routes is one
+ * attribute on `<html>`, which the shell owns.
  *
  * **No JavaScript runs the loops.** Every layer is a CSS-composited gradient moving only
- * `transform`, `opacity` or `offset-distance`; `backdrop.css` carries the whole of it and
- * `ARCHITECTURE.md` §10 #24 carries the reasoning. This component takes no props, so which
- * elements exist is decided from the URL alone and it cannot be misconfigured.
+ * `transform`, `opacity` or `offset-distance`; `ARCHITECTURE.md` §10 #24 carries the reasoning.
+ * This component takes no props, so which elements exist is decided from the URL alone and it
+ * cannot be misconfigured.
  *
- * **The one exception is G-21**, and it is the MR-1 split working rather than a breach of it:
- * a pointer parallax is a one-shot response to input, not a loop, so it is GSAP's. It moves
- * the orb layer only, on `/` only, on a fine pointer only, and is never created under reduced
- * motion — see `useAtmosphereParallax`. The layer it transforms carries no CSS animation of its
- * own (the yoyos are on its children), so the two mechanisms cannot fight over `transform`.
+ * **The one exception is G-21**, and it is the MR-1 split working rather than a breach of it: a
+ * pointer response is a one-shot reaction to input, not a loop, so it is GSAP's. `useAtmosphereLamp`
+ * writes `--px`, `--py` and `--lamp` on **this root element**, and the lamp layer inherits them —
+ * so GSAP touches no `transform` anywhere in this subtree and cannot collide with the CSS drift on
+ * the two lattice layers.
  *
- * **At `off` the animated layers are removed from the DOM, not paused.** A paused compositor
- * layer still holds its memory, and `off` is the case that shares a screen with a lap-time
- * chart (F3). Only the flat base survives.
+ * **At `off` the animated layers are removed from the DOM, not paused.** A paused compositor layer
+ * still holds its memory, and `off` is the case that shares a screen with a lap-time chart (F3).
+ * Only the flat base survives.
  *
- * It contains no text and no focusable element, is `aria-hidden` and `role="presentation"`,
- * takes no pointer events, and is `display: none` in print.
+ * It contains no text and no focusable element, is `aria-hidden` and `role="presentation"`, takes
+ * no pointer events, and is `display: none` in print.
  */
 
 /**
@@ -51,25 +57,21 @@ export function AtmosphereField() {
   const { pathname } = useLocation();
   const intensity = backdropIntensityFor(pathname);
 
-  // G-21. `full` is `/` and nothing else, so the parallax exists on the landing surface and
-  // nowhere else; the hook itself adds the `(pointer: fine)` and reduced-motion gates.
-  const { scope } = useAtmosphereParallax<HTMLDivElement>(intensity === 'full');
+  // G-21. Everywhere except `off`, because a background that only responds on the landing page
+  // reads as a landing-page trick — and `--bg-lamp-max` (§7.7.2), not this flag, is what stops the
+  // lamp competing on a data surface. The hook adds the `(pointer: fine)` and reduced-motion gates.
+  const { scope } = useAtmosphereLamp<HTMLDivElement>(intensity !== 'off');
 
-  // `off` keeps the base surface and nothing else. The plate is dropped too: with no orbs
-  // and no grid behind it there is nothing left to attenuate.
+  // `off` keeps the base surface and nothing else. The veil is dropped too: with no lattice
+  // behind it there is nothing left to attenuate.
   if (intensity === 'off') {
     return <div ref={scope} className="atmosphere" aria-hidden="true" role="presentation" />;
   }
 
   return (
     <div ref={scope} className="atmosphere" aria-hidden="true" role="presentation">
-      <div className="atmosphere-layer atmosphere-grid" />
-
-      <div className="atmosphere-layer atmosphere-orbs" data-motion="orbs">
-        <span className="atmosphere-orb atmosphere-orb-a" />
-        <span className="atmosphere-orb atmosphere-orb-b" />
-        <span className="atmosphere-orb atmosphere-orb-c" />
-      </div>
+      {/* Layer 1 — the resting lattice, below the veil so a route can attenuate it. */}
+      <div className="atmosphere-layer atmosphere-dots" data-motion="dots" />
 
       {/*
        * Layer 3 exists **only** under `hero` (§7.7.5). Not hidden there — absent, so the
@@ -88,12 +90,19 @@ export function AtmosphereField() {
             focusable="false"
           >
             <defs>
-              {/* The comet's glow, as geometry rather than a `filter` — a filter on an element
-               * that moves every frame re-rasterises every frame, which is the one cost
-               * §7.7.5 rules out. */}
+              {/*
+               * The comet's halo, as geometry rather than a `filter` — a filter on an element that
+               * moves every frame re-rasterises every frame, which is the one cost §7.7.5 rules
+               * out.
+               *
+               * The stop colours are **classed, not inline**, and they no longer use
+               * `currentColor`: the element's `color` is now `--bg-line`, which already carries its
+               * own low alpha, so a `currentColor` halo would have been alpha-multiplied down to
+               * nothing. `backdrop.css` gives them `--accent-mark` explicitly.
+               */}
               <radialGradient id="atmosphere-comet-glow">
-                <stop offset="0%" stopColor="currentColor" stopOpacity="0.55" />
-                <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+                <stop className="atmosphere-comet-glow-in" offset="0%" />
+                <stop className="atmosphere-comet-glow-out" offset="100%" />
               </radialGradient>
             </defs>
 
@@ -122,7 +131,20 @@ export function AtmosphereField() {
       )}
 
       <div className="atmosphere-layer atmosphere-grain" />
-      <div className="atmosphere-layer atmosphere-plate" />
+      <div className="atmosphere-layer atmosphere-vignette" />
+      <div className="atmosphere-layer atmosphere-veil" />
+
+      {/*
+       * Layer 2 — the pointer lamp, **above the veil and therefore last in the DOM**. That is the
+       * one thing about this markup that is a decision rather than an ordering: the lamp has to
+       * survive the veil so the field still responds on a data route, and its ceiling there is
+       * `--bg-lamp-max` (§7.7.2) rather than the veil.
+       *
+       * It carries the same drift as `.atmosphere-dots` and stays in phase with it by
+       * construction — same animation name, same period, and both created in this commit, so both
+       * start at the same document time.
+       */}
+      <div className="atmosphere-layer atmosphere-lamp" data-motion="lamp" />
     </div>
   );
 }

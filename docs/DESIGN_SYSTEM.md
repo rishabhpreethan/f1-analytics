@@ -707,7 +707,7 @@ same figures in ms for CSS transitions.
 | `dur.slow` | 0.32 / 320 | sheets, trays, the dock rail, the dock indicator |
 | `dur.chart` | 0.40 / 400 | chart mount only — never on data update |
 | `dur.reveal` | 0.72 / 720 | the landing headline characters (entrance budget only) |
-| `dur.pointer` | 0.60 / — | `quickTo` catch-up for pointer-following (G-8, G-9, G-21) |
+| `dur.pointer` | 0.60 / — | `quickTo` catch-up for pointer-following (G-9, G-21, G-25) |
 
 **There is no spring token set any more.** Framer Motion's `visualDuration` + `bounce` API is gone
 with the library. Its replacement is a **preset pair** — a duration and an ease, together:
@@ -725,11 +725,8 @@ with the library. Its replacement is a **preset pair** — a duration and an eas
 
 | Token | s | Target |
 |---|---|---|
-| `loop.grid` | 24 | grid layer drift (48px per cycle → 2 px/s) |
-| `loop.orbA` | 18 | atmosphere orb A |
-| `loop.orbB` | 24 | atmosphere orb B |
-| `loop.orbC` | 30 | atmosphere orb C (neutral) |
-| `loop.comet` | 11 | racing-line pulse, one lap |
+| `loop.field` | 34 | the dot lattice's drift — one 22px cell per cycle → **0.65 px/s** |
+| `loop.comet` | 11 | racing-line comet, one lap |
 | `loop.skeleton` | 1.2 | skeleton pulse |
 
 **Staggers** — GSAP's object form, so `from` is explicit (Codrops tip 2).
@@ -829,10 +826,10 @@ The old `M-1 … M-11` identifiers are **retired**. Any code comment or spec cit
 | **G-15** | Section reveal on scroll | `ScrollTrigger` (`once: true`) | section enters the viewport | `opacity 0→1, y 16→0`, `dur.base`, `ease.enter`, `ScrollTrigger { start: "top 88%", once: true }`. Children stagger with `stagger.card`, capped at `stagger.cap`. Derives from the documentation's "reveal on scroll once" example | opacity only, `dur.fast`, `once: true`, no `y`, no stagger |
 | **G-16** | **Landing headline reveal** | `SplitText.create` + `gsap.timeline` | `/` mount, once per hard load | `SplitText.create(h1, { type: "chars,lines", mask: "lines", aria: "auto", autoSplit: true })` — `mask` uses SplitText 3.13+'s built-in clip wrappers rather than hand-nested `overflow: hidden` divs (Codrops tip 1), and `aria: "auto"` puts an `aria-label` on the `h1` and `aria-hidden` on every char, which is why this is accessible. Then `gsap.from(split.chars, { yPercent: 118, opacity: 0, duration: dur.reveal, ease: "expo.out", stagger: stagger.char })`. 9 characters × 18ms + 720ms = **≈880ms**, inside the entrance budget | **not created — and no split is performed at all.** The `h1` renders as plain text and fades `opacity 0→1` at `dur.fast`. Splitting text under `reduce` is pointless DOM churn |
 | **G-17** | Stat-figure count-up | `gsap.to` with `snap` | `/` mount, after G-16, once | `gsap.to(proxy, { value: target, duration: 0.9, ease: "power2.out", snap: { value: 1 }, onUpdate })`, staggered `{ each: 0.06 }` across the strip. Safe only because every figure is Chivo Mono tabular (§2.4) — a proportional font would reflow every frame | **not created.** The final value is written once with `gsap.set` |
-| **G-18** | Atmosphere — grid drift | `gsap.to`, `repeat: -1` | app mount | grid layer (sized `calc(100% + 96px)`, offset `-48px`): `x: 48, y: 48`, `duration: loop.grid` (24s), `ease: "none"`, `repeat: -1`. Seamless because the cell is exactly 48px, so the loop has no visible seam and needs no `yoyo` | **not created.** The layer rests at its authored `-48px / -48px` offset |
-| **G-19** | Atmosphere — orb drift | `gsap.to`, `yoyo` | app mount | three tweens, all `ease.drift` (`sine.inOut`), `repeat: -1`, `yoyo: true`: **A** `x: -64, y: 44, duration: loop.orbA` (18s); **B** `x: 88, y: -56, duration: loop.orbB` (24s), `delay: -6`; **C** `x: -40, y: -72, duration: loop.orbC` (30s), `delay: -11`. The negative delays desynchronise the three so the field never pulses in unison | **not created.** All three orbs rest at their authored positions — which is a composed, deliberate arrangement, not a degraded one |
-| **G-20** | Atmosphere — racing-line pulse | `gsap.to` on CSS `offset-distance` | app mount, `/` only | the comet element declares `offset-path: path("…")` and `offset-rotate: auto` in CSS; GSAP tweens `offsetDistance: "0%" → "100%"`, `duration: loop.comet` (11s), `ease: "none"`, `repeat: -1`, `repeatDelay: 1.8`. **Deliberately not `MotionPathPlugin`** — native CSS motion path has been baseline-supported since 2022, is composited, and saves 9.7 KB gzipped. If `offsetDistance` proves un-tweenable in any target browser, the fallback is tweening a registered CSS variable and referencing it from `offset-distance`, still without the plugin | **not created.** The comet is `display: none`; the static racing-line stroke remains, which is the intended still image |
-| **G-21** | Atmosphere — pointer parallax | `gsap.quickTo` | `pointermove` on `window`, `/` only, `(pointer: fine)` only | `quickTo(orbLayer,"x")` / `("y")` to `(pointer − viewportCentre) / 48`, clamped **±14px**, `m.pointer`. The grid, grain and vignette layers do **not** parallax — only the orbs, so the effect reads as depth rather than as the page sliding | **not created** |
+| **G-18** | Atmosphere — lattice drift | CSS `@keyframes` (MR-1) | app mount | **both** lattice layers (`.atmosphere-dots` and `.atmosphere-lamp`), sized `calc(100% + 2 cells)` and offset one cell: `transform: translate3d(--size-field-cell, --size-field-cell, 0)`, `--anim-field` (34s), `linear`, `infinite`. Seamless because the translation is exactly one cell, so the loop has no visible seam and needs no `yoyo`. **0.65 px/s** — slower than the retired grid's 2 px/s, because a lattice with a visible pitch reports its own motion far more legibly than a wireframe did | **stopped by chokepoint 1.** Both layers rest at `transform: none`, which is their authored position (MR-2) |
+| ~~**G-19**~~ | ~~Atmosphere — orb drift~~ | — | — | **RETIRED 2026-08-06 with the orbs it moved** (§7.7.0). A 720px ellipse behind an 80px blur drifting 64px over 18s is stationary to the eye; a soft gradient has no edge for motion to register against. The ID is not reused | — |
+| **G-20** | Atmosphere — racing-line comet | CSS `@keyframes` on `offset-distance` (MR-1) | app mount, `/` only | the comet declares `offset-path: path("…")` and `offset-rotate: auto`; the loop runs `offset-distance: 0% → 100%`, `--anim-comet` (11s), `linear`, `infinite`. **Deliberately not `MotionPathPlugin`** — native CSS motion path has been baseline-supported since 2022, is composited, and saves 9.7 KB gzipped. `offset-distance` is the one documented exception to "transform and opacity only" (§4.2): it is composited and triggers no layout | **not created.** The comet is `display: none` by media query in `backdrop.css`, so it is absent even before hydration; the static racing-line stroke remains, which is the intended still image |
+| **G-21** | **Atmosphere — pointer lamp** | `gsap.quickTo` (docs: *"cursor-following"*) | `pointermove` on `window`, every route except `off`, `(pointer: fine)` only | three `quickTo` setters write `--px`, `--py` (element-relative **px**, from `getBoundingClientRect()`) and `--lamp` (unitless 0→1) on the atmosphere **root**, at `m.pointer`; CSS masks a copy of the lattice drawn at `--bg-dot-lit` to a `--size-lamp` (340px) circle at those coordinates. **The dots under the cursor harden; nothing moves toward it.** No clamp — the position is absolute, and what bounds it is the mask radius, in CSS. Route intensity is `--bg-lamp-max`, not this trigger. **Replaces the orb parallax of the same ID**, which was the same idea applied to marks with no edge | **not created.** No setter, no listener, no tween; `--lamp` stays at its authored `0`, so the lamp is **absent rather than frozen** — a light with nobody holding it is decoration |
 | **G-22** | Theme change | — CSS, not GSAP | `data-theme` change on `<html>` | `background-color` and `color` transition `dur.base` / `ease-in-out` on `:root` and on `[data-theme] *`; **no transition on the `--*` custom properties themselves**, none on `transform`, none on the atmosphere's opacity | transition removed entirely — instant swap |
 | **G-23** | List / grid reveal _(defined here, first used F2)_ | `gsap.from` with `stagger` | list mount | `opacity 0→1, y 8→0`, `dur.base`, `ease.enter`, `stagger.row` (rows) or `stagger.card` (grids), capped at `stagger.cap` | opacity only, `dur.fast`, stagger `each: 0` |
 | **G-24** | Shared element card → profile _(defined here, first used F4; `Flip` is NOT installed in F0)_ | `Flip.from` / `Flip.getState` | route change between a card and its profile page | `const state = Flip.getState(targets)` before the route commits, then `Flip.from(state, { duration: dur.slow, ease: "power2.inOut", absolute: true, scale: true })`. Still the highest-value animation in this product | **not created.** The card and the profile render independently |
@@ -1157,93 +1154,134 @@ team-coloured field) and the team monogram are shipping components with the same
 everything else — not stopgaps. _Full spec in F1 (F4/F5 consume them); the asset contract is
 `PLAN.md` R1/R2._
 
-### 7.7 `AtmosphereField` — the moving background _(CR-007, new)_
+### 7.7 `AtmosphereField` — the background _(rebuilt 2026-08-06)_
 
 One component, rendered **once** in `AppShell`, `position: fixed; inset: 0; z-index: var(--z-atmosphere); pointer-events: none;`
 with `aria-hidden="true"` and `role="presentation"`. It is decorative, it is never interactive, and it
 is never read by assistive technology.
 
-**Six layers, bottom to top. Each is a single element; there is no canvas and no WebGL.**
+#### 7.7.0 What was removed, and why — read this before proposing a gradient
+
+Rishabh: *"i didnt like the moving background you used here, can you please make sure that the
+background is much better, like i want the application to feel alive."*
+
+| Layer | Verdict | Reason |
+|---|---|---|
+| **Three gradient orbs** | **REMOVED** | A 720px ellipse behind an 80px blur, drifting 64px over 18s, is stationary to the eye. **A soft gradient has no edge for motion to register against**, so it cannot read as alive — it can only read as a smudge, and once the accent went monochrome (§3.6) it was literally a grey smudge. They were also the field's entire contrast problem (below) and the only `filter: blur()` in the product. |
+| **48px grid** | **REPLACED** by a 22px two-density dot lattice | A 1px wireframe at 48px reads as an overlay on the page. A dot lattice reads as the *surface* of it, holds a second density for hierarchy, and gives the pointer lamp something with an edge to light. |
+| **Racing line + comet** | **KEPT**, re-tuned | The one element in the field with genuine F1 character, and decisively the one that is **sharp**: a 1.5px stroke and a hard 30×3px pip. Monochrome suits it *better* — the comet is now the brightest mark in the field rather than a pink one. Stroke → `--bg-line`, halo 0.55 → 0.30. |
+| **Grain** | **KEPT**, strengthened | Its original job was to kill orb banding, which no longer exists. Its better job: **a large flat neutral field is the thing most at risk of reading as unfinished**, and grain is what makes it read as a surface. Measured with `overlay` modelled correctly (§9.2.2 **V-21a**), it moves the field's mean luminance by **nothing** — texture at zero contrast cost. |
+| **Contrast plate** | **REMOVED** | **It existed only to undo the orbs.** Text over the orb field measured `--border-control` **2.64:1** and `--ink-tertiary` **4.00:1** (§9.2.1 V-13), so a 0.86–0.92 opaque veil had to be laid back over the whole thing to restore the §3.5 figures — the product was paying for a background it then had to hide. Remove the orbs and the reason goes with them. What replaces it is a **veil at 0.18 on the hero**, which is an *intensity control*, not a rescue: the field clears every §3.5 floor **before** the veil is applied at all (§9.2.2 V-21). |
+
+**The new field is measured, not tuned.** §9.2.2 V-21 solves a **luminance corridor** from the two
+§3.5 tokens with the tightest floors, and every alpha in the field is bounded by it:
+
+| Theme | Bound | Value | From |
+|---|---|---|---|
+| light | **floor** — the field may not get *darker* than this | relative luminance **0.8707** | `--border-control` at 3:1 (`--ink-tertiary` at 4.5:1 gives 0.8618, so it is not the binding one) |
+| dark | **ceiling** — the field may not get *lighter* than this | relative luminance **0.0125** | `--border-control` at 3:1 |
+| dark | **second, tighter ceiling** | relative luminance **0.0115** | `--surface-raised`. Above it a panel is *darker* than its background, the elevation model inverts, and a card reads as a hole |
+
+That asymmetry is why the two themes' fields are **different shapes rather than inversions**: light
+mode may darken only as far as `--surface-sunken`, so its vignette is 0.04 and is a whisper; dark mode
+may darken to black, so its vignette is 0.72 and is the field's main event. It is also why, in dark
+mode, **the only light on screen comes from the cursor.**
+
+#### 7.7.1 The six layers, bottom to top
+
+Each is a single element. There is no canvas, no WebGL and — for the first time — **no `filter`
+anywhere in the file**, which `backdrop.css.test.ts` now asserts.
 
 | # | Layer | Composition | Motion |
 |---|---|---|---|
-| 0 | **Base** | `--surface-canvas` | static |
-| 1 | **Grid** | `repeating-linear-gradient` in both axes, cell `--size-grid-cell` (48px), line width **1px**, colour `--bg-grid-line`: light `rgb(27 30 36 / 0.05)`, dark `rgb(245 247 249 / 0.055)`. Element is sized `calc(100% + 96px)` and offset `-48px / -48px`. `mask-image: radial-gradient(130% 100% at 50% 0%, #000 0%, #000 42%, transparent 88%)` so it fades out toward the bottom and the corners | **G-18** — `x: 48, y: 48`, 24s, `"none"`, `repeat: -1`. 2 px/s |
-| 2 | **Orbs** | three absolutely-positioned divs, each `background: radial-gradient(circle at 50% 50%, <colour> 0%, transparent 70%)`, `filter: blur(<n>px)`, `border-radius: --radius-full`. **A**: 720×720, `--accent-glow`, `blur(80px)`, anchored `top: -180px; right: -140px`. **B**: 560×560, `--accent-glow`, `blur(100px)`, anchored `top: 34%; left: -160px`. **C**: 480×480, `--bg-orb-neutral` (light `#B9BCC3`, dark `#2F3237`), `blur(90px)`, anchored `top: 62%; right: 18%`. Layer opacity: **light 0.09, dark 0.17** for A and B; **light 0.28, dark 0.60** for C | **G-19** — three desynchronised `sine.inOut` yoyos at 18 / 24 / 30s; **G-21** pointer parallax ±14px on this layer only |
-| 3 | **Racing line** | one inline SVG, `viewBox="0 0 1440 900"`, `preserveAspectRatio="xMidYMid slice"`, `width/height: 100%`. **One open path** reading as a circuit sector — a long left sweep, a hairpin, a short chute, a fast right. Stroke `--accent-mark`, `stroke-width: 1.5`, `opacity: 0.34`, `fill: none`, `stroke-linecap: round`, `stroke-linejoin: round`. Beside it: the **comet** — a 30×3px div, `--accent-mark`, `--radius-full`, `box-shadow: 0 0 18px 4px var(--accent-glow)`, declaring `offset-path: path("<the same d>")` and `offset-rotate: auto`, plus a 2px `--accent-mark` trail at `opacity: 0.5, filter: blur(4px)` following 40px behind via a second element at `offset-distance: calc(var(--offset) - 3%)`. **Rendered only when `data-bg="hero"`** | **G-20** — comet `offsetDistance 0%→100%`, 11s, `"none"`, `repeat: -1`, `repeatDelay: 1.8` |
-| 4 | **Grain** | `background-image: url("/textures/grain.svg")`, 240×240 tile, `background-repeat: repeat`, `mix-blend-mode: overlay`, opacity **light 0.020 / dark 0.038**. Its only job is to kill the gradient banding that an 80px-blurred orb otherwise shows on a wide display | static, always |
-| 5 | **Contrast plate** | `radial-gradient(120% 92% at 34% 44%, var(--surface-canvas) 0%, var(--surface-canvas) 36%, transparent 80%)` at alpha **0.86** under `data-bg="hero"`, and a flat `var(--surface-canvas)` at alpha **0.92** under `data-bg="calm"`. **This layer is not decoration — it is the mechanism that keeps every contrast figure in §9.2 V-2 true**, and it doubles as the attenuation control | opacity is set by attribute, never tweened |
+| 0 | **Base** | `--surface-canvas` on the container | static |
+| 1 | **Dot lattice** (`.atmosphere-dots`) | two `radial-gradient` dots with **hard stops** — a soft-edged dot at this size is a blur, and blur is what this field exists to get away from. Minor: 1px at `--size-field-cell` (22px) in `--bg-dot`. Major: 1.2px at `--size-field-major` (132px = exactly six cells, so a major dot always lands on a minor one) in `--bg-dot-major`. Sized `calc(100% + 2 cells)`, offset one cell. `mask-image: radial-gradient(130% 104% at 50% 0%, #000 0%, #000 44%, transparent 92%)` so it fades toward the bottom and the corners and the footer sits on clean canvas | **G-18** — `translate3d(cell, cell, 0)`, `--anim-field` (34s), `linear`, `infinite`. **0.65 px/s** |
+| 2 | **Pointer lamp** (`.atmosphere-lamp`) | the **same** lattice at `--bg-dot-lit` (0.42 — roughly 3× the resting alpha), masked to `radial-gradient(--size-lamp circle at --px --py, #000 0%, #000 18%, transparent 72%)`. Opacity `calc(var(--lamp) * var(--bg-lamp-max))`. **Painted last, above the veil** | **G-21** — `--px` / `--py` / `--lamp` by `gsap.quickTo` at `m.pointer`; plus the same **G-18** drift, in phase |
+| 3 | **Racing line** (hero only) | one inline SVG, `viewBox="0 0 1440 900"`, `preserveAspectRatio="xMidYMid slice"`. One open path reading as a circuit sector. Stroke `--bg-line`, `stroke-width: 1.5`, round caps. Plus the comet: a 30×3 `--accent-mark` pip, a 40×2 trail at 0.45 three percent behind it, and a `26×14` radial halo at 0.30 — all three riding the same `offset-path`, all inside the same `<svg>` so they cannot separate | **G-20** — `offsetDistance 0%→100%`, `--anim-comet` (11s), `linear`, `infinite` |
+| 4 | **Grain** | `url("/textures/grain.svg")`, 240×240 tile, `repeat`, `mix-blend-mode: overlay`, opacity light **0.024** / dark **0.05** | static, always |
+| 5 | **Vignette** | `radial-gradient(128% 98% at 50% 6%, transparent 0%, transparent 30%, var(--bg-vignette) 100%)`. Light `rgb(27 30 36 / 0.04)`; dark `rgb(0 0 0 / 0.72)` | static, always |
+| 6 | **Veil** | flat `var(--surface-canvas)` at `--bg-veil-alpha`. **The only attenuation control in the field** | opacity set by attribute, never tweened |
 
-#### 7.7.1 Why a contrast plate exists, with the measurement
+**Two elements carry the same lattice, and that is a deliberate cost of one extra layer.** They exist
+at different depths: the resting lattice **below** the veil so a route can attenuate it, the lamp
+**above** it so the pointer response survives on a data surface. They stay in phase by construction —
+same animation name, same period, both created in the same React commit, so both start at the same
+document time — and their geometry comes from one shared token, because a one-pixel pitch difference
+would render as two lattices beating against each other and would look like a rendering fault rather
+than a CSS mistake. `AtmosphereField.test.tsx` asserts the DOM order; `backdrop.css.test.ts` asserts
+the shared pitch.
 
-Text placed directly on the orb-tinted field **loses its measured contrast**: over the brightest
-light-mode composite, `--border-control` falls to **2.88:1** (floor 3.0), `--ink-tertiary` to
-**4.35:1** (floor 4.5) and `--accent-mark` to **3.04:1** at the very edge of its floor (§9.2 **V-13**).
-That is a real accessibility regression, and lowering the orb opacity does not fix it — it only makes
-the background invisible before it makes the text legible.
-
-The plate fixes it exactly. Measured (§9.2 **V-17**), the plated composite is within **ΔE 2.5** of
-`--surface-canvas` in light and **ΔE 4.7** in dark, and every token clears its floor:
-
-| Token | Light plated `#F7F4F9` | Dark plated `#151018` | Floor |
-|---|---|---|---|
-| `--ink-primary` | 15.32:1 | 17.47:1 | 4.5 |
-| `--ink-secondary` | 6.66:1 | 9.22:1 | 4.5 |
-| `--ink-tertiary` | **4.75:1** | **5.35:1** | 4.5 |
-| `--border-control` | **3.14:1** | **3.35:1** | 3.0 |
-| `--accent-mark` | **3.32:1** | 5.18:1 | 3.0 |
-| `--accent-ink` | **4.72:1** | 5.18:1 | 4.5 |
+**The lamp's mask is offset by half a cell.** Its coordinates arrive in viewport space but the mask
+resolves in the element's own space, which is displaced by one cell of inset less 0–22px of animated
+translation. Half a cell centres the residual at **±11px** against a 340px lamp — 3%, and the
+alternative (reading the animated transform back on every `pointermove`) would force a style flush
+per frame.
 
 #### 7.7.2 Intensity is route-scoped, by attribute
 
-`<html data-bg="…">` takes exactly three values, set from the route by the shell.
+`<html data-bg="…">` takes exactly three values, set from the route by the shell. **`calm` is the
+default and its values live on `:root`**, so a route that never thinks about its background gets a
+recessive one; `hero` is the exception that raises it.
 
-| Value | Where | Effect |
-|---|---|---|
-| `hero` | `/` only | full field: grid drift, three orbs at authored opacity, racing line + comet, plate at 0.86, pointer parallax on |
-| `calm` | **every other route — the default** | plate flat at 0.92; **orb opacity × 0.4**; **racing line and comet not rendered**; grid drift **continues** (2 px/s behind a 0.92 plate is barely perceptible and is what stops the page feeling dead); pointer parallax **off** |
-| `off` | reserved — a full-screen chart or a print view | every layer above the base is `display: none`. No layer 1–5 exists. F2+ uses this |
+| Value | Where | `--bg-veil-alpha` | `--bg-lamp-max` | Layers |
+|---|---|---|---|---|
+| `hero` | `/` only | **0.18** | **1** | all six, plus the racing line and comet |
+| `calm` | **every other route — the default** | **0.66** | **0.45** | all six except the racing line and comet |
+| `off` | reserved — a full-screen chart or a print view. F2+ escalates to it | — | — | **none.** Only the flat base survives; `AtmosphereField` renders no layer at all, because a paused compositor layer still holds its memory |
 
-**This is the binding answer to "motion must not compete with data".** Dense charts land on `calm`
-routes, where the only surviving motion is a 2 px/s drift behind a 92%-opaque plate, and F2 may
-escalate any chart-dominant surface to `off`.
+**This is the binding answer to "motion must not compete with data", and it changed shape with the
+rebuild.** The old answer was a 92%-opaque plate. The new one is two numbers: at `calm` the resting
+lattice is attenuated to 34% of its alpha, and the pointer lamp — which is the only thing that moves
+in response to anything — is capped at 45%. **The lamp deliberately survives on a data route**, because
+a background that only answers the pointer on the landing page reads as a landing-page trick, and
+Rishabh asked for *the application* to feel alive. Where that is still too much, F2 uses `off`.
 
 #### 7.7.3 Reduced motion
 
-Every tween in layers 1–3 is created inside the `no-preference` branch of §4.4's `gsap.matchMedia()`.
 Under `prefers-reduced-motion: reduce`:
 
-- **G-18, G-19, G-20, G-21 are never created.** The grid rests at `-48px / -48px`; the three orbs rest
-  at their authored anchors; the pointer parallax listener is never attached.
-- **The comet is `display: none`** via a `@media (prefers-reduced-motion: reduce)` rule, not by JS —
-  so it is absent even before hydration.
-- **The static racing-line stroke, the grid, the orbs, the grain and the plate all remain.** The
-  reduced state is a **composed still image**, not a blank page. That is deliberate: turning the
-  background off entirely under `reduce` would give reduced-motion users a visibly poorer product,
-  and nothing about a static gradient is a vestibular trigger.
-- Toggling the OS setting **while the app is open** stops the motion immediately, because
-  `gsap.matchMedia()` reverts its handler's tweens when the condition stops matching.
+- **G-18 stops** — chokepoint 1 in `motion.css` sets `animation: none`, and both lattice layers rest
+  at `transform: none`, which is their authored position (MR-2).
+- **G-20 is absent** — the comet is `display: none` via a `@media (prefers-reduced-motion: reduce)`
+  rule in `backdrop.css`, not by JS, so it does not exist even before hydration.
+- **G-21 is never created** — the hook builds its setters inside `animate`, so no `quickTo`, no
+  listener and no tween exists, and `--lamp` stays at its authored `0`. **The lamp is therefore
+  absent, not frozen at a position.** That is correct: a light with nobody holding it is decoration.
+- **The lattice, the racing-line stroke, the grain, the vignette and the veil all remain.** The
+  reduced state is a **composed still image** — a two-density lattice fading out toward the bottom,
+  a circuit sector drawn across it, grain, and a vignette — not a blank page. Turning the background
+  off under `reduce` would give reduced-motion users a visibly poorer product, and nothing about a
+  static lattice is a vestibular trigger.
+- Toggling the OS setting **while the app is open** stops the motion immediately: chokepoint 1 is a
+  media query, and `gsap.matchMedia()` reverts G-21's handler when the condition starts matching.
 
 #### 7.7.4 Cost and CSP
 
-- **No new dependency, no canvas, no WebGL, no image asset except one 240×240 SVG noise tile.**
-- Six elements, five composited transforms, one repeating `background-image`. `will-change: transform`
-  is set on layers 1 and 2 **only** (`transform`), never on 4 or 5.
-- **CSP-clean.** `script-src 'self'` / `style-src 'self'` with no `'unsafe-inline'`: the atmosphere
-  needs no inline `<style>` and no inline `<script>`. All CSS ships in the stylesheet; all runtime
-  values are written through the CSSOM (`element.style`, GSAP's setters), which CSP does not govern —
-  the same reason `server/app.ts` already notes for React. The grain tile is `img-src 'self'`.
-- The orbs' `filter: blur()` is applied to elements with **no text and no children**, so it never
-  forces a text repaint.
+- **No new dependency, no canvas, no WebGL, no `filter`, and one 240×240 SVG noise tile.**
+- Six elements, two composited transforms (the two lattice layers, `will-change: transform`), one
+  composited `offset-distance`, and three static paints. `will-change` is on nothing else.
+- **CSS reclaimed rather than spent.** Three orb rules, three orb `@keyframes`, the grid rule, the
+  plate rule and two `data-bg` override blocks are gone; the lattice adds two rules and one
+  `@keyframes`. Net effect on the artefact is reported with the build figures.
+- **CSP-clean.** `script-src 'self'` / `style-src 'self'` with no `'unsafe-inline'`: the field needs
+  no inline `<style>` and no inline `<script>`. All CSS ships in the stylesheet; the one runtime value
+  React writes (the comet's `offset-path`) goes through the CSSOM, which CSP does not govern, and the
+  three GSAP-driven properties likewise. The grain tile is `img-src 'self'`.
+- **The comet's gradient stops are classed, not inline**, and no longer use `currentColor`: the
+  element's `color` is `--bg-line`, which already carries a low alpha, so a `currentColor` halo would
+  have been alpha-multiplied down to nothing.
 
 #### 7.7.5 What it must never do
 
 - Never sit above `main` (`--z-atmosphere` is 0 and `main` is 1).
 - Never receive pointer events.
-- Never animate its own `opacity` on route change — the plate's value changes by attribute, instantly.
-  A cross-fading background on every navigation would be perceptible on every click.
+- Never animate its own `opacity` on route change — the veil's value changes by attribute, instantly.
+  A cross-fading background on every navigation is perceptible by the fifth click.
 - Never render layer 3 outside `data-bg="hero"`.
-- Never run while the tab is hidden (§4.5).
+- Never reintroduce a `filter`. It is the one property that makes a decorative layer expensive
+  (§10 #24), and its absence is now asserted.
+- Never let GSAP own `transform` on a lattice layer, or CSS own the lamp's position. That is MR-1,
+  and here it is enforced by construction: GSAP writes only custom properties, and only on the root.
 
 ### 7.8 `CommandDock` — primary navigation _(CR-007, new; replaces `PrimaryNav`)_
 

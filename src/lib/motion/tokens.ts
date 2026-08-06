@@ -85,10 +85,15 @@ const m = {
  * figures.
  */
 const loop = {
-  grid: 24, // grid layer drift — 48px per cycle → 2 px/s
-  orbA: 18,
-  orbB: 24,
-  orbC: 30,
+  /**
+   * The dot lattice's drift (G-18) — one 22px cell per cycle → **0.65 px/s**.
+   *
+   * Slower than the retired 48px grid's 2 px/s on purpose: a lattice with a visible pitch
+   * reports its own motion far more legibly than a wireframe did, so the same perceived
+   * speed needs a smaller figure. The three orb periods that used to live here are gone
+   * with the orbs (§7.7).
+   */
+  field: 34,
   comet: 11, // racing-line pulse, one lap
   skeleton: 1.2, // skeleton pulse
 } as const;
@@ -116,12 +121,12 @@ const stagger = {
  * Distances, px. Small on purpose — every entrance here is a settle, not an arrival
  * from off-screen.
  *
- * **Every entry has a call site.** Two did not and are gone: `hairline` (1), which described the
- * capability card's hover lift — a CSS transition, never a tween, and 1px where Design Spec §3.4
- * says 2, so it lives as `--size-card-lift` in `tokens.css` beside the rule that applies it; and
- * `spotlight` (220), which duplicated `--size-spotlight` for the same reason. Both figures are
- * read by CSS and never by JavaScript, so a copy here could only ever drift out of agreement
- * with the one that renders.
+ * **Every entry has a call site.** Three did not and are gone: `hairline` (1), which described the
+ * capability card's hover lift; `spotlight` (220), which duplicated `--size-spotlight`; and
+ * `parallax` (14), which was G-21's clamp when G-21 moved three gradient orbs — the orbs are gone
+ * and the pointer lamp that replaced them writes an absolute cursor position, so there is nothing
+ * left to clamp. A figure read only by CSS lives in `tokens.css` beside the rule that applies it,
+ * because a JavaScript copy could only ever drift out of agreement with the one that renders.
  */
 const dist = {
   nudge: 6, // shell mount, dock item entrance
@@ -130,13 +135,30 @@ const dist = {
   section: 16, // G-15 — a section revealing on scroll
   lift: 12, // dock container, sheet panel
   sheet: 24, // the bottom sheet's travel
-  parallax: 14, // G-21 clamp
   magnet: 6, // G-9 clamp
 } as const;
 
-export const MOTION = { dur, ease, m, loop, stagger, dist } as const;
+/**
+ * Gesture magnitudes that are neither a duration nor a distance — the rotation and scale of the
+ * capability card's pointer tilt (G-25).
+ *
+ * They live here for the same reason every other figure does: §4.2 forbids a raw literal at a call
+ * site, and a tilt written as `4` inside a hook is exactly the kind of value that gets nudged to
+ * `8` in a later pass and turns a piece of instrument feedback into a wobble.
+ *
+ * `tilt` is **degrees**, applied to `rotationX` and `rotationY`. 4° is the whole budget: measured
+ * from GSAP's own 3D examples, past roughly 6° a card stops reading as a plane responding and
+ * starts reading as a page rendering incorrectly. `lift` is a `scale`, and it is deliberately
+ * small — the elevation is carried by the shadow (§5.4 `--elev-2`), not by the size change.
+ */
+const gesture = {
+  tilt: 4,
+  lift: 1.015,
+} as const;
 
-export { dur, ease, m, loop, stagger, dist };
+export const MOTION = { dur, ease, m, loop, stagger, dist, gesture } as const;
+
+export { dur, ease, m, loop, stagger, dist, gesture };
 
 export type Duration = keyof typeof dur;
 export type Ease = keyof typeof ease;

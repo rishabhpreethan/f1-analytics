@@ -145,10 +145,10 @@
   /* Ambient loop periods (§4.3 `loop.*`). These drive the CSS `@keyframes` of MR-1 —
    * every looping animation in this product is CSS, so these are the figures that
    * actually run, and `MOTION.loop` is their mirror. CT-3 asserts they agree. */
-  --anim-grid: 24000ms;
-  --anim-orb-a: 18000ms;
-  --anim-orb-b: 24000ms;
-  --anim-orb-c: 30000ms;
+  /* The dot lattice's drift. One 22px cell per 34s → **0.65 px/s**, deliberately slower than
+   * the retired grid's 2 px/s: a lattice with a visible pitch reads its own motion far more
+   * legibly than a 48px wireframe did, so the same perceived speed needs a slower figure. */
+  --anim-field: 34000ms;
   --anim-comet: 11000ms;
   --anim-skeleton: 1200ms;
 
@@ -285,18 +285,43 @@
   --surface-glass: rgb(255 255 255 / 0.72);
   --glass-blur: blur(12px) saturate(118%);
 
-  /* ---------------------------------------------------- atmosphere, light — §7.7 layer 1–5 */
-  --bg-grid-line: rgb(27 30 36 / 0.05);
-  --bg-orb-neutral: #b9bcc3;
-  --bg-orb-alpha: 0.09;
-  --bg-orb-neutral-alpha: 0.28;
-  --bg-grain-opacity: 0.02;
-  /* The `calm` value. `[data-bg="hero"]` lowers it to 0.86 in backdrop.css — the default is
-   * the quieter one, so a route that never sets the attribute still gets a legible field.
-   * **This is not decoration**: unplated, `--border-control` measures 2.64:1 and
-   * `--ink-tertiary` 4.00:1 over the orb-tinted field, both below their floors (V-13).
-   * Lowering the orb opacity does not fix it; the plate does (V-17). */
-  --bg-plate-alpha: 0.92;
+  /* ---------------------------------------------------- atmosphere, light — §7.7
+   *
+   * **The three gradient orbs, the 48px grid and the contrast plate are gone** (2026-08-06).
+   * Rishabh: *"i didnt like the moving background you used here … i want the application to
+   * feel alive."* A large, soft, low-contrast gradient field is the one thing that cannot
+   * read as alive: it has no edge to register motion against, and in monochrome a blurred
+   * grey ellipse is a smudge by definition. What replaces it is texture with a **pitch** —
+   * a dot lattice — plus a pointer-driven light, which is motion the eye can actually resolve.
+   *
+   * Every alpha below is bounded by the **luminance corridor** solved in §9.2.2 V-21, not
+   * chosen: in light mode the field may not fall below relative luminance **0.8707** or
+   * `--border-control` drops under 3:1 over it.
+   */
+  --bg-dot: rgb(27 30 36 / 0.13);
+  /* Every sixth dot, at 132px, drawn harder — so the lattice has a *measured* hierarchy and
+   * reads as an instrument's graticule rather than as noise. Costs one extra gradient on an
+   * element that already exists. */
+  --bg-dot-major: rgb(27 30 36 / 0.22);
+  /* The lit dot, under the pointer lamp. In light mode "illuminating" the lattice means
+   * **inking** it — 2.86:1 against the canvas versus the resting dot's 1.29:1 (V-21b). */
+  --bg-dot-lit: rgb(8 9 12 / 0.42);
+  --bg-line: rgb(27 30 36 / 0.16);
+  /* The vignette's darkest corner. **0.04 is a ceiling, not a taste** — at 0.075 the corner
+   * measured `--ink-tertiary` 4.19:1 and `--border-control` 2.77:1, both failing (V-21). At
+   * 0.04 the corner lands at almost exactly `--surface-sunken`, which is a step this system
+   * already owns, so the depth is real and the floors hold. */
+  --bg-vignette: rgb(27 30 36 / 0.04);
+  --bg-grain-opacity: 0.024;
+  /* The `calm` values. `[data-bg="hero"]` raises the field in backdrop.css — the default is
+   * the quieter one, so a route that never sets the attribute still gets a recessive field.
+   *
+   * The veil is a flat `--surface-canvas` layer and it is the **only** attenuation control:
+   * one number, so "how loud is the background here" has exactly one answer per route. */
+  --bg-veil-alpha: 0.66;
+  /* The pointer lamp's ceiling. It sits **above** the veil so the aliveness survives on a
+   * data route, and this is what keeps it from competing there: 0.45 × the lit-dot alpha. */
+  --bg-lamp-max: 0.45;
 }
 
 /*
@@ -385,9 +410,17 @@
   --size-dock-clearance: 6rem; /* 96 — bottom padding on `main` below 1024 */
   --size-rail-clearance: 6rem; /* 96 — left padding on `main` at ≥1024 */
 
-  --size-grid-cell: 48px; /* the atmosphere grid cell (§7.7 layer 1) — px, because the
-                           * loop's 48px translation must match it exactly or the tile
-                           * seams become visible */
+  /* The atmosphere's dot lattice (§7.7 layer 1) — **px, not rem**, because the drift
+   * translates by exactly one cell and a rem cell under a non-16px root font size would not
+   * equal the translation, making the tile seam visible on every cycle. 22 rather than the
+   * retired grid's 48: a lattice needs enough density to read as texture rather than as a
+   * wireframe, and 132 is exactly six cells so the major dots always land on a minor one. */
+  --size-field-cell: 22px;
+  --size-field-major: 132px;
+  /* The pointer lamp's radius. Large enough that the lit region reads as a *pool of light*
+   * rather than as a cursor decoration, and small enough that it never lights the whole
+   * viewport at 1440 (§7.7 layer 2). */
+  --size-lamp: 340px;
   --size-hero-min: 40rem; /* 640 — minimum hero height, so a short landscape viewport
                            * does not crush the headline */
   --size-progress: 2px; /* the scroll progress bar (G-14) */
@@ -467,11 +500,22 @@
   /* glass, dark — §5.2b. Composite measures `#261A27`; ink-tertiary 4.75:1. */
   --surface-glass: rgb(26 28 32 / 0.68);
 
-  /* atmosphere, dark — §7.7. The orbs and the grain are both stronger here, because dark
-   * mode is where the depth reads: a 0.09 orb on near-black is invisible. */
-  --bg-grid-line: rgb(245 247 249 / 0.055);
-  --bg-orb-neutral: #2f3237;
-  --bg-orb-alpha: 0.17;
-  --bg-orb-neutral-alpha: 0.6;
-  --bg-grain-opacity: 0.038;
+  /* atmosphere, dark — §7.7.
+   *
+   * **The two themes' fields are different shapes, not inversions**, and that falls out of the
+   * corridor arithmetic in §9.2.2 V-21 rather than out of preference. Light mode is bounded
+   * *below* (it may darken only as far as `--surface-sunken`), so its vignette is almost
+   * nothing: 0.04. Dark mode is bounded *above* — it must stay under `--surface-raised` or a
+   * card reads as a hole — and may darken all the way to black, so its vignette is **0.72**
+   * and its depth is genuinely dramatic. That asymmetry is what "dark mode is designed, not
+   * flipped" means for a background.
+   *
+   * In dark mode this leaves **the pointer lamp as the only light on screen**, which is the
+   * single most deliberate thing about this field. */
+  --bg-dot: rgb(245 247 249 / 0.13);
+  --bg-dot-major: rgb(245 247 249 / 0.24);
+  --bg-dot-lit: rgb(255 255 255 / 0.42);
+  --bg-line: rgb(245 247 249 / 0.18);
+  --bg-vignette: rgb(0 0 0 / 0.72);
+  --bg-grain-opacity: 0.05;
 }

@@ -30,18 +30,22 @@ function keyframes(): Array<[string, string]> {
 
 describe('CT-9 — only composited properties are animated', () => {
   it('finds the keyframes it is meant to be checking', () => {
-    // A test that silently checks nothing is worse than no test. G-18, G-19 ×3, G-20.
+    // A test that silently checks nothing is worse than no test. G-18 (the lattice drift, shared
+    // by both dot layers) and G-20 (the comet). The three orb yoyos are gone with the orbs.
     expect(
       keyframes()
         .map(([name]) => name)
         .sort(),
-    ).toEqual([
-      'atmosphere-comet',
-      'atmosphere-grid-drift',
-      'atmosphere-orb-a',
-      'atmosphere-orb-b',
-      'atmosphere-orb-c',
-    ]);
+    ).toEqual(['atmosphere-comet', 'atmosphere-drift']);
+  });
+
+  it('holds no `filter` anywhere at all, not just inside a @keyframes', () => {
+    // The orbs each carried an 80–100px static `filter: blur()`. Rasterised once it was affordable,
+    // but it was also the single most expensive property in the field and the reason the layer had
+    // to be documented as "safe because it has no children". The rebuild has none, and this keeps
+    // it that way: a blur is how a background stops being cheap (§10 #24).
+    expect(CSS).not.toMatch(/[^-]filter\s*:/);
+    expect(CSS).not.toMatch(/backdrop-filter\s*:/);
   });
 
   it('animates transform, opacity and offset-distance — and nothing else', () => {
@@ -92,16 +96,49 @@ describe('CT-9 — only composited properties are animated', () => {
     for (const uri of dataUris) expect((uri ?? '').length).toBeLessThan(2048);
   });
 
-  it('sets will-change only on the two layers that move', () => {
-    // `will-change` promotes a layer permanently, so it costs memory wherever it is set.
-    // §7.7.4: layers 1 and 2 only, never the grain or the plate.
-    const declarations = [...CSS.matchAll(/\.([\w-]+)\s*\{([^}]*)\}/g)].filter(([, , body]) =>
-      /will-change\s*:/.test(body ?? ''),
+  it('sets will-change only on the layers that move', () => {
+    /*
+     * `will-change` promotes a layer permanently, so it costs memory wherever it is set. §7.7.4:
+     * only the two lattice layers, never the racing line, the grain, the vignette or the veil.
+     *
+     * The two are declared in **one** rule, which is also what makes the drift phase-safe: same
+     * animation name, same period, both created in the same React commit, so both start at the same
+     * document time. A phase difference between them would render as doubled dots.
+     */
+    const declarations = [...CSS.matchAll(/((?:\.[\w-]+,?\s*)+)\{([^}]*)\}/g)].filter(
+      ([, , body]) => /will-change\s*:/.test(body ?? ''),
     );
-    expect(declarations.map(([, selector]) => selector).sort()).toEqual([
-      'atmosphere-grid',
-      'atmosphere-orbs',
-    ]);
+    expect(declarations).toHaveLength(1);
+    expect(
+      (declarations[0]?.[1] ?? '')
+        .split(',')
+        .map((selector) => selector.trim())
+        .sort(),
+    ).toEqual(['.atmosphere-dots', '.atmosphere-lamp']);
+  });
+
+  it('drives the lattice geometry from tokens, so the two dot layers cannot fall out of pitch', () => {
+    // The lamp re-draws the *same* dots brighter. If its pitch or its drift distance differed from
+    // the resting layer's by even a pixel the effect would be two overlapping lattices beating
+    // against each other — and it would look like a rendering fault, not like a mistake in CSS.
+    const cellUses = [...CSS.matchAll(/var\(--size-field-cell\)/g)];
+    expect(cellUses.length).toBeGreaterThanOrEqual(4);
+
+    /*
+     * Both dot layers' pitch comes from the token, never a literal — asserted on the declarations
+     * themselves rather than per-rule, because the two share a rule for their geometry and have
+     * separate rules for their paint, so a selector-scoped lookup would match the wrong block.
+     *
+     * The grain tile's own `background-size: 240px 240px` is a different thing (a raster tile, not
+     * a lattice) and is deliberately outside this check.
+     */
+    const sizes = [...CSS.matchAll(/background-size:\s*([^;]+);/g)].map((match) =>
+      (match[1] ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    expect(sizes).toContain(
+      'var(--size-field-major) var(--size-field-major), var(--size-field-cell) var(--size-field-cell)',
+    );
+    expect(sizes).toContain('var(--size-field-cell) var(--size-field-cell)');
   });
 
   it('keeps the container inert, contained, and out of print', () => {
@@ -115,6 +152,35 @@ describe('CT-9 — only composited properties are animated', () => {
 
   it('removes every layer at data-bg="off" rather than merely dimming it', () => {
     expect(CSS).toMatch(/html\[data-bg='off'\]\s*\.atmosphere-layer\s*\{\s*display:\s*none/);
+  });
+
+  it('declares the lamp coordinates in px and its fade unitless (the %-vs-px defect)', () => {
+    /*
+     * GSAP's CSSPlugin learns a custom property's unit from its current value and appends that unit
+     * to an end value that carries none. A resting `--px: 50%` therefore rendered every pointer
+     * coordinate as a percentage and put the highlight off the element entirely — that defect
+     * shipped once, on the capability card. `--lamp` is the opposite requirement: it multiplies an
+     * opacity, so it must stay unitless.
+     */
+    const root = /\.atmosphere\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? '';
+    expect(root).toMatch(/--px:\s*0px;/);
+    expect(root).toMatch(/--py:\s*0px;/);
+    expect(root).toMatch(/--lamp:\s*0;/);
+  });
+
+  it('puts the lamp above the veil and the resting lattice below it', () => {
+    // The whole point of two lattice layers rather than one masked one: a route attenuates the
+    // resting field but not the pointer response, so the background still answers the cursor on a
+    // data surface (§7.7.2). Source order inside one stacking context is what decides it.
+    const order = ['.atmosphere-dots,', '.atmosphere-veil', '.atmosphere-lamp {'];
+    const positions = order.map((selector) => CSS.indexOf(selector));
+    expect(
+      positions.every((position) => position >= 0),
+      order.join(' / '),
+    ).toBe(true);
+    // The lamp's own rule may be declared anywhere; what matters is that `AtmosphereField` renders
+    // it last, which `AtmosphereField.test.tsx` asserts against the DOM.
+    expect(positions[0]).toBeLessThan(positions[1] ?? 0);
   });
 
   it('hides the comet under reduced motion by CSS, not by JavaScript', () => {
