@@ -946,10 +946,15 @@ nothing about a file, a location, or an origin.
 
    > ⚠ **CR-007 update.** T13 could not produce the required browser evidence, so the allowance is
    > still present. **`CR-007 task C7-8` now owns closing this**, and the reasoning is stronger than it
-   > was: `framer-motion` is gone, and GSAP writes styles through `element.style` and — verified by
-   > grepping the shipped `gsap`, `ScrollTrigger` and `SplitText` source — **injects no `<style>`
-   > element at all**. The two-console rule below is unchanged and still not dischargeable by one
-   > screenshot.
+   > was: `framer-motion` is gone, and — verified by grepping the shipped `gsap`, `ScrollTrigger` and
+   > `SplitText` source — GSAP **injects no `<style>` element at all**. The two-console rule below is
+   > unchanged and still not dischargeable by one screenshot.
+   >
+   > ⚠⚠ **Gate 5, 2026-08-06 — this note used to add "GSAP writes styles through `element.style`",
+   > and that is imprecise in the one way `style-src-attr` cares about. See the correction in
+   > §S.6.1a: CSSPlugin writes `style.cssText`, and `ScrollTrigger.js:2108` calls
+   > `_body.setAttribute("style", "")` on a startup path that is reachable on `/`.** The static case
+   > is therefore weaker than it reads and the allowance stays until a console says otherwise.
 
    **The CSP is verified twice, in two different consoles, and neither discharges the other.**
    T11 and T13 both say "zero CSP violations"; they are not the same check:
@@ -2057,11 +2062,18 @@ mitigated upstream, in queries this CR does not touch**: trap 15 (cancelled roun
    session. Do not add a refetch-on-mount, do not lower `staleTime` to make the hero feel "live".
 2. **The `styleSrcAttr: 'unsafe-inline'` allowance can now probably go, and this CR is where it gets
    settled.** §2.4 permits removal on exactly one evidence: zero CSP violations in the
-   **production-preview** console. GSAP writes styles through `element.style` (CSSOM), which CSP does
-   not govern, and — **verified by grepping the shipped ESM source of `gsap`, `ScrollTrigger` and
-   `SplitText`, where there is no `document.createElement("style")` at all** — GSAP injects no
-   stylesheet either. So the policy should hold with `styleSrcAttr` removed. **C7-8 owns the check.**
-   If removal breaks the *dev* console only, the dev server gets adjusted, not the policy.
+   **production-preview** console. GSAP injects no stylesheet — **verified by grepping the shipped
+   ESM source of `gsap`, `ScrollTrigger` and `SplitText`, where there is no
+   `document.createElement("style")` at all**. So the policy should probably hold with `styleSrcAttr`
+   removed. **C7-8 owns the check.** If removal breaks the *dev* console only, the dev server gets
+   adjusted, not the policy.
+
+   > ⚠ **Gate 5, 2026-08-06.** This item used to claim "GSAP writes styles through `element.style`
+   > (CSSOM), which CSP does not govern". **Corrected in §S.6.1a** — CSSPlugin writes
+   > `style.cssText`, and `ScrollTrigger.js:2108` calls `_body.setAttribute("style", "")`, which is
+   > the attribute form `style-src-attr` actually governs, on a path reachable on `/`. The
+   > conclusion is unchanged in direction and weaker in strength: removal still looks safe, and it
+   > is still **not** dischargeable without a console.
 3. **`script-src 'self'` / `style-src 'self'` are compatible with everything specified here, and this
    was checked rather than assumed.** No inline `<script>`, no inline `<style>`, no `blob:` worker (we
    ship no worker), no `unsafe-eval` (GSAP does not use `eval`; only `CustomEase` and GSDevTools go
@@ -2325,10 +2337,39 @@ The contract, which does not depend on the form:
 |---|---|
 | Items | `NAV_ITEMS` — a `readonly` array of `{ to: string; label: string; icon: IconName }` in `navItems.ts`. Slugs and literal paths only; **never an integer id**. |
 | Active state | `isActiveNavItem(pathname, to)` — **pure, exported, unit-tested.** `to === '/'` matches **only** exactly `/`; every other `to` matches `pathname === to` or `pathname.startsWith(to + '/')`. Segment-boundary matching, so `/teams` does not light up on `/teamsomething`. `aria-current="page"` on the match — retained from the existing spec. |
-| Active indicator | One element whose position is **measured, not laid out**: `computeIndicatorGeometry(activeRect, containerRect)` → `{ x, scaleX }` against a fixed base width, applied with `transform-origin` at the start edge. Pure and unit-tested. Framer Motion's `layoutId` has no GSAP-core equivalent; `Flip` is the real equivalent and is deferred to F1 (§10 #21), because for one indicator a measured tween is fifteen lines and 9.7 KB gz cheaper. |
+| Active indicator | One element whose position is **measured, not laid out**: `computeIndicatorGeometry(activeRect, containerRect, indicatorLength)` → `{ offset } \| null`, applied as a translate along the dock's main axis. Pure and unit-tested. **See the resolution below — the indicator has a fixed length and is never scaled to the item.** Framer Motion's `layoutId` has no GSAP-core equivalent; `Flip` is the real equivalent and is deferred to F1 (§10 #21), because for one indicator a measured tween is fifteen lines and 9.7 KB gz cheaper. |
 | Reduced motion | The indicator **snaps**: geometry is applied in `settle` (a `gsap.set`), and only the tween between positions lives in `animate`. This is the case §S.3.4's two-builder split exists for. |
 | Keyboard / ARIA | Unchanged from the F0 Design Spec §8 and the tests in `26efa77`. A dock is a `<nav>` with links, not a widget with roving tabindex, unless the Design Spec argues otherwise **and** re-specifies the keyboard model. |
 | Touch | 44 × 44 px minimum on `(pointer: coarse)` — retained. |
+
+> ##### Resolution — the indicator's size. Decided at gate 5, 2026-08-06. **The Design Spec governs.**
+>
+> This section and the Design Spec **contradicted each other**, and the first implementation
+> followed this one. The row above originally read "`{ x, scaleX }` against a fixed base width,
+> applied with `transform-origin` at the start edge", which the developer implemented as
+> `scaleX = itemSize / 20` — so the bar stretched to the full length of the active item and
+> rendered as a **2 × 48** rule in the rail. Design Spec **§5.2** specifies "a **2×20px**
+> `--accent-mark` bar at `left: 0`, **vertically centred**" and **§5.3** "a **2×16px**
+> `--accent-mark` bar at the slot's **top** edge, moved on `x`".
+>
+> **On a purely visual matter the Design Spec governs.** The indicator's length is fixed —
+> 20px in the rail, 16px in the bottom dock — and it is centred on the active item along the
+> main axis. The only scale G-3 applies is `DESIGN_SYSTEM.md` §4.6's `0.4 → 1` growth of the
+> rule about its own centre, which is a flourish on arrival and not a fit to the item.
+>
+> Consequences, all implemented:
+>
+> - `computeIndicatorGeometry` returns `{ offset } \| null` and no scale. `transform-origin` is
+>   the element's centre, not the start edge.
+> - The lengths live in `tokens.css` as `--size-dock-indicator` / `--size-dock-indicator-rail`,
+>   in **px** rather than rem, and are mirrored by `INDICATOR_LENGTH` in `navItems.ts`. The
+>   centring is JavaScript arithmetic against `getBoundingClientRect()`, so a rem length under a
+>   non-16px root font size would put the bar off-centre by half the difference.
+>   `styles/index.css.test.ts` asserts the two agree.
+> - `null` replaces the old identity geometry, and it is **not only a degenerate-input guard**:
+>   below 1024px the three overflow destinations are `display: none`, so on `/teams`,
+>   `/circuits` and `/records` the active slot measures 0×0. The old code turned that into
+>   `scaleX: 0` — an indicator that was invisible on three of the twelve routes.
 
 **Route transition.** `RootLayout` currently owns it inline; extract `src/routes/RouteTransition.tsx`:
 one `useMotion` with `deps: [pathname]` (hence `revertOnUpdate: true`, R-G3), animating `from` on the
@@ -2418,7 +2459,7 @@ the two mechanisms of MR-1 cannot drift apart.
 | Function | File | Contract |
 |---|---|---|
 | `isActiveNavItem(pathname, to)` | `components/layout/navItems.ts` | §S.3.6 |
-| `computeIndicatorGeometry(activeRect, containerRect, baseWidth)` | `components/layout/navItems.ts` | `{ x, scaleX }`; `baseWidth <= 0` → `{ x: 0, scaleX: 1 }`, never `NaN`/`Infinity` |
+| `computeIndicatorGeometry(activeRect, containerRect, indicatorLength)` | `components/layout/navItems.ts` | `{ offset }`, centring a **fixed-length** bar on the active item (§S.3.6 resolution). `null` — never `NaN`/`Infinity`, never a scale — for a degenerate length, a degenerate rect, or a `display: none` slot measuring 0×0; `settle` then leaves the indicator alone |
 | `backdropIntensityFor(pathname)` | `components/layout/backdrop.ts` | §S.3.5 |
 | `selectHeroFigures(meta)` | `features/landing/selectors.ts` | §S.4 |
 | `prefersReducedMotion(win?)` | `lib/motion/reducedMotion.ts` | §S.3.7 |
@@ -2555,10 +2596,53 @@ The decision stands on the headroom, not on the claim.
 > `<script>` and no inline `<style>` exists in `index.html` or in the built output; the three places
 > this CR sets a CSS custom property from JavaScript (`AtmosphereField`'s `--atmosphere-line-path`,
 > `CoverageRuler`'s two band variables) go through React's `style` prop, which React applies via
-> `style.setProperty` — CSSOM, which CSP does not govern; and GSAP writes exclusively through
-> `element.style`, with no `document.createElement("style")` anywhere in the shipped ESM source of
-> `gsap`, `ScrollTrigger` or `SplitText`. **The expectation is therefore that removal is safe. It
-> still needs the two console observations, and they belong to whoever next opens a browser.**
+> `style.setProperty` — CSSOM, which CSP does not govern; and there is no
+> `document.createElement("style")` anywhere in the shipped ESM source of `gsap`, `ScrollTrigger` or
+> `SplitText`, so nothing here needs `style-src` for an injected stylesheet.
+>
+> ⚠ **Corrected at gate 5, 2026-08-06.** The sentence that previously read "GSAP writes exclusively
+> through `element.style`" was **imprecise in the one way that matters to `style-src-attr`**, and the
+> imprecision made the static case read as stronger than it is. Two counts, both re-verified against
+> the installed `gsap@3.15` rather than restated:
+>
+> - **`CSSPlugin.js` writes `style.cssText` wholesale**, not only individual `element.style.<prop>`
+>   assignments — `cssText = ""` at line 575 on the style-saver's revert path (which R-G3's
+>   `revertOnUpdate: true` reaches on **every** dependency change in this app) and again at line 678
+>   for `className` tweens. This is still CSSOM, so it is the lesser of the two points, but "writes
+>   exclusively through `element.style`" was simply not true.
+> - **`ScrollTrigger.js:2108` calls `_body.setAttribute("style", "")`** on its startup path. This is
+>   the load-bearing one: `setAttribute("style", …)` **is** the attribute form `style-src-attr`
+>   governs, whereas a property assignment on `element.style` is not. The path is reachable on `/`,
+>   because `ScrollTrigger` is registered there and G-13, G-14 and G-15 all run on the landing page.
+>
+> Whether a browser actually reports a violation for an *empty* attribute value is a separate
+> question and **not answerable without a console** — which is precisely the point. The static
+> argument is weaker than it read, so the two-console requirement stands rather than being softened.
+> **`styleSrcAttr: 'unsafe-inline'` is deliberately NOT removed.** The observations belong to
+> whoever next opens a browser.
+
+###### S.6.1b Deferred out of CR-007 — `developer`, gate 5, 2026-08-06
+
+**The coverage ruler's hover/focus tooltip (Design Spec §3.5, the `Interaction` row).** §3.5 asks
+that hovering or focusing a ruler row show "a tooltip with that row's no-coverage sentence from
+`DESIGN_SYSTEM.md` §7.4". Only the surface change is implemented: the row raises to
+`--surface-raised` on `:hover` and `:focus-visible`.
+
+**Declined for CR-007 by the orchestrator at gate 5, recorded rather than built.** Three reasons,
+in order:
+
+1. **The information is not hover-only, and §10 requires that.** Every row is
+   `tabindex="0"` inside a `role="list"` and carries `aria-label="<label>: available from
+   <year>"`, so the coverage boundary is already reachable by keyboard and by screen reader
+   without the tooltip. No state the tooltip would express is expressed *only* by it.
+2. **A tooltip is a component, not a detail.** Done properly it needs a positioned, dismissible,
+   `aria-describedby`-wired surface with `Esc` handling and coarse-pointer behaviour — which is
+   `Tooltip` in `DESIGN_SYSTEM.md` §7, a component F0 does not otherwise ship and F1 will.
+   Improvising one inside a landing section is how a second, worse tooltip gets into the product.
+3. **Scope.** It was not among the review's blocking findings and inventing it during a fix pass
+   is exactly the scope creep gate 5 is not for.
+
+**Carry it into F1 with the `Tooltip` component**, and the §7.4 sentences with it.
 
 ###### S.6.2 CPU cost of an always-running animation
 
@@ -2632,9 +2716,10 @@ Cheap, and they are what makes "cannot be forgotten" true rather than hoped for.
 11. **CT-11** — `isActiveNavItem`: `/` matches `/` only, and **not** `/seasons`, `/drivers`, `/records`;
     `/seasons` matches `/seasons`, `/seasons/2024`, `/seasons/2024/races/3` and **not** `/seasonsomething`;
     trailing slash on `pathname` behaves like no trailing slash
-12. **CT-12** — `computeIndicatorGeometry`: correct `x`/`scaleX` for the first and last item; a
-    container scrolled or offset from the viewport origin; and `baseWidth <= 0` → `{ x: 0, scaleX: 1 }`
-    with no `NaN` and no `Infinity`
+12. **CT-12** — `computeIndicatorGeometry`: a correctly **centred** `offset` for the first and last
+    item; the bar is never scaled to the item (the §S.3.6 resolution, asserted); a container
+    scrolled or offset from the viewport origin; and `null` — never `NaN`, never `Infinity` — for a
+    degenerate `indicatorLength`, a degenerate rect, or a `display: none` slot measuring 0×0
 
 **`src/components/layout/backdrop.test.ts`**
 13. **CT-13** — `backdropIntensityFor`: `/` → `full`; `/seasons` and `/seasons/2024` → `muted`;

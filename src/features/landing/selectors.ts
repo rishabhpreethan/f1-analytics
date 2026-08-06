@@ -135,13 +135,25 @@ export function selectCoverageBands(meta: Meta): CoverageBand[] {
 }
 
 /**
- * The axis ticks. 1950 / 1970 / 1990 / 2010 / `latestYear` at ≥768 (Design Spec §3.6), and
- * the domain bounds are read rather than assumed, so a tick outside the domain is dropped
+ * The axis ticks. 1950 / 1970 / 1990 / 2010 / `latestYear` at ≥768, and 1950 / 1990 /
+ * `latestYear` below it (Design Spec §3.6) — the caller decides which, because that is a
+ * decision about what to render.
+ *
+ * The domain bounds are read rather than assumed, so a tick outside the domain is dropped
  * instead of rendered off the end of the track.
+ *
+ * **Why the four literal years are allowed here, and are not the thing §S.1 rule 2 forbids.**
+ * They are **axis positions, not statistics**: they describe where the eye should find a
+ * gridline, they are not read from the data and they make no claim about it. They are also
+ * domain-filtered on the next line, so a payload whose first season were 1961 would simply drop
+ * 1950 rather than draw a tick off the end. CT-14 greps `Landing.tsx` and the components it
+ * renders — deliberately not this module, which is where a *figure* is allowed to be computed
+ * and where `latestYear` in this very list comes from.
  */
 export function selectRulerTicks(meta: Meta, dense: boolean): Array<{ year: number; at: number }> {
   const { firstYear, latestYear } = meta.seasons;
   const span = latestYear - firstYear;
+  // Axis positions — see the note above on why these four are not hard-coded statistics.
   const years = dense ? [1950, 1970, 1990, 2010, latestYear] : [1950, 1990, latestYear];
 
   return years
