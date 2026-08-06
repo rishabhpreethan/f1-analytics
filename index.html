@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>F1 Analytics</title>
+    <meta
+      name="description"
+      content="Formula 1 analysis: seasons, races, drivers, teams and circuits, compared across eras."
+    />
+
+    <!--
+      Pre-paint theme, before the stylesheet. Synchronous by necessity: no defer, no
+      async, no type="module" — a module script is deferred by specification and would
+      still flash the wrong theme. External because script-src is 'self' (S-9).
+    -->
+    <script src="/theme-init.js"></script>
+
+    <!--
+      Exactly two faces preloaded, both `latin`. `crossorigin` is required even
+      same-origin for a font preload; without it the browser fetches the file twice.
+      Chivo Mono is not preloaded: figures only appear once /api/meta resolves, so it
+      is not on the first-paint path.
+    -->
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

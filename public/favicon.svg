@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="F1 Analytics">
+  <!--
+    Typographic placeholder, updated by CR-007 (Design Spec §11.2).
+
+    The mark now carries the accent: a `--signal-600` rounded square with **F1** set in
+    Archivo 700 at wdth 82, in white. `#D1018A` rather than `#FE02A9` because it must also
+    be legible on a **light** browser tab strip, where the vivid step only reaches 3.62:1;
+    white on `#D1018A` measures **5.14:1** (§9.2.1 V-11).
+
+    One colour in both schemes, unlike the previous achromatic placeholder: the accent is
+    designed to read on either, and a mark that inverts is a mark that looks like two
+    products. `rx` is `--radius-md` (6) scaled to the 64px viewBox.
+
+    Built from a font this project is licensed to use and carrying no third-party mark.
+    **The real icon set is R3 and is Rishabh's** — this is not it.
+
+    A favicon is a standalone document and cannot read the page's custom properties, so the
+    two token values are written literally here and nowhere else.
+  -->
+  <rect width="64" height="64" rx="16" fill="#D1018A" />
+  <text
+    x="32"
+    y="45"
+    fill="#FFFFFF"
+    text-anchor="middle"
+    font-family="Archivo, 'Arial Narrow', system-ui, sans-serif"
+    font-size="34"
+    font-weight="700"
+    font-stretch="82%"
+    letter-spacing="-1"
+  >F1</text>
+</svg>

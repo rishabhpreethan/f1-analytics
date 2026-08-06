@@ -1,0 +1,553 @@
+/*
+ * Design tokens. The single source for every colour, size, radius and duration in
+ * this product (docs/DESIGN_SYSTEM.md). A literal value written anywhere else — in a
+ * component, in a chart config, in a "just this once" escape — is a review failure.
+ *
+ * Two layers:
+ *   1. `@theme`  — Tailwind's token namespaces, so utilities exist for them.
+ *   2. `:root` / `[data-theme="dark"]` — the semantic colour layer. Light and dark are
+ *      designed separately (§3.5); dark is never an automatic inversion.
+ */
+
+@theme {
+  /* ---------------------------------------------------------------- families
+   * §2.2. Fallbacks are metric-tolerant. The @font-face blocks in fonts.css declare
+   * exactly these family names, which is why no alias is needed.
+   */
+  --font-display: Archivo, 'Arial Narrow', system-ui, sans-serif;
+  --font-text: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Chivo Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ---------------------------------------------------------------- type scale
+   * §2.3 — eleven steps and nothing off them. Tailwind's default font sizes are
+   * cleared first, so an off-scale size is a missing utility rather than a review
+   * finding discovered late. The display steps live in Tailwind's font-size
+   * namespace as `--text-display-*`; they are §2.3's `--display-*` tokens.
+   */
+  --text-*: initial;
+
+  --text-2xs: 0.6875rem; /* 11 */
+  --text-2xs--line-height: 0.875rem; /* 14 */
+  --text-2xs--letter-spacing: 0.06em;
+  --text-2xs--font-weight: 500;
+
+  --text-xs: 0.75rem; /* 12 */
+  --text-xs--line-height: 1rem; /* 16 */
+
+  --text-sm: 0.8125rem; /* 13 */
+  --text-sm--line-height: 1.125rem; /* 18 */
+
+  --text-base: 0.875rem; /* 14 */
+  --text-base--line-height: 1.25rem; /* 20 */
+
+  --text-md: 1rem; /* 16 */
+  --text-md--line-height: 1.5rem; /* 24 */
+  --text-md--letter-spacing: -0.005em;
+
+  --text-lg: 1.125rem; /* 18 */
+  --text-lg--line-height: 1.625rem; /* 26 */
+  --text-lg--letter-spacing: -0.01em;
+  --text-lg--font-weight: 500;
+
+  --text-display-xs: 1.25rem; /* 20 */
+  --text-display-xs--line-height: 1.5rem; /* 24 */
+  --text-display-xs--letter-spacing: 0.005em;
+  --text-display-xs--font-weight: 600;
+
+  --text-display-sm: 1.5rem; /* 24 */
+  --text-display-sm--line-height: 1.75rem; /* 28 */
+  --text-display-sm--font-weight: 600;
+
+  --text-display-md: 2rem; /* 32 */
+  --text-display-md--line-height: 2.125rem; /* 34 */
+  --text-display-md--letter-spacing: -0.01em;
+  --text-display-md--font-weight: 700;
+
+  --text-display-lg: 2.75rem; /* 44 */
+  --text-display-lg--line-height: 2.75rem; /* 44 */
+  --text-display-lg--letter-spacing: -0.015em;
+  --text-display-lg--font-weight: 700;
+
+  --text-display-xl: 3.75rem; /* 60 */
+  --text-display-xl--line-height: 3.5rem; /* 56 */
+  --text-display-xl--letter-spacing: -0.02em;
+  --text-display-xl--font-weight: 700;
+
+  /* CR-007 (§2.3). The two largest steps exist because the rejected build topped out at
+   * 44px and nothing on screen was big enough to be a moment. **They are reserved for one
+   * element** — the landing headline — and are not available to any other surface without
+   * a design-system amendment. The headline switches between xl / 2xl / 3xl at the §5.3
+   * breakpoints: discrete steps, never `clamp()` and never a `vw` unit, because those
+   * produce sizes that are not on the scale. */
+  --text-display-2xl: 5rem; /* 80 */
+  --text-display-2xl--line-height: 4.5rem; /* 72 */
+  --text-display-2xl--letter-spacing: -0.025em;
+  --text-display-2xl--font-weight: 700;
+
+  --text-display-3xl: 7rem; /* 112 */
+  --text-display-3xl--line-height: 6rem; /* 96 */
+  --text-display-3xl--letter-spacing: -0.032em;
+  --text-display-3xl--font-weight: 700;
+
+  /* §2.1 sets the wordmark at --display-xs but with its own tracking, which is the one
+   * place a display step is not used exactly as the scale defines it. */
+  --tracking-wordmark: 0.02em;
+
+  /* Archivo is set at wdth 82 at every display step (§2.3). Applied in CSS, never
+   * baked into the binary and never via font-variation-settings, which would bypass
+   * the cascade for the other axes. */
+  --font-stretch-display: 82%;
+
+  /* ---------------------------------------------------------------- radii — §5.2 */
+  --radius-*: initial;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-full: 9999px;
+  /* CR-007 — the only radius above 12, reserved for the two floating chrome elements (the
+   * dock rail and the dock's overflow sheet) so they read as objects rather than panels. */
+  --radius-2xl: 20px;
+
+  /* ---------------------------------------------------------------- breakpoints
+   * §5.3 — design and verification breakpoints are 390 / 768 / 1440.
+   */
+  --breakpoint-md: 48rem; /* 768 */
+  --breakpoint-lg: 64rem; /* 1024 */
+  --breakpoint-xl: 90rem; /* 1440 */
+
+  /* ---------------------------------------------------------------- durations
+   * §4.3. The same figures are mirrored in `src/lib/motion/tokens.ts`, which states
+   * them in seconds because that is GSAP's unit. **CT-3 parses this file and asserts
+   * the two agree**, so the CSS and JS halves of the mechanism split (MR-1) cannot
+   * drift apart.
+   *
+   * `dur.pointer` has no entry here on purpose: it is the `gsap.quickTo` catch-up
+   * constant, not a transition duration, so there is no CSS transition it could drive.
+   */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --dur-chart: 400ms;
+  --dur-reveal: 720ms;
+
+  /* Easings for CSS transitions. They are keywords, never a `cubic-bezier()` literal —
+   * §4.3 forbids one anywhere in this product. GSAP's `power2.*` curves have no exact
+   * CSS keyword, so these are the nearest keyword equivalents and are used only for the
+   * colour/surface transitions of G-22 and G-7; every spatial curve is GSAP's, named
+   * from `MOTION.ease`. */
+  --ease-enter: ease-out;
+  --ease-exit: ease-in;
+  --ease-move: ease-in-out;
+
+  /* Ambient loop periods (§4.3 `loop.*`). These drive the CSS `@keyframes` of MR-1 —
+   * every looping animation in this product is CSS, so these are the figures that
+   * actually run, and `MOTION.loop` is their mirror. CT-3 asserts they agree. */
+  /* The dot lattice's drift. One 22px cell per 34s → **0.65 px/s**, deliberately slower than
+   * the retired grid's 2 px/s: a lattice with a visible pitch reads its own motion far more
+   * legibly than a 48px wireframe did, so the same perceived speed needs a slower figure. */
+  --anim-field: 34000ms;
+  --anim-comet: 11000ms;
+  --anim-skeleton: 1200ms;
+
+  /* ---------------------------------------------------------------- colours
+   * Tailwind's default palette is cleared: every colour in this product is either a
+   * semantic neutral below or a team's identity, and a stray `bg-blue-500` would
+   * collide with an identity somewhere (§1.1).
+   */
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-canvas: var(--surface-canvas);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-border-control: var(--border-control);
+
+  --color-ink-primary: var(--ink-primary);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-status-info-ink: var(--status-info-ink);
+  --color-status-info-wash: var(--status-info-wash);
+  --color-status-good-ink: var(--status-good-ink);
+  --color-status-good-wash: var(--status-good-wash);
+  --color-status-caution-ink: var(--status-caution-ink);
+  --color-status-caution-wash: var(--status-caution-wash);
+  --color-status-critical-ink: var(--status-critical-ink);
+  --color-status-critical-wash: var(--status-critical-wash);
+
+  /* The interface accent, as Tailwind utilities. **Monochrome since 2026-08-06** — the
+   * accent is the extreme end of the neutral scale, not a hue (§3.6). The names are
+   * unchanged on purpose: every one of the ~76 call sites reads a semantic alias, which is
+   * exactly what let the hue be removed without touching a single component. */
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-ink-strong: var(--accent-ink-strong);
+  --color-accent-fill: var(--accent-fill);
+  --color-accent-fill-hover: var(--accent-fill-hover);
+  --color-accent-on: var(--accent-on);
+  --color-accent-mark: var(--accent-mark);
+  --color-accent-border: var(--accent-border);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-wash-ink: var(--accent-wash-ink);
+  --color-accent-glow: var(--accent-glow);
+}
+
+/*
+ * Semantic colour, light — §3.5. All neutrals are generated in OkLCh at hue 264 with
+ * chroma 0.000–0.013: enough cool cast to read as an instrument, little enough not to
+ * fight McLaren orange or Ferrari red. Every text pair clears 4.5:1 and every
+ * --border-control pair clears 3:1 (measured, §9.2 V-2).
+ */
+:root {
+  color-scheme: light;
+
+  --surface-sunken: #eff1f5;
+  --surface-canvas: #f7f8fb;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+
+  --border-subtle: #dde0e4;
+  --border-strong: #b9bcc3;
+  --border-control: #878b92;
+
+  --ink-primary: #1b1e24;
+  --ink-secondary: #53575e;
+  --ink-tertiary: #6a6d74;
+  --ink-inverse: #ffffff;
+
+  --status-info-ink: #034f89;
+  --status-info-wash: #e1eefc;
+  --status-good-ink: #0a7554;
+  --status-good-wash: #d2f7e7;
+  --status-caution-ink: #6f5306;
+  --status-caution-wash: #feebc4;
+  --status-critical-ink: #c50721;
+  --status-critical-wash: #fde7e5;
+
+  /* §5.4 — two levels, and the dark model is different. */
+  --elev-1-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  --elev-2-shadow: 0 8px 24px rgb(0 0 0 / 0.1);
+  --elev-2-border: var(--border-subtle);
+
+  /* Specified by CR-007 (Design Spec §5.3), which closes the open item the previous build
+   * correctly flagged: §3.5 and §5.4 defined no scrim colour, so this token used to be a
+   * developer's guess. It is now design's, and it stays achromatic (§1.1). */
+  --scrim: rgb(0 0 0 / 0.44);
+
+  /* ---------------------------------------------------------------- the accent, light
+   * §3.6.3, **monochrome**. The accent is the *absolute* end of the neutral scale —
+   * `#08090C` in light, `#FFFFFF` in dark — and its emphasis comes from **contrast,
+   * inversion, weight and motion**, never from hue.
+   *
+   * Every figure below was measured by `scripts/validate-palette.mjs` (§9.2.2 **V-18**):
+   * `--accent-ink` **19.91 / 18.75 / 17.61:1** on raised / canvas / sunken (floor 4.5) and
+   * `--accent-mark` the same figures against a floor of 3.0. The retired magenta reached
+   * 5.14 / 4.84 / 4.55 and 3.62 / 3.41 / 3.20 — so **every accent surface in the product got
+   * between 3.5× and 5.5× more separation from its background**, which is the whole reason a
+   * monochrome accent is not a quieter one.
+   *
+   * `--accent-wash` keeps its own ink token even though `--accent-ink` now clears it easily
+   * (16.07:1): the alias is the API, and a component must not have to know which of the two
+   * happens to work on a given surface.
+   */
+  --accent-ink: #08090c;
+  --accent-ink-strong: #000000;
+  --accent-fill: #08090c;
+  /* Hover **recedes one step** rather than deepening, because `--accent-fill` is already the
+   * pole and there is nowhere darker to go. `--accent-on` on it: 11.95:1 (V-18). */
+  --accent-fill-hover: #33373e;
+  --accent-on: #ffffff;
+  --accent-mark: #08090c;
+  --accent-border: #08090c;
+  --accent-wash: #e4e7ed;
+  --accent-wash-ink: #08090c;
+  --accent-glow: #08090c;
+  /* Decorative 1px accent rules — the eyebrow rule, a card's edge. No contrast floor
+   * applies, which is exactly why it is a separate token from `--accent-mark`: a component
+   * cannot reach for the decorative value where a measured one is required. */
+  --accent-hairline: rgb(8 9 12 / 0.2);
+
+  /* ---------------------------------------------------------------- glass, light — §5.2b
+   * The header and the dock are translucent so the atmosphere is visible moving behind
+   * them. Measured over the worst-case composite (canvas + orb + grain + glass): the
+   * result is `#FCF5FB` and every token still clears its floor — `--ink-tertiary` 4.83:1,
+   * `--accent-ink` 4.80:1 (§9.2.1 V-12). The `@supports` fallback in index.css is
+   * **mandatory**: an unblurred 72% white over a moving field is unreadable.
+   */
+  --surface-glass: rgb(255 255 255 / 0.72);
+  --glass-blur: blur(12px) saturate(118%);
+
+  /* ---------------------------------------------------- atmosphere, light — §7.7
+   *
+   * **The three gradient orbs, the 48px grid and the contrast plate are gone** (2026-08-06).
+   * Rishabh: *"i didnt like the moving background you used here … i want the application to
+   * feel alive."* A large, soft, low-contrast gradient field is the one thing that cannot
+   * read as alive: it has no edge to register motion against, and in monochrome a blurred
+   * grey ellipse is a smudge by definition. What replaces it is texture with a **pitch** —
+   * a dot lattice — plus a pointer-driven light, which is motion the eye can actually resolve.
+   *
+   * Every alpha below is bounded by the **luminance corridor** solved in §9.2.2 V-21, not
+   * chosen: in light mode the field may not fall below relative luminance **0.8707** or
+   * `--border-control` drops under 3:1 over it.
+   */
+  --bg-dot: rgb(27 30 36 / 0.13);
+  /* Every sixth dot, at 132px, drawn harder — so the lattice has a *measured* hierarchy and
+   * reads as an instrument's graticule rather than as noise. Costs one extra gradient on an
+   * element that already exists. */
+  --bg-dot-major: rgb(27 30 36 / 0.22);
+  /* The lit dot, under the pointer lamp. In light mode "illuminating" the lattice means
+   * **inking** it — 2.86:1 against the canvas versus the resting dot's 1.29:1 (V-21b). */
+  --bg-dot-lit: rgb(8 9 12 / 0.42);
+  --bg-line: rgb(27 30 36 / 0.16);
+  /* The vignette's darkest corner. **0.04 is a ceiling, not a taste** — at 0.075 the corner
+   * measured `--ink-tertiary` 4.19:1 and `--border-control` 2.77:1, both failing (V-21). At
+   * 0.04 the corner lands at almost exactly `--surface-sunken`, which is a step this system
+   * already owns, so the depth is real and the floors hold. */
+  --bg-vignette: rgb(27 30 36 / 0.04);
+  --bg-grain-opacity: 0.024;
+  /* The `calm` values. `[data-bg="hero"]` raises the field in backdrop.css — the default is
+   * the quieter one, so a route that never sets the attribute still gets a recessive field.
+   *
+   * The veil is a flat `--surface-canvas` layer and it is the **only** attenuation control:
+   * one number, so "how loud is the background here" has exactly one answer per route. */
+  --bg-veil-alpha: 0.66;
+  /* The pointer lamp's ceiling. It sits **above** the veil so the aliveness survives on a
+   * data route, and this is what keeps it from competing there: 0.45 × the lit-dot alpha. */
+  --bg-lamp-max: 0.45;
+}
+
+/*
+ * Layering — §5.2a. **One scale, and nothing off it.** A fixed animated background makes
+ * stacking order load-bearing: the atmosphere must sit under everything, and the skip link
+ * must sit over the dock or a keyboard user cannot see it at ≥1024px. These are the only
+ * permitted values, and `index.css` consumes them so no component writes a z-index.
+ */
+:root {
+  --z-atmosphere: 0;
+  --z-content: 1;
+  --z-header: 30;
+  --z-dock: 40;
+  --z-overlay: 50;
+  --z-skip: 60;
+}
+
+/*
+ * Component geometry that is **not** on the 4px spacing scale.
+ *
+ * §5.1 restricts the spacing steps a component may use, and it names 7 / 9 / 11 / 14
+ * as review failures — which rules out `h-14` for a 56px header. Everything below is a
+ * fixed dimension named by the Design Spec (shell anatomy §2.1, `ThemeToggle` §5.2,
+ * `DataVintage` §5.1, `DESIGN_SYSTEM.md` §7.1 / §7.4). It lives here, with the rest of
+ * the tokens, and is consumed by the classes in `index.css` — never written inline.
+ *
+ * Theme-independent, so it is declared once and not repeated under [data-theme].
+ */
+:root {
+  --size-shell-max: 90rem; /* 1440 — §5.3 container */
+  --size-header: 3.5rem; /* 56 — header height at every breakpoint */
+  --size-rule: 2px; /* the nav active rule and the sheet's leading rule */
+
+  /* The landing headline's outlined final word (§2.3, §3.6.5). **px, and it steps at the
+   * §5.3 breakpoints** rather than scaling: a stroke that scaled with the type would be
+   * 1.7px at 60px and hairline-fragile, and a stroke is not on the type scale, so it cannot
+   * be derived from one. `-webkit-text-stroke` is applied behind an `@supports` guard in
+   * `index.css`, because the rule also sets `color: transparent` and a browser that ignored
+   * the stroke would render an invisible word. */
+  --size-headline-stroke: 2px;
+  --size-headline-stroke-xl: 3px;
+
+  --size-control-sm: 1.75rem; /* 28 — DataVintage trigger, Button sm */
+  --size-control-md: 2.25rem; /* 36 — Button md, theme popover row */
+  --size-control-lg: 2.75rem; /* 44 — Button lg */
+  --size-touch: 2.75rem; /* 44 — minimum touch target (§8) */
+  --size-toggle: 2rem; /* 32 — ThemeToggle trigger */
+
+  --size-sheet-row: 3rem; /* 48 — mobile nav sheet row */
+  --size-icon-tile: 2.5rem; /* 40 — StateCard icon tile (§7.4) */
+  --size-dot: 0.5rem; /* 8 — DataVintage coverage dot */
+
+  --size-popover-theme: 12.5rem; /* 200 — ThemeToggle popover (§5.2) */
+  --size-popover-coverage: 20rem; /* 320 — DataVintage popover (§5.1) */
+  --size-state-card: 35rem; /* 560 — StateCard standalone max-width (§7.4) */
+  --size-state-block: 60vh; /* the DataUnavailableState block in `main` (§7) */
+
+  /* ------------------------------------------------- chrome geometry — CR-007, §5.3
+   * Fixed dimensions, named here so they are not invented in a component. They are
+   * deliberately **not** on §5.1's permitted spacing subset, which is precisely why they
+   * are tokens: §5.1 restricts spacing utilities, not named dimensions.
+   */
+  --size-dock: 4rem; /* 64 — rail width collapsed AND bottom-dock height, the same
+                      * number on purpose, so the two orientations feel like one object */
+  --size-dock-open: 14.5rem; /* 232 — rail width expanded (G-4) */
+  --size-dock-inset: 1rem; /* 16 — gap to the viewport edge, every breakpoint */
+  --size-dock-item: 3rem; /* 48 — a rail row's height, and a bottom-dock slot's min-width */
+  /* The dock's own inner padding, in **both** orientations, so the active pill is inset by the
+   * same amount on every side and can never be clipped by the container's corner radius.
+   * px, because the same arithmetic is mirrored in JavaScript.
+   *
+   * **It is NOT true that `--size-dock` − 2 × this equals `--size-dock-item`**, which is what
+   * the comment here used to claim. Under `box-sizing: border-box` the dock's own 1px border
+   * comes out of its width too, so the inner lane is 46px. That missing 2px is the third
+   * offset fault this rail has had; `--size-dock-lane` below now states the whole subtraction
+   * in one place. */
+  --size-dock-pad: 8px;
+  /* The dock's border width. A token, not a literal, because `.dock` consumes it as its
+   * `border-width` *and* `--size-dock-lane` subtracts it — so the two can never disagree,
+   * which is precisely how the 1px offset below got in. */
+  --size-dock-hairline: 1px;
+  /* **The collapsed rail's inner lane: 46px.** `--size-dock` (64) less its own two borders
+   * (2) and its two paddings (16). This is the box a collapsed glyph is centred in, and it is
+   * the *only* figure the centring may be solved against — see `.dock-item` in `index.css`
+   * §7.8 and the arithmetic assertion in `index.css.test.ts`. Written as the subtraction so
+   * forgetting a term is not expressible. */
+  --size-dock-lane: calc(
+    var(--size-dock) - var(--size-dock-hairline) * 2 - var(--size-dock-pad) * 2
+  );
+  /* The Lucide glyph the dock renders, mirrored by `DOCK_GLYPH_SIZE` in `navItems.ts` and tied
+   * together by `index.css.test.ts`. It exists as a token for one reason: the collapsed rail's
+   * `padding-left` is `(item width − glyph) / 2`, and if the token and the rendered size ever
+   * disagreed the glyph would sit off-centre by half the difference in the collapsed state and
+   * nothing would fail. That is exactly the class of defect that has shipped here twice — first
+   * a literal 22px with a comment claiming it centred the glyph at x = 32, having forgotten the
+   * container's own 8px padding (true centre 40); then a 48px lane that forgot the 1px borders
+   * on top of a box the label was silently sizing (see `--size-dock-lane`). */
+  --size-dock-glyph: 20px;
+  /* How far a rail label travels as it appears (G-4). Read only by CSS, so it lives here rather
+   * than in `MOTION.dist`, where a copy could only drift from the figure that renders. */
+  --size-dock-label-shift: 6px;
+  /* The rail labels' reveal stagger. **18ms, and the figure is budget-derived**: seven labels
+   * at 18ms is 126ms of stagger plus `--dur-fast` (140) = 266ms, inside §4.2's 400ms
+   * interaction ceiling. `stagger.nav`'s 35ms would reach 350 + 140 = 490 and break it. */
+  --stagger-dock-label: 18ms;
+  --size-dock-sheet-row: 3.5rem; /* 56 — one overflow-sheet row */
+  --size-dock-max: 30rem; /* 480 — bottom dock max-width */
+  /* G-3's active-item bar. **px, not rem**, and mirrored by `INDICATOR_LENGTH` in
+   * `navItems.ts`: the bar is centred on the active item by JavaScript arithmetic against
+   * `getBoundingClientRect()`, so a rem length under a non-16px root font size would not
+   * equal the rendered length and the bar would sit off-centre by half the difference.
+   * `index.css.test.ts` proves the two figures agree. Thickness is `--size-rule` in both
+   * orientations. Design Spec §5.2 (2×20 in the rail) and §5.3 (2×16 in the bottom dock). */
+  --size-dock-indicator: 16px;
+  --size-dock-indicator-rail: 20px;
+  /* Both 96. `main` reserves this so the dock never covers content and no page needs a
+   * bespoke offset. **The rail expands OVER content**, so the reservation is constant
+   * whether it is collapsed or expanded — a chart that resized because a user hovered the
+   * nav would be a defect, and that is the whole reason the design chose an overlay rail
+   * rather than a push sidebar (§5.3). */
+  --size-dock-clearance: 6rem; /* 96 — bottom padding on `main` below 1024 */
+  --size-rail-clearance: 6rem; /* 96 — left padding on `main` at ≥1024 */
+
+  /* The atmosphere's dot lattice (§7.7 layer 1) — **px, not rem**, because the drift
+   * translates by exactly one cell and a rem cell under a non-16px root font size would not
+   * equal the translation, making the tile seam visible on every cycle. 22 rather than the
+   * retired grid's 48: a lattice needs enough density to read as texture rather than as a
+   * wireframe, and 132 is exactly six cells so the major dots always land on a minor one. */
+  --size-field-cell: 22px;
+  --size-field-major: 132px;
+  /* The pointer lamp's radius. Large enough that the lit region reads as a *pool of light*
+   * rather than as a cursor decoration, and small enough that it never lights the whole
+   * viewport at 1440 (§7.7 layer 2). */
+  --size-lamp: 340px;
+  --size-hero-min: 40rem; /* 640 — minimum hero height, so a short landscape viewport
+                           * does not crush the headline */
+  --size-progress: 2px; /* the scroll progress bar (G-14) */
+  --size-magnet: 6px; /* G-9's clamp — mirrors MOTION.dist.magnet */
+  /* `--size-spotlight` (220) and `--size-card-lift` (2) are **removed**. G-8's pointer spotlight
+   * is retired from the product and the capability card's 2px lift is superseded by G-25's
+   * perspective tilt (§3.5.2, §4.6). Recorded here rather than silently deleted, because both
+   * figures appear in the archive and in §4.6's history, and someone reading either would
+   * otherwise reasonably expect to find them. */
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-sunken: #08090c;
+  --surface-canvas: #0e0f13;
+  --surface-raised: #1a1c20;
+  --surface-overlay: #23252a;
+
+  --border-subtle: #2f3237;
+  --border-strong: #4f535a;
+  --border-control: #64686f;
+
+  --ink-primary: #f5f7f9;
+  --ink-secondary: #b3b6ba;
+  --ink-tertiary: #86898f;
+  --ink-inverse: #0e0f13;
+
+  --status-info-ink: #2e9cfd;
+  --status-info-wash: #142f4b;
+  --status-good-ink: #26f0b0;
+  --status-good-wash: #0f3830;
+  --status-caution-ink: #fec431;
+  --status-caution-wash: #3c2b02;
+  --status-critical-ink: #fd5e5a;
+  --status-critical-wash: #47211e;
+
+  /* Elevation is a surface step plus a border here, because a soft shadow on a
+   * near-black canvas is invisible. Overlays are the only dark-mode shadow, and it
+   * is deep enough to read. */
+  --elev-1-shadow: none;
+  --elev-2-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
+  --elev-2-border: var(--border-strong);
+
+  /* Deeper in dark mode for the same reason overlays carry the only dark shadow: the
+   * canvas is already near-black, so a light scrim would not read. */
+  --scrim: rgb(0 0 0 / 0.62);
+
+  /* ---------------------------------------------------------------- the accent, dark
+   * §3.6.3, and **designed rather than inverted** (§3.5). The accent is the pole of the
+   * neutral scale in each theme, so the two themes' values are opposite ends rather than a
+   * flip of one value: pure `#FFFFFF` here, `#08090C` there. Measured (§9.2.2 V-18):
+   * `--accent-ink` **17.06 / 19.15 / 19.91:1** on raised / canvas / sunken.
+   *
+   * `--accent-ink-strong` equals `--accent-ink` here **and that is correct, not an
+   * oversight**: white is the pole and there is nothing stronger. The link-hover signal is
+   * therefore carried by G-10's underline sweep, not by an ink step — recorded in §3.6.3.
+   */
+  --accent-ink: #ffffff;
+  --accent-ink-strong: #ffffff;
+  --accent-fill: #ffffff;
+  /* Recedes one step, as in light mode. `--accent-on` on it: 12.12:1 (V-18). */
+  --accent-fill-hover: #c6cad2;
+  --accent-on: #08090c;
+  --accent-mark: #ffffff;
+  --accent-border: #ffffff;
+  /* 1.27:1 against `--surface-raised` — a visible field, matched to the timing-wash
+   * precedent of 1.15–1.28 (§3.4.1). Its ink reaches 13.42:1 (V-18). */
+  --accent-wash: #2c2f35;
+  --accent-wash-ink: #ffffff;
+  --accent-glow: #ffffff;
+  --accent-hairline: rgb(255 255 255 / 0.22);
+
+  /* glass, dark — §5.2b. Composite measures `#261A27`; ink-tertiary 4.75:1. */
+  --surface-glass: rgb(26 28 32 / 0.68);
+
+  /* atmosphere, dark — §7.7.
+   *
+   * **The two themes' fields are different shapes, not inversions**, and that falls out of the
+   * corridor arithmetic in §9.2.2 V-21 rather than out of preference. Light mode is bounded
+   * *below* (it may darken only as far as `--surface-sunken`), so its vignette is almost
+   * nothing: 0.04. Dark mode is bounded *above* — it must stay under `--surface-raised` or a
+   * card reads as a hole — and may darken all the way to black, so its vignette is **0.72**
+   * and its depth is genuinely dramatic. That asymmetry is what "dark mode is designed, not
+   * flipped" means for a background.
+   *
+   * In dark mode this leaves **the pointer lamp as the only light on screen**, which is the
+   * single most deliberate thing about this field. */
+  --bg-dot: rgb(245 247 249 / 0.13);
+  --bg-dot-major: rgb(245 247 249 / 0.24);
+  --bg-dot-lit: rgb(255 255 255 / 0.42);
+  --bg-line: rgb(245 247 249 / 0.18);
+  --bg-vignette: rgb(0 0 0 / 0.72);
+  --bg-grain-opacity: 0.05;
+}

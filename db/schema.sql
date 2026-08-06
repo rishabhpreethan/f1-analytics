@@ -1,24 +1,24 @@
 -- F1 Analytics — local SQLite schema
 --
--- Session-centric normalized F1 model. Authoritative reference: docs/DATABASE.md.
--- Populated offline; the application treats this database as read-only.
+-- The 18 application tables. Authoritative reference: docs/DATABASE.md.
+-- The application opens this database read-only and never writes to it.
 --
 --   season ── round ── session ── session_entry ── lap ── pit_stop
 --                        │            └── round_entry ── team_driver ── driver
 --                        └── point_system                             └── team
 --
--- Design notes:
---   * `id` columns are stable integer surrogate keys, preserved across refreshes so
---     foreign keys stay valid and re-imports are idempotent. Internal only — never in a URL.
---   * `api_id` is the stable public identifier — use it for permalinks, never `id`.
---   * Booleans arrive as 't'/'f' in CSV and are stored as INTEGER 0/1.
---   * Durations arrive as 'HH:MM:SS.fff' text; each is stored verbatim AND parsed
---     to an integer millisecond column for analytics (REQUIREMENTS IN-4).
+-- Column conventions:
+--   * `id` is a stable integer surrogate key. Internal only — never in a URL.
+--   * `reference` is the public identifier: a human-readable slug (`max_verstappen`).
+--     URLs and API responses use `reference`, never `id` and never `api_id`.
+--   * Booleans are stored as INTEGER 0/1.
+--   * A duration is stored twice: verbatim text (`*_str`) and an integer
+--     millisecond column (`*_ms`) for analytics.
 
 PRAGMA foreign_keys = ON;
 
 -- ---------------------------------------------------------------- rule systems
--- These make cross-era normalization exact rather than hand-coded (REQUIREMENTS §5.2).
+-- These make cross-era normalization exact rather than hand-coded (docs/DATABASE.md §5).
 
 CREATE TABLE IF NOT EXISTS championship_system (
   id                       INTEGER PRIMARY KEY,
@@ -62,7 +62,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_season_year ON season(year);
 CREATE TABLE IF NOT EXISTS circuit (
   id           INTEGER PRIMARY KEY,
   api_id       TEXT,
-  reference    TEXT,
+  reference    TEXT,          -- public slug
   name         TEXT,
   locality     TEXT,
   country      TEXT,
@@ -78,10 +78,10 @@ CREATE INDEX IF NOT EXISTS idx_circuit_ref ON circuit(reference);
 CREATE TABLE IF NOT EXISTS driver (
   id                   INTEGER PRIMARY KEY,
   api_id               TEXT,
-  reference            TEXT,
+  reference            TEXT,   -- public slug
   forename             TEXT,
   surname              TEXT,
-  abbreviation         TEXT,
+  abbreviation         TEXT,   -- three-letter code ('VER')
   permanent_car_number INTEGER,
   date_of_birth        TEXT,
   nationality          TEXT,
@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS driver (
 CREATE INDEX IF NOT EXISTS idx_driver_ref     ON driver(reference);
 CREATE INDEX IF NOT EXISTS idx_driver_surname ON driver(surname);
 
+-- Successive identities of one organisation. Holds no rows; see docs/DATABASE.md §2.6.
 CREATE TABLE IF NOT EXISTS base_team (
   id     INTEGER PRIMARY KEY,
   api_id TEXT,
@@ -101,12 +102,12 @@ CREATE TABLE IF NOT EXISTS base_team (
 CREATE TABLE IF NOT EXISTS team (
   id            INTEGER PRIMARY KEY,
   api_id        TEXT,
-  reference     TEXT,
+  reference     TEXT,          -- public slug
   name          TEXT,
   base_team_id  INTEGER REFERENCES base_team(id),
   nationality   TEXT,
   country_code  TEXT,
-  primary_color TEXT,          -- populated for modern teams only
+  primary_color TEXT,          -- brand colour; present for the current grid only
   wikipedia     TEXT
 );
 
@@ -119,7 +120,7 @@ CREATE TABLE IF NOT EXISTS team_driver (
   season_id INTEGER REFERENCES season(id),
   team_id   INTEGER REFERENCES team(id),
   driver_id INTEGER REFERENCES driver(id),
-  role      INTEGER
+  role      INTEGER            -- undocumented enum; never displayed
 );
 
 CREATE INDEX IF NOT EXISTS idx_td_season ON team_driver(season_id);
@@ -133,11 +134,11 @@ CREATE TABLE IF NOT EXISTS round (
   api_id       TEXT,
   season_id    INTEGER REFERENCES season(id),
   circuit_id   INTEGER REFERENCES circuit(id),
-  number       INTEGER,
+  number       INTEGER,        -- round number within the season; NULL when cancelled
   race_number  INTEGER,
   name         TEXT,
-  date         TEXT,
-  is_cancelled INTEGER,
+  date         TEXT,           -- race date, ISO 8601
+  is_cancelled INTEGER,        -- 1 is not a data gap; see docs/DATABASE.md §7 trap 12
   wikipedia    TEXT
 );
 
@@ -146,7 +147,6 @@ CREATE INDEX IF NOT EXISTS idx_round_circuit ON round(circuit_id);
 CREATE INDEX IF NOT EXISTS idx_round_date    ON round(date);
 
 -- One row per session: R, Q1/Q2/Q3, SQ1-3, SR, FP1/FP2/FP3, and legacy QB/QO/QA.
--- has_time_data flags whether lap-level timing exists for this session.
 CREATE TABLE IF NOT EXISTS session (
   id              INTEGER PRIMARY KEY,
   api_id          TEXT,
@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS session (
   scheduled_laps  INTEGER,
   timestamp       TEXT,
   timezone        TEXT,
-  has_time_data   INTEGER,
+  has_time_data   INTEGER,     -- unreliable in both directions; docs/DATABASE.md §7 trap 1
   is_cancelled    INTEGER
 );
 
@@ -183,17 +183,17 @@ CREATE TABLE IF NOT EXISTS session_entry (
   api_id                 TEXT,
   session_id             INTEGER REFERENCES session(id),
   round_entry_id         INTEGER REFERENCES round_entry(id),
-  position               INTEGER,
-  grid                   INTEGER,
-  points                 REAL,
+  position               INTEGER,     -- NULL when not classified
+  grid                   INTEGER,     -- 0 means a pit-lane start
+  points                 REAL,        -- points from this session only
   laps_completed         INTEGER,
-  status                 INTEGER,     -- integer enum; see REQUIREMENTS §3
+  status                 INTEGER,     -- integer enum; see docs/DATABASE.md §3
   detail                 TEXT,        -- human-readable status ('Finished', 'Engine', ...)
-  fastest_lap_rank       INTEGER,
-  is_classified          INTEGER,
+  fastest_lap_rank       INTEGER,     -- 1 = fastest lap of the session
+  is_classified          INTEGER,     -- the canonical finisher flag
   is_eligible_for_points INTEGER,
   time_str               TEXT,
-  time_ms                INTEGER      -- parsed from time_str
+  time_ms                INTEGER      -- millisecond form of time_str
 );
 
 CREATE INDEX IF NOT EXISTS idx_se_session  ON session_entry(session_id);
@@ -208,13 +208,13 @@ CREATE TABLE IF NOT EXISTS lap (
   id                   INTEGER PRIMARY KEY,
   api_id               TEXT,
   session_entry_id     INTEGER REFERENCES session_entry(id),
-  number               INTEGER,
-  position             INTEGER,
+  number               INTEGER,       -- lap number
+  position             INTEGER,       -- position on that lap
   time_str             TEXT,
-  time_ms              INTEGER,       -- parsed from time_str
-  average_speed        REAL,
+  time_ms              INTEGER,       -- millisecond form of time_str
+  average_speed        REAL,          -- per-lap average, not a telemetry trace
   is_entry_fastest_lap INTEGER,
-  is_deleted           INTEGER
+  is_deleted           INTEGER        -- lap invalidated; exclude from pace metrics
 );
 
 CREATE INDEX IF NOT EXISTS idx_lap_entry     ON lap(session_entry_id, number);
@@ -227,13 +227,14 @@ CREATE TABLE IF NOT EXISTS pit_stop (
   lap_id           INTEGER REFERENCES lap(id),
   number           INTEGER,
   duration_str     TEXT,
-  duration_ms      INTEGER,           -- parsed from duration_str
+  duration_ms      INTEGER,           -- millisecond form of duration_str
   local_timestamp  TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_ps_entry ON pit_stop(session_entry_id);
 CREATE INDEX IF NOT EXISTS idx_ps_lap   ON pit_stop(lap_id);
 
+-- Holds no rows; see docs/DATABASE.md §2.6.
 CREATE TABLE IF NOT EXISTS penalty (
   id                     INTEGER PRIMARY KEY,
   api_id                 TEXT,
@@ -249,6 +250,8 @@ CREATE TABLE IF NOT EXISTS penalty (
 -- ---------------------------------------------------------------- championships
 
 -- Standings snapshots, one row per driver per session-with-points.
+-- `year`, `round_number` and `session_number` are denormalized, so championship
+-- progression needs no joins.
 CREATE TABLE IF NOT EXISTS driver_championship (
   id              INTEGER PRIMARY KEY,
   driver_id       INTEGER REFERENCES driver(id),
@@ -263,7 +266,7 @@ CREATE TABLE IF NOT EXISTS driver_championship (
   win_count       INTEGER,
   highest_finish  INTEGER,
   is_eligible     INTEGER,
-  adjustment_type INTEGER
+  adjustment_type INTEGER            -- undocumented enum; never displayed
 );
 
 CREATE INDEX IF NOT EXISTS idx_dc_driver ON driver_championship(driver_id, year);
@@ -283,12 +286,13 @@ CREATE TABLE IF NOT EXISTS team_championship (
   win_count       INTEGER,
   highest_finish  INTEGER,
   is_eligible     INTEGER,
-  adjustment_type INTEGER
+  adjustment_type INTEGER            -- undocumented enum; never displayed
 );
 
 CREATE INDEX IF NOT EXISTS idx_tc_team ON team_championship(team_id, year);
 CREATE INDEX IF NOT EXISTS idx_tc_year ON team_championship(year, round_number);
 
+-- Points adjustments. Effectively unpopulated (3 rows); docs/DATABASE.md §2.5.
 CREATE TABLE IF NOT EXISTS championship_adjustment (
   id         INTEGER PRIMARY KEY,
   api_id     TEXT,
@@ -297,17 +301,4 @@ CREATE TABLE IF NOT EXISTS championship_adjustment (
   team_id    INTEGER REFERENCES team(id),
   adjustment INTEGER,
   points     REAL
-);
-
--- ---------------------------------------------------------------- load audit
-
-CREATE TABLE IF NOT EXISTS load_audit (
-  source_file TEXT PRIMARY KEY,   -- e.g. formula_one_lap.csv
-  target      TEXT NOT NULL,
-  csv_rows    INTEGER,            -- data rows counted in the CSV
-  loaded      INTEGER,            -- rows present in the table afterwards
-  status      TEXT NOT NULL,      -- ok | mismatch | error | skipped
-  error       TEXT,
-  dump_date   TEXT,               -- uploaded_at of the dump this came from
-  loaded_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
