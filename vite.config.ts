@@ -33,6 +33,22 @@ export default defineConfig({
 
   build: {
     outDir: 'dist',
+
+    /*
+     * One authority on the gzipped size of a file, and it is `npm run check:budget`
+     * (ARCHITECTURE.md §8).
+     *
+     * Vite's own reporter compresses with Rolldown's Rust deflate implementation, whose
+     * output is the widest of the five gzip encoders measured on this build: 162.06 kB against
+     * the gate's 160.25 kB for the same JS chunk, a 1.8 kB disagreement about one file (the
+     * full comparison is in `scripts/check-budget.mjs`). Two numbers for one file is exactly
+     * the drift §10 #19 removed for
+     * colour — someone quotes whichever they saw last, and a budget conversation starts with
+     * reconciling the measurement instead of the size. The gate prints a per-asset table with
+     * budgets and lazy-chunk sizes, so nothing is lost by turning this off; the build also
+     * stops spending time compressing every chunk twice.
+     */
+    reportCompressedSize: false,
   },
 
   test: {

@@ -247,7 +247,7 @@ describe('formatReport', () => {
     const report = formatReport(result);
     expect(report).toContain('FAIL: css-blocking is 0.15 KB over its 0.10 KB budget.');
     expect(report).toContain('Basis for that number: y');
-    expect(report).toContain('npx vite build');
+    expect(report).toContain('npm run build:unchecked');
   });
 
   it('says a raise needs a §10 entry when max already sits at the ceiling', () => {

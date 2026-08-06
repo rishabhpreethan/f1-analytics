@@ -381,8 +381,11 @@ export function formatReport(result, extras = {}) {
       }
     }
     lines.push('');
-    lines.push('To get a build without this gate (it runs at the end of `npm run build`):');
-    lines.push('  npx vite build');
+    // Named rather than left to be discovered. The gate runs at the end of `npm run build`,
+    // so without a stated way past it the first person who needs a build while over budget
+    // will delete the gate instead of using the hatch.
+    lines.push('The gate runs at the end of `npm run build`. To build without it:');
+    lines.push('  npm run build:unchecked');
   }
 
   return lines.join('\n');

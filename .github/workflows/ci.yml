@@ -91,8 +91,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run format:check
 
-      - name: Build
+      - name: Build (includes the §8 performance-budget gate)
         if: ${{ !cancelled() }}
+        # `npm run build` ends with `npm run check:budget`, so a bundle over the
+        # ARCHITECTURE.md §8 budget fails this step. That is deliberate rather than a separate
+        # step: a budget nothing enforces is a budget that gets missed, and putting the gate
+        # inside `build` means it also runs on the machine where the change was written. The
+        # gate prints which bucket, by how much, and the basis for the number. `npm run
+        # build:unchecked` is the escape hatch and it is named in the failure output.
+        #
         # Deliberately **before** the test step. Two cases in `server/app.test.ts` read
         # `dist/` — the canary that GSAP's `setAttribute('style', …)` survives minification
         # (ARCHITECTURE.md §7.4) and the assertion that the built `index.html` carries no
