@@ -142,16 +142,24 @@ function Ruler({
           </div>
         ))}
 
+        {/*
+         * The axis repeats the row's three columns and puts the ticks in the middle one, so a
+         * tick's percentage is a percentage **of the track it labels**. Without the inner
+         * element the ticks were positioned against the full row width and every one of them
+         * sat ~130px left of its year.
+         */}
         <div className="ruler-axis" aria-hidden="true">
-          {ticks.map((tick) => (
-            <span
-              key={tick.year}
-              className="ruler-tick t-2xs t-mono text-ink-tertiary"
-              style={{ '--tick-at': `${String(tick.at * 100)}%` } as CSSProperties}
-            >
-              {tick.year}
-            </span>
-          ))}
+          <span className="ruler-axis-track">
+            {ticks.map((tick) => (
+              <span
+                key={tick.year}
+                className="ruler-tick t-2xs t-mono text-ink-tertiary"
+                style={{ '--tick-at': `${String(tick.at * 100)}%` } as CSSProperties}
+              >
+                {tick.year}
+              </span>
+            ))}
+          </span>
         </div>
       </div>
 

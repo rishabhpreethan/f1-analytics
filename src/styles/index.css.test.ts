@@ -38,3 +38,16 @@ describe('G-3 — the indicator length agrees between tokens.css and navItems.ts
     expect(INDEX).toContain('height: var(--size-dock-indicator-rail);');
   });
 });
+
+describe('the coverage ruler’s axis shares its column template with its rows', () => {
+  it('drives both from one custom property, and nothing relies on the dead grid-column', () => {
+    // The bug this exists for: `.ruler-axis` carried `grid-column: 1 / -1` inside a flex
+    // parent, where it does nothing. The axis then spanned the full row while the bars sat in
+    // the middle column of the row's 3-column grid, so every tick landed ~130px left of the
+    // year it labelled and 1950 sat under the row labels. One template, declared once, cannot
+    // drift — and the responsive step now changes the property rather than two rules.
+    expect(INDEX).toContain('--ruler-columns:');
+    expect([...INDEX.matchAll(/grid-template-columns:\s*var\(--ruler-columns\)/g)]).toHaveLength(2);
+    expect(INDEX).not.toContain('grid-column: 1 / -1');
+  });
+});
