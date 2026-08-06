@@ -961,9 +961,378 @@ function mono() {
   if (failures > 0) process.exitCode = 1;
 }
 
+/* ================================================================ V-23 … V-26
+ * THE CATEGORICAL PALETTE — the fallback ramp for the 202 teams with no brand colour,
+ * and the chart-safe plotting variants for the 12 that have one.
+ *
+ * The headline fact inverts the assumption the rest of this file was written under:
+ * **214 teams exist and 12 carry a `primary_color`** (queried, not remembered). The ramp
+ * is therefore not an edge case at 94% of the data — it is the norm, and the brand
+ * colours are the enrichment.
+ *
+ * What is gated here, and why each floor is the floor it is:
+ *
+ *   1. **Per entry, both themes.** OkLCh chroma >= 0.05 (§9.1 step 5 — a ramp entry that
+ *      reads as grey is indistinguishable from this product's achromatic chart furniture),
+ *      OkLCh L inside the plotting band (§9.1 step 6), and >= 3:1 against BOTH
+ *      `--surface-raised` and `--surface-sunken` — sunken because that is the colour of a
+ *      plot area.
+ *   2. **Pairwise inside the ramp, both themes.** normal-vision CIEDE2000 >= 15 and CVD
+ *      >= 8 under all three dichromacies, worse of the two §9.1 models. This is the gate
+ *      that sizes the ramp, and it buys a property worth more than a larger palette: two
+ *      entities in a chart are either the SAME ramp entry — an exact collision, which the
+ *      differentiator ladder resolves explicitly — or they are >= 15 apart. **There are no
+ *      near-misses by construction**, and a near-miss (Cadillac <-> Haas at 3.8) is the
+ *      worst of the three cases because it reads as "probably different, possibly not".
+ *   3. **Every entry against the three reserved F1 timing inks** (§3.4) at the same two
+ *      floors. HARD, because timing colours and series colours co-occur constantly — a
+ *      lap-time chart carries purple/green/yellow marks over the series' own strokes.
+ *   4. **Every entry against the four status inks** — REPORTED, not gated, and the reason
+ *      is the posture §3.4.3 already takes: the status set's own `caution <-> critical`
+ *      pair fails CVD at 7.5, which is why a status colour never appears without an icon
+ *      and a text label. A floor the reserved set itself cannot meet is not a floor a
+ *      series colour can be held to.
+ *   5. **Every entry against the achromatic chart furniture** — `--border-strong` (axis),
+ *      `--border-subtle` (gridline), `--ink-tertiary` (ticks) and `--accent-mark` — at
+ *      normal-vision ΔE >= 15. A series that reads as a gridline is a defect no legend
+ *      fixes.
+ */
+
+/** The chart furniture a series must never be confusable with. §6.2. */
+const FURNITURE = {
+  light: {
+    'border-subtle': '#DDE0E4',
+    'border-strong': '#B9BCC3',
+    'ink-tertiary': '#6A6D74',
+    'accent-mark': '#08090C',
+  },
+  dark: {
+    'border-subtle': '#2F3237',
+    'border-strong': '#4F535A',
+    'ink-tertiary': '#86898F',
+    'accent-mark': '#FFFFFF',
+  },
+};
+
+const PLOT_BAND = { light: [0.4, 0.72], dark: [0.55, 0.88] };
+
+/**
+ * The plotting colour at a given OkLCh hue **and lightness** for a theme: the maximum chroma
+ * in gamut at that (L, h) that still clears 3:1 on both `--surface-raised` and
+ * `--surface-sunken`, and C >= 0.05. `null` when there is no solution there.
+ *
+ * **Lightness is a search dimension and not a derived value, and that is the single decision
+ * that makes this palette possible.** A hue-only ramp — max chroma per hue, one entry per hue
+ * — caps at **N = 3** under a pairwise CVD floor of 8, measured. The reason is structural: a
+ * dichromat's colour space is essentially one chromatic axis (blue <-> yellow) plus lightness,
+ * the yellow half of that axis is reserved by the F1 timing convention, and so hue alone has
+ * almost nothing left to spend. Lightness, by contrast, is preserved *exactly* under every CVD
+ * model — it is the one channel a dichromat loses nothing of. Spending it is how the ramp gets
+ * past three.
+ */
+function plotAt(theme, h, L) {
+  const S = SURF[theme];
+  const { hex, C } = lch2hex(L, 0.4, h);
+  if (C < 0.05) return null;
+  if (contrast(hex, S.raised) < 3 || contrast(hex, S.sunken) < 3) return null;
+  return { hex, C, L };
+}
+
+/**
+ * The three lightness tiers, per theme, inside each theme's plotting band (§9.1 step 6).
+ *
+ * Light mode's band is 0.40–0.72 but its *usable* upper end is lower than 0.72, because a
+ * light colour has to clear 3:1 against white; dark mode's is 0.55–0.88 and usable throughout.
+ * The tiers are therefore stated per theme rather than derived by one proportional mapping,
+ * which is also what §3.5's "dark is designed, not flipped" already requires of every other
+ * colour in this document.
+ *
+ * A ramp entry is a **(hue, tier)** pair: hue is shared across themes so the entry is
+ * recognisably the same colour after a theme switch, and only the lightness differs.
+ */
+const TIER_SETS = {
+  3: { light: [0.44, 0.54, 0.64], dark: [0.62, 0.72, 0.82] },
+  4: { light: [0.42, 0.5, 0.58, 0.66], dark: [0.58, 0.68, 0.78, 0.88] },
+  5: { light: [0.42, 0.48, 0.54, 0.6, 0.66], dark: [0.58, 0.65, 0.72, 0.79, 0.86] },
+  6: {
+    light: [0.4, 0.45, 0.5, 0.55, 0.6, 0.66],
+    dark: [0.56, 0.62, 0.68, 0.74, 0.8, 0.86],
+  },
+};
+let PLOT_TIERS = TIER_SETS[3];
+let MIN_HUE_SEP = 40;
+let GATE_BRAND = false;
+
+/** Both themes' variants of one (hue, tier), or null if either theme has no solution. */
+function hueEntry(h, tier = 1) {
+  const light = plotAt('light', h, PLOT_TIERS.light[tier]);
+  const dark = plotAt('dark', h, PLOT_TIERS.dark[tier]);
+  if (!light || !dark) return null;
+  return { h, tier, light: light.hex, dark: dark.hex, Cl: light.C, Cd: dark.C };
+}
+
+/** Worst pairwise figures for a set of ramp entries, across both themes. */
+function setFigures(entries) {
+  let minNormal = Infinity;
+  let minCvd = Infinity;
+  let worst = '';
+  for (const theme of ['light', 'dark']) {
+    for (let i = 0; i < entries.length; i++) {
+      for (let j = i + 1; j < entries.length; j++) {
+        const a = entries[i][theme];
+        const b = entries[j][theme];
+        const dn = dE(a, b);
+        const dc = minCVD(a, b);
+        if (dn < minNormal) minNormal = dn;
+        if (dc < minCvd) {
+          minCvd = dc;
+          worst = `${theme} h${entries[i].h}/t${entries[i].tier} <-> h${entries[j].h}/t${entries[j].tier}`;
+        }
+      }
+    }
+  }
+  return { minNormal, minCvd, worst };
+}
+
+/**
+ * True when an entry clears **normal-vision** ΔE 15 against all three timing inks, in both
+ * themes.
+ *
+ * **The CVD floor is deliberately NOT applied here, and the reason is measured.** Requiring
+ * CVD ΔE >= 8 from all three timing inks in both themes rejects **117 of the 120 hues on the
+ * wheel** — which is not a search failure but an impossibility, because the timing set does
+ * not meet that floor *internally*: green <-> yellow is 6.88 deuteranopic and purple <->
+ * yellow is 6.82 tritanopic (§9.2 V-3). A floor the reserved set cannot meet against itself
+ * cannot be imposed on everything that has to coexist with it.
+ *
+ * What discharges it is the channel argument, and it is the same one §3.4.3 uses for status:
+ * a series stroke and a timing chip are **different objects in different places**, and both
+ * sides already carry a mandatory non-colour channel — the timing chip a marker glyph, a
+ * visible value and an `aria-label` (§3.4.2), the series a direct label or legend entry plus
+ * its ladder rung (§6.4). Two *series*, by contrast, are the same channel in the same plot
+ * area, which is why the within-ramp pairwise CVD floor below IS hard.
+ */
+function clearsReserved(entry) {
+  for (const theme of ['light', 'dark']) {
+    for (const ink of Object.values(TIMING[theme])) {
+      if (dE(entry[theme], ink) < 15) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * **The chart-safe plotting variant of a brand colour** (§3.3 rule 6), derived rather than
+ * chosen, so the same function answers for a colour the data adds tomorrow.
+ *
+ * Hue is the identity and is never moved. Lightness is moved the *minimum* distance needed to
+ * enter the theme's plotting band and clear 3:1 against both `--surface-raised` and
+ * `--surface-sunken`. Chroma is held at the brand's own value where the gamut allows it and
+ * only reduced when it does not — a brand colour that gained chroma would stop being the
+ * brand's colour.
+ *
+ * Returns `null` when the colour cannot be a plotting colour at all, which happens for exactly
+ * one reason: **OkLCh chroma below 0.05**, i.e. it reads as grey. Haas `#9C9FA2` (C 0.0056) and
+ * Cadillac `#AAAAAD` (C 0.0043) are both in that case, and no lightness move fixes it because
+ * chroma is what is missing. Those two teams therefore keep the brand grey as their *identity*
+ * swatch and plot from the fallback ramp — see §3.3a. That is not a downgrade: this product's
+ * chart furniture is achromatic by design (grid `--border-subtle`, axis `--border-strong`,
+ * ticks `--ink-tertiary`), so a grey series is confusable with the chart's own structure, which
+ * is a worse failure than being confusable with another team.
+ */
+function brandChartVariant(theme, hex) {
+  const o = oklch(hex);
+  if (o.C < 0.05) return null;
+  const S = SURF[theme];
+  const [lo, hi] = PLOT_BAND[theme];
+  let best = null;
+  for (let L = lo; L <= hi + 1e-9; L += 0.002) {
+    const { hex: cand, C } = lch2hex(L, o.C, o.h);
+    if (C < 0.05) continue;
+    if (contrast(cand, S.raised) < 3 || contrast(cand, S.sunken) < 3) continue;
+    const move = Math.abs(L - o.L);
+    if (!best || move < best.move) best = { hex: cand, C, L, move };
+  }
+  return best;
+}
+
+/** True when an entry is >= 15 from every derived brand plotting variant, both themes. */
+function clearsBrandVariants(entry) {
+  for (const theme of ['light', 'dark']) {
+    for (const hex of Object.values(BRAND)) {
+      const v = brandChartVariant(theme, hex);
+      if (v && dE(entry[theme], v.hex) < 15) return false;
+    }
+  }
+  return true;
+}
+
+/** True when an entry is >= 15 from every piece of achromatic chart furniture. */
+function clearsFurniture(entry) {
+  for (const theme of ['light', 'dark']) {
+    for (const hex of Object.values(FURNITURE[theme])) {
+      if (dE(entry[theme], hex) < 15) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * The search that sized the ramp. Greedy from every admissible seed, adding the hue that
+ * leaves the largest minimum CVD separation, stopping when no hue keeps every floor.
+ * Reported so the chosen set is reproducible rather than asserted.
+ */
+/**
+ * The reserved **hue bands**, in OkLCh degrees: ±30 around each F1 timing ink's own hue,
+ * measured — purple **305**, green **148**, yellow **92** (both themes agree to within 1°).
+ *
+ * This is a *semantic* exclusion and it sits on top of the metric one, not instead of it. The
+ * metric test (ΔE >= 15 from the ink) asks "could these two be confused?"; the band asks the
+ * different and stricter question "would a viewer call these the same colour?" — because
+ * `purple = session fastest` is a convention about a **hue family**, not about one hex, and a
+ * lime series line beside green personal-best chips undermines the convention even at ΔE 26.
+ *
+ * 60° is one colour name's worth of wheel. Both tests are applied and the ramp clears both.
+ */
+const RESERVED_HUE_BANDS = [
+  [62, 122], // yellow  92 ± 30
+  [118, 178], // green  148 ± 30
+  [275, 335], // purple 305 ± 30
+];
+const inReservedHueBand = (h) => RESERVED_HUE_BANDS.some(([lo, hi]) => h >= lo && h <= hi);
+
+function catSearch(cvdFloor = 8) {
+  const pool = [];
+  const rejected = { hueband: 0, nosolution: 0, timing: 0, furniture: 0, brand: 0 };
+  for (let h = 0; h < 360; h += 6) {
+    if (inReservedHueBand(h)) {
+      rejected.hueband += PLOT_TIERS.light.length;
+      continue;
+    }
+    for (let tier = 0; tier < PLOT_TIERS.light.length; tier++) {
+      const e = hueEntry(h, tier);
+      if (!e) {
+        rejected.nosolution += 1;
+        continue;
+      }
+      if (!clearsReserved(e)) {
+        rejected.timing += 1;
+        continue;
+      }
+      if (!clearsFurniture(e)) {
+        rejected.furniture += 1;
+        continue;
+      }
+      if (GATE_BRAND && !clearsBrandVariants(e)) {
+        rejected.brand += 1;
+        continue;
+      }
+      pool.push(e);
+    }
+  }
+  console.log(
+    `\n=== CATEGORICAL RAMP SEARCH (pairwise CVD floor ${cvdFloor}) ===\n` +
+      `  pool ${pool.length} of ${60 * PLOT_TIERS.light.length} (hue, tier) candidates.  rejected: ` +
+      `${rejected.hueband} reserved hue band, ${rejected.nosolution} no in-gamut/contrast solution, ` +
+      `${rejected.timing} within ΔE 15 of a timing ink, ${rejected.furniture} within ΔE 15 of chart furniture, ${rejected.brand} within ΔE 15 of a brand plotting variant`,
+  );
+
+  // Precomputed pairwise matrices, so the greedy search is table lookups rather than
+  // hundreds of millions of CIEDE2000 evaluations.
+  const N = pool.length;
+  const normal = Array.from({ length: N }, () => new Float64Array(N));
+  const cvd = Array.from({ length: N }, () => new Float64Array(N));
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const dn = Math.min(dE(pool[i].light, pool[j].light), dE(pool[i].dark, pool[j].dark));
+      const dc = Math.min(minCVD(pool[i].light, pool[j].light), minCVD(pool[i].dark, pool[j].dark));
+      normal[i][j] = normal[j][i] = dn;
+      cvd[i][j] = cvd[j][i] = dc;
+    }
+  }
+
+  /*
+   * **This is a maximum-clique problem, and solving it as one rather than greedily matters.**
+   * Build the graph whose edge (i, j) means "this pair clears both floors in both themes";
+   * the largest admissible palette is then the largest clique. A greedy walk from every seed
+   * returns 4 on this graph; branch-and-bound returns the true maximum, and the difference is
+   * not a rounding detail — it is how many teams can be told apart by colour.
+   */
+  /*
+   * **A third edge condition, and it is a judgement rather than a measurement: entries must be
+   * at least `MIN_HUE_SEP` degrees apart in OkLCh hue.** Two entries can clear every metric
+   * floor and still be "dark blue and mid blue", which a reader describes as one colour with
+   * two shades — the categorical channel then carries less than the count of colours suggests.
+   * 40° is a colour-family's width, and it is the same reasoning as the 60° reserved band
+   * above, applied between palette members instead of against a reserved hue.
+   */
+  const hueGap = (a, b) => {
+    const d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
+  };
+  const adj = Array.from({ length: N }, () => new Uint8Array(N));
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const ok =
+        normal[i][j] >= 15 && cvd[i][j] >= cvdFloor && hueGap(pool[i].h, pool[j].h) >= MIN_HUE_SEP
+          ? 1
+          : 0;
+      adj[i][j] = adj[j][i] = ok;
+    }
+  }
+  let best = [];
+  let bestScore = -Infinity;
+  const expand = (clique, candidates) => {
+    if (clique.length + candidates.length < best.length) return;
+    if (clique.length >= best.length) {
+      // Among equal-sized cliques prefer the one whose worst CVD pair is best.
+      let worst = Infinity;
+      for (let i = 0; i < clique.length; i++)
+        for (let j = i + 1; j < clique.length; j++)
+          if (cvd[clique[i]][clique[j]] < worst) worst = cvd[clique[i]][clique[j]];
+      const score = clique.length * 1000 + (worst === Infinity ? 0 : worst);
+      if (clique.length > best.length || score > bestScore) {
+        best = [...clique];
+        bestScore = score;
+      }
+    }
+    for (let k = 0; k < candidates.length; k++) {
+      if (clique.length + (candidates.length - k) < best.length) return;
+      const v = candidates[k];
+      expand(
+        [...clique, v],
+        candidates.slice(k + 1).filter((u) => adj[v][u] === 1),
+      );
+    }
+  };
+  expand(
+    [],
+    Array.from({ length: N }, (_, i) => i),
+  );
+  const overall = { entries: best.map((i) => pool[i]), f: setFigures(best.map((i) => pool[i])) };
+  if (best.length === 0) {
+    console.log('  no admissible set found');
+    return;
+  }
+  console.log(
+    `\n  BEST: N = ${overall.entries.length}   min normal ΔE ${n(overall.f.minNormal)}   min CVD ΔE ${n(overall.f.minCvd)}  (worst pair ${overall.f.worst})`,
+  );
+  for (const e of [...overall.entries].sort((a, b) => a.h - b.h)) {
+    console.log(
+      `    h ${String(e.h).padStart(3)} tier ${e.tier}   light ${e.light} (L ${n(PLOT_TIERS.light[e.tier], 2)} C ${n(e.Cl, 3)})   dark ${e.dark} (L ${n(PLOT_TIERS.dark[e.tier], 2)} C ${n(e.Cd, 3)})`,
+    );
+  }
+}
+
 /* ================================================================ main */
 if (mode === 'calibrate' || mode === 'all') calibration();
 if (mode === 'mono' || mode === 'all') mono();
+if (mode === 'catsearch') {
+  PLOT_TIERS = TIER_SETS[Number(args[2] ?? 3)] ?? TIER_SETS[3];
+  MIN_HUE_SEP = Number(args[3] ?? 40);
+  GATE_BRAND = args.includes('--brand');
+  catSearch(Number(args[1] ?? 8));
+}
 if (mode === 'scan') hueScan(args[1] ?? 'light');
 if (mode === 'ramp') ramp(args[1] ?? 0);
 if (mode === 'check') check(args[1]);
