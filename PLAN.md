@@ -87,8 +87,10 @@ npm run validate:palette # whenever colour moves
 `TASKS.md`.
 
 **F0 is built and unpushed** on `feat/foundation`: server, `/api/meta`, data layer, 12 routes, landing
-page, `CommandDock`, theme, GSAP motion. 236 tests. Outstanding: the background replacement, the rail's
-collapsed/expanded formatting, and the coverage chip's legibility.
+page, `CommandDock`, theme, GSAP motion. **281 tests.** The background replacement, the coverage chip's
+legibility, the capability-card hover and both rounds of the rail's formatting are all landed.
+Outstanding: nothing from Rishabh's run of the CR-007 build. Not yet seen by him: the rail's second
+round (header clearance, glyph lane, pin affordance) — see `DESIGN_SYSTEM.md` §7.8.0 faults 4–6.
 
 ## 7. Changes
 
@@ -103,5 +105,6 @@ Decisions worth remembering, with their reasoning archived:
 | Provenance constraint | Removed. Do not reinstate. |
 | GSAP replaced `framer-motion` | Measured: core+ScrollTrigger+SplitText 47.7 KB vs 40.8 KB, so **+6.9 KB** — the "smaller bundle" claim was wrong, and it was kept on ~90 KB of headroom, not on size. |
 | `/` is the landing page | Season hub is `/seasons`, no redirect. |
-| Accent is magenta | `#D1018A` light / `#FE02A9` dark. Hue 350 was derived by scanning all 360° against 12 brand + 3 timing + 4 status colours; violet lost at ΔE 1.10 to reserved purple, blue at 2.66 to Red Bull, teal at 1.74 to reserved green. |
+| ~~Accent is magenta~~ **Accent is monochrome** | Superseded 2026-08-06 at Rishabh's request — *"no purple accent, i want the accent to be a color of white/black"*. It is now the pole of the neutral scale: `#08090C` light / `#FFFFFF` dark, and the whole `--signal-*` hue-350 ramp is deleted from the product. Emphasis is carried by inversion, absolute contrast, weight and motion, which measure 3.6–5.5× more separation than the magenta they replace (`DESIGN_SYSTEM.md` §3.6, §9.2.2 V-18). The magenta derivation is kept in §9 V-10…V-17 for the record only. |
 | Background is CSS-composited | No canvas, no WebGL — the main thread must stay free for F2's charts. |
+| The rail starts **below** the header | Not at the viewport top, and not fixed by a z-index swap. It expands to 248px over content, so a full-height rail with a padded header would lose the wordmark every time it opened; `top: calc(--size-header + --size-dock-inset)` is the only geometry that holds at every rail width. `DESIGN_SYSTEM.md` §7.8.3. |

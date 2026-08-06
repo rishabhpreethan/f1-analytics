@@ -388,20 +388,37 @@
                       * number on purpose, so the two orientations feel like one object */
   --size-dock-open: 14.5rem; /* 232 — rail width expanded (G-4) */
   --size-dock-inset: 1rem; /* 16 — gap to the viewport edge, every breakpoint */
-  --size-dock-item: 3rem; /* 48 — one rail row or one bottom-dock slot */
-  /* The dock's own inner padding, in **both** orientations — which is what makes
-   * `--size-dock` (64) minus twice this equal `--size-dock-item` (48) exactly, so the pill
-   * inset and the slot size are one arithmetic rather than two that can disagree. It is also
-   * what the collapsed rail's glyph centring is solved against; see `.dock-item` in
-   * `index.css`. px, because that arithmetic is mirrored in JavaScript. */
+  --size-dock-item: 3rem; /* 48 — a rail row's height, and a bottom-dock slot's min-width */
+  /* The dock's own inner padding, in **both** orientations, so the active pill is inset by the
+   * same amount on every side and can never be clipped by the container's corner radius.
+   * px, because the same arithmetic is mirrored in JavaScript.
+   *
+   * **It is NOT true that `--size-dock` − 2 × this equals `--size-dock-item`**, which is what
+   * the comment here used to claim. Under `box-sizing: border-box` the dock's own 1px border
+   * comes out of its width too, so the inner lane is 46px. That missing 2px is the third
+   * offset fault this rail has had; `--size-dock-lane` below now states the whole subtraction
+   * in one place. */
   --size-dock-pad: 8px;
+  /* The dock's border width. A token, not a literal, because `.dock` consumes it as its
+   * `border-width` *and* `--size-dock-lane` subtracts it — so the two can never disagree,
+   * which is precisely how the 1px offset below got in. */
+  --size-dock-hairline: 1px;
+  /* **The collapsed rail's inner lane: 46px.** `--size-dock` (64) less its own two borders
+   * (2) and its two paddings (16). This is the box a collapsed glyph is centred in, and it is
+   * the *only* figure the centring may be solved against — see `.dock-item` in `index.css`
+   * §7.8 and the arithmetic assertion in `index.css.test.ts`. Written as the subtraction so
+   * forgetting a term is not expressible. */
+  --size-dock-lane: calc(
+    var(--size-dock) - var(--size-dock-hairline) * 2 - var(--size-dock-pad) * 2
+  );
   /* The Lucide glyph the dock renders, mirrored by `DOCK_GLYPH_SIZE` in `navItems.ts` and tied
    * together by `index.css.test.ts`. It exists as a token for one reason: the collapsed rail's
    * `padding-left` is `(item width − glyph) / 2`, and if the token and the rendered size ever
    * disagreed the glyph would sit off-centre by half the difference in the collapsed state and
-   * nothing would fail. That is exactly the class of defect that shipped here once — the old
-   * rule used a literal 22px and a comment claiming it centred the glyph at x = 32, having
-   * forgotten the container's own 8px padding, so the true centre was 40. */
+   * nothing would fail. That is exactly the class of defect that has shipped here twice — first
+   * a literal 22px with a comment claiming it centred the glyph at x = 32, having forgotten the
+   * container's own 8px padding (true centre 40); then a 48px lane that forgot the 1px borders
+   * on top of a box the label was silently sizing (see `--size-dock-lane`). */
   --size-dock-glyph: 20px;
   /* How far a rail label travels as it appears (G-4). Read only by CSS, so it lives here rather
    * than in `MOTION.dist`, where a copy could only drift from the figure that renders. */

@@ -162,9 +162,11 @@
   /* §8 — the skip link is the first focusable element and is visually hidden until
    * focused, then a legible overlay chip.
    *
-   * `--z-skip` (60) and **not** the old literal 50: at ≥1024px the dock's rail sits at 40 and
-   * overlaps the top-left corner, so a skip link below it would be announced and then
-   * covered. That is the one z-index in the product that has to beat the chrome. */
+   * `--z-skip` (60) and **not** the old literal 50: it is the one z-index in the product that has
+   * to beat the chrome, since a skip link announced and then covered is worse than none. It no
+   * longer needs to beat the *rail* specifically — the rail now starts below the header band
+   * (§7.8 fault 4) and the focused link sits inside that band — but it does have to beat the
+   * header at 30 and the sheet's scrim at 50. */
   .skip-link {
     position: absolute;
     left: -9999px;
@@ -294,7 +296,22 @@
    *   3. **The vertical geometry was an accident** — a floating box at roughly 235→660px in a
    *      900px viewport, neither full-height nor centred, with the active item's fill clipped by
    *      the container's own corner radius. It is now **full height less `--size-dock-inset` at
-   *      both ends**, with the destinations at the top and the pin pushed to the bottom.
+   *      the foot and the header's height plus that inset at the top** (fault 4 below), with the
+   *      destinations at the top and the pin pushed to the bottom.
+   *
+   * **Amended again 2026-08-06** — *"the menu bar is still broken … please fix that side bar, its
+   * really broken."* Three further faults, all of them consequences of the full-height geometry
+   * item 3 introduced, and all diagnosed from a screenshot of the built shell:
+   *
+   *   4. **The rail painted over the header and hid the wordmark** — collapsed, the header read
+   *      "ANALYTICS"; expanded, nothing. `top` is now derived from `--size-header`; the reasoning,
+   *      and the resolution that was rejected, are recorded at the rail media query below.
+   *   5. **Every collapsed glyph sat at a different x, set by the length of its own hidden
+   *      label**, and the active pill was ~100px wide inside a 64px rail. Root cause was
+   *      `flex: none` on an item whose `opacity: 0` label still laid out; see `.dock-item` in the
+   *      rail block. This is the *third* time this rail's horizontal centring has been wrong, so
+   *      the lane is now a single token (`--size-dock-lane`) with the whole subtraction in it.
+   *   6. **The pin read as an empty box rather than a control**; see `.dock-pin`.
    *
    * **The expansion is now driven by CSS `:hover` / `:focus-within`, not by React state**, and
    * that is a deliberate removal of a mechanism rather than a style preference. The previous
@@ -324,7 +341,10 @@
     padding: var(--size-dock-pad);
     border-radius: var(--radius-full);
     background-color: var(--surface-raised);
-    border: 1px solid var(--border-subtle);
+    /* The border width is `--size-dock-hairline` and not a literal `1px` because
+     * `--size-dock-lane` subtracts it: under `box-sizing: border-box` this 2px total comes out
+     * of `--size-dock`, and a literal here is what let the lane arithmetic forget it. */
+    border: var(--size-dock-hairline) solid var(--border-subtle);
     box-shadow: var(--elev-2-shadow);
   }
 
@@ -451,15 +471,44 @@
 
   /* ------------------------------------------------------------------ the rail, ≥1024
    *
-   * **Full height, with stated offsets**: `--size-dock-inset` (16px) from the top and the bottom
-   * of the viewport, and the same from the left. That replaces a content-height box floating at
-   * an arbitrary vertical position, which is fault 3 above. A tall object also carries more
-   * confidence than a small one, which is the point of a rail rather than a menu.
+   * **Full height below the header, with stated offsets**: the rail starts one
+   * `--size-dock-inset` (16px) below the header band and ends the same distance above the
+   * viewport's foot, `--size-dock-inset` in from the left. That replaces a content-height box
+   * floating at an arbitrary vertical position, which is fault 3 above. A tall object also
+   * carries more confidence than a small one, which is the point of a rail rather than a menu.
+   *
+   * ---
+   *
+   * **Why `top` is derived from `--size-header` and not simply the inset — fault 4, reported
+   * 2026-08-06: *"the menu bar is still broken … please fix that side bar, its really
+   * broken."***
+   *
+   * The rail sat at `top: var(--size-dock-inset)` — 16px from the viewport's top, i.e. *inside*
+   * the 56px header band — and at `--z-dock` (40) against the header's `--z-header` (30). So it
+   * painted over the header's left end: collapsed, the wordmark read "ANALYTICS" with the `F1`
+   * badge buried under the active pill; expanded, the wordmark was gone entirely. The previous
+   * content-height box escaped this only by accident, because it happened to start at ~235px.
+   *
+   * **Two coherent resolutions existed and this is not the arbitrary one.** The alternative was a
+   * genuinely full-height rail with the header yielding — the header's inner container padded
+   * left by the rail's clearance. That reads well and gives the rail primacy, but it cannot hold
+   * the requirement: the *expanded* rail is `--size-dock-open` (232) + 16 = 248px wide and
+   * expands over content on hover, so a header padded by the collapsed clearance (96px) would
+   * still lose its wordmark every time the rail opened, and padding by 248px+ would leave a third
+   * of the header empty. Starting the rail below the header satisfies "never obscure the wordmark
+   * or the coverage chip" **at every rail width, structurally**, and it is the only one of the two
+   * that does.
+   *
+   * A z-index swap is deliberately *not* the fix. Reordering `--z-header` and `--z-dock` would
+   * put the header's 56px band over the rail's first row — the header would then clip the top of
+   * a nav item, trading a hidden wordmark for a truncated destination. Geometry, not stacking.
+   * `index.css.test.ts` pins the derivation, because the failure mode is a token drifting (a
+   * taller header) with nothing to notice.
    */
   @media (min-width: 64rem) {
     .dock {
       flex-direction: column;
-      top: var(--size-dock-inset);
+      top: calc(var(--size-header) + var(--size-dock-inset));
       bottom: var(--size-dock-inset);
       right: auto;
       left: var(--size-dock-inset);
@@ -524,19 +573,36 @@
       flex-direction: row;
       justify-content: flex-start;
       /*
-       * **The glyph's centre sits at exactly half the collapsed rail's width, in both states** —
-       * the single most noticeable detail if it is got wrong, because a glyph that shifts as the
-       * rail expands makes the whole panel look like it is sliding.
+       * **The item fills its slot, and that is the fix rather than the tidying.**
        *
-       * Solved from tokens rather than written as a literal: the item's box is
-       * `--size-dock` less twice `--size-dock-pad` (64 − 16 = 48), so centring a
-       * `--size-dock-glyph` (20) glyph in it needs (48 − 20) / 2 = 14. The previous rule said
-       * `22px` with a comment claiming it centred at 32, having forgotten the padding — the real
-       * centre was 40, i.e. 8px off, in the state the user sees most.
+       * `.dock-slot` is `justify-content: center` and the rule above makes the item `flex: none`,
+       * so the item was sized by `max-content` — `padding-left` + glyph + gap + **the label**.
+       * The collapsed label is `opacity: 0`, which paints nothing and lays out fully, so every
+       * item was as wide as its own text, overflowed the 46px slot, and was then *centred* in it:
+       * item left = slot left + (46 − intrinsic) / 2, a different negative number per item.
+       *
+       * The glyph column therefore tracked label length. `Home` (shortest) sat furthest right,
+       * `Compare` and `Records` furthest left, and the active pill — `--accent-fill`, so the only
+       * one you can see — was ~100px wide inside a 64px rail, clipped by the dock's
+       * `overflow: hidden` to look edge-to-edge with no inset. Expanded, the same fault put every
+       * destination glyph at x ≈ 105 while `.dock-pin` (which does set `width: 100%`) sat
+       * correctly at 49, so the pin never lined up with the menu above it.
+       *
+       * `width: 100%` + `min-width: 0` (the base rule's `min-width: --size-dock-item`, 48, is
+       * larger than the 46px lane and would reintroduce a 1px overflow) makes the box exactly the
+       * lane, in both states.
+       *
+       * **The glyph's centre then sits at exactly half the rail's width in both states** — the
+       * single most noticeable detail if it is got wrong, because a glyph that shifts as the rail
+       * expands makes the whole panel look like it is sliding. Centring a `--size-dock-glyph`
+       * (20) in `--size-dock-lane` (46) is (46 − 20) / 2 = 13, which puts the centre at
+       * 16 + 1 + 8 + 13 + 10 = 48 = the rail's own centre. The lane is 46 and not 48 because
+       * `border-box` takes the dock's two 1px borders out of `--size-dock` as well; the previous
+       * rule subtracted only the padding and was 1px right even before the label sizing.
        */
-      padding-left: calc(
-        (var(--size-dock) - var(--size-dock-pad) * 2 - var(--size-dock-glyph)) / 2
-      );
+      width: 100%;
+      min-width: 0;
+      padding-left: calc((var(--size-dock-lane) - var(--size-dock-glyph)) / 2);
       gap: calc(var(--spacing) * 3);
       border-radius: var(--radius-md);
       white-space: nowrap;
@@ -591,9 +657,38 @@
       --dock-index: 7;
     }
 
+    /*
+     * **The pin reads as a control, collapsed.** Reported 2026-08-06: at 64px wide, with no
+     * label and nothing else in its compartment, a bare 20px outline glyph below a divider read
+     * as "an almost-empty rounded box … a stray artefact rather than a control".
+     *
+     * Contrast is *not* the cause and raising the ink would have been the wrong fix:
+     * `--ink-secondary` (`#B3B6BA` dark / `#53575E` light) over the glass composite is ~8.6:1
+     * and ~7.4:1, both far past AA. What the compartment lacks is ink *area* — a 1.5px-stroke
+     * glyph is ~60px² of mark in a 46×48 box. So the box itself becomes the affordance: a
+     * resting hairline ring, the same `--border-subtle` as every other bounded control, which
+     * gives the target an edge without adding a second loud object to the rail.
+     *
+     * `box-shadow: inset`, not `border`: a border is drawn *inside* the box under `border-box`,
+     * so it would push this glyph 1px off the lane the seven destinations above it use — the
+     * exact class of 1px drift the lane arithmetic exists to prevent. An inset ring has no
+     * layout effect at all.
+     *
+     * The pressed state is `--accent-wash` — the same "held, not current" weight as
+     * `.dock-sheet-row-active` — and deliberately **not** the active pill's inversion: that
+     * device means "the page you are on", and a second inverted object in the same rail would
+     * dilute the only wayfinding signal the collapsed rail has. It is also never seen without
+     * its label, since pinned implies expanded, so it needs no louder cue than that.
+     */
     .dock-pin {
       width: 100%;
       height: var(--size-dock-item);
+      box-shadow: inset 0 0 0 var(--size-dock-hairline) var(--border-subtle);
+    }
+
+    .dock-pin[aria-pressed='true'] {
+      background-color: var(--accent-wash);
+      color: var(--accent-wash-ink);
     }
   }
 
