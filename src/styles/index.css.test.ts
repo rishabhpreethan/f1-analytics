@@ -193,44 +193,125 @@ describe('§7.8 — the expanded rail: opened by CSS, and overridable under `red
   });
 });
 
-describe('§3.4 — the capability card lifts on hover and on focus, and not under `reduce`', () => {
+describe('§4.6 G-25 / G-26 — the capability card’s rebuilt hover', () => {
   /**
-   * The gap this exists for: §3.4 specifies `y: -2` at `m.control` on card hover, it was never
-   * implemented, and nothing failed. A lift is invisible in a diff and, with no visual gate
-   * (CR-006), invisible until someone hovers the card in a browser.
+   * **Rewritten 2026-08-06.** This block used to assert the 2px `y` lift and its
+   * `--size-card-lift` token. Rishabh rejected the card hover outright — *"even the hover effects
+   * for these cards … i dont really like them either"* — and the four polite effects it guarded
+   * are gone: the pointer spotlight, the lift, the top-edge recolour as the only edge signal, and
+   * the accent index at rest.
    *
-   * The lift is a CSS transition rather than a tween because §3.4 requires `:focus-visible` to
-   * get the same states — see the reasoning in `index.css`. So this is where it is provable.
+   * What is guarded now is what replaced them. Every assertion below is a rule whose violation
+   * looks like nothing in a diff and cannot be seen without a browser (CR-006).
    */
-  it('declares the distance as a token, at the 2px §3.4 specifies', () => {
-    expect(TOKENS).toMatch(/--size-card-lift:\s*2px;/);
+  it('has removed every trace of the four retired effects', () => {
+    // A leftover `--px`/`--spotlight` on the card would paint a gradient nothing drives, and a
+    // leftover `--size-card-lift` reference would resolve to nothing and silently do nothing.
+    expect(INDEX).not.toContain('.capability-card::before');
+    expect(INDEX).not.toContain('.capability-edge');
+    expect(INDEX).not.toContain('--size-card-lift');
+    expect(INDEX).not.toContain('--size-spotlight');
+    expect(TOKENS).not.toMatch(/--size-card-lift:/);
+    expect(TOKENS).not.toMatch(/--size-spotlight:/);
+    // The card must not declare pointer coordinates any more; only the atmosphere does.
+    const card = /\.capability-card\s*\{([^}]*)\}/.exec(INDEX)?.[1] ?? '';
+    expect(card).not.toMatch(/--px:/);
+    expect(card).not.toMatch(/--spotlight:/);
   });
 
-  it('applies it on hover and on focus-visible alike, from the token', () => {
+  it('drops `overflow: hidden`, which would shear the near corner of a 3D tilt', () => {
+    /*
+     * A subtle one, and the reason it is asserted: `overflow: hidden` was on the card only to clip
+     * the spotlight gradient. Left in place it would clip the tilted card against a *flattened*
+     * plane, cutting off the corner nearest the viewer — which looks like a rendering fault rather
+     * than like a mistake in CSS, and only at certain pointer positions.
+     */
+    const card = /\.capability-card\s*\{([^}]*)\}/.exec(INDEX)?.[1] ?? '';
+    expect(card).not.toMatch(/overflow:\s*hidden/);
+  });
+
+  it('steps the elevation on hover AND on focus-visible, in one selector list', () => {
+    // One selector list for both states is what makes "a keyboard user is not shown less"
+    // structural rather than a thing two rules have to remember to agree on. The shadow is also
+    // the part that makes G-25's ±4° read as *lift* rather than as skew.
     const rule = /\.capability-card:hover,\s*\.capability-card:focus-visible\s*\{([^}]*)\}/.exec(
       INDEX,
     );
     expect(rule, 'the hover/focus rule for .capability-card is missing').not.toBeNull();
-    // One selector list for both states is what makes "a keyboard user is not shown less"
-    // structural rather than a thing two rules have to remember to agree on.
-    expect(rule?.[1]).toContain('transform: translateY(calc(-1 * var(--size-card-lift)))');
+    expect(rule?.[1]).toContain('box-shadow: var(--elev-2-shadow)');
+    expect(rule?.[1]).toContain('border-color: var(--accent-border)');
+    // A paint transition, so it is permitted (§4.5 forbids layout properties and loops).
+    expect(INDEX).toContain('box-shadow var(--dur-fast) var(--ease-enter)');
   });
 
-  it('transitions the transform at `m.control` — `dur.fast` and `ease.enter`', () => {
-    // `m.control` is `{ duration: dur.fast, ease: ease.enter }`. A lift on `--ease-move`, the
-    // ease the colour half uses, would be a different curve from the one §3.4 names.
-    expect(INDEX).toContain('transform var(--dur-fast) var(--ease-enter);');
-  });
+  it('G-26: two brackets, revealed from opposite corners by a clip-path transition', () => {
+    /*
+     * The brackets are the gesture a keyboard user gets, so they must be CSS and they must be
+     * keyed on both states. Their *direction* is the design — opposite corners closing on the card
+     * — and a copy-paste that gave both the same `clip-path` origin would still animate, still
+     * look plausible in a diff, and read as one bracket appearing twice.
+     */
+    expect(INDEX).toMatch(/\.capability-bracket\s*\{[^}]*clip-path:\s*inset\(0 100% 100% 0\)/);
+    expect(INDEX).toMatch(
+      /\.capability-bracket::after\s*\{[^}]*clip-path:\s*inset\(100% 0 0 100%\)/,
+    );
+    expect(INDEX).toContain('transition: clip-path var(--dur-slow) var(--ease-enter);');
 
-  it('removes the lift under `prefers-reduced-motion: reduce`, not merely its transition', () => {
-    // §4.6 G-7's reduced column: "token/colour change only — no `y`, no `scale`". The global
-    // chokepoint in `motion.css` sets `transition: none`, which would leave the lift *snapping*
-    // into place. Suppressing the transform is the only thing that satisfies the clause.
-    const block =
-      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*\.capability-card:hover,\s*\.capability-card:focus-visible\s*\{([^}]*)\}/.exec(
+    // Both halves open on hover and on focus alike.
+    const open =
+      /\.capability-card:hover \.capability-bracket,\s*\.capability-card:focus-visible \.capability-bracket,\s*\.capability-card:hover \.capability-bracket::after,\s*\.capability-card:focus-visible \.capability-bracket::after\s*\{([^}]*)\}/.exec(
         INDEX,
       );
-    expect(block, 'no reduced-motion override for the capability-card lift').not.toBeNull();
+    expect(open, 'the brackets never open').not.toBeNull();
+    expect(open?.[1]).toContain('clip-path: inset(0)');
+
+    // 2px, from the token — the same rule thickness as every other accent mark (§3.6.4).
+    expect(INDEX).toMatch(/border-top-width:\s*var\(--size-rule\)/);
+    expect(INDEX).toMatch(/border-bottom-width:\s*var\(--size-rule\)/);
+
+    /*
+     * `content` belongs to the `::after` alone. In the shared rule it would also land on
+     * `.capability-bracket`, which is a real `<span>` — and `content` on a non-pseudo element
+     * *replaces its children* in Chrome. The span has none today, so the bug would be invisible
+     * until someone put something inside it.
+     */
+    const shared = /\.capability-bracket,\s*\.capability-bracket::after\s*\{([^}]*)\}/.exec(INDEX);
+    expect(shared, 'the shared bracket rule is missing').not.toBeNull();
+    expect(shared?.[1]).not.toMatch(/content:/);
+
+    /*
+     * Anchored on the closing brace of the preceding rule, so the selector must *begin* a rule. A
+     * bare `/\.capability-bracket::after\s*\{/` also matches the tail of the shared selector list
+     * above — which is how this assertion first passed while reading the wrong block, twice.
+     */
+    const afterOnly = /\}\s*\.capability-bracket::after\s*\{([^}]*)\}/.exec(INDEX);
+    expect(afterOnly, 'no rule targets .capability-bracket::after alone').not.toBeNull();
+    expect(afterOnly?.[1]).toMatch(/content:\s*''/);
+  });
+
+  it('makes the index a STATE change rather than an accent at rest', () => {
+    // `--accent-ink` at rest cannot work in monochrome: near-black beside `--ink-primary` is
+    // ΔE ≈ 5, so the index and the title would read as one flat block of type (§3.6.1).
+    expect(INDEX).toMatch(/\.capability-index\s*\{[^}]*color:\s*var\(--ink-tertiary\)/);
+    expect(INDEX).toMatch(
+      /\.capability-card:hover \.capability-index,\s*\.capability-card:focus-visible \.capability-index\s*\{\s*color:\s*var\(--accent-ink\)/,
+    );
+  });
+
+  it('removes the arrow’s nudge under `reduce`, not merely its transition', () => {
+    /*
+     * §4.6 G-7's reduced column: "token/colour change only — no `y`, no `scale`".
+     *
+     * The **tilt** satisfies that by construction — it is GSAP, and `useMotion` never builds a
+     * tween under `reduce`, so no inline transform ever exists and there is nothing for CSS to
+     * override. The arrow's 3px nudge is CSS, and chokepoint 1 in `motion.css` kills only its
+     * *transition*: it would still snap into place, which is movement without the softening.
+     */
+    const block =
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.capability-card:hover \.capability-arrow,\s*\.capability-card:focus-visible \.capability-arrow \{([^}]*)\}/.exec(
+        INDEX,
+      );
+    expect(block, 'no reduced-motion override for the capability-card arrow').not.toBeNull();
     expect(block?.[1]).toContain('transform: none');
   });
 });

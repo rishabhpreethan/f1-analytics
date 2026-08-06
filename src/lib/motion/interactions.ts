@@ -1,5 +1,5 @@
 import { gsap } from './gsap';
-import { dist, dur, ease, m } from './tokens';
+import { dist, dur, ease, gesture, m } from './tokens';
 import { useMotion, type MotionHandle } from './useMotion';
 import { MOTION_QUERY_FINE_POINTER } from './reducedMotion';
 
@@ -61,57 +61,108 @@ export function usePressMotion<T extends HTMLElement = HTMLButtonElement>(): Pre
   };
 }
 
-/** The subset of DOM handlers G-8 needs. */
-export interface SpotlightHandlers {
+/** The subset of DOM handlers a pointer-tracked effect needs. */
+export interface PointerHandlers {
   onPointerMove: (event: { clientX: number; clientY: number }) => void;
   onPointerLeave: () => void;
 }
 
-export interface SpotlightMotion<T extends HTMLElement> {
+export interface PointerMotion<T extends HTMLElement> {
   scope: React.RefObject<T | null>;
-  handlers: SpotlightHandlers;
+  handlers: PointerHandlers;
 }
 
 /**
- * **G-8 — the pointer spotlight.** Two `gsap.quickTo` setters write `--px` / `--py` in
- * element-relative pixels at `m.pointer`; CSS paints a `radial-gradient` at those coordinates
- * as a `::before` layer under the content. The component never writes a duration, an ease or a
- * colour — it asks for the behaviour and attaches two handlers.
+ * **G-25 — the capability card's perspective tilt.**
  *
- * ⚠ **The resting values in `index.css` must be declared in `px`, not `%`.** GSAP's CSSPlugin
- * reads the property's current value to learn its unit and appends that unit to an end value
- * that has none — so with a resting `50%` the pixel figures written below rendered as
- * percentages and the highlight landed off the element entirely. `index.css.test.ts` asserts
- * the declaration and `interactions.test.ts` asserts the rendered value.
+ * Two `gsap.quickTo` setters drive `rotationY` and `rotationX` toward the pointer at
+ * `m.pointer`, and one short tween lifts the card's `scale`. With the CSS elevation step and
+ * G-26's traced brackets, the card reads as **a physical object rising and turning to face you.**
  *
- * Three properties that are decisions:
+ * **It replaces G-8, the pointer spotlight, which is retired from the product.** Rishabh on the
+ * cards: *"even the hover effects for these cards … i dont really like them either."* Two
+ * independent reasons the spotlight goes rather than gets tuned:
+ *
+ *   1. With a monochrome accent, a 14%-opacity achromatic radial over a panel is a **smudge** —
+ *      the identical failure the atmosphere's three gradient orbs were removed for the same day.
+ *   2. It was one of *four* simultaneous polite effects on one element (spotlight, 2px lift,
+ *      edge recolour, arrow nudge). One committed gesture beats four polite ones, and politeness
+ *      is what Rishabh has now rejected three times.
+ *
+ * Five properties that are decisions rather than incidentals:
  *
  *   - **`quickTo`, not `gsap.to` per event.** `quickTo` reuses one tween instance and is
- *     GreenSock's documented answer to a high-frequency setter; creating a tween per
- *     `pointermove` would allocate on every frame of every hover.
- *   - **`(pointer: fine)` only.** On a touch screen `pointermove` arrives during a drag, so the
- *     spotlight would follow a scrolling finger. Nothing is lost: the affordance G-8 decorates
- *     is also expressed by the flat surface step of G-7, which is a CSS transition.
- *   - **A no-op under reduced motion**, via `motionSafe`. The hover still changes surface and
- *     ink, because that half is CSS.
+ *     GreenSock's documented answer to a high-frequency setter; a tween per `pointermove` would
+ *     allocate on every frame of every hover.
+ *   - **4° is the whole budget** (`gesture.tilt`). Past roughly 6° a card stops reading as a
+ *     plane responding and starts reading as a page rendering incorrectly.
+ *   - **`transformPerspective` is set on the element by GSAP, not by a CSS `perspective` on the
+ *     grid.** A perspective on the parent would make every card share one vanishing point, so a
+ *     card at the edge of a three-column grid would skew rather than tilt.
+ *   - **`(pointer: fine)` only.** On a touch screen `pointermove` arrives during a scroll, so a
+ *     card would wobble as a finger dragged past it.
+ *   - **A no-op under reduced motion**, via `motionSafe`, and the setters are built inside
+ *     `animate` so under `reduce` **no tween object and no inline transform ever exists**. That
+ *     is why this needs no `transform: none` override the way the retired CSS lift did: there is
+ *     no CSS transform to suppress. Toggling the OS preference mid-hover reverts the context and
+ *     clears the inline transform with it.
  *
- * `--spotlight` is toggled to 0 on leave rather than the gradient being removed, so the
- * highlight fades out where it was instead of vanishing.
+ * The card's non-motion feedback — the surface step, the elevation, the brackets, the index and
+ * the arrow — is all CSS keyed on `:hover` **and** `:focus-visible`, so a keyboard user gets
+ * everything except the tilt, which is pointer-derived by definition and has nothing to follow.
  */
-export function useSpotlight<T extends HTMLElement = HTMLDivElement>(): SpotlightMotion<T> {
+const TILT_PERSPECTIVE = 900;
+
+/**
+ * G-25's arithmetic: the pointer's position within an element, as tilt angles in degrees.
+ *
+ * Pure and exported **so the geometry is unit-testable without a browser**, which is the lesson
+ * of the `%`-vs-px spotlight defect: the part of a pointer effect that decides whether it looks
+ * right is arithmetic, and arithmetic that quietly stopped being right would look like nothing
+ * in a diff.
+ *
+ * **The signs are the design.** The edge under the cursor comes *toward* the viewer, so the card
+ * leans into the pointer rather than being pressed away from it — which is the reading that pairs
+ * with a `scale` up and a deeper shadow. In CSS's coordinate system (x right, y down, z toward
+ * the viewer) `rotateY(+θ)` pushes the right edge back and `rotateX(+θ)` brings the bottom
+ * forward, hence the negated `x` and the plain `y`.
+ *
+ * A degenerate rect — zero width or height, which is every rect in jsdom and any element before
+ * first layout — yields `0`, never `NaN`. A `NaN` reaching a transform is ignored silently.
+ */
+export function tiltAngles(
+  pointer: { clientX: number; clientY: number },
+  rect: { left: number; top: number; width: number; height: number },
+): { rotationX: number; rotationY: number } {
+  const unit = (position: number, start: number, extent: number) => {
+    if (!(extent > 0)) return 0;
+    const offset = (position - (start + extent / 2)) / (extent / 2);
+    return Math.max(-1, Math.min(1, offset));
+  };
+
+  return {
+    rotationY: -unit(pointer.clientX, rect.left, rect.width) * gesture.tilt,
+    rotationX: unit(pointer.clientY, rect.top, rect.height) * gesture.tilt,
+  };
+}
+
+export function useTilt<T extends HTMLElement = HTMLDivElement>(): PointerMotion<T> {
   /**
-   * The two `quickTo` instances are created in `animate`, not in the handler and not during
-   * render. Three reasons, in order of importance: `animate` runs **only** in the
-   * `no-preference` branch, so under `reduce` no tween object is ever constructed; it runs in a
-   * layout effect, so the element exists; and it means the handler only ever *reads* a ref,
-   * which is what `react-hooks/refs` is protecting (a ref written during render is a value React
-   * cannot see change).
+   * The `quickTo` instances are created in `animate`, not in the handler and not during render.
+   * Three reasons, in order of importance: `animate` runs **only** in the `no-preference` branch,
+   * so under `reduce` no tween object is ever constructed; it runs in a layout effect, so the
+   * element exists; and it means the handler only ever *reads* a ref, which is what
+   * `react-hooks/refs` is protecting.
    */
   const { scope, motionSafe } = useMotion<T>({
     animate: ({ root, gsap: g }) => {
+      // Applied here rather than in CSS so it exists only where a tilt exists. `force3D` keeps
+      // the element on its own compositor layer for the life of the hover instead of promoting
+      // and demoting it per tween.
+      g.set(root, { transformPerspective: TILT_PERSPECTIVE, transformOrigin: '50% 50%' });
       POINTER_SETTERS.set(root, {
-        x: voidSetter(g.quickTo(root, '--px', { ...m.pointer })),
-        y: voidSetter(g.quickTo(root, '--py', { ...m.pointer })),
+        x: voidSetter(g.quickTo(root, 'rotationY', { ...m.pointer })),
+        y: voidSetter(g.quickTo(root, 'rotationX', { ...m.pointer })),
       });
       return () => {
         POINTER_SETTERS.delete(root);
@@ -127,16 +178,18 @@ export function useSpotlight<T extends HTMLElement = HTMLDivElement>(): Spotligh
     const setter = POINTER_SETTERS.get(el);
     if (setter === undefined) return;
 
-    const rect = el.getBoundingClientRect();
-    setter.x(event.clientX - rect.left);
-    setter.y(event.clientY - rect.top);
-    gsap.to(el, { '--spotlight': 1, duration: dur.fast, ease: ease.enter });
+    const { rotationX, rotationY } = tiltAngles(event, el.getBoundingClientRect());
+    setter.x(rotationY);
+    setter.y(rotationX);
+    gsap.to(el, { scale: gesture.lift, duration: dur.fast, ease: ease.enter });
   });
 
   const onPointerLeave = motionSafe(() => {
     const el = scope.current;
     if (el === null || !fine) return;
-    gsap.to(el, { '--spotlight': 0, duration: dur.base, ease: ease.exit });
+    // Everything settles together, at `dur.slow` / `ease.arrive` — the long deceleration §4.3
+    // calls "weight transfer". A card that snapped flat would undo the physicality the tilt buys.
+    gsap.to(el, { rotationX: 0, rotationY: 0, scale: 1, duration: dur.slow, ease: ease.arrive });
   });
 
   return { scope, handlers: { onPointerMove, onPointerLeave } };
@@ -195,7 +248,7 @@ const MAGNET_RATIO = 0.14;
 
 export function useMagnet<T extends HTMLElement = HTMLAnchorElement>(
   enabled = true,
-): SpotlightMotion<T> {
+): PointerMotion<T> {
   const { scope, motionSafe } = useMotion<T>({
     animate: ({ root, gsap: g }) => {
       if (!enabled) return undefined;

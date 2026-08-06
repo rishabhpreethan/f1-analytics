@@ -442,15 +442,12 @@
   --size-hero-min: 40rem; /* 640 — minimum hero height, so a short landscape viewport
                            * does not crush the headline */
   --size-progress: 2px; /* the scroll progress bar (G-14) */
-  --size-spotlight: 220px; /* G-8's pointer-spotlight radius */
   --size-magnet: 6px; /* G-9's clamp — mirrors MOTION.dist.magnet */
-  /* G-7's `y` lift on a card, Design Spec §3.4 (`y: -2` at `m.control`). It lives here and
-   * **not** in `MOTION.dist`, for the same reason `--size-spotlight` does: it is read only by
-   * the CSS transition that applies it, never by a tween, so a JavaScript copy could only
-   * ever drift out of agreement with the figure that renders. `index.css.test.ts` asserts the
-   * declaration and its two call sites. Cards are the only surface that lifts — §4.6 G-7 says
-   * "cards only", and a lifting button is a different, worse affordance. */
-  --size-card-lift: 2px;
+  /* `--size-spotlight` (220) and `--size-card-lift` (2) are **removed**. G-8's pointer spotlight
+   * is retired from the product and the capability card's 2px lift is superseded by G-25's
+   * perspective tilt (§3.5.2, §4.6). Recorded here rather than silently deleted, because both
+   * figures appear in the archive and in §4.6's history, and someone reading either would
+   * otherwise reasonably expect to find them. */
 }
 
 [data-theme='dark'] {

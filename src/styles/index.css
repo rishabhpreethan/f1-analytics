@@ -1077,54 +1077,47 @@
     }
   }
 
+  /*
+   * The card. **Its hover was rebuilt 2026-08-06** — Rishabh: *"even the hover effects for these
+   * cards … i dont really like them either."*
+   *
+   * Gone: G-8's pointer spotlight (`::before`, `--px`/`--py`/`--spotlight`, `--size-spotlight`), the
+   * 2px `y` lift (`--size-card-lift`), and `.capability-edge`'s top hairline. That was **four small
+   * polite effects on one element**, which reads as a template's default hover — and politeness is
+   * what has now been rejected three times.
+   *
+   * Here: **G-25**, a perspective tilt toward the pointer with a `scale` step, in GSAP because it
+   * needs the pointer's position; and **G-26**, two accent brackets closing on the card from
+   * opposite corners, in CSS because it must fire for `:focus-visible` too. Plus a real elevation
+   * step, which is the part that makes the tilt read as lift rather than as skew.
+   *
+   * `overflow: hidden` is gone with the spotlight it clipped. It has to be: a 3D-transformed card
+   * inside an `overflow: hidden` box is clipped against a flattened plane, and the near corner of a
+   * tilt would be sheared off.
+   */
   .capability-card {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing) * 2);
     height: 100%;
-    overflow: hidden;
     padding: calc(var(--spacing) * 4);
     border-radius: var(--radius-lg);
     background-color: var(--surface-raised);
     border: 1px solid var(--border-subtle);
     box-shadow: var(--elev-1-shadow);
     /*
-     * G-8's spotlight coordinates. **The `px` unit here is load-bearing, and `%` was a defect.**
-     * GSAP's CSSPlugin reads the *current* value of a custom property to learn its unit and
-     * appends that unit to an end value that has none. `useSpotlight` writes element-relative
-     * **pixels** from `getBoundingClientRect()`, so with a resting `50%` a pointer at the centre
-     * of a 400px card produced `--px: 200%` — 800px, outside the card — and the highlight never
-     * appeared under the cursor at all. Verified both ways in jsdom: rest `50%` → GSAP writes
-     * `123%`; rest `0px` → `123px`. `interactions.test.ts` keeps that assertion live.
+     * The non-motion half of the gesture, and **all of it that a keyboard user gets**.
      *
-     * Nothing is lost. The flash-at-the-origin the `50%` was justified by is prevented by
-     * `--spotlight: 0`, which is the opacity the gradient is painted at.
-     */
-    --px: 0px;
-    --py: 0px;
-    --spotlight: 0;
-    /*
-     * G-7 on a card: the surface and edge step, **and** the `y` lift of Design Spec §3.4.
-     *
-     * **CSS, not GSAP, and that is a decision.** §3.4 requires `:focus-visible` to get every
-     * non-pointer hover state, "so a keyboard user is not shown less". A GSAP `pointerenter`
-     * tween cannot deliver that: `:focus-visible` is a browser heuristic with no reliable DOM
-     * event, and `useSpotlight` — the one hook already on this element — is additionally gated
-     * to `(pointer: fine)`, so a tween wired beside it would never fire for the keyboard user
-     * the clause exists for. Two further reasons: the arrow's `x: 0→3` half of the *same*
-     * gesture is already a CSS transition, and running the two halves on different clocks is
-     * how a hover comes apart; and GSAP writing `transform` on this element would sit beside
-     * `useSpotlight`'s `--px`/`--py` writes inside one `useGSAP` context, where a revert on a
-     * dependency change strips inline styles mid-hover. Same reasoning as G-4 and G-10.
-     *
-     * The transform uses `--dur-fast`/`--ease-enter` because §3.4 specifies `m.control`, which
-     * is `{ duration: dur.fast, ease: ease.enter }`.
+     * `box-shadow` is a paint, not a layout property, so transitioning it is permitted — §4.5
+     * forbids layout properties and forbids anything in a *loop*, and this is a one-shot on an
+     * interaction path. It is also the property that carries "this rose off the field", which the
+     * ±4° tilt cannot do on its own.
      */
     transition:
       background-color var(--dur-fast) var(--ease-move),
       border-color var(--dur-fast) var(--ease-move),
-      transform var(--dur-fast) var(--ease-enter);
+      box-shadow var(--dur-fast) var(--ease-enter);
   }
 
   @media (min-width: 48rem) {
@@ -1133,54 +1126,78 @@
     }
   }
 
-  .capability-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: var(--spotlight);
-    background: radial-gradient(
-      var(--size-spotlight) circle at var(--px) var(--py),
-      var(--accent-glow) 0%,
-      transparent 62%
-    );
-  }
-
-  /* The 1px accent top edge — decorative, so it uses `--accent-hairline`, which carries no
-   * contrast floor. It goes to `--accent-mark` on hover and on focus alike. */
-  .capability-edge {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background-color: var(--accent-hairline);
-    transition: background-color var(--dur-fast) var(--ease-move);
-  }
-
   .capability-card:hover,
   .capability-card:focus-visible {
     background-color: var(--surface-overlay);
-    /* §3.4's `y: -2`. Negated from a positive token so the token itself reads as a distance
-     * rather than a direction — the same figure would lift a card up or push it down. */
-    transform: translateY(calc(-1 * var(--size-card-lift)));
+    border-color: var(--accent-border);
+    /* §5.4's overlay elevation, borrowed deliberately: there is no `--elev-3`, and a card that is
+     * being pointed at is the one case where a panel legitimately reads as lifted toward the
+     * overlay plane. */
+    box-shadow: var(--elev-2-shadow);
   }
 
-  /* §4.6 G-7's reduced column is explicit: under `reduce` a control gets the "token/colour
-   * change only — no `y`, no `scale`". `motion.css`'s global chokepoint kills the *transition*
-   * but not the transform, so the lift would still snap into place, which is movement without
-   * the softening. The lift is therefore removed outright, exactly as G-4 removes the
-   * hover-to-reveal rail above. The surface and edge steps survive, so the card still responds. */
-  @media (prefers-reduced-motion: reduce) {
-    .capability-card:hover,
-    .capability-card:focus-visible {
-      transform: none;
-    }
+  /*
+   * **G-26 — the traced brackets.** Two boxes, each carrying only two borders, each revealed by a
+   * `clip-path: inset()` transition from its own corner — so the pair closes on the card from
+   * opposite ends like a viewfinder's crop marks.
+   *
+   * Three reasons this shape rather than a stroked SVG perimeter:
+   *
+   *   1. **No browser-support gamble.** The obvious implementation is `pathLength` +
+   *      `stroke-dashoffset` on an SVG `<rect>`, but `pathLength` on a *basic shape* is SVG 2 and
+   *      support is uneven; a `<path>` in a stretched `viewBox` would distort its own corner radii.
+   *      `clip-path: inset()` interpolates everywhere.
+   *   2. **It is a paint operation**, so it triggers no layout and needs no extra element per edge.
+   *   3. **It is CSS, so `:focus-visible` gets it.** A GSAP draw could not: `:focus-visible` is a
+   *      browser heuristic with no reliable DOM event pair, and `useTilt` — the one hook on this
+   *      element — is additionally gated to `(pointer: fine)`, so a tween wired beside it would
+   *      never fire for the keyboard user the clause exists for. Chokepoint 1 removes the
+   *      transition under `reduce`, which leaves the brackets arriving instantly: a state change,
+   *      which is exactly what §4.6 G-7's reduced column asks for.
+   *
+   * Inset by 8px rather than sitting on the card's own edge, so they read as **marks placed on the
+   * card** rather than as its border changing colour — and so they never double the 1px
+   * `--border-subtle` edge into a muddy 2px line.
+   */
+  .capability-bracket,
+  .capability-bracket::after {
+    position: absolute;
+    pointer-events: none;
+    border-radius: var(--radius-sm);
+    border: 0 solid var(--accent-mark);
+    transition: clip-path var(--dur-slow) var(--ease-enter);
   }
 
-  .capability-card:hover .capability-edge,
-  .capability-card:focus-visible .capability-edge {
-    background-color: var(--accent-mark);
+  .capability-bracket {
+    inset: calc(var(--spacing) * 2);
+    border-top-width: var(--size-rule);
+    border-left-width: var(--size-rule);
+    clip-path: inset(0 100% 100% 0);
+  }
+
+  /* The second bracket is the first one's `::after`, so the markup stays one element.
+   *
+   * **`content` is declared here and nowhere else, deliberately.** `content: ''` in the shared rule
+   * above would also land on `.capability-bracket`, which is a real `<span>` — and `content` on a
+   * non-pseudo element *replaces its children* in Chrome. The span has none today, so it would have
+   * been harmless and invisible; it is exactly the kind of latent trap that surfaces the first time
+   * someone puts something inside it.
+   *
+   * `inset: 0` covers the parent's box, which is already inset by 8px, so the two brackets sit on
+   * the same rectangle rather than one inside the other. */
+  .capability-bracket::after {
+    content: '';
+    inset: 0;
+    border-bottom-width: var(--size-rule);
+    border-right-width: var(--size-rule);
+    clip-path: inset(100% 0 0 100%);
+  }
+
+  .capability-card:hover .capability-bracket,
+  .capability-card:focus-visible .capability-bracket,
+  .capability-card:hover .capability-bracket::after,
+  .capability-card:focus-visible .capability-bracket::after {
+    clip-path: inset(0);
   }
 
   .capability-head {
@@ -1188,6 +1205,19 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: calc(var(--spacing) * 2);
+  }
+
+  /* `--ink-tertiary` at rest, `--accent-ink` on hover — a real state change. It was `--accent-ink`
+   * at rest, which a monochrome accent cannot express: near-black beside `--ink-primary` is ΔE ≈ 5,
+   * so the index and the title read as one block of type (§3.6.1). */
+  .capability-index {
+    color: var(--ink-tertiary);
+    transition: color var(--dur-fast) var(--ease-move);
+  }
+
+  .capability-card:hover .capability-index,
+  .capability-card:focus-visible .capability-index {
+    color: var(--accent-ink);
   }
 
   .capability-chip {
@@ -1212,6 +1242,18 @@
   .capability-card:focus-visible .capability-arrow {
     color: var(--accent-ink);
     transform: translateX(3px);
+  }
+
+  /* §4.6 G-7's reduced column is explicit: under `reduce` a control gets the "token/colour change
+   * only — no `y`, no `scale`". The **tilt** satisfies that by construction, because it is GSAP and
+   * `useMotion` never builds it under `reduce`, so no inline transform ever exists. The arrow's 3px
+   * nudge is CSS, and chokepoint 1 kills only its *transition* — it would still snap into place,
+   * which is movement without the softening. It is therefore removed outright. */
+  @media (prefers-reduced-motion: reduce) {
+    .capability-card:hover .capability-arrow,
+    .capability-card:focus-visible .capability-arrow {
+      transform: none;
+    }
   }
 
   /* ------------------------------------------------------------- the coverage ruler §3.5

@@ -1,21 +1,45 @@
 import { Link } from 'react-router';
 import { ArrowRight } from '@/components/ui/icons';
 import { useSectionReveal } from '@/lib/motion/scroll';
-import { useSpotlight } from '@/lib/motion/interactions';
+import { useTilt } from '@/lib/motion/interactions';
 
 /**
- * Section B — the capability grid (Design Spec §3.4).
+ * Section B — the capability grid (§3.4).
  *
  * Six cards, one per destination, each the whole card as a single `<a>` so the hit area is the
- * card rather than the title. The `IN BUILD` chip is present **only while the destination is a
+ * card rather than the title. The `In build` chip is present **only while the destination is a
  * placeholder** and disappears with the feature that replaces it — a chip that outlives its
  * reason is worse than no chip.
  *
- * Motion: **G-15** reveals the section once on scroll with the cards staggered, and **G-8** gives
- * each card a pointer spotlight. Both are absent under reduced motion, and the card's hover still
- * changes surface, edge and arrow colour, because that half is a CSS transition. §10 is explicit
- * that no G-8 spotlight may carry information: everything it expresses is also expressed by a
- * token change that `:focus-visible` triggers, so a keyboard user is never shown less.
+ * ---
+ *
+ * **The hover was rebuilt 2026-08-06.** Rishabh: *"even the hover effects for these cards … i
+ * dont really like them either."*
+ *
+ * What it was: a pointer spotlight (G-8), a 2px `y` lift, the top edge recolouring, and the arrow
+ * nudging 3px. **Four small polite effects layered on one element** — which is legible as a
+ * template's default hover, and politeness is what has now been rejected three times.
+ *
+ * What it is: **two committed gestures.**
+ *
+ *   - **G-25 — a perspective tilt toward the pointer**, ±4°, with a `scale` step and a real
+ *     `--elev-2` shadow. The card reads as a physical object rising and turning to face you,
+ *     rather than as a rectangle changing colour.
+ *   - **G-26 — two accent brackets closing on the card** from opposite corners, like a
+ *     viewfinder's crop marks. Sharp, instrument-like, and it works in pure monochrome, which a
+ *     14%-opacity glow does not.
+ *
+ * **G-8 is retired from the product**, not merely from this card: with a monochrome accent a
+ * low-opacity achromatic radial over a panel is a smudge — the identical failure the
+ * atmosphere's gradient orbs were removed for the same day.
+ *
+ * Motion: **G-15** reveals the section once on scroll with the cards staggered; **G-25** is the
+ * tilt. G-26 and the index / arrow / surface / elevation steps are **CSS keyed on `:hover` and
+ * `:focus-visible` together**, so a keyboard user gets everything except the tilt — which is
+ * pointer-derived by definition and has nothing to follow. Under `reduce` the tilt is never
+ * created and the CSS transitions are stopped by chokepoint 1, which leaves the brackets and the
+ * token changes arriving instantly: a state change, which is exactly what §4.6 G-7's reduced
+ * column asks for.
  */
 
 interface Capability {
@@ -106,16 +130,26 @@ export function CapabilityGrid() {
 }
 
 function CapabilityCard({ capability }: { capability: Capability }) {
-  const { scope, handlers } = useSpotlight<HTMLAnchorElement>();
+  const { scope, handlers } = useTilt<HTMLAnchorElement>();
 
   return (
     <Link ref={scope} to={capability.to} className="capability-card" {...handlers}>
-      <span className="capability-edge" aria-hidden="true" />
+      {/*
+       * G-26. Two brackets rather than one traced perimeter: each is a box carrying only two
+       * borders, revealed by a `clip-path` transition from its own corner, so the pair closes on
+       * the card from opposite ends. Decorative and `aria-hidden` — everything it signals is also
+       * signalled by the surface step, the index and the arrow.
+       */}
+      <span className="capability-bracket" aria-hidden="true" />
 
       <span className="capability-head">
-        <span className="capability-index t-mono t-display-md text-accent-ink">
-          {capability.index}
-        </span>
+        {/*
+         * `--ink-tertiary` at rest, `--accent-ink` on hover and focus — a real state change. It
+         * used to be `--accent-ink` at rest, which a monochrome accent cannot express: `#08090C`
+         * beside `--ink-primary` `#1B1E24` is ΔE ≈ 5, so the index and the title read as one flat
+         * block of type (§3.6.1).
+         */}
+        <span className="capability-index t-mono t-display-md">{capability.index}</span>
         {capability.inBuild !== null && (
           <span className="chip t-2xs capability-chip">In build</span>
         )}
