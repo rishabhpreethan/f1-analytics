@@ -62,7 +62,13 @@ const RAIL_QUERY = '(min-width: 64rem)';
 /**
  * Where a dock indicator is travelling **from** and **to**, keyed by the element. Written by
  * `settle`, which runs first and in both modes; read by `animate`, which runs second and only
- * when motion is allowed. `from: null` is first paint.
+ * when motion is allowed. `from: null` is first paint, and `from === to` means "did not move" —
+ * which `animate` treats as nothing to build.
+ *
+ * **`settle` must write on every run, including the runs where it measures nothing.** If it
+ * returned early and left the previous entry in place, `animate` would read a stale pair and
+ * replay the flourish for a move that never happened — which is what navigating to `/teams`
+ * below 1024px does, since that slot is `display: none` and cannot be measured.
  *
  * **A `WeakMap`, not a `useRef`, and for the same reason `POINTER_SETTERS` is one.** This is
  * written by a motion builder and read by another; a ref written from a builder is exactly the
@@ -73,7 +79,7 @@ const RAIL_QUERY = '(min-width: 64rem)';
  * It cannot be an inline style read back off the element instead: `revertOnUpdate: true`
  * (R-G3) strips the previous run's inline transform *before* the next run measures.
  */
-const INDICATOR_TRAVEL = new WeakMap<HTMLElement, { from: number | null; to: number }>();
+const INDICATOR_TRAVEL = new WeakMap<HTMLElement, { from: number | null; to: number | null }>();
 
 export interface CommandDockProps {
   items: readonly NavItem[];
@@ -98,8 +104,8 @@ export function CommandDock({ items }: CommandDockProps) {
     reduced,
   } = useDisclosure<HTMLDivElement>({ enter: sheetEnter, exit: sheetExit });
 
-  // The spotlight's scope **is** the list, so it doubles as the element G-3 measures against.
-  // One ref on one node: merging two would mean a ref callback written during render.
+  // The spotlight's scope **is** the list, so it doubles as the element G-3 measures against —
+  // one ref, one node, and no merge needed, because G-3 now scopes to the indicator itself.
   const { scope: listScope, handlers: spotlightHandlers } = useSpotlight<HTMLUListElement>();
 
   /**
@@ -145,21 +151,25 @@ export function CommandDock({ items }: CommandDockProps) {
   const { scope: indicatorScope } = useMotion<HTMLLIElement>({
     settle: ({ root, gsap: g }) => {
       const geometry = measureIndicator(listScope.current, activeIndex, isRail);
+      const previous = INDICATOR_TRAVEL.get(root)?.to ?? null;
+
       // `null` is "leave it alone" — nothing to measure, or a `display: none` slot below
-      // 1024px. Writing zero here would park the bar in the top-left corner.
-      if (geometry === null) return;
-      INDICATOR_TRAVEL.set(root, {
-        from: INDICATOR_TRAVEL.get(root)?.to ?? null,
-        to: geometry.offset,
-      });
+      // 1024px. Writing zero would park the bar in the top-left corner; recording
+      // `from === to` is what tells `animate` that nothing moved.
+      if (geometry === null) {
+        INDICATOR_TRAVEL.set(root, { from: previous, to: previous });
+        return;
+      }
+
+      INDICATOR_TRAVEL.set(root, { from: previous, to: geometry.offset });
       g.set(root, { [isRail ? 'y' : 'x']: geometry.offset });
     },
     animate: (ctx) => {
       const travel = INDICATOR_TRAVEL.get(ctx.root);
       // Nothing measured, or a re-measure that landed on the same offset — which is what
       // every rail hover is, and it must not replay the flourish.
-      if (travel === undefined || travel.from === travel.to) return;
-      indicatorTravel(ctx, travel, isRail);
+      if (travel === undefined || travel.to === null || travel.from === travel.to) return;
+      indicatorTravel(ctx, { from: travel.from, to: travel.to }, isRail);
     },
     deps: [pathname, isRail, expanded, activeIndex],
   });
