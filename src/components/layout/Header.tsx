@@ -1,31 +1,25 @@
 import { Link } from 'react-router';
 import { selectCoverageDetail, selectDataVintage } from '@/features/meta/selectors';
 import { useMeta } from '@/features/meta/useMeta';
-import { NAV_ITEMS } from '@/components/layout/navItems';
-import { PrimaryNav, PrimaryNavSheet } from '@/components/layout/PrimaryNav';
 import { DataVintage } from '@/components/ui/DataVintage';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 /**
- * The header's inner bar (Design Spec §2.1): wordmark, nav, then the right cluster.
+ * The header's inner bar (Design Spec §5.5): wordmark, then the right cluster.
+ *
+ * **The nav has left the header.** CR-007 replaced the inline nav and its mobile sheet with
+ * `CommandDock`, which `AppShell` renders as a sibling — so this bar is now the wordmark, the
+ * coverage indicator and the theme control, and nothing else. That is what makes 56px of chrome
+ * enough at every width, and it is why the two focus orders §10 specifies now hold without a
+ * split component: there is only one arrangement.
  *
  * **This is where `/api/meta` is read.** `Header` calls the feature hook, runs the pure
  * selectors and passes plain values down, so `DataVintage` stays presentational
- * (`ARCHITECTURE.md` §3). It is the only fetch in F0.
+ * (`ARCHITECTURE.md` §3). It is the only fetch in the shell.
  *
- * DOM order is what makes Design §8's two focus orders hold. At ≥768 the menu button is
- * `display: none`, giving wordmark → nav → cluster; at <768 the inline nav is
- * `display: none`, giving wordmark → cluster → menu button. `AppShell` owns the `header`
- * landmark itself, and with it M-1.
- *
- * The item list is now `navItems.ts`'s `NAV_ITEMS` — the same array `CommandDock` consumes
- * from C7-5, so the two can never disagree about where a destination lives. There is no
- * entry for `/seasons/:year` or `/seasons/:year/races/:round`: those are reached from Season,
- * and `isActiveNavItem` keeps Season lit while you are inside them. There are no dead
- * controls: the global search and the app-wide season selector are F9, so they are
- * **absent** rather than present-and-disabled.
+ * The wordmark sets **the `1` of "F1" in `--accent-ink`** (§3.6.4). It is one glyph and it is
+ * decorative: the accessible name is on the link, so nothing depends on the colour being seen.
  */
-
 export function Header() {
   const { data, isPending } = useMeta();
 
@@ -43,18 +37,18 @@ export function Header() {
 
   return (
     <div className="shell-container shell-bar flex items-center gap-4 px-4 md:px-6 xl:px-8">
-      <Link to="/" className="shell-wordmark t-display-xs text-ink-primary font-bold">
-        F1 Analytics
+      <Link
+        to="/"
+        aria-label="F1 Analytics — home"
+        className="shell-wordmark t-display-xs text-ink-primary font-bold"
+      >
+        F<span className="text-accent-ink">1</span> ANALYTICS
       </Link>
-
-      <PrimaryNav items={NAV_ITEMS} />
 
       <div className="ml-auto flex items-center gap-2">
         <DataVintage vintage={vintage} detail={detail} state={vintageState} />
         <ThemeToggle />
       </div>
-
-      <PrimaryNavSheet items={NAV_ITEMS} />
     </div>
   );
 }

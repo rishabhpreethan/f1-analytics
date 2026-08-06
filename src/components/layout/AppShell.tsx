@@ -1,8 +1,10 @@
 import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
 import { AtmosphereField } from '@/components/layout/AtmosphereField';
+import { CommandDock } from '@/components/layout/CommandDock';
 import { Header } from '@/components/layout/Header';
 import { BACKDROP_ATTRIBUTE, backdropAttributeFor } from '@/components/layout/backdrop';
+import { NAV_ITEMS } from '@/components/layout/navItems';
 import { shellMount } from '@/lib/motion/surfaces';
 import { useMotion } from '@/lib/motion/useMotion';
 import { useMotionPause } from '@/lib/motion/useMotionPause';
@@ -66,6 +68,14 @@ export function AppShell({ children, footerNote }: AppShellProps) {
       <header ref={headerScope} className="shell-header sticky top-0">
         <Header />
       </header>
+
+      {/*
+       * DOM order is `header` → `nav` → `main` → `footer`, whatever the dock's visual position
+       * (§10). Focus order follows DOM order, so this is what puts the destinations before the
+       * page content for a keyboard user at both widths — and it is why the dock is a sibling
+       * of `main` rather than a child of the header.
+       */}
+      <CommandDock items={NAV_ITEMS} />
 
       <main id="main" className="shell-main flex-1">
         {children}

@@ -16,6 +16,14 @@ export const MOTION_QUERY_REDUCE = '(prefers-reduced-motion: reduce)';
 /** The `no-preference` side, which is the branch every tween is created inside. */
 export const MOTION_QUERY_ALLOW = '(prefers-reduced-motion: no-preference)';
 
+/**
+ * Pointer-following motion is attached **only** where there is a pointer that can hover
+ * (§4.6 G-8, G-9, G-21). On a touch screen a `pointermove` arrives only during a drag, so a
+ * spotlight would appear under the finger mid-scroll — and the effect is decorative, so there
+ * is nothing to substitute.
+ */
+export const MOTION_QUERY_FINE_POINTER = '(pointer: fine)';
+
 export function prefersReducedMotion(win?: Pick<Window, 'matchMedia'>): boolean {
   const target = win ?? (typeof window === 'undefined' ? undefined : window);
   if (target === undefined || typeof target.matchMedia !== 'function') return false;

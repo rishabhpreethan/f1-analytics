@@ -388,6 +388,8 @@
   --size-hero-min: 40rem; /* 640 — minimum hero height, so a short landscape viewport
                            * does not crush the headline */
   --size-progress: 2px; /* the scroll progress bar (G-14) */
+  --size-spotlight: 220px; /* G-8's pointer-spotlight radius */
+  --size-magnet: 6px; /* G-9's clamp — mirrors MOTION.dist.magnet */
 }
 
 [data-theme='dark'] {

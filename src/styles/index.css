@@ -248,58 +248,292 @@
     letter-spacing: var(--tracking-wordmark);
   }
 
-  /* Each nav item is the full header height, so the hit area is generous and the 2px
-   * active rule can sit flush to the header's bottom edge. */
-  .nav-item {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    height: var(--size-header);
-  }
-
-  .nav-rule {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: var(--size-rule);
-    background-color: var(--ink-primary);
-  }
-
-  /* G-5 — the sheet drops from under the header, full width. */
-  .nav-sheet {
+  /* ============================================================ CommandDock §5.2 / §5.3
+   * One component, two orientations, one `<nav>`. Below 1024 it is a floating bottom dock;
+   * at ≥1024 it becomes a vertical rail that expands **over** content.
+   *
+   * Both surfaces are glass, with the same mandatory `@supports` fallback as the header: an
+   * unblurred translucent panel over a moving field is unreadable.
+   */
+  .dock {
     position: fixed;
-    left: 0;
-    right: 0;
-    top: var(--size-header);
-    z-index: var(--z-overlay);
-    background-color: var(--surface-overlay);
-    border-bottom: 1px solid var(--elev-2-border);
+    z-index: var(--z-dock);
+    bottom: var(--size-dock-inset);
+    left: var(--size-dock-inset);
+    right: var(--size-dock-inset);
+    max-width: var(--size-dock-max);
+    margin-inline: auto;
+    height: var(--size-dock);
+    border-radius: var(--radius-full);
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
     box-shadow: var(--elev-2-shadow);
   }
 
-  .nav-scrim {
+  @supports (backdrop-filter: blur(1px)) {
+    .dock {
+      background-color: var(--surface-glass);
+      backdrop-filter: var(--glass-blur);
+    }
+  }
+
+  .dock-list {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: calc(var(--spacing) * 1);
+    /* G-8's spotlight coordinates. Declared here, not in the tween, so the resting state is a
+     * spotlight of zero strength at the element's origin — never a flash at 0,0 on first move. */
+    --px: 50%;
+    --py: 50%;
+    --spotlight: 0;
+  }
+
+  .dock-slot {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--size-dock-item);
+    min-height: var(--size-dock-item);
+  }
+
+  /* Below 1024 the three overflow destinations live in the sheet, not the dock. `display: none`
+   * rather than `visibility: hidden`, so they are out of the tab order too. */
+  .dock-slot[data-overflow='true'] {
+    display: none;
+  }
+
+  .dock-item {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+    height: 100%;
+    min-width: var(--size-dock-item);
+    min-height: var(--size-dock-item);
+    border: 0;
+    border-radius: var(--radius-full);
+    background-color: transparent;
+    color: var(--ink-secondary);
+    cursor: pointer;
+    /* G-7's non-motion half — a CSS transition, so a reduced-motion user still gets feedback
+     * when no tween is created. */
+    transition:
+      background-color var(--dur-instant) var(--ease-move),
+      color var(--dur-instant) var(--ease-move);
+  }
+
+  .dock-item:hover {
+    color: var(--accent-ink);
+  }
+
+  /* The active item: an accent wash **plus** `aria-current` **plus** the 2px indicator rule.
+   * Colour is never the only signal (§3.6.4). */
+  .dock-item-active {
+    background-color: var(--accent-wash);
+    color: var(--ink-primary);
+  }
+
+  .dock-label {
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    font-weight: var(--text-2xs--font-weight);
+    text-transform: uppercase;
+  }
+
+  /* G-3. Authored 20px along the main axis and scaled to the active item, so one element
+   * travels rather than one per item appearing. `transform-origin` is the start edge, which is
+   * what makes `scaleX`/`scaleY` grow from the leading corner rather than from the centre. */
+  .dock-indicator {
+    position: absolute;
+    pointer-events: none;
+    background-color: var(--accent-mark);
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: var(--size-rule);
+    transform-origin: left top;
+  }
+
+  /* The pin row is rail-only. */
+  .dock-pin-row {
+    display: none;
+  }
+
+  /* ------------------------------------------------------------------ the rail, ≥1024 */
+  @media (min-width: 64rem) {
+    .dock {
+      top: 50%;
+      bottom: auto;
+      right: auto;
+      left: var(--size-dock-inset);
+      transform: translateY(-50%);
+      width: var(--size-dock);
+      max-width: none;
+      height: auto;
+      margin-inline: 0;
+      border-radius: var(--radius-2xl);
+      padding: calc(var(--spacing) * 2);
+      overflow: hidden;
+      /* G-4. CSS owns the width; see the note in `CommandDock.tsx` for why this is not a GSAP
+       * tween. Chokepoint 1 removes the transition under reduced motion, and the rule below
+       * makes the rail permanently expanded there — so the reduced state is a rail with labels,
+       * not a rail that a keyboard user has to chase. */
+      transition: width var(--dur-slow) var(--ease-move);
+    }
+
+    .dock[data-expanded='true'] {
+      width: var(--size-dock-open);
+    }
+
+    .dock-list {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 0;
+    }
+
+    /* All seven destinations are in the rail; nothing overflows, so nothing is hidden and the
+     * "More" trigger has nothing to do. */
+    .dock-slot[data-overflow='true'] {
+      display: flex;
+    }
+
+    .dock-slot-more {
+      display: none;
+    }
+
+    .dock-slot,
+    .dock-item {
+      height: var(--size-dock-item);
+      flex: none;
+    }
+
+    .dock-item {
+      flex-direction: row;
+      justify-content: flex-start;
+      /* The glyph's centre sits at x = 32 whether the rail is open or closed — the single most
+       * noticeable detail if it is got wrong, because a glyph that shifts as the rail expands
+       * makes the whole panel look like it is sliding. 32 − half of a 20px glyph = 22. */
+      padding-left: 22px;
+      gap: calc(var(--spacing) * 3);
+      border-radius: var(--radius-md);
+      white-space: nowrap;
+    }
+
+    .dock-label {
+      font-size: var(--text-base);
+      line-height: var(--text-base--line-height);
+      letter-spacing: normal;
+      font-weight: 500;
+      text-transform: none;
+    }
+
+    .dock-indicator {
+      width: var(--size-rule);
+      height: 20px;
+      transform-origin: left top;
+    }
+
+    .dock-pin-row {
+      display: block;
+      margin-top: calc(var(--spacing) * 2);
+      padding-top: calc(var(--spacing) * 2);
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .dock-pin {
+      width: 100%;
+      height: var(--size-dock-item);
+    }
+  }
+
+  /* §4.6 G-4: under `reduce` the rail is permanently expanded and the pin control is hidden. A
+   * hover-to-reveal affordance is precisely what a reduced-motion user should not have to
+   * chase, and with the rail always open the pin has nothing left to toggle. */
+  @media (min-width: 64rem) and (prefers-reduced-motion: reduce) {
+    .dock {
+      width: var(--size-dock-open);
+    }
+
+    .dock-pin-row {
+      display: none;
+    }
+  }
+
+  /* G-8 — the pointer spotlight, painted from the two custom properties `useSpotlight` writes.
+   * A `::before` under the content, so it never affects the ink's contrast. 14% per §4.6. */
+  .dock-list::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: var(--spotlight);
+    background: radial-gradient(
+      var(--size-spotlight) circle at var(--px) var(--py),
+      var(--accent-glow) 0%,
+      transparent 62%
+    );
+  }
+
+  /* ------------------------------------------------------- the overflow sheet, <1024 (G-5) */
+  .dock-scrim {
     position: fixed;
     inset: 0;
     z-index: var(--z-overlay);
     background-color: var(--scrim);
   }
 
-  .nav-sheet-row {
-    position: relative;
-    display: flex;
-    align-items: center;
-    height: var(--size-sheet-row);
+  .dock-sheet {
+    position: fixed;
+    z-index: var(--z-overlay);
+    left: var(--size-dock-inset);
+    right: var(--size-dock-inset);
+    bottom: var(--size-dock-inset);
+    max-width: var(--size-dock-max);
+    margin-inline: auto;
+    padding: calc(var(--spacing) * 2);
+    border-radius: var(--radius-2xl);
+    background-color: var(--surface-overlay);
+    border: 1px solid var(--elev-2-border);
+    box-shadow: var(--elev-2-shadow);
   }
 
-  /* In the sheet the active item takes a leading rule instead of an underline (§2.2). */
-  .nav-sheet-rule {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--size-rule);
-    background-color: var(--ink-primary);
+  .dock-sheet-row {
+    display: flex;
+    align-items: center;
+    height: var(--size-dock-sheet-row);
+    border-radius: var(--radius-md);
+    color: var(--ink-secondary);
+    transition: background-color var(--dur-instant) var(--ease-move);
+  }
+
+  .dock-sheet-row:hover {
+    background-color: var(--surface-sunken);
+    color: var(--ink-primary);
+  }
+
+  .dock-sheet-row-active {
+    background-color: var(--accent-wash);
+    color: var(--ink-primary);
+  }
+
+  .dock-sheet-close {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: var(--size-touch);
+    border: 0;
+    border-radius: var(--radius-md);
+    background-color: transparent;
+    color: var(--ink-tertiary);
+    cursor: pointer;
   }
 
   /* --------------------------------------------------------- Icon-only controls

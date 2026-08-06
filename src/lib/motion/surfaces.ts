@@ -34,6 +34,39 @@ export function shellMount<T extends HTMLElement>({ tl, root }: Ctx<T>): void {
 export const DOCK_MOUNT_DELAY = dur.base - 0.1;
 
 /**
+ * **G-1 — the shell mount, dock half.** The container arrives, then its items stagger in.
+ *
+ * The axis is the caller's, because only the dock knows its orientation: the rail comes in from
+ * the left (`x −12→0`), the bottom dock rises (`y 12→0`). §4.6 specifies both.
+ *
+ * `DOCK_MOUNT_DELAY` reproduces the `-=0.10` overlap with the header's half. Total sequence
+ * stays inside G-1's 460ms: 100ms in, 320ms for the container, items overlapping it.
+ */
+export function dockMount<T extends HTMLElement>({ tl, root, q }: Ctx<T>, isRail: boolean): void {
+  tl.from(
+    root,
+    {
+      opacity: 0,
+      ...(isRail ? { x: -dist.lift } : { y: dist.lift }),
+      duration: dur.slow,
+      ease: ease.arrive,
+      delay: DOCK_MOUNT_DELAY,
+    },
+    0,
+  ).from(
+    q('[data-motion="dock-item"]'),
+    {
+      opacity: 0,
+      ...(isRail ? { x: -dist.nudge } : { y: dist.nudge }),
+      duration: dur.fast,
+      ease: ease.enter,
+      stagger: stagger.nav,
+    },
+    '-=0.18',
+  );
+}
+
+/**
  * **G-12, content half** — the tween vars only, because the target differs at every call
  * site and the builders above all own their own selector. Opacity only, so it is identical
  * under reduced motion by §4.4 rule 1 — and it is still authored `from` (MR-2), so the
