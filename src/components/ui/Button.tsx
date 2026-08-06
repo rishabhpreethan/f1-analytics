@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { usePressMotion } from '@/lib/motion/interactions';
+import { useMagnet, usePressMotion } from '@/lib/motion/interactions';
 
 /**
  * `DESIGN_SYSTEM.md` §7.1. F0 needs `primary`, `secondary`, `ghost` and — added by
@@ -64,6 +64,12 @@ export function Button({
 
 export interface ButtonLinkProps extends CommonProps {
   to: string;
+  /**
+   * **G-9.** `true` on exactly one element in the product — the landing hero's primary action. A
+   * page of magnetic buttons is a toy, and §4.6 says so; it is a prop rather than a variant
+   * because `hero` is about size and colour and this is about behaviour.
+   */
+  magnetic?: boolean;
 }
 
 /**
@@ -77,11 +83,20 @@ export function ButtonLink({
   className,
   children,
   to,
+  magnetic = false,
 }: ButtonLinkProps) {
-  const { scope, press } = usePressMotion<HTMLAnchorElement>();
+  const { scope: pressScope, press } = usePressMotion<HTMLAnchorElement>();
+  const { scope: magnetScope, handlers: magnetHandlers } = useMagnet<HTMLAnchorElement>();
+
+  // Two hooks, two scopes, one node — so the ref is **chosen**, not merged. Every link gets G-7's
+  // press feedback; the magnet replaces it on the one element that has it, because G-9's `quickTo`
+  // on `x`/`y` and G-7's `scale` are both transforms on the same target, and `overwrite: 'auto'`
+  // would have them fight over it.
+  const scope = magnetic ? magnetScope : pressScope;
+  const handlers = magnetic ? magnetHandlers : press;
 
   return (
-    <Link ref={scope} to={to} className={classesFor(variant, size, className)} {...press}>
+    <Link ref={scope} to={to} className={classesFor(variant, size, className)} {...handlers}>
       {children}
     </Link>
   );

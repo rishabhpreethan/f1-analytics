@@ -5,9 +5,11 @@ import { CommandDock } from '@/components/layout/CommandDock';
 import { Header } from '@/components/layout/Header';
 import { BACKDROP_ATTRIBUTE, backdropAttributeFor } from '@/components/layout/backdrop';
 import { NAV_ITEMS } from '@/components/layout/navItems';
+import { useHeaderHairline } from '@/lib/motion/scroll';
 import { shellMount } from '@/lib/motion/surfaces';
 import { useMotion } from '@/lib/motion/useMotion';
 import { useMotionPause } from '@/lib/motion/useMotionPause';
+import { useScrollState } from '@/lib/useScrollState';
 
 /**
  * The chrome: the atmosphere, the skip link, `header`, `main#main`, `footer`
@@ -43,7 +45,11 @@ export interface AppShellProps {
 export function AppShell({ children, footerNote }: AppShellProps) {
   const { pathname } = useLocation();
   useMotionPause();
+  // G-13's non-motion half: `<html data-scrolled>` past 24px. A plain listener, because it must
+  // work in the mode where no tween is permitted.
+  useScrollState();
   const { scope: headerScope } = useMotion<HTMLElement>({ animate: shellMount });
+  const { scope: hairlineScope } = useHeaderHairline<HTMLDivElement>();
 
   /**
    * `<html data-bg>` — **the shell writes it, never a route** (`DESIGN_SYSTEM.md` §7.7.2), so
@@ -67,6 +73,17 @@ export function AppShell({ children, footerNote }: AppShellProps) {
 
       <header ref={headerScope} className="shell-header sticky top-0">
         <Header />
+
+        {/*
+         * G-13. Two elements rather than a border on the header itself: the hairline fades in and
+         * the 96px accent segment grows `scaleX 0→1` from the left, and a border cannot do the
+         * second. `data-scrolled` on `<html>` shows the hairline without either tween, which is
+         * what a reduced-motion user gets at the same threshold.
+         */}
+        <div ref={hairlineScope} className="header-hairline" aria-hidden="true">
+          <span className="header-hairline-line" data-motion="hairline" />
+          <span className="header-hairline-accent" data-motion="hairline-accent" />
+        </div>
       </header>
 
       {/*

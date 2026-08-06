@@ -641,13 +641,28 @@
     padding-inline: calc(var(--spacing) * 4);
   }
 
-  .btn-primary {
-    background-color: var(--ink-primary);
-    color: var(--ink-inverse);
+  /* §7.1 as superseded by CR-007: the three variants carry the accent, and the hover ring on
+   * `primary` is the one shadow in the system that is not elevation. */
+  .btn-primary,
+  .btn-hero {
+    background-color: var(--accent-fill);
+    color: var(--accent-on);
   }
 
-  .btn-primary:hover {
-    background-color: var(--ink-secondary);
+  .btn-primary:hover,
+  .btn-hero:hover {
+    background-color: var(--accent-fill-hover);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-glow) 18%, transparent);
+  }
+
+  /* The one instance of `hero` in the product — the landing CTA. As `primary` at size `lg`, plus
+   * a trailing arrow that steps 3px on hover and G-9's magnetic pointer follow. */
+  .btn-hero .btn-arrow {
+    transition: transform var(--dur-fast) var(--ease-enter);
+  }
+
+  .btn-hero:hover .btn-arrow {
+    transform: translateX(3px);
   }
 
   .btn-secondary {
@@ -658,6 +673,8 @@
 
   .btn-secondary:hover {
     background-color: var(--surface-overlay);
+    border-color: var(--accent-border);
+    color: var(--accent-ink);
   }
 
   .btn-ghost {
@@ -665,8 +682,8 @@
   }
 
   .btn-ghost:hover {
-    background-color: var(--surface-overlay);
-    color: var(--ink-primary);
+    background-color: var(--accent-wash);
+    color: var(--accent-ink);
   }
 
   .btn:disabled,
@@ -732,6 +749,413 @@
     display: flex;
     min-height: var(--size-state-block);
     align-items: center;
+  }
+
+  /* ================================================== the landing surface §3 (CR-007)
+   * Section A — the hero. `svh`, **not `vh`**: on iOS Safari `vh` is the *largest* viewport, so a
+   * `100vh` hero is cropped by the URL bar on first paint — and this is the first thing anyone
+   * sees on a phone. `max()` with `--size-hero-min` keeps a short landscape viewport from
+   * crushing the headline.
+   */
+  .hero {
+    display: flex;
+    align-items: center;
+    min-height: max(100svh, var(--size-hero-min));
+    padding-block: calc(var(--spacing) * 24);
+  }
+
+  /* The text column, aligned to the container's left gutter — not centred. A 112px headline
+   * centred on a 1440px viewport has no rag to read. */
+  .hero-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /*
+   * The headline. `--display-xl` below 768, `--display-2xl` at 768–1439, `--display-3xl` at 1440+:
+   * three exact steps from the §2.3 scale, switched at the §5.3 breakpoints. `clamp()` and `vw`
+   * are forbidden for type because they produce sizes that are not on the scale.
+   */
+  .hero-headline {
+    margin-top: calc(var(--spacing) * 4);
+    max-width: 20ch;
+    font-family: var(--font-display);
+    font-stretch: var(--font-stretch-display);
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+    color: var(--ink-primary);
+    font-size: var(--text-display-xl);
+    line-height: var(--text-display-xl--line-height);
+    letter-spacing: var(--text-display-xl--letter-spacing);
+    font-weight: var(--text-display-xl--font-weight);
+  }
+
+  @media (min-width: 48rem) {
+    .hero-headline {
+      font-size: var(--text-display-2xl);
+      line-height: var(--text-display-2xl--line-height);
+      letter-spacing: var(--text-display-2xl--letter-spacing);
+    }
+  }
+
+  @media (min-width: 90rem) {
+    .hero-headline {
+      font-size: var(--text-display-3xl);
+      line-height: var(--text-display-3xl--line-height);
+      letter-spacing: var(--text-display-3xl--letter-spacing);
+    }
+  }
+
+  /* The headline's three lines. Block spans, not `<br>` — see `HeroSection.tsx`. */
+  .hero-line {
+    display: block;
+  }
+
+  .hero-lead {
+    margin-top: calc(var(--spacing) * 6);
+    max-width: 52ch;
+  }
+
+  .hero-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: calc(var(--spacing) * 3);
+    margin-top: calc(var(--spacing) * 8);
+    width: 100%;
+  }
+
+  @media (min-width: 48rem) {
+    .hero-cta {
+      flex-direction: row;
+      align-items: center;
+      width: auto;
+    }
+  }
+
+  /* ------------------------------------------------------------------ the stat strip §3.3 */
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(var(--spacing) * 6);
+    width: 100%;
+    margin-top: calc(var(--spacing) * 12);
+    padding-top: calc(var(--spacing) * 6);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  @media (min-width: 48rem) {
+    .stat-strip {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .stat-strip-error {
+    margin-top: calc(var(--spacing) * 12);
+    padding-top: calc(var(--spacing) * 6);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .stat-tile {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+  }
+
+  /* Mono and tabular, which is what makes G-17's count-up safe: a proportional figure would
+   * reflow the whole strip on every frame (§2.4). */
+  .stat-figure {
+    font-size: var(--text-display-md);
+    line-height: var(--text-display-md--line-height);
+    letter-spacing: var(--text-display-md--letter-spacing);
+    color: var(--ink-primary);
+  }
+
+  @media (min-width: 48rem) {
+    .stat-figure {
+      font-size: var(--text-display-lg);
+      line-height: var(--text-display-lg--line-height);
+    }
+  }
+
+  .stat-label {
+    max-width: 14ch;
+  }
+
+  .skeleton-stat-figure {
+    width: 4ch;
+    height: var(--text-display-md);
+  }
+
+  .skeleton-stat-label {
+    width: 10ch;
+    height: var(--text-2xs--line-height);
+  }
+
+  /* ------------------------------------------------------------- the capability grid §3.4 */
+  .capability-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: calc(var(--spacing) * 6);
+  }
+
+  @media (min-width: 48rem) {
+    .capability-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .capability-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .capability-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    height: 100%;
+    overflow: hidden;
+    padding: calc(var(--spacing) * 4);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--elev-1-shadow);
+    /* G-8's spotlight coordinates rest at the centre with zero strength, so the first
+     * `pointermove` cannot produce a flash at the card's origin. */
+    --px: 50%;
+    --py: 50%;
+    --spotlight: 0;
+    /* G-7's non-motion half. The `y` lift is GSAP's; this is what a reduced-motion user gets. */
+    transition:
+      background-color var(--dur-fast) var(--ease-move),
+      border-color var(--dur-fast) var(--ease-move);
+  }
+
+  @media (min-width: 48rem) {
+    .capability-card {
+      padding: calc(var(--spacing) * 6);
+    }
+  }
+
+  .capability-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: var(--spotlight);
+    background: radial-gradient(
+      var(--size-spotlight) circle at var(--px) var(--py),
+      var(--accent-glow) 0%,
+      transparent 62%
+    );
+  }
+
+  /* The 1px accent top edge — decorative, so it uses `--accent-hairline`, which carries no
+   * contrast floor. It goes to `--accent-mark` on hover and on focus alike. */
+  .capability-edge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: var(--accent-hairline);
+    transition: background-color var(--dur-fast) var(--ease-move);
+  }
+
+  .capability-card:hover,
+  .capability-card:focus-visible {
+    background-color: var(--surface-overlay);
+  }
+
+  .capability-card:hover .capability-edge,
+  .capability-card:focus-visible .capability-edge {
+    background-color: var(--accent-mark);
+  }
+
+  .capability-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .capability-chip {
+    text-transform: uppercase;
+    flex: none;
+  }
+
+  .capability-body {
+    flex: 1;
+  }
+
+  .capability-arrow {
+    align-self: flex-end;
+    color: var(--ink-tertiary);
+    transition:
+      color var(--dur-fast) var(--ease-move),
+      transform var(--dur-fast) var(--ease-enter);
+  }
+
+  /* Focus gets the same states as hover, so a keyboard user is never shown less (§10). */
+  .capability-card:hover .capability-arrow,
+  .capability-card:focus-visible .capability-arrow {
+    color: var(--accent-ink);
+    transform: translateX(3px);
+  }
+
+  /* ------------------------------------------------------------- the coverage ruler §3.5 */
+  .ruler {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .ruler-row {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) 64px;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    padding-block: calc(var(--spacing) * 1);
+    border-radius: var(--radius-sm);
+    transition: background-color var(--dur-fast) var(--ease-move);
+  }
+
+  @media (min-width: 48rem) {
+    .ruler-row {
+      grid-template-columns: 180px minmax(0, 1fr) 64px;
+    }
+  }
+
+  .ruler-row:hover,
+  .ruler-row:focus-visible {
+    background-color: var(--surface-raised);
+  }
+
+  .ruler-track {
+    position: relative;
+    display: block;
+    height: 10px;
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-sunken);
+    overflow: hidden;
+  }
+
+  /*
+   * The available span. **A 2px `--surface-raised` gap** separates it from the unavailable span
+   * per §3.3 rule 2 — a border-box inset rather than a margin, so the percentage arithmetic in
+   * `selectCoverageBands` stays exact.
+   */
+  .ruler-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--band-offset);
+    width: var(--band-extent);
+    border-radius: var(--radius-sm);
+    background-color: var(--accent-mark);
+    border-left: 2px solid var(--surface-raised);
+  }
+
+  .ruler-axis {
+    position: relative;
+    height: calc(var(--spacing) * 5);
+    margin-top: calc(var(--spacing) * 2);
+    grid-column: 1 / -1;
+  }
+
+  .ruler-tick {
+    position: absolute;
+    top: 0;
+    left: var(--tick-at);
+    transform: translateX(-50%);
+  }
+
+  .ruler-table table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+  }
+
+  .ruler-table th {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+    font-weight: var(--text-2xs--font-weight);
+    padding-block: calc(var(--spacing) * 2);
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  .ruler-table td {
+    color: var(--ink-secondary);
+    padding-block: calc(var(--spacing) * 2);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .ruler-table summary {
+    cursor: pointer;
+  }
+
+  .coverage-error {
+    min-height: 240px;
+  }
+
+  .skeleton-ruler-year {
+    width: 4ch;
+    height: var(--text-xs--line-height);
+  }
+
+  /* ------------------------------------------------------------------ G-13 / G-14 */
+  .header-hairline {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+  }
+
+  /*
+   * Resting state is invisible, and that is the one place in the product where an element's
+   * resting state is *not* its final readable state — legitimately, because MR-2 is about
+   * **content**, and a hairline carries none. `data-scrolled` is what shows it when no tween
+   * exists, which is the reduced-motion path.
+   */
+  .header-hairline-line {
+    position: absolute;
+    inset: 0;
+    background-color: var(--border-subtle);
+    opacity: 0;
+  }
+
+  html[data-scrolled] .header-hairline-line {
+    opacity: 1;
+  }
+
+  .header-hairline-accent {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: calc(var(--spacing) * 24);
+    height: 1px;
+    background-color: var(--accent-mark);
+    transform-origin: left center;
+    transform: scaleX(0);
+  }
+
+  .scroll-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--size-progress);
+    z-index: var(--z-header);
+    background-color: var(--accent-mark);
+    transform-origin: left center;
+    transform: scaleX(0);
   }
 
   /* ------------------------------------------------- Route placeholder §5.6 (CR-007)

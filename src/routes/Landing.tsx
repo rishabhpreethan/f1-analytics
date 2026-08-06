@@ -1,75 +1,75 @@
-import { selectHeroFigures } from '@/features/landing/selectors';
-import { useMeta } from '@/features/meta/useMeta';
+import { useMeta, useRetryMeta } from '@/features/meta/useMeta';
+import { CapabilityGrid } from '@/features/landing/CapabilityGrid';
+import { CoverageRuler } from '@/features/landing/CoverageRuler';
+import { HeroSection } from '@/features/landing/HeroSection';
+import {
+  selectCoverageBands,
+  selectHeroFigures,
+  selectRulerTicks,
+} from '@/features/landing/selectors';
+import { DataUnavailableState } from '@/components/ui/DataUnavailableState';
+import { ScrollProgress } from '@/components/ui/ScrollProgress';
 
 /**
  * `/` — the landing surface (Design Spec §3, `ARCHITECTURE.md` §10 #23).
  *
- * **C7-3 lands the structure only.** The three sections, the single `h1`, and the data
- * states exist; the hero's exact composition, the capability grid, the coverage ruler and
- * every motion arrive with C7-6. This staging is the Technical Spec's (§S.8: C7-3 is "the
- * route split", and the landing is "structure only — a heading and the hero slots, no
- * motion yet").
+ * **This is the feature boundary, so this is the only thing here that fetches**
+ * (`ARCHITECTURE.md` §3): `Landing` calls `useMeta()`, runs the pure selectors, and hands plain
+ * values to presentational children. No section below fetches anything, and none of them derives
+ * a figure of its own.
  *
- * **This is the feature boundary, so this is where the fetch lives** (`ARCHITECTURE.md` §3):
- * `Landing` calls `useMeta()`, runs the pure selector, and passes plain values to
- * presentational children. No child of this route fetches anything.
+ * **The hero never depends on data** (§8). Its headline, sub-headline, CTAs and background need no
+ * API response, so no failure of `/api/meta` can blank this page — the loading, error and
+ * unavailable states are scoped to the stat strip and the coverage ruler. On a 503 the hero renders
+ * in full and the two lower sections are replaced by one `DataUnavailableState`, because a missing
+ * database must not produce a blank first impression.
  *
- * **The hero never depends on data** (Design Spec §8). Its headline, sub-headline and CTAs
- * need no API response, so no failure of `/api/meta` can blank this page — the loading,
- * error and unavailable states are scoped to the figures.
+ * **No figure is a literal.** `77`, `1950`, `2026`, `22`, `10` and `1996` all arrive from
+ * `/api/meta` through `selectHeroFigures` / `selectCoverageBands`; CT-14 greps this file and every
+ * component it renders for a three-digit sequence, because those numbers are correct today and
+ * silently wrong after the next refresh — on the most visible surface in the product.
  *
- * **No figure is a literal here.** `77`, `1950`, `2026`, `22`, `10` all come from
- * `selectHeroFigures`; CT-14 greps this file for a three-digit sequence to keep it that way,
- * because those numbers are correct today and wrong after the next refresh.
+ * `staleTime` is deliberately left alone (§S.2): `/api/meta` is cached for five minutes, so the
+ * hero paints from cache on every return to `/` and its loading state is seen once per session.
+ * Adding a refetch-on-mount to make the hero feel "live" would trade that away for nothing.
  */
 export function Landing() {
   const { data, error, isPending } = useMeta();
+  const retry = useRetryMeta();
+
   const figures = data === undefined ? null : selectHeroFigures(data);
+  const bands = data === undefined ? null : selectCoverageBands(data);
+  const ticks = data === undefined ? [] : selectRulerTicks(data, true);
+
+  // A missing database is the fresh-clone case and gets the instructional state, not an error
+  // card. Every other failure is a failure of *this section*, not of the product.
+  const unavailable = error?.code === 'DATABASE_UNAVAILABLE';
+  const sectionError = error !== null && !unavailable ? error.code : null;
 
   return (
-    <div className="flex flex-col">
-      <section className="shell-container px-4 py-12 md:px-6 xl:px-8" aria-labelledby="hero-title">
-        <p className="t-2xs text-ink-tertiary">THE ARCHIVE</p>
-        <h1 id="hero-title" className="t-display-lg text-ink-primary mt-3">
-          Settle the argument.
-        </h1>
-        <p className="t-md text-ink-secondary mt-4 max-w-[52ch]">
-          Every race result, every qualifying session, and every lap the record holds. Compared
-          across eras, and honest about where the record stops.
-        </p>
+    <>
+      {/* G-14, `/` only, and not rendered at all under reduced motion — the component decides. */}
+      <ScrollProgress />
 
-        {/*
-         * The figure slot. C7-6 replaces this with the stat strip, the capability grid and
-         * the coverage ruler; the three states below are already the ones those sections
-         * inherit, so the state handling is not rewritten with them.
-         */}
-        <div className="mt-8">
-          {isPending && <p className="t-xs text-ink-tertiary">Loading coverage figures…</p>}
-          {error !== null && (
-            <p className="t-xs text-ink-tertiary">
-              Coverage figures aren&apos;t available right now.
-            </p>
-          )}
-          {figures !== null && (
-            <dl className="t-mono t-sm text-ink-secondary flex flex-col gap-1">
-              <div className="flex gap-2">
-                <dt className="text-ink-tertiary">Seasons</dt>
-                <dd className="text-ink-primary">{figures.seasonCount}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="text-ink-tertiary">Coverage</dt>
-                <dd className="text-ink-primary">{figures.seasonSpan}</dd>
-              </div>
-              <div className="flex gap-2">
-                <dt className="text-ink-tertiary">Rounds complete</dt>
-                <dd className="text-ink-primary">
-                  {figures.roundProgress.completed} of {figures.roundProgress.scheduled}
-                </dd>
-              </div>
-            </dl>
-          )}
+      <HeroSection figures={figures} pending={isPending} failed={error !== null} />
+
+      {unavailable ? (
+        <div className="shell-container px-4 py-12 md:px-6 xl:px-8">
+          <DataUnavailableState />
         </div>
-      </section>
-    </div>
+      ) : (
+        <>
+          <CapabilityGrid />
+          <CoverageRuler
+            bands={bands}
+            ticks={ticks}
+            lapTimingFrom={figures?.lapTimingFrom ?? null}
+            pending={isPending}
+            errorCode={sectionError}
+            onRetry={retry}
+          />
+        </>
+      )}
+    </>
   );
 }

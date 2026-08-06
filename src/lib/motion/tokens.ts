@@ -115,6 +115,7 @@ const dist = {
   nudge: 6, // shell mount, dock item entrance
   step: 8, // rows, popover rows
   rise: 10, // route content enter
+  section: 16, // G-15 — a section revealing on scroll
   lift: 12, // dock container, sheet panel
   sheet: 24, // the bottom sheet's travel
   parallax: 14, // G-21 clamp
