@@ -47,13 +47,17 @@ export default defineConfig({
 
     /*
      * Vitest replaces every CSS import with an empty string by default, and it does so
-     * even for an explicit `?raw` request. Three test files assert *on the stylesheet
-     * text* — CT-3 (JS and CSS durations cannot drift), CT-9 (nothing but transform and
-     * opacity is animated in the backdrop) and CT-10 (the reduced-motion chokepoint
-     * exists) — so those three files, and only those three, are exempted. `index.css` is
-     * deliberately not listed: processing it would run the whole Tailwind pipeline in
-     * every test run for no assertion.
+     * even for an explicit `?raw` request. Four stylesheets are asserted *on their text* —
+     * CT-3 (JS and CSS durations cannot drift), CT-9 (nothing but transform, opacity and
+     * `offset-distance` is animated in the backdrop), CT-10 (the reduced-motion chokepoint
+     * exists) and the accent rules of §3.6 / §5.2a (no raw ramp step consumed, no literal
+     * z-index, an achromatic focus ring) — so those four, and only those four, are exempted.
+     *
+     * `index.css` was previously excluded on the grounds that processing it runs the whole
+     * Tailwind pipeline for no assertion. There is now an assertion, and it is one nothing
+     * else in the pipeline can make: with no visual gate (CR-006), a component reaching for
+     * a raw `--signal-*` step or hard-coding a z-index would otherwise reach review unseen.
      */
-    css: { include: [/tokens\.css/, /motion\.css/, /backdrop\.css/] },
+    css: { include: [/tokens\.css/, /motion\.css/, /backdrop\.css/, /index\.css/] },
   },
 });

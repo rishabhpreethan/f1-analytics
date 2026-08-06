@@ -1,31 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="F1 Analytics">
   <!--
-    Typographic placeholder (PLAN.md F0 Design Spec §9.3). An --ink-primary rounded
-    square carrying the product initial set in Archivo 700 at wdth 82, in
-    --ink-inverse. Built from a font this project is licensed to use and carrying no
-    third-party mark. The real icon set is R3 and is Rishabh's.
+    Typographic placeholder, updated by CR-007 (Design Spec §11.2).
 
-    A favicon is a standalone document and cannot read the page's custom properties,
-    so the two token values are written literally here and nowhere else:
-    --ink-primary / --ink-inverse, light then dark (DESIGN_SYSTEM.md §3.5).
+    The mark now carries the accent: a `--signal-600` rounded square with **F1** set in
+    Archivo 700 at wdth 82, in white. `#D1018A` rather than `#FE02A9` because it must also
+    be legible on a **light** browser tab strip, where the vivid step only reaches 3.62:1;
+    white on `#D1018A` measures **5.14:1** (§9.2.1 V-11).
+
+    One colour in both schemes, unlike the previous achromatic placeholder: the accent is
+    designed to read on either, and a mark that inverts is a mark that looks like two
+    products. `rx` is `--radius-md` (6) scaled to the 64px viewBox.
+
+    Built from a font this project is licensed to use and carrying no third-party mark.
+    **The real icon set is R3 and is Rishabh's** — this is not it.
+
+    A favicon is a standalone document and cannot read the page's custom properties, so the
+    two token values are written literally here and nowhere else.
   -->
-  <style>
-    .field { fill: #1b1e24; }
-    .mark { fill: #ffffff; }
-    @media (prefers-color-scheme: dark) {
-      .field { fill: #f5f7f9; }
-      .mark { fill: #0e0f13; }
-    }
-  </style>
-  <rect class="field" width="64" height="64" rx="12" />
+  <rect width="64" height="64" rx="16" fill="#D1018A" />
   <text
-    class="mark"
     x="32"
-    y="46"
+    y="45"
+    fill="#FFFFFF"
     text-anchor="middle"
     font-family="Archivo, 'Arial Narrow', system-ui, sans-serif"
-    font-size="44"
+    font-size="34"
     font-weight="700"
     font-stretch="82%"
-  >F</text>
+    letter-spacing="-1"
+  >F1</text>
 </svg>

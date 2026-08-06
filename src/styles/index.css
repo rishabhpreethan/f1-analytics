@@ -1158,6 +1158,53 @@
     transform: scaleX(0);
   }
 
+  /* ------------------------------------------------------------------ G-10, links §3.6.4
+   * An inline link is `--accent-ink` with a 1px underline **at all times** — the underline never
+   * disappears, so the link is identifiable without hovering it — and a 2px `--accent-mark`
+   * pseudo-element sweeps `scaleX 0→1` from the left on hover and on focus.
+   *
+   * **This is CSS rather than GSAP, and it has to be:** the sweeping mark is a `::after`, and a
+   * pseudo-element is not a DOM node, so GSAP has nothing to take as a target. The same
+   * reasoning applies here as to G-4's width. Chokepoint 1 removes the transition under reduced
+   * motion, which leaves the specified reduced behaviour exactly — the rest underline, thickened,
+   * instantly.
+   *
+   * **F0 has no inline link to apply this to** — the footer, the state cards and the capability
+   * cards are all block-level or plain text. It is defined here so F1 inherits it rather than
+   * inventing a second underline treatment.
+   */
+  .link {
+    position: relative;
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: color var(--dur-instant) var(--ease-move);
+  }
+
+  .link:hover {
+    color: var(--accent-ink-strong);
+  }
+
+  .link::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -3px;
+    height: var(--size-rule);
+    background-color: var(--accent-mark);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--dur-instant) var(--ease-exit);
+  }
+
+  .link:hover::after,
+  .link:focus-visible::after {
+    transform: scaleX(1);
+    transition: transform var(--dur-fast) var(--ease-enter);
+  }
+
   /* ------------------------------------------------- Route placeholder §5.6 (CR-007)
    * A panel on the atmosphere rather than loose text floating on a moving field. Placeholders
    * are permanent infrastructure (§7.6), so this is not throwaway styling.
