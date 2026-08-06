@@ -23,9 +23,27 @@ app.use(
       // therefore an external public/theme-init.js, not an inline block.
       scriptSrc: ["'self'"],
       styleSrc: ["'self'"],
-      // Provisional allowance. React and GSAP both mutate styles through the CSSOM,
-      // which CSP does not govern, so this may well be unnecessary — CR-007 task
-      // C7-8 settles it against the production build, not by reasoning.
+      // The one allowance in this policy, and it is **not** the precaution the previous
+      // comment here claimed (ARCHITECTURE.md §7.4, §10 #26). "React and GSAP mutate
+      // styles through the CSSOM, which CSP does not govern" is true and does not
+      // finish the argument: `gsap/ScrollTrigger.js` also runs
+      //
+      //     if (!bodyHasStyle) { _body.setAttribute("style", ""); _body.removeAttribute("style"); }
+      //
+      // and `setAttribute('style', …)` is exactly the inline-style-attribute form that
+      // `style-src-attr` governs, unlike `element.style.x = y`. That statement sits on
+      // the path ScrollTrigger.enable() ← ScrollTrigger.register() ←
+      // gsap.registerPlugin(), which runs at module evaluation of
+      // src/lib/motion/gsap.ts — so on every page load, not only when a trigger is
+      // created. Our <body> carries no `style` attribute, so the guard is satisfied and
+      // the call runs. Verified present in the minified production bundle, asserted in
+      // app.test.ts.
+      //
+      // Whether a browser *reports* a violation for an empty attribute value cannot be
+      // settled in Node — jsdom implements no CSP enforcement. So the removal bar is
+      // unchanged and is evidence, not reasoning: **zero CSP violations in the
+      // production-preview console** (`npm run build && npm run start`), re-verified
+      // after removal. Nobody has had a browser on it yet.
       styleSrcAttr: ["'unsafe-inline'"],
       imgSrc: ["'self'", 'data:'],
       fontSrc: ["'self'"],
