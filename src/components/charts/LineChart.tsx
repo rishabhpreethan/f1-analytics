@@ -196,7 +196,9 @@ export function LineChart({
    * must not truncate the axis to rounds 5+. */
   const xs = [...new Set(clipped.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
 
-  const ys = clipped.flatMap((s) => s.points.map((p) => p.y).filter((y): y is number => y !== null));
+  const ys = clipped.flatMap((s) =>
+    s.points.map((p) => p.y).filter((y): y is number => y !== null),
+  );
 
   const yMin =
     yDomain?.[0] ?? (zeroBaseline ? Math.min(0, ...ys) : Math.min(...(ys.length > 0 ? ys : [0])));

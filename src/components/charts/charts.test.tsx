@@ -486,9 +486,7 @@ describe('§6.3 — a clipped axis states what it clipped', () => {
   });
 
   it('says nothing at all when no reading exceeds the ceiling', () => {
-    render(
-      <LineChart series={SEASON} title="Points" ariaLabel="Points" yCeiling={1_000_000} />,
-    );
+    render(<LineChart series={SEASON} title="Points" ariaLabel="Points" yCeiling={1_000_000} />);
     expect(screen.queryByText(/slower than/)).toBeNull();
   });
 

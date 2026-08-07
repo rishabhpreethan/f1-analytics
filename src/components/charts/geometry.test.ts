@@ -3,8 +3,6 @@ import {
   AXIS_GAP,
   CATEGORY_COUNT_LIMIT,
   clampTooltip,
-  lapTimeCeiling,
-  LAP_TIME_CEILING_FACTOR,
   MARKER_RING,
   ISOLATION_THRESHOLD,
   nearestByOffset,
@@ -381,37 +379,6 @@ describe('shouldDrawMarkers', () => {
     // every marker on the first paint and pop them in, and would make the marker layer absent in
     // jsdom — where the "a null reading is a gap, not a zero" assertion depends on counting them.
     expect(shouldDrawMarkers(58, 0)).toBe(true);
-  });
-});
-
-/**
- * §6.3's lap-time ceiling. Measured on 2026 R1: fastest 82.091s, p99 122.340s, max 1168.144s — the
- * last being a lap spent stationary under a red flag.
- */
-describe('lapTimeCeiling', () => {
-  const FASTEST = 82_091;
-
-  it('sits just above the 99th percentile of a real race', () => {
-    // p99 was 122_340ms. The ceiling holds it; an unclipped axis would be set by the 1168s lap.
-    expect(lapTimeCeiling(FASTEST)).toBeGreaterThan(122_340);
-  });
-
-  it('excludes the stoppage lap that would otherwise set the axis', () => {
-    expect(lapTimeCeiling(FASTEST)).toBeLessThan(1_168_144);
-  });
-
-  it('is a multiple of the session fastest, so it scales across circuit lengths', () => {
-    // A 40s oval and a 90s street circuit get proportionate ceilings, which a fixed
-    // millisecond bound would not give.
-    expect(lapTimeCeiling(40_000) / 40_000).toBe(LAP_TIME_CEILING_FACTOR);
-    expect(lapTimeCeiling(90_000) / 90_000).toBe(LAP_TIME_CEILING_FACTOR);
-  });
-
-  it('compresses the racing range to under a tenth of the plot if NOT applied', () => {
-    // The arithmetic behind "7% of the plot", asserted so the rule keeps its justification.
-    const racingRange = 122_340 - FASTEST;
-    const unclippedRange = 1_168_144 - FASTEST;
-    expect(racingRange / unclippedRange).toBeLessThan(0.1);
   });
 });
 

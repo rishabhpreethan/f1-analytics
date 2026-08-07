@@ -1788,9 +1788,17 @@ settles it arithmetically at §6.5.2's 16px pitch:
 So the full field is labelled at desktop and not below it. Where it does not fit, **the selection is
 still always labelled**, plus P1 and the deepest classified runner — the two positions the eye goes to
 first — and the rest are identified by hover, by the table view, and by the position axis, which
-already states their rank. Labels are the driver's **code** where one exists (`VER`, `HAM`): the
-sport's own timing convention, and about a third the width of a surname. `abbreviation` covers 107 of
-881 drivers, so it falls back to the full label rather than assuming the modern era.
+already states their rank. Labels come from `selectDriverShortLabel`: the driver's **code** where one exists
+(`VER`, `HAM`), the sport's own timing convention and about a third the width of a surname —
+otherwise the **surname**.
+
+> **The fallback is the common case for early lap-data races, not an edge case.** `abbreviation`
+> covers 107 of 881 drivers overall, and measured against the lap window specifically, **40 drivers
+> who have race lap data carry no code at all** — Häkkinen, Damon Hill, Frentzen, Irvine, Panis and
+> much of the 1996–2004 grid. So a label built from `code` alone would leave half a 1996 field
+> unlabelled. The fallback is the **surname** and never a three-letter abbreviation derived from it,
+> which would invent a convention the data does not carry. It widens the label gutter, which costs
+> nothing: §6.5.2's capacity arithmetic is a *vertical* pitch and is unaffected by label width.
 
 **3. The tooltip carries the analysis set, not the field.** §6.5.1 asks for *"every series' value at
 that x, in ONE tooltip"* — which at 22 series is a tooltip taller than the plot it covers. That rule
@@ -1884,9 +1892,19 @@ reversed. Two properties of it are design decisions rather than implementation:
 
 #### 6.6.1 F3 — the race page, specified _(2026-08-07)_
 
-**The surface is not built: `/api/races/:year/:round` does not exist yet.** These are specified first
-because the endpoint shape depends on them, and because a chart spec written after the data layer
-tends to accept whatever the data layer happened to return.
+**The endpoints are `GET /api/seasons/:year/races/:round`** and its two companions,
+`…/laps` and `…/stints`.
+
+> **Correction, 2026-08-07.** This section first named a flat `/api/races/:year/:round`. That was
+> wrong and it was mine: `ARCHITECTURE.md` §6 has specified the **hierarchical** form since F0, and it
+> mirrors the client route `/seasons/:year/races/:round` — a race is addressed *through* its season
+> because that is how the data is keyed and how a reader arrives. The engineer built the documented
+> form and raised the conflict rather than silently satisfying one side, which is the right handling;
+> a design document inventing an API path is not an authority, and this one was invented by analogy
+> with `/api/seasons`.
+
+The charts below were specified before the data layer existed, deliberately: a chart spec written
+afterwards tends to accept whatever the data layer happened to return.
 
 **The organising problem is that one page spans four coverage boundaries.** Measured, one race per
 era, `session.type = 'R'`:
@@ -1920,15 +1938,41 @@ job at scale. Accessibility: endpoint labels both ends, table view, `aria-live` 
 **RD-2 · Lap-time trace** — Job: change over time, dense, ≤4 drivers. Form: per-lap line, capped at
 4 by §6.5.2 (RD-2's "multi-select" is that cap by another name). Marks: no markers at race density.
 **The measure axis carries the mandatory ceiling of §6.3** — `fastest × 1.5`, off-scale laps as a
-caret at the ceiling plus a counted note, exact values in the table. Invalidated laps
-(`lap.is_deleted`) are **excluded from the series and stated in the note**, never plotted. **1996+.**
+caret at the ceiling plus a counted note, exact values in the table. The ceiling is a property of the
+**session**, so toggling a fourth driver cannot move the axis. **1996+.**
+
+> **Correction: the invalidated-lap note is withdrawn.** This said invalidated laps
+> (`lap.is_deleted`) are *"excluded from the series and stated in the note"*. Trap 19 measures
+> `is_deleted = 1` on **2,199 of 717,764 lap rows and on none of the 627,025 race lap rows** — every
+> flagged row is practice or qualifying, 2023 onward. So the note would have been **permanently
+> empty on every race page**, which is worse than absent: it implies a feature that is working and
+> finding nothing. The trap-8 filter stays in every pace metric, because it is a no-op that one
+> refresh can make load-bearing and a metric that must remember to add it later will not — but the
+> *interface* promises nothing it cannot show.
 
 **RD-7 · Pit stop timeline** — Job: magnitude and sequence. Form: horizontal bar per stop, `scaleBand`
-by driver, x = lap. Marks: bar length is duration; §6.3's 4px data-end on the far end only. **The same
-outlier problem as the lap trace and the same treatment**: durations in 2026 R1 run 17.6s to
-**1,081.6s**, so the axis is clipped and the note counts what is above it. Copy must carry the
-cross-era caveat — `DATABASE.md` §2.4: *"duration semantics vary across eras (some stationary time,
-some pit-lane transit)"*, so **durations are never compared across decades without it**. **2011+.**
+by driver, x = lap. Marks: bar length is duration; §6.3's 4px data-end on the far end only. Durations
+in 2026 R1 run 17.6 s to **1,081.6 s**, so the axis is clipped and the note counts what is above it.
+Copy must carry the cross-era caveat — `DATABASE.md` §2.4: *"duration semantics vary across eras
+(some stationary time, some pit-lane transit)"* — so **durations are never compared across decades
+without it**. **2011+.**
+
+> **Correction: the pit ceiling is `median × 2`, not the lap trace's `fastest × 1.5`.** I carried the
+> 1.5 across by analogy and **the analogy does not hold**, which is measurable rather than arguable:
+>
+> | Ceiling | Stops clipped | Races affected | 2026 R1 |
+> |---|---|---|---|
+> | `fastest × 1.5` | **1,910 of 12,582 (15.2%)** | 217 of 319 | clips 7 of 32, five of them ordinary 27–36 s stops |
+> | `median × 2` | **457 of 12,582 (3.6%)** | 79 of 319 | clips exactly the two red-flag stops, keeps the 34.6 s p90 on scale |
+>
+> **The references differ in kind.** A fastest *lap* is a capability — every other lap of that race is
+> an attempt at the same thing, so 1.5× bounds the honest range. A fastest *stop* is one best case that
+> legitimate stops exceed widely, because `duration_ms` mixes stationary time with pit-lane transit
+> across eras: `p90 / fastest` has a median of 1.27 and a p90 of **1.95**. A ceiling anchored to the
+> best case therefore clips normal work. The median is the centre of the distribution rather than its
+> edge, so `× 2` bounds the same *shape* of range that `× 1.5` bounds for laps.
+>
+> Implemented once, as `PIT_CEILING_MEDIAN_MULTIPLE` in `src/features/race/series.ts`.
 
 **RD-3 · Stint reconstruction** — Job: sequence. Form: stacked horizontal bar, one row per driver,
 `d3-shape.stack`. **This is the one kit form F3 needs that does not exist**; `BarChart` does not stack.

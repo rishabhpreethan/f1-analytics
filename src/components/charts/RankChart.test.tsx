@@ -231,7 +231,9 @@ describe('refinement 3 — the tooltip carries the analysis set, not all twenty'
       target: container.querySelector('.chart-hit') as Element,
       coords: { x: 10, y: 10 },
     });
-    const values = [...container.querySelectorAll('.chart-tooltip-value')].map((n) => n.textContent);
+    const values = [...container.querySelectorAll('.chart-tooltip-value')].map(
+      (n) => n.textContent,
+    );
     expect(values).toEqual(['P1', 'P5']);
   });
 });

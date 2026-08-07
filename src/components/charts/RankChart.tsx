@@ -342,7 +342,10 @@ export function RankChart({
     ],
   });
 
-  const drawMarkers = shouldDrawMarkers(Math.max(1, ...series.map((s) => s.points.length)), plot.innerWidth);
+  const drawMarkers = shouldDrawMarkers(
+    Math.max(1, ...series.map((s) => s.points.length)),
+    plot.innerWidth,
+  );
 
   return (
     <ChartFrame
@@ -446,7 +449,7 @@ export function RankChart({
                 })}
 
                 {/* Markers only on the selection, and only where density allows. The field never
-                  * carries them — 22 × 58 is 1,276 marks (§6.5.4a condition 2). */}
+                 * carries them — 22 × 58 is 1,276 marks (§6.5.4a condition 2). */}
                 {drawMarkers &&
                   chosen.map((s) => {
                     const channels = channelsFor.get(s.reference);
@@ -485,9 +488,7 @@ export function RankChart({
               )}
             </g>
 
-            <g
-              transform={`translate(${String(plot.left + plot.innerWidth)} ${String(plot.top)})`}
-            >
+            <g transform={`translate(${String(plot.left + plot.innerWidth)} ${String(plot.top)})`}>
               {endLabels('right').map(({ series: s, placement }) =>
                 placement === undefined ? null : (
                   <text

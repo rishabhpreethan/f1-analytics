@@ -4,7 +4,14 @@ import { cssVar, identityToken, plotToken } from '@/lib/entityColor';
 import { CHART_REVEAL_ATTR, useChartMount } from '@/lib/motion/chart';
 import { ChartFrame } from './ChartFrame';
 import { SpanTable } from './ChartTable';
-import { computeMargin, measureTickCount, mountKey, plotArea, spanPath, withEndpoints } from './geometry';
+import {
+  computeMargin,
+  measureTickCount,
+  mountKey,
+  plotArea,
+  spanPath,
+  withEndpoints,
+} from './geometry';
 import type { PlotState } from './types';
 import { useChartSize } from './useChartSize';
 
@@ -249,7 +256,11 @@ export function SpanChart({
               ))}
             </g>
 
-            <g className="chart-marks" data-dimmed={activeKey !== null} clipPath={`url(#${clipId})`}>
+            <g
+              className="chart-marks"
+              data-dimmed={activeKey !== null}
+              clipPath={`url(#${clipId})`}
+            >
               {rows.map((row) => {
                 const token = plotToken(row.teamReference);
                 const y = plot.top + (band(row.reference) ?? 0);

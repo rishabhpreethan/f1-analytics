@@ -185,27 +185,20 @@ export function shouldDrawMarkers(pointCount: number, axisLengthPx: number): boo
 /** The `--size-mark-ring` figure, needed by `shouldDrawMarkers`'s spacing arithmetic. */
 export const MARKER_RING = 1.5;
 
-/**
- * **The ceiling for a lap-time axis, and why one is mandatory rather than optional.**
+/*
+ * **The lap-time ceiling used to be implemented here and is now `src/features/race/pace.ts`.**
  *
- * Measured on 2026 R1 (`lap`, one session, 1003 rows): fastest **82.091s**, median 85.228s, p90
- * 98.755s, p99 122.340s — and **maximum 1168.144s**. That last value is a lap spent stationary
- * under a red flag, and it is not an error in the data; it is what the lap took. But an axis that
- * accommodates it compresses every racing lap into **7% of the plot**, so an unclipped lap-time
- * trace is not a chart of pace, it is a chart of one stoppage.
+ * The *rule* is this design system's (§6.3): `fastest × 1.5`, off-scale readings carried as a caret
+ * plus a counted note, exact values in the table. The *implementation* belongs where the data is —
+ * `paceCeilingMs` handles a session with no timed lap (`null`, never 0, which is a lap time) and
+ * keys the ceiling to the **session** rather than to the chart's current selection, so toggling a
+ * fourth driver cannot move the axis. Mine did neither.
  *
- * The ceiling is **`fastest × 1.5`**, which on that race is 123.1s — just above p99, so it holds
- * 99% of laps including pit and traffic laps while excluding the two stoppage laps. A multiple of
- * the session's own fastest lap rather than a percentile, because it is a *physical* bound (a lap
- * 50% slower than the best is not racing) and it therefore means the same thing on a 90-second
- * street circuit as on a 40-second oval.
- *
- * **Laps above the ceiling are never silently dropped.** They render as an off-scale caret at the
- * ceiling in the series colour, they are counted in a note above the plot, and their exact values
- * are in the table view — which every chart in this product has (§6.5.5), and which is what makes
- * clipping honest rather than lossy.
+ * Two constants with the same value in two modules is the drift this project has already paid for
+ * once (`--size-tooltip` against `TOOLTIP_WIDTH`, tied together by a test only after the fact). So
+ * this one is deleted rather than kept "for the kit": a chart takes `yCeiling` as a number and does
+ * not care where it came from, which is the correct seam.
  */
-export const LAP_TIME_CEILING_FACTOR = 1.5;
 
 /**
  * The off-scale glyph — an upward caret drawn at the ceiling where a reading exceeds it.
@@ -221,10 +214,6 @@ export const LAP_TIME_CEILING_FACTOR = 1.5;
 export function offScalePath(size = MARKER_SIZE): string {
   const half = size / 2;
   return `M ${fmtCoord(-half)} ${fmtCoord(half / 2)} L 0 ${fmtCoord(-half / 2)} L ${fmtCoord(half)} ${fmtCoord(half / 2)}`;
-}
-
-export function lapTimeCeiling(fastestMs: number): number {
-  return fastestMs * LAP_TIME_CEILING_FACTOR;
 }
 
 /**
