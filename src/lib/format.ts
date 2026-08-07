@@ -144,3 +144,31 @@ export function formatGap(ms: number): string {
   }
   return `${sign}${String(seconds)}.${pad(millis, 3)}`;
 }
+
+/**
+ * A lap deficit — the *other* thing the result column can be, and not a duration at all.
+ *
+ * `DESIGN_SYSTEM.md` §6.6.1 requires a lapped finisher to read `+N Laps` rather than a
+ * time, because its result **is** a lap deficit. This is the one spelling of that, for the
+ * same reason `formatGap` is the one spelling of a gap.
+ *
+ * **The wording matches the dataset's own, exactly**, so a derived deficit is
+ * indistinguishable from a recorded one on the same page: `session_entry.detail` carries
+ * `+1 Lap` on 3,850 rows and `+2 Laps` on 1,593, i.e. singular at one and plural above.
+ * Getting that wrong would put `+1 Laps` beside a `+1 Lap` from a different season.
+ *
+ * ```
+ *   1 → "+1 Lap"
+ *   2 → "+2 Laps"
+ *  15 → "+15 Laps"
+ * ```
+ *
+ * Anything that is not a whole deficit of at least one lap returns `'—'`, not `+0 Laps`:
+ * a car on the same lap as the winner is not a lapped car, so a zero here is a defect
+ * upstream and an em dash is a visible question rather than a plausible wrong answer. That
+ * is `formatDuration`'s rule for a negative duration, applied to the same class of problem.
+ */
+export function formatLapDeficit(laps: number): string {
+  if (!Number.isInteger(laps) || laps < 1) return '—';
+  return `+${String(laps)} Lap${laps === 1 ? '' : 's'}`;
+}

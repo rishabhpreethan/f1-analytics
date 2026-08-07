@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDuration, formatGap, formatIsoDate } from './format';
+import { formatDuration, formatGap, formatIsoDate, formatLapDeficit } from './format';
 
 describe('formatIsoDate', () => {
   it('is stable and locale-independent', () => {
@@ -109,4 +109,39 @@ describe('formatGap — the sign glyph is part of the spec', () => {
   it('returns an em dash for a non-finite input', () => {
     expect(formatGap(Number.NaN)).toBe('—');
   });
+});
+
+describe('formatLapDeficit — the result column’s other quantity', () => {
+  /**
+   * The spellings are the dataset's own, counted: `detail` reads `+1 Lap` on 3,850 rows and
+   * `+2 Laps` on 1,593. A derived deficit has to be indistinguishable from a recorded one,
+   * because both appear in the same column on different seasons.
+   */
+  it.each([
+    [1, '+1 Lap'],
+    [2, '+2 Laps'],
+    [3, '+3 Laps'],
+    [10, '+10 Laps'],
+    [15, '+15 Laps'],
+  ])('%i → %s', (laps, expected) => {
+    expect(formatLapDeficit(laps)).toBe(expected);
+  });
+
+  it('is singular at one lap and plural at every other value', () => {
+    expect(formatLapDeficit(1)).toBe('+1 Lap');
+    expect(formatLapDeficit(1)).not.toBe('+1 Laps');
+    expect(formatLapDeficit(2)).toBe('+2 Laps');
+  });
+
+  /**
+   * A car on the winner's lap is not a lapped car, so zero is not `+0 Laps`. An em dash is a
+   * visible question; a plausible-looking wrong answer is not — the same reasoning
+   * `formatDuration` applies to a negative duration.
+   */
+  it.each([0, -1, -58, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'returns an em dash for %s rather than inventing a deficit',
+    (laps) => {
+      expect(formatLapDeficit(laps)).toBe('—');
+    },
+  );
 });
