@@ -686,12 +686,156 @@ describe.skipIf(!hasDatabase)('race queries against the live database', () => {
     expect(winners.every((row) => row.carNumber === 8)).toBe(true);
   });
 
-  it('a lapped finisher carries no total time, so a gap column cannot print a duration', () => {
+  /**
+   * **This test used to be named for a conclusion it does not support**, and the rename is
+   * the point. It asserted that a lapped finisher carries no total time "so a gap column
+   * cannot print a duration" — true of 1988 R1, false of the archive, and the false half
+   * shipped a defect. 364 lapped finishers **do** carry a time, and every one of them is
+   * 2023 or later. What 1988 actually demonstrates is the *older* of the two `detail`
+   * spellings (trap 22).
+   */
+  it('1988 R1 — a lapped finisher whose `detail` states the deficit and carries no time', () => {
     const race = readRace(1988, 1);
     const lapped = (race?.classification ?? []).find((row) => row.outcome === 'lapped');
     expect(lapped?.isClassified).toBe(true);
     expect(lapped?.totalTimeMs).toBeNull();
     expect(lapped?.detail).toMatch(/^\+\d+ Lap/);
+  });
+
+  /* --------------------------------------------- trap 22, and the RESULT column's basis */
+
+  /**
+   * **The four measurements the result column is built on.** `DESIGN_SYSTEM.md` §6.6.1 keys
+   * that column on `outcome`, and `src/features/race/selectors.ts` derives a lap deficit for
+   * the rows where `detail` no longer states one. Both rest on facts about this dump rather
+   * than on anything the schema enforces, so a refresh that moves one of them must fail
+   * here — that is what this section of the file is for.
+   *
+   * The selector itself is tested against fixtures, not against the database: it lives in
+   * the client project and importing it here would pull the SQLite driver into that graph.
+   * These assertions cover the other half — that the data still looks the way the selector
+   * assumes.
+   */
+  it('trap 22 — `detail` states the lap deficit up to 2022 and never from 2023', () => {
+    const rows = getDb()
+      .prepare(
+        `SELECT sea.year AS year, se.detail AS detail, COUNT(*) AS n
+           FROM session_entry se
+           JOIN session s ON s.id = se.session_id
+           JOIN round ro ON ro.id = s.round_id
+           JOIN season sea ON sea.id = ro.season_id
+          WHERE s.type = 'R' AND se.status = 1
+          GROUP BY sea.year, se.detail`,
+      )
+      .all() as { year: number; detail: string; n: number }[];
+
+    let statesDeficit = 0;
+    let bareWord = 0;
+    for (const row of rows) {
+      if (/^\+\d+ Laps?$/.test(row.detail)) {
+        // A `+N Laps` spelling from 2023 onward would mean the split has moved.
+        expect(row.year).toBeLessThanOrEqual(2022);
+        statesDeficit += row.n;
+      } else if (row.detail === 'Lapped') {
+        expect(row.year).toBeGreaterThanOrEqual(2023);
+        bareWord += row.n;
+      }
+    }
+    expect(statesDeficit).toBe(7279);
+    expect(bareWord).toBe(363);
+  });
+
+  /**
+   * The derivation's basis: `raceLaps` is `max(laps_completed)`, and for it to be a lap
+   * deficit against the winner it has to *be* the winner's lap count. Trap 21 makes
+   * `laps_completed` unreliable in general, so this is asserted rather than assumed — and it
+   * is asserted only over the rows the derivation actually runs on.
+   */
+  it('the race distance is the winner’s own lap count on every row the deficit is derived for', () => {
+    const row = getDb()
+      .prepare(
+        `WITH mx AS (
+           SELECT se.session_id AS sid, MAX(se.laps_completed) AS ml
+             FROM session_entry se JOIN session s ON s.id = se.session_id
+            WHERE s.type = 'R' GROUP BY se.session_id
+         ),
+         win AS (
+           SELECT se.session_id AS sid, se.laps_completed AS wlc
+             FROM session_entry se JOIN session s ON s.id = se.session_id
+            WHERE s.type = 'R' AND se.position = 1
+         )
+         SELECT COUNT(*) AS n,
+                SUM(mx.ml = win.wlc) AS winnerIsMax,
+                MIN(mx.ml - se.laps_completed) AS minDeficit
+           FROM session_entry se
+           JOIN mx ON mx.sid = se.session_id
+           JOIN win ON win.sid = se.session_id
+          WHERE se.status = 1 AND se.is_classified = 1 AND se.detail NOT LIKE '+%Lap%'`,
+      )
+      .get() as { n: number; winnerIsMax: number; minDeficit: number };
+
+    expect(row.n).toBe(362);
+    expect(row.winnerIsMax).toBe(row.n);
+    // A deficit of zero or less would mean rendering `+0 Laps` for a lapped car.
+    expect(row.minDeficit).toBeGreaterThanOrEqual(1);
+  });
+
+  /**
+   * The leader reference: every P1 row is a **finisher** carrying a time, so the winning
+   * time is never taken from a disqualified or retired entry. 9 disqualified entries do
+   * carry a recorded time, which is why the selector filters on `outcome` and not on
+   * `position === 1` alone.
+   */
+  it('every P1 row in the archive is a finisher with a recorded time', () => {
+    const row = getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n,
+                SUM(se.status = 0) AS finishers,
+                SUM(se.time_ms IS NOT NULL) AS withTime
+           FROM session_entry se JOIN session s ON s.id = se.session_id
+          WHERE s.type = 'R' AND se.position = 1`,
+      )
+      .get() as { n: number; finishers: number; withTime: number };
+
+    expect(row.n).toBe(1162);
+    expect(row.finishers).toBe(row.n);
+    expect(row.withTime).toBe(row.n);
+  });
+
+  /**
+   * **The invariant the negative-gap defect violated**, stated as data rather than as
+   * behaviour: a full-distance finisher's time is never below the winner's, so the one
+   * subtraction the selector still performs cannot go negative — while **537 non-finishers
+   * carry a time**, which is why that subtraction must never be reached for them.
+   */
+  it('no finisher’s time is below the winner’s, and 537 non-finishers carry a time anyway', () => {
+    const row = getDb()
+      .prepare(
+        `WITH lead AS (
+           SELECT se.session_id AS sid, MIN(se.time_ms) AS t
+             FROM session_entry se JOIN session s ON s.id = se.session_id
+            WHERE s.type = 'R' AND se.position = 1 AND se.time_ms IS NOT NULL
+            GROUP BY se.session_id
+         )
+         SELECT SUM(se.status = 0 AND se.time_ms < l.t) AS finisherBelowLeader,
+                SUM(se.status <> 0 AND se.time_ms IS NOT NULL) AS nonFinishersWithTime,
+                SUM(se.status <> 0 AND se.time_ms IS NOT NULL AND se.time_ms <  l.t) AS wouldReadNegative,
+                SUM(se.status <> 0 AND se.time_ms IS NOT NULL AND se.time_ms >= l.t) AS wouldReadPlausible
+           FROM session_entry se JOIN lead l ON l.sid = se.session_id`,
+      )
+      .get() as {
+      finisherBelowLeader: number;
+      nonFinishersWithTime: number;
+      wouldReadNegative: number;
+      wouldReadPlausible: number;
+    };
+
+    expect(row.finisherBelowLeader).toBe(0);
+    expect(row.nonFinishersWithTime).toBe(537);
+    // The two halves of the defect: the visible one that was reported, and the larger
+    // invisible one a `delta < 0` guard would have left in place.
+    expect(row.wouldReadNegative).toBe(165);
+    expect(row.wouldReadPlausible).toBe(372);
   });
 
   it('the weekend list is schedule metadata, and practice carries almost nothing', () => {
