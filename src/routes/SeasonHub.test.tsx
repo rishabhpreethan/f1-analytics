@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Season, SeasonList } from '@schemas/season';
+import { selectSeasonNotices } from '@/features/season/selectors';
 import { SeasonHub } from './SeasonHub';
 
 vi.hoisted(() => {
@@ -258,7 +259,9 @@ describe('the surface assembles', () => {
   it('leads with the championship leader while a season is in progress', async () => {
     renderHub('/seasons');
     expect(await screen.findByText('Championship leader')).toBeTruthy();
-    expect(screen.getByText('Andrea Kimi Antonelli')).toBeTruthy();
+    // Twice, and correctly so: the masthead's title card and the standings table's first row. The
+    // card is the headline reading; the table is the full field.
+    expect(screen.getAllByText('Andrea Kimi Antonelli')).toHaveLength(2);
   });
 
   it('leads with the champion once a season is complete', async () => {
@@ -314,6 +317,46 @@ describe('failure keeps the way out', () => {
     await screen.findByText('No 2025 season');
     // The old copy read "seasons run from 1950 to 2026, and 2025 is not one of them".
     expect(screen.queryByText(/is not one of them/)).toBeNull();
+  });
+});
+
+/**
+ * **The guard for a defect Rishabh caught by looking.**
+ *
+ * `noticeSlot` routes each of the eight codes to the surface whose numbers it changes. That is the
+ * right design and it has one failure mode: a code routed to a surface **that does not exist yet**
+ * renders nowhere, silently, and every unit test still passes. It happened — `bestNResults` and
+ * `noTeamChampionship` were routed to `standings` and `constructors` before either was built, so
+ * 1950 showed one notice out of three and nothing failed.
+ *
+ * This asserts the property directly: **every notice a season emits appears somewhere on the page.**
+ * It is a test of the routing table against the surfaces that actually exist, which is the only
+ * thing that could have caught it.
+ */
+describe('every notice a season emits reaches the page', () => {
+  it('renders all three of 1950’s notices — best-4, no Constructors’ Championship, no lap data', async () => {
+    renderHub('/seasons/1950', { 1950: SEASON_1950 });
+    const notices = selectSeasonNotices(SEASON_1950);
+
+    // Three, and if the selector ever emits a fourth this fails rather than quietly ignoring it.
+    expect(notices.map((notice) => notice.code).sort()).toEqual([
+      'bestNResults',
+      'noLapData',
+      'noTeamChampionship',
+    ]);
+
+    // `noTeamChampionship` is the one code whose text is rendered inside a state card rather than a
+    // note, so the assertion is on the text and not on the container.
+    for (const notice of notices) {
+      expect(await screen.findByText(notice.text)).toBeTruthy();
+    }
+  });
+
+  it('renders both of 2026’s — in progress, and the two cancellations', async () => {
+    renderHub('/seasons');
+    for (const notice of selectSeasonNotices(SEASON_2026)) {
+      expect(await screen.findByText(notice.text)).toBeTruthy();
+    }
   });
 });
 

@@ -7,6 +7,7 @@ import { useMeta } from '@/features/meta/useMeta';
 import { SeasonCalendar } from '@/features/season/SeasonCalendar';
 import { SeasonMasthead } from '@/features/season/SeasonMasthead';
 import { SeasonNotes } from '@/features/season/SeasonNotes';
+import { SeasonStandings } from '@/features/season/SeasonStandings';
 import {
   dialCells,
   driverTitleCard,
@@ -15,6 +16,8 @@ import {
   teamTitleCard,
 } from '@/features/season/presenters';
 import {
+  type DriverStandingRow,
+  type TeamStandingRow,
   resolveSeasonYear,
   selectDriverStandings,
   selectSeasonNotices,
@@ -117,6 +120,10 @@ export function SeasonHub() {
         notices={notices}
         markLapCoverage={markLapCoverage}
         pending={pending}
+        driverStandings={driverStandings}
+        teamStandings={teamStandings}
+        asOfRound={data?.standings.asOfRound ?? null}
+        isComplete={data?.isComplete ?? false}
       />
     </div>
   );
@@ -135,6 +142,10 @@ function SeasonBody({
   notices,
   markLapCoverage,
   pending,
+  driverStandings,
+  teamStandings,
+  asOfRound,
+  isComplete,
 }: {
   season: ReturnType<typeof useSeason>;
   meta: ReturnType<typeof useMeta>;
@@ -144,6 +155,10 @@ function SeasonBody({
   notices: ReturnType<typeof selectSeasonNotices>;
   markLapCoverage: boolean;
   pending: boolean;
+  driverStandings: readonly DriverStandingRow[];
+  teamStandings: readonly TeamStandingRow[];
+  asOfRound: number | null;
+  isComplete: boolean;
 }) {
   // The fresh-clone case gets the instructional state, not an error card.
   const unavailable =
@@ -199,11 +214,24 @@ function SeasonBody({
   if (pageNotices.length > 0) return <SeasonNotes notices={pageNotices} />;
 
   return (
-    <SeasonCalendar
-      entries={calendar}
-      notices={noticesFor(notices, 'calendar')}
-      markLapCoverage={markLapCoverage}
-      pending={pending}
-    />
+    <>
+      <SeasonCalendar
+        entries={calendar}
+        notices={noticesFor(notices, 'calendar')}
+        markLapCoverage={markLapCoverage}
+        pending={pending}
+      />
+
+      <SeasonStandings
+        year={year ?? 0}
+        drivers={driverStandings}
+        teams={teamStandings}
+        driverNotices={noticesFor(notices, 'standings')}
+        teamNotices={noticesFor(notices, 'constructors')}
+        asOfRound={asOfRound}
+        isComplete={isComplete}
+        pending={pending}
+      />
+    </>
   );
 }

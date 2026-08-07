@@ -659,13 +659,37 @@
 
   /* ================================================================= standings */
 
+  .season-subsection {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+  }
+
   /*
-   * §5.3 — a wide table scrolls **inside its own container**, with the leading identity column
-   * sticky and a `--border-strong` right edge on it. That is what keeps a 7-column standings
-   * table usable at 390px without the page itself scrolling sideways.
+   * §5.3 offers a wide table a sticky leading column and horizontal scroll. **This table takes
+   * neither, and that is a deliberate reading of the rule rather than an omission.**
+   *
+   * The rule exists so a wide table never makes the *page* scroll sideways. The better way to
+   * satisfy it is to not be wide: the team is a second line inside the driver's name cell rather
+   * than its own column, and `Best` — the least-consulted measure here — is dropped below 768px.
+   * That leaves four columns at 390px, which fit, and a two-line name cell reads better at every
+   * width than a sticky column and a scrollbar do. `overflow-x` stays as the safety net for an
+   * unusually long team name, not as the layout.
    */
   .standings-scroll {
     overflow-x: auto;
+  }
+
+  /* Dropped below `md`. Never `display: none` on a `<th>` alone — the header and every cell in the
+   * column have to go together or the remaining rows shift one column left. */
+  .standings-optional {
+    display: none;
+  }
+
+  @media (min-width: 48rem) {
+    .standings-optional {
+      display: table-cell;
+    }
   }
 
   .standings-table {
@@ -745,11 +769,15 @@
     letter-spacing: var(--text-2xs--letter-spacing);
   }
 
+  /* The team, on its own line under the driver's name — see the `.standings-scroll` note for why
+   * this is not a column. `block` so it wraps rather than widening the cell. */
   .standings-team {
+    display: block;
+    max-width: 22rem;
+    overflow: hidden;
     color: var(--ink-secondary);
     font-size: var(--text-xs);
-    max-width: 18rem;
-    overflow: hidden;
+    line-height: var(--text-xs--line-height);
     text-overflow: ellipsis;
   }
 
@@ -771,9 +799,37 @@
     color: var(--ink-tertiary);
   }
 
+  /*
+   * An excluded row recedes but **keeps its figures at full ink**. 2007 McLaren's 8 wins and 1997
+   * Schumacher's 78 points are the point of showing the row at all; dimming them would say the
+   * numbers are doubtful, when what is true is that they did not count toward a title.
+   */
   .standings-table tbody tr[data-adjustment='excluded'] .standings-position,
   .standings-table tbody tr[data-adjustment='excluded'] .standings-name {
     color: var(--ink-tertiary);
+  }
+
+  /* A chip that sits inside a cell beside other content, rather than as the cell's whole value. */
+  .season-chip-inline {
+    margin-inline-start: calc(var(--spacing) * 2);
+  }
+
+  .standings-footnotes {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    margin: 0;
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+    border-top: 1px solid var(--border-subtle);
+    list-style: none;
+  }
+
+  /* Eight rows of the table's height, so the panel does not grow when the query resolves. */
+  .standings-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 4);
+    padding: calc(var(--spacing) * 4);
   }
 
   .standings-disclosure {
