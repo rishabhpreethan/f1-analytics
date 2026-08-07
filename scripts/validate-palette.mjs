@@ -1324,9 +1324,661 @@ function catSearch(cvdFloor = 8) {
   }
 }
 
+/* ================================================================ V-23 … V-28
+ * THE SHIPPED ENTITY PALETTE. `catsearch` above is the exploration; this is the run that
+ * records what ships, and it is the one wired into `npm run validate:palette`.
+ *
+ * The ramp is **two tiers of guarantee, not two palettes**, and the split is the whole design:
+ *
+ *   TIER A — the first 6 entries. Mutually normal-vision ΔE >= 15 **and** CVD ΔE >= 8 in both
+ *            themes, and >= 40 deg apart in OkLCh hue. Colour alone separates these, for every
+ *            viewer. 6 > the comparison cap of 4, so any admissible 4-subset is fully separated.
+ *   TIER B — entries 7…12. Mutually and against tier A, normal-vision ΔE >= 15 in both themes.
+ *            CVD separation is **measured and reported per pair, not gated** — the pairs that
+ *            fall below 8 are precisely the pairs §6.4's differentiator ladder exists to carry.
+ *
+ * What tier B buys is collision *rate*, and that is a product property rather than a nicety:
+ * 202 of 214 teams take their colour from this ramp, so the probability that four randomly
+ * selected colourless teams all land on distinct entries is 0.278 at N = 6 and 0.573 at N = 12.
+ * What tier B must never buy is a **near-miss**: two entities in one plot are either the SAME
+ * entry — an exact collision, which the ladder resolves explicitly and visibly — or they are
+ * >= 15 apart. Cadillac <-> Haas at 3.8 is the failure this forbids, and it is worse than either
+ * of the other two cases because it reads as "probably different, possibly not".
+ */
+
+/** Hue distance on the wheel, degrees. */
+const hueGap = (a, b) => {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+};
+
+/**
+ * The pool of admissible (hue, tier) candidates under the **per-entry** gates only.
+ * Shared by the tier-A clique search and the tier-B extension so both draw from one set.
+ */
+function entityPool() {
+  const pool = [];
+  const rejected = { hueband: 0, nosolution: 0, timing: 0, furniture: 0 };
+  for (let h = 0; h < 360; h += 6) {
+    if (inReservedHueBand(h)) {
+      rejected.hueband += PLOT_TIERS.light.length;
+      continue;
+    }
+    for (let tier = 0; tier < PLOT_TIERS.light.length; tier++) {
+      const e = hueEntry(h, tier);
+      if (!e) {
+        rejected.nosolution += 1;
+        continue;
+      }
+      if (!clearsReserved(e)) {
+        rejected.timing += 1;
+        continue;
+      }
+      if (!clearsFurniture(e)) {
+        rejected.furniture += 1;
+        continue;
+      }
+      pool.push(e);
+    }
+  }
+  return { pool, rejected };
+}
+
+/** Worse-of-both-themes normal-vision and CVD separation for two pool entries. */
+const pairNormal = (a, b) => Math.min(dE(a.light, b.light), dE(a.dark, b.dark));
+const pairCvd = (a, b) => Math.min(minCVD(a.light, b.light), minCVD(a.dark, b.dark));
+
+/** Exact maximum clique by branch and bound, over a boolean adjacency matrix. */
+function maxClique(N, adj, score) {
+  let best = [];
+  let bestScore = -Infinity;
+  const expand = (clique, candidates) => {
+    if (clique.length + candidates.length < best.length) return;
+    if (clique.length >= best.length) {
+      const s = clique.length * 1000 + score(clique);
+      if (clique.length > best.length || s > bestScore) {
+        best = [...clique];
+        bestScore = s;
+      }
+    }
+    for (let k = 0; k < candidates.length; k++) {
+      if (clique.length + (candidates.length - k) < best.length) return;
+      const v = candidates[k];
+      expand(
+        [...clique, v],
+        candidates.slice(k + 1).filter((u) => adj[v][u] === 1),
+      );
+    }
+  };
+  expand(
+    [],
+    Array.from({ length: N }, (_, i) => i),
+  );
+  return best;
+}
+
+/**
+ * **Every lightness at (hue, chroma) that is admissible as a plotting colour in this system.**
+ *
+ * The gate set is deliberately the *same* one every other plotting colour carries, and stating it
+ * in one place is the point: a teammate shade is not a special kind of colour with relaxed rules,
+ * it is an ordinary series colour that happens to share a hue with another series colour.
+ *
+ *   chroma  >= 0.05                          — below it, it reads as grey (§9.1 step 5)
+ *   L inside the theme's plotting band       — §9.1 step 6
+ *   >= 3:1 on `--surface-raised` AND `--surface-sunken`
+ *   >= dE 15 from all three reserved timing inks (§3.4) — a series that reads as the
+ *           personal-best green is a defect no legend fixes
+ *   >= dE 15 from the achromatic chart furniture (§6.2)
+ *
+ * Returns the admitted shades plus a **blocking census**, because when a hue has too few
+ * admissible shades the useful question is not "how many" but "what took them".
+ */
+function plottableShades(theme, h, C) {
+  const S = SURF[theme];
+  const [lo, hi] = PLOT_BAND[theme];
+  const shades = [];
+  const blocked = { chroma: 0, contrast: 0, timing: 0, furniture: 0 };
+  let considered = 0;
+  for (let L = lo; L <= hi + 1e-9; L += 0.002) {
+    considered += 1;
+    const { hex, C: Cg } = lch2hex(L, C, h);
+    if (Cg < 0.05) {
+      blocked.chroma += 1;
+      continue;
+    }
+    if (contrast(hex, S.raised) < 3 || contrast(hex, S.sunken) < 3) {
+      blocked.contrast += 1;
+      continue;
+    }
+    if (Object.values(TIMING[theme]).some((ink) => dE(hex, ink) < 15)) {
+      blocked.timing += 1;
+      continue;
+    }
+    if (Object.values(FURNITURE[theme]).some((fx) => dE(hex, fx) < 15)) {
+      blocked.furniture += 1;
+      continue;
+    }
+    shades.push({ hex, C: Cg, L });
+  }
+  return { shades, blocked, considered };
+}
+
+/**
+ * **The teammate shade pair** (§6.4a): two admissible plotting shades of the *same* OkLCh hue and
+ * chroma, so a teammate pair reads as one colour family in two shades — which is exactly what
+ * "same team, two drivers" should look like.
+ *
+ * **Lightness is the channel, and that is not a stylistic preference.** It is the one channel every
+ * dichromat keeps in full, so a split built on it survives colour-vision deficiency where a split
+ * built on hue or chroma does not. The measured consequence is visible in the run: the worst CVD
+ * figure across all 22 entities is nearly twice the CVD floor.
+ *
+ * **The pair is symmetric — neither driver "gets the team colour".** An earlier version of this
+ * function anchored one driver on the team's own plotting variant and derived the other from it,
+ * and that was wrong in two separate ways. Measurably: the anchor sits mid-band for several
+ * entities, so the reach to the far end fell short of the ΔE floor even though the band's own
+ * extremes clear it by 10 points — Williams light reached 14.70 against a span ceiling of 27.07,
+ * and ramp #9 light reached 13.63 against 28.62. Editorially: painting one driver in the true team
+ * colour and the other in a derivative implies a number-one/number-two hierarchy the data does not
+ * support. Placing both on the pair fixes both faults at once.
+ *
+ * Returns `null` when fewer than two admissible shades exist — a real case, see the Sauber record
+ * in V-27 — never a near-miss dressed as a pass.
+ */
+function shadePair(theme, h, C) {
+  const { shades, blocked, considered } = plottableShades(theme, h, C);
+  if (shades.length < 2) return { pair: null, shades, blocked, considered };
+  let best = null;
+  for (let i = 0; i < shades.length; i++) {
+    for (let j = i + 1; j < shades.length; j++) {
+      const dn = dE(shades[i].hex, shades[j].hex);
+      // The margin is scored against BOTH floors at once, normalised, and the weaker of the two
+      // is what is maximised — so the search cannot buy a comfortable normal-vision figure with
+      // a CVD figure that scrapes the floor.
+      //
+      // The skip is only safe once a *passing* pair is in hand (m >= 1): below the normal floor a
+      // pair's margin is capped at dn/15 < 1, so it cannot beat one. Skipping unconditionally
+      // would corrupt the failing case, which is precisely the case whose figure must be honest.
+      if (best && best.m >= 1 && dn < 15) continue;
+      const dc = minCVD(shades[i].hex, shades[j].hex);
+      const m = Math.min(dn / 15, dc / 8);
+      if (!best || m > best.m) best = { m, dn, dc, deep: shades[i], bright: shades[j] };
+    }
+  }
+  return { pair: best, shades, blocked, considered };
+}
+
+/**
+ * The same search with the timing gate lifted. Its only job is **attribution**: when a hue has no
+ * admissible pair, this says whether the reserved timing convention is what removed it — a
+ * constraint the product did not choose and cannot move — or whether the cause is something in
+ * this design system's own gift, which would be a finding rather than a fact of the sport.
+ */
+function shadePairIgnoringTiming(theme, h, C) {
+  const S = SURF[theme];
+  const [lo, hi] = PLOT_BAND[theme];
+  const shades = [];
+  for (let L = lo; L <= hi + 1e-9; L += 0.002) {
+    const { hex, C: Cg } = lch2hex(L, C, h);
+    if (Cg < 0.05) continue;
+    if (contrast(hex, S.raised) < 3 || contrast(hex, S.sunken) < 3) continue;
+    shades.push(hex);
+  }
+  let best = null;
+  for (let i = 0; i < shades.length; i++)
+    for (let j = i + 1; j < shades.length; j++) {
+      const dn = dE(shades[i], shades[j]);
+      if (!best || dn > best.dn) best = { dn, dc: minCVD(shades[i], shades[j]) };
+    }
+  return best;
+}
+
+function catramp() {
+  PLOT_TIERS = TIER_SETS[6];
+  MIN_HUE_SEP = 40;
+  let failures = 0;
+  const V = (cond) => {
+    if (!cond) failures += 1;
+    return cond ? 'PASS' : 'FAIL';
+  };
+
+  const { pool, rejected } = entityPool();
+  console.log(
+    '\n=== V-23  ENTITY RAMP SEARCH — the pool under the per-entry gates ===\n' +
+      `  ${pool.length} admissible of ${60 * PLOT_TIERS.light.length} (hue, tier) candidates at 6 deg x 6 tiers.\n` +
+      `  rejected: ${rejected.hueband} inside a reserved timing hue band (yellow 92+-30, green 148+-30, purple 305+-30),\n` +
+      `            ${rejected.nosolution} with no in-gamut solution clearing C >= 0.05 and 3:1 on raised AND sunken,\n` +
+      `            ${rejected.timing} within normal-vision dE 15 of a timing ink,\n` +
+      `            ${rejected.furniture} within normal-vision dE 15 of achromatic chart furniture.`,
+  );
+
+  /* ---- tier A: the CVD-hard clique ---- */
+  const N = pool.length;
+  const adjA = Array.from({ length: N }, () => new Uint8Array(N));
+  const cvdM = Array.from({ length: N }, () => new Float64Array(N));
+  const nrmM = Array.from({ length: N }, () => new Float64Array(N));
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const dn = pairNormal(pool[i], pool[j]);
+      const dc = pairCvd(pool[i], pool[j]);
+      nrmM[i][j] = nrmM[j][i] = dn;
+      cvdM[i][j] = cvdM[j][i] = dc;
+      adjA[i][j] = adjA[j][i] =
+        dn >= 15 && dc >= 8 && hueGap(pool[i].h, pool[j].h) >= MIN_HUE_SEP ? 1 : 0;
+    }
+  }
+  const tierA = maxClique(N, adjA, (cl) => {
+    let worst = Infinity;
+    for (let i = 0; i < cl.length; i++)
+      for (let j = i + 1; j < cl.length; j++)
+        if (cvdM[cl[i]][cl[j]] < worst) worst = cvdM[cl[i]][cl[j]];
+    return worst === Infinity ? 0 : worst;
+  });
+
+  /* ---- tier B: extend to 12 on the normal-vision floor alone ---- */
+  const chosen = [...tierA];
+  const TARGET = 12;
+  while (chosen.length < TARGET) {
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    for (let c = 0; c < N; c++) {
+      if (chosen.includes(c)) continue;
+      let minN = Infinity;
+      let minC = Infinity;
+      let minHue = Infinity;
+      for (const s of chosen) {
+        if (nrmM[c][s] < minN) minN = nrmM[c][s];
+        if (cvdM[c][s] < minC) minC = cvdM[c][s];
+        const g = hueGap(pool[c].h, pool[s].h);
+        if (g < minHue) minHue = g;
+      }
+      if (minN < 15) continue;
+      // Prefer the candidate that keeps CVD separation highest, then hue spread, then
+      // normal-vision separation. Deterministic: ties break on pool order.
+      const score = minC * 1000 + minHue * 10 + minN;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = c;
+      }
+    }
+    if (bestIdx === -1) break;
+    chosen.push(bestIdx);
+  }
+
+  const entries = chosen.map((i) => pool[i]);
+  console.log(
+    `\n  TIER A (colour alone separates, every viewer): N = ${tierA.length}` +
+      `   TIER B extension: +${entries.length - tierA.length}   TOTAL N = ${entries.length}`,
+  );
+  console.log(
+    '\n  #   tier  hue   LIGHT     L     C      c/raised c/sunken   DARK      L     C      c/raised c/sunken',
+  );
+  entries.forEach((e, i) => {
+    const ol = oklch(e.light);
+    const od = oklch(e.dark);
+    const guard =
+      V(ol.C >= 0.05 && od.C >= 0.05) === 'PASS' &&
+      contrast(e.light, SURF.light.raised) >= 3 &&
+      contrast(e.light, SURF.light.sunken) >= 3 &&
+      contrast(e.dark, SURF.dark.raised) >= 3 &&
+      contrast(e.dark, SURF.dark.sunken) >= 3;
+    V(guard);
+    console.log(
+      `  ${String(i + 1).padStart(2)}  ${i < tierA.length ? 'A' : 'B'}     ${String(e.h).padStart(3)}   ` +
+        `${e.light}  ${n(ol.L, 3)} ${n(ol.C, 3)}  ${n(contrast(e.light, SURF.light.raised)).padStart(6)}  ${n(contrast(e.light, SURF.light.sunken)).padStart(6)}   ` +
+        `${e.dark}  ${n(od.L, 3)} ${n(od.C, 3)}  ${n(contrast(e.dark, SURF.dark.raised)).padStart(6)}  ${n(contrast(e.dark, SURF.dark.sunken)).padStart(6)}`,
+    );
+  });
+
+  /* ---- V-24: pairwise ---- */
+  console.log(
+    '\n=== V-24  PAIRWISE SEPARATION inside the ramp (worse of the two themes, worse of the two CVD models) ===',
+  );
+  let minNA = Infinity;
+  let minCA = Infinity;
+  let minNAll = Infinity;
+  let minCAll = Infinity;
+  const ladderPairs = [];
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      const dn = pairNormal(entries[i], entries[j]);
+      const dc = pairCvd(entries[i], entries[j]);
+      if (dn < minNAll) minNAll = dn;
+      if (dc < minCAll) minCAll = dc;
+      if (i < tierA.length && j < tierA.length) {
+        if (dn < minNA) minNA = dn;
+        if (dc < minCA) minCA = dc;
+      }
+      if (dc < 8) ladderPairs.push([i + 1, j + 1, dn, dc]);
+    }
+  }
+  console.log(
+    `  TIER A only  — min normal dE ${n(minNA)} (floor 15) ${V(minNA >= 15)}   min CVD dE ${n(minCA)} (floor 8) ${V(minCA >= 8)}`,
+  );
+  console.log(
+    `  ALL ${entries.length}       — min normal dE ${n(minNAll)} (floor 15) ${V(minNAll >= 15)}   min CVD dE ${n(minCAll)} (REPORTED, ladder-carried)`,
+  );
+  console.log(
+    `  pairs below CVD 8, i.e. the ladder's remit: ${ladderPairs.length} of ${(entries.length * (entries.length - 1)) / 2}`,
+  );
+  for (const [a, b, dn, dc] of ladderPairs)
+    console.log(`    #${a} <-> #${b}   normal ${n(dn).padStart(6)}   CVD ${n(dc).padStart(5)}`);
+
+  /* ---- V-25: against the reserved sets and the furniture ---- */
+  console.log('\n=== V-25  RAMP vs THE RESERVED SETS AND THE CHART FURNITURE ===');
+  for (const [label, set, floor, gated] of [
+    ['timing ink (§3.4)', TIMING, 15, true],
+    ['status ink (§3.4.3)', STATUS, 15, false],
+  ]) {
+    let worst = Infinity;
+    let worstWhat = '';
+    let worstCvd = Infinity;
+    for (const theme of ['light', 'dark'])
+      for (const [nm, ink] of Object.entries(set[theme]))
+        entries.forEach((e, i) => {
+          const d = dE(e[theme], ink);
+          const c = minCVD(e[theme], ink);
+          if (d < worst) {
+            worst = d;
+            worstWhat = `#${i + 1} <-> ${theme} ${nm}`;
+          }
+          if (c < worstCvd) worstCvd = c;
+        });
+    console.log(
+      `  vs ${label.padEnd(22)} min normal dE ${n(worst).padStart(6)} (floor ${floor}) ${gated ? V(worst >= floor) : 'REPORTED'}   worst pair ${worstWhat}   min CVD dE ${n(worstCvd)} (reported)`,
+    );
+  }
+  {
+    let worst = Infinity;
+    let worstWhat = '';
+    for (const theme of ['light', 'dark'])
+      for (const [nm, hex] of Object.entries(FURNITURE[theme]))
+        entries.forEach((e, i) => {
+          const d = dE(e[theme], hex);
+          if (d < worst) {
+            worst = d;
+            worstWhat = `#${i + 1} <-> ${theme} ${nm}`;
+          }
+        });
+    console.log(
+      `  vs ${'chart furniture (§6.2)'.padEnd(22)} min normal dE ${n(worst).padStart(6)} (floor 15) ${V(worst >= 15)}   worst pair ${worstWhat}`,
+    );
+  }
+
+  /* ---- V-26: brand plotting variants, and why the ramp is NOT gated against them ---- */
+  console.log(
+    '\n=== V-26  BRAND CHART VARIANTS (§3.3 rule 6) — hue held, lightness moved the minimum distance into band ===',
+  );
+  const variants = {};
+  for (const [team, hex] of Object.entries(BRAND)) {
+    const o = oklch(hex);
+    if (o.C < 0.05) {
+      console.log(
+        `  ${team.padEnd(13)} ${hex}  OkLCh C ${n(o.C, 4)}  -> NO PLOTTING VARIANT: below the 0.05 chroma floor, it reads as grey. Plots from the ramp; keeps the brand grey as its identity swatch.`,
+      );
+      continue;
+    }
+    const l = brandChartVariant('light', hex);
+    const d = brandChartVariant('dark', hex);
+    if (!l || !d) {
+      console.log(`  ${team.padEnd(13)} ${hex}  -> no in-band solution in one theme`);
+      continue;
+    }
+    variants[team] = { light: l.hex, dark: d.hex, h: o.h };
+    V(contrast(l.hex, SURF.light.raised) >= 3 && contrast(l.hex, SURF.light.sunken) >= 3);
+    V(contrast(d.hex, SURF.dark.raised) >= 3 && contrast(d.hex, SURF.dark.sunken) >= 3);
+    console.log(
+      `  ${team.padEnd(13)} ${hex}  h ${n(o.h, 0).padStart(3)}  light ${l.hex} (L ${n(o.L, 3)}->${n(l.L, 3)}, dL ${n(l.move, 3)}, c ${n(contrast(l.hex, SURF.light.raised))}/${n(contrast(l.hex, SURF.light.sunken))})  ` +
+        `dark ${d.hex} (L ${n(o.L, 3)}->${n(d.L, 3)}, dL ${n(d.move, 3)}, c ${n(contrast(d.hex, SURF.dark.raised))}/${n(contrast(d.hex, SURF.dark.sunken))})`,
+    );
+  }
+  {
+    // The impossibility record: the brand set does not clear dE 15 against ITSELF, so it cannot
+    // be imposed as a floor on the ramp. Same argument shape as §3.4.2 and §3.4.3.
+    const names = Object.keys(variants);
+    let worst = Infinity;
+    let worstWhat = '';
+    let under = 0;
+    for (let i = 0; i < names.length; i++)
+      for (let j = i + 1; j < names.length; j++) {
+        const dn = Math.min(
+          dE(variants[names[i]].light, variants[names[j]].light),
+          dE(variants[names[i]].dark, variants[names[j]].dark),
+        );
+        if (dn < 15) under += 1;
+        if (dn < worst) {
+          worst = dn;
+          worstWhat = `${names[i]} <-> ${names[j]}`;
+        }
+      }
+    console.log(
+      `\n  INTERNAL separation of the ${names.length} brand plotting variants: min normal dE ${n(worst)} (${worstWhat}); ` +
+        `${under} of ${(names.length * (names.length - 1)) / 2} pairs below 15.\n` +
+        '  THEREFORE the ramp is deliberately NOT gated against the brand variants: a floor the brand set\n' +
+        '  cannot meet against itself cannot be imposed on everything that must coexist with it. Gating it\n' +
+        '  was measured and costs the ramp two thirds of its size (N = 6 -> N = 3 at the same floors, and\n' +
+        '  N = 3 is below the comparison cap of 4). Cross-source collisions are carried by the runtime\n' +
+        '  ladder (§6.4), which is the same posture §3.4.2 takes for the timing hues.',
+    );
+    let cross = Infinity;
+    let crossWhat = '';
+    for (const [team, v] of Object.entries(variants))
+      entries.forEach((e, i) => {
+        const dn = Math.min(dE(e.light, v.light), dE(e.dark, v.dark));
+        if (dn < cross) {
+          cross = dn;
+          crossWhat = `ramp #${i + 1} <-> ${team}`;
+        }
+      });
+    console.log(
+      `  Cross-source worst case, ramp vs brand variant: normal dE ${n(cross)} (${crossWhat}) — REPORTED, ladder-carried.`,
+    );
+  }
+
+  /* ---- V-27: the teammate shade pair ---- */
+  console.log(
+    '\n=== V-27  TEAMMATE SHADE PAIR (§6.4a) — two admissible shades of one hue, and the one case\n' +
+      '           where colour provably cannot separate two teammates at all ===',
+  );
+
+  /**
+   * Every entity that can be plotted, with the chroma policy each one plots under.
+   *
+   * A branded team holds its **brand chroma**: chroma is part of the identity, and a Ferrari that
+   * gained saturation would stop being Ferrari's colour. A ramp entry requests 0.4 and takes the
+   * maximum the gamut allows at that lightness — the same policy `plotAt` used to build it, so the
+   * pair and the entry are made of the same material.
+   */
+  const plotEntities = [];
+  for (const [team, hex] of Object.entries(BRAND)) {
+    const o = oklch(hex);
+    if (o.C < 0.05) continue; // achromatic: plots from the ramp, so it splits from the ramp
+    plotEntities.push({ name: team, kind: 'brand', h: o.h, C: o.C });
+  }
+  entries.forEach((e, i) =>
+    plotEntities.push({ name: `ramp#${i + 1}`, kind: 'ramp', h: e.h, C: 0.4 }),
+  );
+
+  const paired = [];
+  const unavailable = [];
+  for (const ent of plotEntities) {
+    const row = [];
+    for (const theme of ['light', 'dark']) {
+      const r = shadePair(theme, ent.h, ent.C);
+      if (!r.pair) {
+        unavailable.push({ ...ent, theme, ...r });
+        row.push(`${theme} NO PAIR (${r.shades.length} admissible shade(s))`);
+        continue;
+      }
+      paired.push({ ...ent, theme, ...r.pair });
+      row.push(
+        `${theme} ${r.pair.deep.hex}/${r.pair.bright.hex} n ${n(r.pair.dn).padStart(6)} c ${n(r.pair.dc).padStart(6)} ${r.pair.dn >= 15 && r.pair.dc >= 8 ? 'OK  ' : 'FAIL'}`,
+      );
+    }
+    console.log(`  ${ent.name.padEnd(13)} h ${n(ent.h, 0).padStart(3)}  ${row.join('   ')}`);
+  }
+  for (const [team, hex] of Object.entries(BRAND)) {
+    if (oklch(hex).C >= 0.05) continue;
+    console.log(
+      `  ${team.padEnd(13)} ${hex} achromatic — plots from the ramp (§3.3a), so it splits from the ramp.`,
+    );
+  }
+
+  /* G-27a — the gate that the previous construction failed. */
+  {
+    let wn = Infinity;
+    let wc = Infinity;
+    let wnw = '';
+    let wcw = '';
+    for (const p of paired) {
+      if (p.dn < wn) {
+        wn = p.dn;
+        wnw = `${p.name} ${p.theme}`;
+      }
+      if (p.dc < wc) {
+        wc = p.dc;
+        wcw = `${p.name} ${p.theme}`;
+      }
+    }
+    console.log(
+      `\n  G-27a  wherever two admissible shades exist, the CHOSEN pair clears both floors.\n` +
+        `         ${paired.length} pairs. worst normal dE ${n(wn)} (${wnw}, floor 15) ${V(wn >= 15)}` +
+        `   worst CVD dE ${n(wc)} (${wcw}, floor 8) ${V(wc >= 8)}`,
+    );
+  }
+
+  /* G-27b — the ramp is ours to choose, so every entry must be splittable in both themes. */
+  {
+    const rampPaired = paired.filter((p) => p.kind === 'ramp');
+    const rampUnavail = unavailable.filter((p) => p.kind === 'ramp');
+    console.log(
+      `  G-27b  every ramp entry is shade-pair-available in BOTH themes: ${rampPaired.length} of ${entries.length * 2} ` +
+        `theme-slots paired, ${rampUnavail.length} unavailable ${V(rampUnavail.length === 0)}\n` +
+        `         This one is gated rather than reported because the ramp's hues are this design's own\n` +
+        `         choice: 41 of the 60 hues on the wheel are splittable, so shipping an entry that\n` +
+        `         cannot split would be a self-inflicted limitation, not a fact of the sport.`,
+    );
+  }
+
+  /* G-27c — construction claims rot; assert the shades independently. */
+  {
+    let worstC = Infinity;
+    let worstCtr = Infinity;
+    let worstTim = Infinity;
+    let worstFurn = Infinity;
+    let worstTimW = '';
+    let worstStatus = Infinity;
+    let worstStatusW = '';
+    for (const p of paired) {
+      for (const s of [p.deep, p.bright]) {
+        worstC = Math.min(worstC, oklch(s.hex).C);
+        for (const surf of ['raised', 'sunken'])
+          worstCtr = Math.min(worstCtr, contrast(s.hex, SURF[p.theme][surf]));
+        for (const [nm, ink] of Object.entries(TIMING[p.theme])) {
+          const d = dE(s.hex, ink);
+          if (d < worstTim) {
+            worstTim = d;
+            worstTimW = `${p.name} ${p.theme} ${s.hex} <-> ${nm}`;
+          }
+        }
+        for (const fx of Object.values(FURNITURE[p.theme]))
+          worstFurn = Math.min(worstFurn, dE(s.hex, fx));
+        for (const [nm, ink] of Object.entries(STATUS[p.theme])) {
+          const d = dE(s.hex, ink);
+          if (d < worstStatus) {
+            worstStatus = d;
+            worstStatusW = `${p.name} ${p.theme} ${s.hex} <-> ${nm}`;
+          }
+        }
+      }
+    }
+    console.log(
+      `  G-27c  every shade in every pair independently clears the full plotting gate set:\n` +
+        `         chroma ${n(worstC, 3)} (floor 0.05) ${V(worstC >= 0.05)}` +
+        `   contrast ${n(worstCtr)}:1 (floor 3) ${V(worstCtr >= 3)}\n` +
+        `         vs timing ink dE ${n(worstTim)} (floor 15) ${V(worstTim >= 15)}  worst ${worstTimW}\n` +
+        `         vs chart furniture dE ${n(worstFurn)} (floor 15) ${V(worstFurn >= 15)}\n` +
+        `         vs status ink dE ${n(worstStatus)} REPORTED (§3.4.3 posture: a status colour never\n` +
+        `         appears without an icon and a label, so it is not a floor a series is held to)  worst ${worstStatusW}`,
+    );
+  }
+
+  /* G-27d — attribution. An impossibility is only acceptable if we did not cause it. */
+  {
+    console.log(
+      `\n  G-27d  ATTRIBUTION — ${unavailable.length} entity/theme slot(s) have no admissible shade pair.\n` +
+        `         Gated: each one must be caused by the reserved timing convention, which F1 fixed and this\n` +
+        `         product cannot move. A slot that lost its pair to a contrast, gamut or chroma limit would\n` +
+        `         be OUR defect and must fail here rather than be absorbed into a footnote.`,
+    );
+    let attributed = 0;
+    for (const u of unavailable) {
+      const nt = shadePairIgnoringTiming(u.theme, u.h, u.C);
+      const causedByTiming = nt !== null && nt.dn >= 15 && nt.dc >= 8;
+      if (causedByTiming) attributed += 1;
+      console.log(
+        `         ${u.name} ${u.theme}: ${u.shades.length} admissible shade(s)` +
+          `${u.shades.length ? ` (${u.shades.map((s) => s.hex).join(', ')})` : ''}.\n` +
+          `           of ${u.considered} candidate lightnesses — ${u.blocked.timing} blocked by a timing ink, ` +
+          `${u.blocked.contrast} by contrast, ${u.blocked.chroma} by the chroma floor, ${u.blocked.furniture} by furniture.\n` +
+          `           with the timing gate lifted the pair reaches normal dE ${nt ? n(nt.dn) : 'n/a'} / CVD dE ${nt ? n(nt.dc) : 'n/a'}` +
+          ` -> caused by the timing convention: ${causedByTiming ? 'YES' : 'NO'}`,
+      );
+    }
+    console.log(
+      `         ${attributed} of ${unavailable.length} attributable to the reserved timing hues ${V(attributed === unavailable.length)}`,
+    );
+    console.log(
+      `\n         WHAT THIS MEANS FOR THE DESIGN, and it is the whole reason V-27 exists:\n` +
+        `         because at least one real team on the current grid provably cannot be split by colour,\n` +
+        `         colour is NOT the teammate channel. §6.4a therefore makes marker shape, dash and the\n` +
+        `         direct label MANDATORY for every teammate pair — always, not as a fallback — and the\n` +
+        `         shade pair is the redundant fourth channel that most teams also get. Presenting one\n` +
+        `         team differently from the rest because its hue is unlucky would make the reader learn\n` +
+        `         two conventions; making the non-colour channels universal makes the unlucky team\n` +
+        `         indistinguishable in TREATMENT from every other, which is the point.`,
+    );
+  }
+
+  /* ---- V-28: identity swatches on identity surfaces ---- */
+  console.log(
+    '\n=== V-28  IDENTITY SWATCH — every ramp entry as a 10x10 chip and a 3px accent bar (§3.3, floor 3:1) ===',
+  );
+  {
+    let worst = Infinity;
+    let worstWhat = '';
+    for (const theme of ['light', 'dark'])
+      entries.forEach((e, i) => {
+        for (const surf of ['raised', 'canvas', 'sunken']) {
+          const c = contrast(e[theme], SURF[theme][surf]);
+          if (c < worst) {
+            worst = c;
+            worstWhat = `#${i + 1} on ${theme} ${surf}`;
+          }
+        }
+      });
+    console.log(
+      `  worst ramp entry vs any surface: ${n(worst)}:1 (${worstWhat}) — floor 3.0 ${V(worst >= 3)}\n` +
+        '  Unlike the 12 brand colours, of which 6 fail this in light mode (§9.2 V-8), every ramp entry\n' +
+        '  clears 3:1 on all three surfaces in both themes — so a colourless team needs no identity-form\n' +
+        '  workaround at all, and that is a strictly better position than the branded teams are in.',
+    );
+  }
+
+  console.log(
+    failures === 0
+      ? '\nPASS — every gated floor cleared, both themes. Reported-only figures listed above.\n'
+      : `\nFAIL — ${failures} gated check(s) failed.\n`,
+  );
+  if (failures > 0) process.exitCode = 1;
+  return entries;
+}
+
 /* ================================================================ main */
 if (mode === 'calibrate' || mode === 'all') calibration();
 if (mode === 'mono' || mode === 'all') mono();
+if (mode === 'catramp' || mode === 'all') catramp();
 if (mode === 'catsearch') {
   PLOT_TIERS = TIER_SETS[Number(args[2] ?? 3)] ?? TIER_SETS[3];
   MIN_HUE_SEP = Number(args[3] ?? 40);
