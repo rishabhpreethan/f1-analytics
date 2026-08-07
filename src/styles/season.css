@@ -420,10 +420,10 @@
   .round-row {
     position: relative;
     display: grid;
-    grid-template-columns: calc(var(--spacing) * 10) minmax(0, 1fr);
+    grid-template-columns: calc(var(--spacing) * 10) minmax(0, 1fr) calc(var(--spacing) * 5);
     grid-template-areas:
-      'number name'
-      'number meta';
+      'number name arrow'
+      'number meta arrow';
     gap: calc(var(--spacing) * 1) calc(var(--spacing) * 3);
     padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4) calc(var(--spacing) * 3)
       calc(var(--spacing) * 4);
@@ -435,8 +435,60 @@
     border-bottom: none;
   }
 
-  .round-row:hover {
+  .round-row:hover,
+  .round-row:focus-visible {
     background-color: var(--surface-sunken);
+  }
+
+  /*
+   * The rows are anchors now (numbered rounds only — a cancelled round has no number and therefore no
+   * address, trap 15). `color: inherit` and no underline, because the affordance is the whole row
+   * lifting plus the chevron, not link styling on five different pieces of text.
+   */
+  a.round-row {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /*
+   * §7.3.0's lesson, applied: *"it was not broken, it was undiscoverable, and that is worse."* The
+   * chevron is the standing "go here" gesture in this product — `x: 3` on hover, the same nudge the
+   * hero CTA and `CapabilityCard` use — so a row reads as navigable without a new visual language.
+   */
+  .round-arrow {
+    grid-area: arrow;
+    align-self: center;
+    justify-self: end;
+    flex: none;
+    color: var(--ink-tertiary);
+    opacity: 0;
+    transition:
+      opacity var(--dur-fast) var(--ease-enter),
+      transform var(--dur-fast) var(--ease-enter),
+      color var(--dur-fast) var(--ease-enter);
+  }
+
+  .round-row:hover .round-arrow,
+  .round-row:focus-visible .round-arrow {
+    color: var(--accent-ink);
+    opacity: 1;
+    transform: translateX(3px);
+  }
+
+  /* A cancelled row is not a link, so it never shows the affordance. */
+  li > .round-row .round-arrow {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .round-arrow {
+      transition: none;
+    }
+
+    .round-row:hover .round-arrow,
+    .round-row:focus-visible .round-arrow {
+      transform: none;
+    }
   }
 
   @media (min-width: 48rem) {

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -79,12 +80,15 @@ const CANCELLED: CancelledRound = {
 
 function renderCalendar(rounds: SeasonRound[], cancelled: CancelledRound[] = [], markLaps = false) {
   return render(
-    <SeasonCalendar
-      entries={mergeCalendar(rounds, cancelled)}
-      notices={[]}
-      markLapCoverage={markLaps}
-      pending={false}
-    />,
+    <MemoryRouter>
+      <SeasonCalendar
+        entries={mergeCalendar(rounds, cancelled)}
+        notices={[]}
+        markLapCoverage={markLaps}
+        pending={false}
+        year={1951}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -187,7 +191,9 @@ describe('structure', () => {
   });
 
   it('holds its box while the query is in flight, and says busy once', () => {
-    render(<SeasonCalendar entries={null} notices={[]} markLapCoverage={false} pending />);
+    render(
+      <SeasonCalendar entries={null} notices={[]} markLapCoverage={false} pending year={1951} />,
+    );
     const busy = screen.getByRole('list', { name: 'Season calendar' });
     expect(busy.getAttribute('aria-busy')).toBe('true');
     expect(within(busy).queryAllByRole('status')).toHaveLength(0);
@@ -198,5 +204,52 @@ describe('structure', () => {
       round({ round: 2, name: 'Chinese Grand Prix', date: '2026-03-15', hasSprint: true }),
     ]);
     expect(screen.getByText('Sprint')).toBeTruthy();
+  });
+});
+
+/**
+ * ⚠ **The seam, asserted.** Rishabh asked *"how do I go to the race page?"* and the answer was that he
+ * could not: the race deep dive was reachable only by typing a URL. F2 was correct in isolation and F3
+ * was correct in isolation, and the path between them was in nobody's scope.
+ *
+ * These are the tests that would have caught it, and they are cheap. The lesson is in
+ * `DESIGN_SYSTEM.md` §1.0a: a surface naming an entity another surface owns must link to it, and the
+ * link is part of that surface's own deliverable rather than of the destination's.
+ */
+describe('every numbered round links to its race page', () => {
+  it('gives each raced round an href through its season', () => {
+    renderCalendar([round({ round: 7, name: 'British Grand Prix', date: '1951-07-14' })]);
+    const link = screen.getByRole('link', { name: 'Round 7, British Grand Prix' });
+    expect(link.getAttribute('href')).toBe('/seasons/1951/races/7');
+  });
+
+  it('links an UPCOMING round too — a scheduled race is a real destination', () => {
+    // Its race page shows the masthead, the circuit and the `notRun` notice. Treating a scheduled
+    // race as unreachable would repeat REQUIREMENTS.md §2.2's mistake in the navigation.
+    renderCalendar([
+      round({ round: 11, name: 'Hungarian Grand Prix', date: '2026-07-26', hasResults: false }),
+    ]);
+    expect(screen.getByRole('link', { name: /Hungarian Grand Prix/ })).toBeTruthy();
+  });
+
+  it('does NOT link a cancelled round, which has no number and therefore no address', () => {
+    renderCalendar([], [CANCELLED]);
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('names the link by where it goes, not by every value in the row', () => {
+    // The row's text would read "07 British Grand Prix Silverstone Circuit 14 Jul 1951 …" as one
+    // sentence. A link's accessible name should say its destination.
+    renderCalendar([round({ round: 7, name: 'British Grand Prix', date: '1951-07-14' })]);
+    const link = screen.getByRole('link', { name: 'Round 7, British Grand Prix' });
+    expect(link.getAttribute('aria-label')).toBe('Round 7, British Grand Prix');
+  });
+
+  it('carries a visible affordance, so a navigable row does not look like a static one', () => {
+    // §7.3.0: "it was not broken, it was undiscoverable, and that is worse."
+    const { container } = renderCalendar([
+      round({ round: 7, name: 'British Grand Prix', date: '1951-07-14' }),
+    ]);
+    expect(container.querySelector('a.round-row .round-arrow')).toBeTruthy();
   });
 });

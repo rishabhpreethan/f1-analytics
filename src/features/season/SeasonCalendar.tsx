@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router';
 import type { SeasonRound } from '@schemas/season';
 import { LoadingState } from '@/components/ui/LoadingState';
+import { ChevronRight } from '@/components/ui/icons';
 import { cssVar, identityToken } from '@/lib/entityColor';
 import { formatIsoDate } from '@/lib/format';
 import { SeasonNotes } from './SeasonNotes';
@@ -73,6 +75,8 @@ export interface SeasonCalendarProps {
    */
   markLapCoverage: boolean;
   pending: boolean;
+  /** Needed for the row's URL — a race is addressed through its season. */
+  year: number;
 }
 
 export function SeasonCalendar({
@@ -80,6 +84,7 @@ export function SeasonCalendar({
   notices,
   markLapCoverage,
   pending,
+  year,
 }: SeasonCalendarProps) {
   return (
     <section className="season-section" aria-labelledby="season-calendar-title">
@@ -103,7 +108,12 @@ export function SeasonCalendar({
         ) : (
           <ol className="season-calendar">
             {entries.map((entry) => (
-              <RoundRow key={entry.key} entry={entry} markLapCoverage={markLapCoverage} />
+              <RoundRow
+                key={entry.key}
+                entry={entry}
+                markLapCoverage={markLapCoverage}
+                year={year}
+              />
             ))}
           </ol>
         )}
@@ -112,7 +122,29 @@ export function SeasonCalendar({
   );
 }
 
-function RoundRow({ entry, markLapCoverage }: { entry: CalendarEntry; markLapCoverage: boolean }) {
+/**
+ * ⚠ **Every numbered round is a link to its race page, and its absence was a shipped defect.**
+ *
+ * Rishabh asked *"how do I go to the race page?"* and the answer was that he could not: the whole race
+ * deep dive was reachable only by typing a URL. Twenty-two rows carrying a round number, a grand prix
+ * name, a circuit, a date and a winner, and not one of them clickable.
+ *
+ * **A cancelled round is deliberately NOT a link**, and that follows from trap 15 rather than from
+ * taste: it has no round number, so it has no address. There is nothing to navigate to.
+ *
+ * **An upcoming round IS a link.** Its race page is a real destination — the masthead, the circuit and
+ * the `notRun` notice — and a scheduled race is not missing data (REQUIREMENTS.md §2.2), so treating
+ * it as unreachable would repeat that mistake in the navigation.
+ */
+function RoundRow({
+  entry,
+  markLapCoverage,
+  year,
+}: {
+  entry: CalendarEntry;
+  markLapCoverage: boolean;
+  year: number;
+}) {
   const status = roundStatus(entry);
   const winners = entry.kind === 'round' ? entry.round.winners : [];
   const leadWinner = winners[0];
@@ -128,8 +160,8 @@ function RoundRow({ entry, markLapCoverage }: { entry: CalendarEntry; markLapCov
       ? undefined
       : ({ '--identity': cssVar(identityToken(leadWinner.team.ref)) } as CSSProperties);
 
-  return (
-    <li className="round-row" data-status={status} style={identity}>
+  const content = (
+    <>
       <span className="round-number" aria-hidden="true">
         {entry.kind === 'round' ? String(entry.round.round).padStart(2, '0') : '—'}
       </span>
@@ -166,6 +198,41 @@ function RoundRow({ entry, markLapCoverage }: { entry: CalendarEntry; markLapCov
           ))
         )}
       </span>
+
+      {/*
+       * The affordance. A row that navigates and looks exactly like a row that does not is the coverage
+       * chip's lesson repeated — *"it was not broken, it was undiscoverable, and that is worse"*. The
+       * chevron nudges `x: 3` on hover and focus, the same gesture `CapabilityCard` and the hero CTA
+       * use, so this reads as the product's existing "go here" rather than as a new one.
+       */}
+      <ChevronRight size={16} className="round-arrow" />
+    </>
+  );
+
+  if (entry.kind === 'cancelled') {
+    return (
+      <li className="round-row" data-status={status} style={identity}>
+        {content}
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <Link
+        className="round-row"
+        data-status={status}
+        style={identity}
+        to={`/seasons/${String(year)}/races/${String(entry.round.round)}`}
+        /*
+         * The accessible name is built here rather than left to the row's text, which would read as
+         * "07 British Grand Prix Silverstone Circuit 13 May 1950 Nino Farina Alfa Romeo" — every value
+         * in the row, in order, as one sentence. A link's name should say where it goes.
+         */
+        aria-label={`Round ${String(entry.round.round)}, ${entry.round.name}`}
+      >
+        {content}
+      </Link>
     </li>
   );
 }

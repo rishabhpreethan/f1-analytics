@@ -102,7 +102,9 @@ describe('a loading state is never animated in', () => {
 
   it('puts no skeleton inside a reveal container — the calendar', () => {
     const { container } = render(
-      <SeasonCalendar entries={null} notices={[]} markLapCoverage={false} pending />,
+      <MemoryRouter>
+        <SeasonCalendar entries={null} notices={[]} markLapCoverage={false} pending year={1951} />
+      </MemoryRouter>,
     );
     const skeletons = [...container.querySelectorAll('.skeleton')];
     expect(skeletons.length).toBeGreaterThan(0);

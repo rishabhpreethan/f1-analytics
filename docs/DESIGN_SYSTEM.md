@@ -84,6 +84,41 @@ something present.** The mitigation generalises, and it is binding from here:
 query, a query result or a route parameter can be *absent* rather than *empty* — and the tell is a
 falsy check (`!width`, `?? 0`, `|| 1`) standing in for a three-state question.
 
+### 1.0a ⚠ The seam between two features is in nobody's scope _(added 2026-08-07)_
+
+**Rishabh asked "how do I go to the race page?" and the answer was that he could not.** The race deep
+dive — masthead, classification, four charts, the whole feature — was reachable only by typing a URL.
+`SeasonCalendar` rendered twenty-two rows carrying a round number, a grand prix name, a circuit, a date
+and a winner, and **not one of them was a link.**
+
+**Neither feature was wrong.** F2 was specified, built and reviewed against its own spec and is good.
+F3 was specified, built and reviewed against its own spec and is good. The path a reader takes *from one
+to the other* belonged to neither, so nobody walked it. That is a different failure from §1.0's — not
+"correct in the wrong space" but **"correct in isolation, unconnected in the whole"** — and it is the
+failure mode a feature-by-feature process produces by construction.
+
+**The rule, binding from here:**
+
+1. **A surface that names an entity another surface owns must link to it, and the link is part of *this*
+   surface's deliverable** — not the destination's. The calendar owes the race page its link; the race
+   page does not owe the calendar its inbound traffic.
+2. **Both directions are checked.** Here the back-link (`RaceMasthead` → `/seasons/:year`) existed and
+   the forward one did not, which is why "we have navigation between them" was true and useless.
+3. **A navigable element carries a visible affordance** (§7.3.0: *"it was not broken, it was
+   undiscoverable, and that is worse"*). Reuse the product's existing "go here" gesture — the `x: 3`
+   chevron nudge — rather than inventing a second one.
+4. **Not everything that names an entity can be linked, and the exceptions are principled.** A
+   cancelled round has no round number, so it has no address (trap 15) and is deliberately not a link.
+   An *upcoming* round is linked, because its race page is a real destination and treating a scheduled
+   race as unreachable would repeat `REQUIREMENTS.md` §2.2's mistake in the navigation.
+5. **Assert it.** `SeasonCalendar.test.tsx` checks the `href`, the accessible name, the affordance and
+   the cancelled exception. These are cheap tests and they are the ones that would have caught it.
+
+**The seams still to build, so they are not rediscovered one question at a time:** driver → races,
+driver → teams, team → seasons, team → drivers, circuit → races, race → circuit, race → drivers, and
+compare → every entity it holds. Each is one feature's obligation to another, and each will be invisible
+to a review that reads one feature at a time.
+
 ### 1.1 The three decisions that produce the character
 
 Everything else follows from these.
