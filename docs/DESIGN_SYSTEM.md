@@ -300,16 +300,101 @@ unchanged in character: **6 of 11 fall below 3:1 in light mode, all 11 pass in d
    - a 2px surface ring where marks overlap
 3. **Comparison is capped at 4 entities.** Satisfies the direct-label rule; collapses collision risk.
 4. **Runtime collision detection is required.** Given the selected entities, compute pairwise
-   perceptual distance and automatically assign a differentiator to any colliding pair. Implemented
-   in `src/lib/teamColor.ts`. _Thresholds and the differentiator ladder are specified in F1; the
-   distance metric and CVD models are already fixed by §9.1._
+   perceptual distance and automatically assign a differentiator to any colliding pair. **Specified
+   in §3.3a and §6.4; the ladder is in §6.4.** The distance metric and CVD models are fixed by §9.1.
 5. **Teammate comparison always collides** — identical team colour — and is simultaneously the most
-   valuable comparison in the product. Its differentiation treatment must be explicit, not emergent.
-   _Specified in F1/F7._
+   valuable comparison in the product. **Resolved in §6.4a, and the resolution is not primarily a
+   colour one:** for at least one team on the current grid, colour provably cannot separate two
+   teammates at all (§9.2.3 G-27d), so marker shape, dash and direct label are mandatory for every
+   teammate pair and the shade pair is a redundant fourth channel.
 6. **Per-theme chart-safe variants.** Brand colours failing the lightness band need a derived
    plotting variant per theme (a darkened Mercedes for light mode, etc.). Brand colour for identity;
-   derived variant for plotting. _Derived and validated in F1._
+   derived variant for plotting. **Derived, validated and shipped** — `--team-<ref>-plot` in
+   `src/styles/entity.css`, generated; figures in §9.2.3 V-26.
 7. **Validate anything new.** Run the validator (§9.1); fix FAILs; record results in §9.2.
+
+### 3.3a Entity colour encoding — the ramp is the norm, not the fallback
+
+**214 teams exist and 12 carry a `primary_color`** (queried, not remembered). The ramp is therefore
+**94% of the data**, and the brand colours are the enrichment. Designing the ramp as an afterthought
+would be designing for 6% of the product.
+
+Everything below is **generated** into `src/styles/entity.css` by
+`node scripts/validate-palette.mjs tokens`. Do not hand-edit that file: `scripts/entity-tokens.test.mjs`
+re-runs the emitter and diffs it, because a mistyped hex still renders, is still roughly the right
+colour, and silently makes every figure in §9.2.3 stop describing what ships.
+
+#### 3.3a.1 Three roles, and never mixing them up
+
+| Role | Token | What it is for |
+|---|---|---|
+| **Identity** | `--team-<ref>` | The **true brand colour**, theme-invariant. Swatches, 3px accent bars, team header bands — always beside a name (§3.3). **Never a chart mark.** |
+| **Plot** | `--team-<ref>-plot` · `--ramp-<n>-plot` | One series, one entity. Hue and chroma held from the brand; lightness moved the minimum distance into the theme's plotting band. |
+| **Shade pair** | `--*-plot-deep` · `--*-plot-bright` | Two drivers of **one** team in one plot area (§6.4a). |
+
+**Haas `#9C9FA2` and Cadillac `#AAAAAD` have an identity colour and no plotting colour.** Their OkLCh
+chroma is 0.0056 and 0.0043 — they read as pure grey, and this product's chart furniture is achromatic
+by design (grid `--border-subtle`, axis `--border-strong`, ticks `--ink-tertiary`). A grey series is
+confusable with the chart's own structure, which is a worse failure than being confusable with another
+team. **Both plot from the ramp, exactly like a colourless team.** This is not a downgrade and must not
+be "completed for symmetry" later; `entity.css.test.ts` asserts the absence.
+
+#### 3.3a.2 The ramp — 12 slots, two tiers of guarantee, one palette
+
+| Tier | Slots | Guarantee |
+|---|---|---|
+| **A** | 1–6 | Mutually **ΔE ≥ 15 normal-vision *and* ≥ 8 CVD** in both themes, and ≥ 40° apart in OkLCh hue. **Colour alone separates these, for every viewer.** 6 > the comparison cap of 4, so any admissible 4-subset is fully separated. |
+| **B** | 7–12 | Mutually, and against tier A, **ΔE ≥ 15 normal-vision** in both themes. CVD separation is measured and reported per pair, **not** gated — the 14 pairs below CVD 8 are precisely what §6.4's ladder exists to carry. |
+
+**What tier B buys is collision *rate*, and that is a product property.** With 202 teams drawing from
+the ramp, the probability that four randomly selected colourless teams land on four distinct slots is
+**0.278 at N = 6** and **0.573 at N = 12**.
+
+**What tier B must never buy is a near-miss.** Two entities in one plot are either the *same* slot — an
+exact collision, which the ladder resolves explicitly and visibly — or they are ≥ 15 apart. There are
+no near-misses by construction. Cadillac ↔ Haas at ΔE 3.8 is the failure this forbids, and it is worse
+than either of the other two cases because it reads as *"probably different, possibly not"*.
+
+**Lightness is a search dimension, and that single decision is what makes the ramp possible.** A
+hue-only ramp — one entry per hue at maximum chroma — caps at **N = 3** under a CVD floor of 8,
+measured. The reason is structural: a dichromat's colour space is essentially one chromatic axis
+(blue ↔ yellow) plus lightness, the yellow half of that axis is reserved by the F1 timing convention,
+and hue alone has almost nothing left to spend. Lightness is preserved *exactly* under every CVD
+model. Spending it is how the ramp gets past three. Each slot is a **(hue, lightness-tier)** pair; the
+hue is shared across themes so a slot is recognisably the same colour after a theme switch.
+
+#### 3.3a.3 Assignment — deterministic, by identity, never by rank
+
+A team without a `primary_color` takes slot `1 + (h mod 12)` where `h` is a stable hash of the team's
+`reference` (not its `id`, which is an insertion artefact, and not its name, which is edited).
+
+Three properties this must have, and each is a rule rather than an implementation note:
+
+1. **Stable across sessions, filters and reloads.** The same team is the same colour tomorrow.
+2. **Independent of the selection.** Adding a fourth entity must not repaint the first three (§6.2).
+3. **Independent of rank.** A championship-order palette would encode standing in hue and change
+   colour when the standings do.
+
+Implemented in `src/lib/entityColor.ts` — **not yet built; F1.** Its contract is fixed here: it maps
+an entity to a token *name*, never to a literal hex, so the theme keeps working and no colour is
+inlined into markup.
+
+#### 3.3a.4 CR-004 — team logos where colours collide
+
+Rishabh's proposal: use a logo where two brand colours collide and colour where they do not. **The
+slot is designed; the assets do not exist.**
+
+| | |
+|---|---|
+| **Slot** | 16×16 logo mark in a legend row and in a tooltip header, replacing the colour swatch for the colliding entities only |
+| **Assets** | `public/assets/teams/<reference>.svg` — square, 1:1, ≥ 64×64 viewBox, monochrome-capable (a single-path silhouette that can be filled with `currentColor`), named by `team.reference` |
+| **Status** | ⛔ **BLOCKED — R2, assigned to Rishabh.** Never fabricate, generate or hotlink a team logo. |
+| **Interim rendering** | The colour swatch plus the **ladder differentiator** (§6.4) — dash pattern and marker shape — and the team's name in `--ink-primary`. This is not a placeholder box; it is the full non-logo treatment and it is sufficient on its own. When a logo arrives it *adds* recognition, it does not fix a broken state. |
+| **Why the interim is genuinely sufficient** | The ladder already guarantees a non-colour channel for every colliding pair. The logo's value is recognition speed for an F1 fan, not disambiguation. |
+
+**Note for whoever picks CR-004 up:** a monochrome silhouette is required precisely *because* the
+colliding case is the one where colour cannot be trusted. A full-colour logo would reintroduce the
+collision inside the mark that exists to resolve it.
 
 **Identity-surface rule added in F0.** Because 6 of 11 brand colours fall below 3:1 against a light
 surface (§9.2 V-8), a brand colour is never the sole carrier of identity on an identity surface
@@ -660,7 +745,7 @@ GSAP documentation page it derives from. Sources consulted for this section:
 
 ### 4.2 Binding rules
 
-- **The timing / easing / stagger set is defined once** here and in `src/lib/motion.ts`. Ad-hoc
+- **The timing / easing / stagger set is defined once** here and in `src/lib/motion/tokens.ts`. Ad-hoc
   durations are how a product starts feeling incoherent — they are a review failure.
 - **`prefers-reduced-motion` must be honoured everywhere**, with a *specified* reduced variant. For
   a looping animation the reduced variant is **stopped, not slowed** — see §4.4.
@@ -701,7 +786,7 @@ this product. GSAP's default is `power1.out`; we never rely on the default, alwa
 `CustomEase`, `CustomBounce`, `CustomWiggle`. They overshoot or oscillate; this product decelerates
 like a mechanism, it does not wobble. Using one is a review failure.
 
-**Durations** — GSAP takes seconds. `src/lib/motion.ts` exports seconds; `tokens.css` mirrors the
+**Durations** — GSAP takes seconds. `src/lib/motion/tokens.ts` exports seconds; `tokens.css` mirrors the
 same figures in ms for CSS transitions.
 
 | Token | s / ms | Use |
@@ -740,9 +825,41 @@ with the library. Its replacement is a **preset pair** — a duration and an eas
 |---|---|---|
 | `stagger.char` | `{ each: 0.018, from: "start" }` | SplitText characters |
 | `stagger.nav` | `{ each: 0.035, from: "start" }` | dock items on mount |
-| `stagger.row` | `{ each: 0.024, from: "start" }` | table rows |
-| `stagger.card` | `{ each: 0.045, from: "start" }` | card and tile grids |
+| `stagger.row` | `{ each: 0.024, from: "start" }` | **list and table rows** — G-23, and a leaderboard's bars |
+| `stagger.card` | `{ each: 0.045, from: "start" }` | **card and tile grids** — G-23, G-15's children |
+| `stagger.bar` | `{ each: 0.06, from: "start" }` | **data marks growing from an axis** — G-27. First instance is the coverage ruler's six bars; every bar chart inherits it |
 | `stagger.cap` | 12 | items after the 12th get **zero** delay — a 20-row stagger at 24ms would take 480ms and break the 400ms interaction ceiling |
+
+**`stagger.cap` is expressed to GSAP as `amount`, not `each`.** `amount` distributes a *total* delay
+across however many targets there are, so `amount: min(count, 12) × each` caps the sequence length
+without capping the count. Implemented once as `staggerAmount()` in `src/lib/motion/scroll.ts`; a
+call site that passes `each` directly has reintroduced the 480ms bug.
+
+**Distances** — px. Small on purpose: every entrance here is a settle, not an arrival from off-screen.
+
+| Token | px | Use |
+|---|---|---|
+| `dist.nudge` | 6 | shell mount, dock item entrance |
+| `dist.step` | 8 | rows, popover rows |
+| `dist.rise` | 10 | route content enter |
+| `dist.lift` | 12 | dock container, sheet panel |
+| `dist.section` | 16 | G-15, a section revealing on scroll |
+| `dist.sheet` | 24 | the bottom sheet's travel |
+| `dist.magnet` | 6 | G-9's clamp |
+
+**Gesture magnitudes** — neither a duration nor a distance.
+
+| Token | Value | Use |
+|---|---|---|
+| `gesture.tilt` | 4 (degrees) | G-25's `rotationX` / `rotationY` clamp. Past ~6° a card stops reading as a plane responding and starts reading as a page rendering incorrectly |
+| `gesture.lift` | 1.015 (scale) | G-25. Deliberately small — the elevation is carried by `--elev-2`, not by the size change |
+
+> **Path correction, 2026-08-07.** §4.2 and this section previously said the token set lives in
+> `src/lib/motion.ts`. It does not and never did: it is **`src/lib/motion/tokens.ts`**, with the named
+> motions split across `surfaces.ts`, `scroll.ts`, `text.ts` and `interactions.ts` in the same
+> directory. `stagger.bar`, `dist` and `gesture` existed in that file and were missing from this table
+> — which is exactly the drift a "defined once" section is supposed to make impossible, so it is
+> recorded rather than quietly fixed.
 
 ### 4.4 Reduced motion is a `gsap.matchMedia()` condition, not an `if`
 
@@ -794,7 +911,7 @@ The old `M-1 … M-11` identifiers are **retired**. Any code comment or spec cit
 
 | ID | Motion | GSAP reference | Trigger | Spec | Reduced motion |
 |---|---|---|---|---|---|
-| **G-0** | Root reduced-motion guard | `gsap.matchMedia()` | app mount | one `gsap.matchMedia()` created in `src/lib/motion.ts`, exported; every ambient and spatial tween registers through it | — (this *is* the mechanism) |
+| **G-0** | Root reduced-motion guard | `gsap.matchMedia()` | app mount | one `gsap.matchMedia()` per scope, created inside `useMotion` (`src/lib/motion/useMotion.ts`); every ambient and spatial tween registers through it. `src/lib/motion/gsap.ts` is the single place the plugins are registered | — (this *is* the mechanism) |
 | **G-1** | Shell mount — header, dock | `gsap.timeline`, Eases | once per hard load | timeline: header `opacity 0→1, y −6→0`, `dur.base`, `ease.enter`; then dock container `opacity 0→1, x −12→0` (rail) / `y 12→0` (bottom dock) at `-=0.10`; then dock items `opacity 0→1, x −6→0`, `dur.fast`, `stagger.nav`. Total **≤460ms** | opacity only, `dur.fast`, no stagger, no transform |
 | **G-2** | Route content enter | `gsap.fromTo`, Eases | `location.pathname` change | `main > *`: `opacity 0→1, y 10→0`, `dur.base`, `ease.enter`. **No exit tween** — an exit would add its duration to every perceived navigation | opacity only, `dur.fast` |
 | **G-3** | Dock active-item indicator | `gsap.from` + Eases | active route change, and rail resize | one absolutely-positioned indicator element, a **fixed 2×20px** bar (2×16 in the bottom dock) **vertically centred** on the active item. Rail: tweens `y` to `offsetTop + (height − 20) / 2`, `dur.slow`, `ease.arrive`; the 2px `--accent-mark` edge rule tweens `scaleY 0.4→1` over `dur.fast`. Bottom dock: the same on `x`, same timing | **not created** — the indicator is positioned by a single `gsap.set()`. It snaps. Correct and intended |
@@ -868,8 +985,32 @@ the authority when the prose disagrees.
 | Scroll progress | — | **G-14** scrubbed | — | — | not rendered |
 | Link | — | **G-10** underline sweep | — | — | rest underline thickens instantly |
 
-**Chart entry motion** (`ease.mech`, `dur.chart`, axis-anchored growth for bars, left-to-right
-`strokeDasharray` draw for lines) is specified per-chart in §6.3 — F1.
+#### 4.6.2 Chart motion — G-27 … G-30 _(specified 2026-08-07)_
+
+This replaced a one-line forward reference that said chart entry was *"axis-anchored growth for bars,
+left-to-right `strokeDasharray` draw for lines"* and deferred the rest. The dasharray half of that
+sentence has been **withdrawn** — see G-28.
+
+| ID | Motion | GSAP reference | Trigger | Spec | Reduced motion |
+|---|---|---|---|---|---|
+| **G-27** | **Chart mount — axis-anchored bar growth** | `gsap.from` + `stagger`, Eases | chart mount, once | each bar `scaleY: 0 → 1` with `transformOrigin` at **the baseline** — `"center bottom"` for columns, `"left center"` for horizontal bars — `dur.chart`, `ease.mech`, `stagger.bar` via `amount` (capped at `stagger.cap`). **The origin is the axis, never the mark's own centre**: a bar that grows from its middle is not reporting a magnitude, it is decorating one. `ease.mech` (`circ.out`) is the "mechanical" curve and this is what it exists for. Total for a 12-bar chart: 12 × 60 + 400 = **1120ms** — outside the interaction ceiling and **legal only because a chart mount is not an interaction path**; a chart re-entering on a filter change would not be | opacity only, `dur.fast`, **no stagger, no `scaleY`**. Bars are at full length in the DOM from frame one |
+| **G-28** | **Chart mount — left-to-right reveal** for lines, areas, scatters and their markers | `gsap.to` on a transform, Eases | chart mount, once | **one tween for the whole mark layer.** The layer is wrapped in a `<g clip-path="url(#…)">`; the `<clipPath clipPathUnits="userSpaceOnUse">` holds a single `<rect>` covering the plot area, and the tween runs `scaleX: 0 → 1` on **that rect** with `transformOrigin` at the plot area's left edge. `dur.chart`, `ease.none` — a reveal that eased would imply the *time axis* was accelerating. Markers appear as the edge passes them, for free, with no per-marker tween | **not created.** The clip rect is at `scaleX: 1`, its authored state, so the chart is simply drawn |
+| **G-29** | **Chart data update — deliberately no motion** | — | any query result replacing another | **Nothing animates.** Marks are re-rendered at their new positions in one frame. The exception, and the only one: a **deliberate user action** that changes the entity set or the scope may cross-fade the mark layer, `opacity`, `dur.fast`, `ease.enter` — never a re-run of G-27 or G-28. A chart that re-animates while someone is reading it is a defect (§4.2), and this row exists so §4.6.1 can cite it per component instead of relying on a rule nobody looks up | identical — there is nothing to reduce |
+| **G-30** | **Crosshair and tooltip readout** | `gsap.quickSetter` (docs: *"quickSetter"*) | `pointermove` / arrow keys within a plot area | **the readout snaps; it never follows.** `quickSetter` writes the crosshair's `x` and the tooltip's `x`/`y` with **no tween at all** — `m.pointer`'s 600ms catch-up is for decoration (G-9, G-21, G-25), and a value readout that lags behind the cursor is misreporting which lap the reader is pointing at. The only motion is the tooltip's **arrival**: `opacity 0 → 1`, `dur.fast`, `ease.enter`, once per entry into the plot area, not per move | opacity kept (a 140ms crossfade is not what `reduce` protects against, §4.4 rule 1); position was never tweened, so nothing changes |
+
+**Why not `DrawSVG`, and why not `strokeDashoffset`.** `DrawSVG` is 9.7 KB gzipped and is not
+installed (§4.1). `strokeDashoffset` would need `getTotalLength()` per path and reveals at constant
+*arc* speed, so a steep segment of a lap-time trace crawls while a flat one races — the reveal would
+report gradient rather than time. It also animates a non-transform property, which would need a second
+exception to §4.2 on top of `offset-distance`. The clip-rect transform needs neither: it is a
+transform, it triggers no layout, it is exact against the **plot area** rather than the data's bounding
+box, and one tween covers every mark type at once. `clip-path` as a reveal channel is already
+precedented by G-26.
+
+**`clipPathUnits="userSpaceOnUse"` is load-bearing.** The default, `objectBoundingBox`, resolves
+against the *data's* bounding box, so a series that stops short of the right edge would finish its
+reveal early and a chart with one short series would reveal at a visibly different rate from its
+neighbour in a small-multiples grid.
 
 ---
 
@@ -1004,9 +1145,39 @@ There is no `--elev-3`. If something needs to float above an overlay, the design
 
 ## 6. Charts — form before colour
 
-Two libraries, one visual language. Recharts for standard charts, visx for lap-level charts
-(`ARCHITECTURE.md` §4). **They must be indistinguishable to a user** — shared axis, grid, legend and
-tooltip components; shared tokens.
+> **Superseded 2026-08-07.** This section previously read *"Recharts for standard charts, visx for
+> lap-level charts"*. `ARCHITECTURE.md` §10 #28 replaced both with **d3 primitives plus an in-repo
+> kit**, and **nothing is installed**. Any spec naming Recharts or visx is stale.
+
+**One kit, no library.** Every chart in this product is drawn by a small in-repo component set over
+d3's scale and shape primitives. The language below is specified so it is **buildable from those
+primitives** — no chart-library feature is assumed anywhere in it.
+
+**The d3 primitives the kit needs**, and nothing beyond them:
+
+| Package | Used for | Notes |
+|---|---|---|
+| `d3-scale` | `scaleLinear`, `scaleTime`, `scaleBand`, `scalePoint` | the whole coordinate system |
+| `d3-shape` | `line`, `area`, `curveLinear`, `curveMonotoneX`, `stack` | path generation |
+| `d3-array` | `extent`, `max`, `bisector`, `group`, `rollup` | domains, and the crosshair's nearest-point lookup |
+| `d3-time-format` | axis tick labels on a `scaleTime` | the one formatter d3 supplies that `src/lib/format.ts` does not; `ARCHITECTURE.md` §4 lists it |
+| `d3-axis` | ✗ **not used** | it writes DOM imperatively; §6.3's ticks are React output from `scale.ticks()` |
+| `d3-selection`, `d3-transition` | ✗ **not used** | React owns the DOM and GSAP owns motion. Two DOM writers in one subtree is the defect class this avoids |
+| `d3-format` | ✗ **not used** | numerals go through `src/lib/format.ts`. A second number formatter would drift on lap times, which are the one quantity in this product with a non-obvious form |
+
+**Cost, measured (`ARCHITECTURE.md` §4): the primitives are 16.33 KB gzipped** — against Recharts'
+121.72 KB import surface and visx's 29.96 KB. That is the whole reason the kit exists.
+
+**Everything is SVG, and every colour is a `var()`.** SVG presentation attributes are CSS properties,
+so `stroke: var(--ramp-3-plot)` resolves through `[data-theme]` and a theme switch needs no re-render
+and no JS colour table. **No component ever holds a literal hex.**
+
+**When the kit is built.** `ARCHITECTURE.md` §4 says the primitives are *"not installed until the first
+chart lands (F2)"*, so **F2 is the standing answer**. ⚑ **Flagged for Rishabh:** the only open question
+is whether any of it moves earlier — a records leaderboard or a head-to-head bar is buildable from
+`scaleBand` alone and could land in F1 without `d3-shape`. This section is complete either way and
+blocks nothing; §6.6 gives each chart's primitives so the call can be made on scope rather than on
+guesswork.
 
 ### 6.1 Specify every chart in this order
 
@@ -1033,13 +1204,251 @@ tooltip components; shared tokens.
 - **Recessive grid and axes.** The data is the subject. Grid lines `--border-subtle`, axis lines
   `--border-strong`, tick labels `--ink-tertiary` at `--text-2xs`, values `--font-mono`.
 - **A table view exists for every chart** — accessibility, and the discharge of the contrast WARN
-  in §3.2.
+  in §3.2. **Not optional, and not a link to somewhere else** — see §6.5.5.
+- **Points are never summed across eras.** 24 point systems, and some eras counted only best-N
+  results (`DATABASE.md` §7). A chart whose y-axis is "career points" is a defect, not a design
+  choice. Read `driver_championship`, or use a rate metric, and say which in the axis label.
 
-### 6.3 Per-chart specifications — _TO BE COMPLETED IN F1_
+**One permitted repaint, and it is named rather than hidden.** §6.2 forbids repainting survivors when
+the series count changes. Adding or removing a **teammate** re-shades that team's pair, because a
+shade pair only exists relative to its other member (§6.4a). It is a change in *entity relationship*,
+not in rank; it is always the result of a deliberate action in the compare tray; and it is the one
+case §4.2 allows a chart to re-animate. Nothing else may repaint.
 
-One entry per chart type in the product: championship progression, points gap, position chart,
-lap-time trace, stint timeline, pace degradation, pit timeline, grid-vs-finish, comparison views,
-records leaderboards.
+### 6.3 The chart furniture — one axis, one grid, everywhere
+
+Every figure below is a token. A chart that sets a literal is a review failure.
+
+| Element | Token | Geometry |
+|---|---|---|
+| Plot area | `--surface-sunken` | the plot area is **recessed**, so a mark's 3:1 floor is measured against it (§9.1) |
+| Axis line | `--border-strong` | **1px**, and **only on the measure axis** — see below |
+| Gridline | `--border-subtle` | **1px**, dashed `2 4`, perpendicular to the measure axis only |
+| Tick label | `--ink-tertiary` | `--text-2xs`, `--font-mono` for any numeral (§2.4 — tabular, always) |
+| Axis title | `--ink-secondary` | `--text-xs`, sentence case, **carries the unit** |
+| Crosshair | `--border-strong` | 1px, dashed `2 3` |
+| Mark stroke | entity token | **2px** |
+| Marker | entity token | **≥ 8px** across, 1.5px `--surface-sunken` ring where marks overlap |
+| Bar / area fill | entity token | **2px `--surface-sunken` gap** between adjacent fills |
+| Bar data-end | — | **4px** radius, **on the far end only**, square against the baseline |
+| Reference line (e.g. a personal best) | `--border-strong` | 1px, dashed `4 4`, label at the right end in `--ink-tertiary` |
+
+**One axis line, not two.** The category axis gets **no line** — the marks already sit on it and a
+second rule is a box drawn around the data. This is the recessive-furniture rule made specific, and it
+is the single most common way a competent chart still looks like a spreadsheet.
+
+**Tick density is a rule, not a judgement.** The kit computes ticks from `scale.ticks(n)` where `n`
+comes from the axis length, so density is consistent across every chart in the product:
+
+| Axis | Rule | Reason |
+|---|---|---|
+| Measure (usually y) | `max(3, min(6, round(px / 56)))` | 56px is comfortably more than `--text-2xs`'s 14px line-height plus breathing room; 6 is where a value axis starts reading as a ruler |
+| Time / round (usually x) | `max(2, min(12, round(px / 72)))`, then **drop labels, never ticks**, until none collide | a dropped tick loses the position; a dropped label loses only the reading |
+| Category (band) | **every band is labelled** | if they do not fit, the chart is horizontal instead — see below |
+
+**A category axis that does not fit rotates the chart, it never rotates the label.** Angled tick
+labels are ~20% slower to read and force a taller axis gutter. With more than ~7 categories, or any
+label over ~12 characters, the bar chart is **horizontal**: categories run down the left in
+`--text-xs`, the measure runs along the bottom.
+
+**Zero, and where the axis starts.**
+
+- A **bar or area** measure axis **always includes zero**. Length is the encoding; truncating it lies.
+- A **line** measure axis does not have to, because position is the encoding — but a non-zero
+  baseline is **always** stated in the axis title (`"Gap to leader (s) — axis does not start at 0"`).
+- A **position** axis (P1 … P20) is **inverted**, with P1 at the top. Never a numeric axis pointed the
+  ordinary way: in F1, up means faster, and 1 is the best value. Ticks at 1, 5, 10, 15, 20.
+
+### 6.4 Runtime collision detection and the differentiator ladder
+
+Given the entities the user selected, compute pairwise perceptual distance on **the colours actually
+assigned** (§9.1 metric, both CVD models, the theme in force) and assign a differentiator to any pair
+that collides. **This is a design requirement, not an optimisation** — it is what makes tier B of the
+ramp safe to ship (§3.3a.2) and it is what carries every cross-source collision.
+
+**Thresholds.** A pair collides when normal-vision ΔE < 15 **or** worst-model CVD ΔE < 8 — the same
+two floors the palette is built on, so a collision is by definition a pair the palette did not
+promise to separate.
+
+**The ladder.** Rungs are applied in order, and a colliding pair takes the lowest rung not already
+used by either member. Every rung is a **non-colour** channel; that is the whole point.
+
+| Rung | Channel | Applied as |
+|---|---|---|
+| **1** | **Direct label** | always present at ≤ 4 series, so rung 1 is free and already satisfied — a colliding pair is *never* unlabelled |
+| **2** | **Marker shape** | circle → square → triangle → diamond, in that fixed order, ≥ 8px, 1.5px `--surface-sunken` ring |
+| **3** | **Dash pattern** | solid → `6 3` → `2 3` → `9 3 2 3`, in that fixed order. Dash lengths are ≥ 2× stroke width so the pattern survives at 2px |
+| **4** | **Texture** | 45° hatch for area and bar fills, at `--border-subtle` over the entity colour. Also the print and CVD-preference rung — see §6.5.6 |
+
+Three rules that make the ladder trustworthy rather than decorative:
+
+1. **Rungs are assigned by entity identity, in the stable entity order — never by rank, never by
+   z-order.** Two entities that collide today must get the same two rungs tomorrow.
+2. **A rung is never withdrawn when a collision clears.** Removing the entity that caused a collision
+   does not restore a plain solid line for the survivor; that would be the repaint §6.2 forbids.
+3. **Comparison is capped at 4**, so the ladder never runs out: four rungs, four entities.
+
+#### 6.4a The teammate treatment — colour is not the channel
+
+Two drivers of one team is the most valuable comparison in the sport and the only truly like-for-like
+one. It is also the case where colour is **weakest**, and the measurement is unambiguous:
+
+> **Sauber's brand hue is 143 — inside the reserved green timing band. In light mode, exactly ONE
+> lightness in the whole plotting band clears ΔE 15 from `--timing-green-ink`: 109 of 161 candidates
+> are blocked by the green ink and 51 by contrast. A two-shade split is impossible.** (§9.2.3 G-27d.)
+
+So the treatment is **mandatory and non-colour first**, and it is identical for every team — including
+the nine whose colour *would* have worked. Presenting one team differently because its hue is unlucky
+would make the reader learn two conventions:
+
+| Channel | Rule |
+|---|---|
+| **Marker shape** | **Mandatory.** The team's two drivers take marker rungs 2's first two shapes — circle and square — in driver order |
+| **Dash pattern** | **Mandatory.** Solid and `6 3`, in driver order |
+| **Direct label** | **Mandatory.** Always available: a teammate comparison is ≤ 4 entities |
+| **Shade pair** | **When available.** `--*-plot-deep` and `--*-plot-bright` — two admissible plotting shades of the team's own hue and chroma, ≥ ΔE 15 normal and ≥ 8 CVD apart in both themes |
+
+**Driver order is `driver.reference` ascending** among the selected drivers of that team; the lower
+takes `deep`. `reference` is used because it is the only identifier with **100% coverage** —
+`permanent_car_number` covers 63 of 881 drivers and `abbreviation` 107 of 881 (queried).
+
+**Four properties of the shade pair, each measured:**
+
+1. **It is symmetric — neither driver "gets the team colour".** Both take a shade; the true brand
+   colour stays on the identity swatch beside each name. An earlier draft anchored one driver on the
+   team's plotting variant and derived the other from it, which failed twice over: measurably, because
+   a mid-band anchor cannot reach the floor (Williams light reached 14.70 against a span ceiling of
+   27.07), and editorially, because painting one driver in the true colour and the other in a
+   derivative implies a number-one/number-two hierarchy the data does not support.
+2. **The split spends lightness and nothing else.** Hue and chroma are held, so the pair reads as one
+   colour family in two shades. Lightness is the one channel every dichromat keeps in full, which is
+   why the worst measured CVD figure across all 22 entities is **14.18** — nearly twice the floor.
+3. **It is a property of the entity, not of the theme.** Available in both themes or withheld from
+   both. Sauber has an admissible pair in dark mode and it is **deliberately discarded**: an encoding
+   that changed with the theme would make a reader who had learned "two lines of one colour are one
+   team" unlearn it at sunset.
+4. **The ladder caps at two shades, and light mode sets the cap.** One hue supplies at most 2 mutually
+   separated shades in light mode (3 in dark, unusable per property 3), because light's band has its
+   usable top cut by the 3:1-against-white requirement. **Beyond two drivers of one team in one plot,
+   colour is exhausted outright** and rungs 1–3 carry the whole distinction. This happens for real —
+   a mid-season replacement driver — and it is a designed state, not an edge case.
+
+**Cross-era normalisation is made visible, never applied silently.** When a teammate comparison spans
+a regulation change or a scoring change, the chart carries a `--status-info` note above the plot
+naming what was normalised and what was not. A silently indexed axis is the same class of defect as a
+dual axis: it makes an incomparable comparison look fine.
+
+### 6.5 States, interaction and the table view
+
+#### 6.5.1 Hover and the crosshair
+
+| Form | Interaction |
+|---|---|
+| Line / area | **One crosshair, one tooltip, all series.** A vertical `--border-strong` 1px dashed `2 3` rule snapped to the nearest x via `d3-array`'s `bisector`; every series' value at that x in one tooltip, **sorted by value descending**, each row led by its entity swatch and marker glyph. Per-series hover tooltips on a multi-series line chart are the defect this replaces: they make the reader chase. |
+| Bar / dot / cell | **Per-mark tooltip.** The hovered mark keeps full opacity; siblings drop to `opacity: 0.4` — *opacity only*, never a colour change, because a changed colour would break the identity the swatch just promised. |
+| Hit target | **≥ 24px** on the cross-axis regardless of mark size — a transparent overlay rect per band, or a Voronoi for scattered points. A 2px line is not a hit target. |
+| Keyboard | The plot area is one tab stop. `←` / `→` step the crosshair by one x; `Home` / `End` jump to the ends; `↑` / `↓` move between series on a bar chart. The tooltip content is mirrored into an `aria-live="polite"` region so the reading is announced, not just drawn. |
+| Filters | One row **above** the chart, never inside the plot area, never floating over it. |
+
+**The tooltip is `--surface-overlay` at `--radius-md`, `--elev-2`, `--text-xs`, numerals `--font-mono`,
+and it never covers the mark it describes** — it flips side at the axis midpoint. It follows the
+pointer at `m.pointer`; under `reduce` it is positioned with a single `gsap.set` and snaps.
+
+#### 6.5.2 Legend at ≥ 2 series, direct labels at ≤ 4 — and how they coexist
+
+- **≤ 4 series: direct labels, and they are the primary identification.** Placed at the **end of the
+  line**, vertically de-collided by pushing apart to a 16px minimum gap, in `--ink-primary` at
+  `--text-xs` — **not** in the series colour (§6.2: text wears text tokens). A 12px leader line in the
+  entity colour connects label to mark where the de-collision moved it more than 8px.
+- **A legend is *also* present at ≥ 2 series**, above the plot, one row, each item = swatch + marker
+  glyph + dash sample + name. It is the only place the dash and marker rungs are stated, so it is
+  required even when direct labels make it redundant for identification.
+- **> 4 series does not happen in a comparison** (capped at 4). It happens on a season-wide chart —
+  and there the answer is not a bigger legend, it is **small multiples** (§6.5.4).
+
+#### 6.5.3 Empty, loading, error, partial and no-coverage — five states, and only one is a fault
+
+The five states are §7.4's; what follows is what each looks like *inside a plot area*. The plot area
+keeps its exact height in every one of them, so nothing reflows as a query resolves.
+
+| State | Rendering | Copy |
+|---|---|---|
+| **Loading** | Axes and gridlines render **immediately from the known domain**; the marks are a skeleton (G-11). The frame is never a spinner — the reader can already start reading the axes. | — |
+| **Empty** (a valid query, no matching rows) | Plot area at `--surface-sunken`, axes present, centred `--ink-secondary` `--text-sm` | "No results match these filters." + a `secondary` button, "Clear filters" |
+| **Error** | Plot area replaced by `ErrorState`; axes removed, because axes over an error imply the data is merely late | "This chart could not load." + "Try again" |
+| **Partial** (some series have data in the window, some do not) | The chart renders. Series with no data in the window appear in the legend **struck through** at `--ink-tertiary`, and a note above the plot names them | "Lap data begins in 1996. Two of the four drivers selected have no laps before then." |
+| **No coverage** (the whole window predates the data) | **Neutral, never a status colour.** `--ink-tertiary`, `--border-subtle`, `--surface-sunken`. The axes still render, with the coverage boundary drawn as a 1px dashed `--border-strong` vertical rule and a label | "Lap times begin in 1996. This race is from 1988, so there are no lap times to chart. Results, grid positions and championship standings are available for it." |
+
+**A no-coverage state is not an error and must never be painted `caution` or `critical` (§3.4.3).**
+Absent lap data before 1996 is a property of the sport's history. The copy always says three things:
+**where the boundary is**, **which side this request falls on**, and **what *is* available instead** —
+the third is the one that gets dropped, and it is the only one that helps.
+
+The exact boundaries, which every one of these strings must be generated from and never hardcoded
+(`GET /api/meta`): results **1950+** · qualifying **1994+** · Q1/Q2/Q3 **2006+** · lap times
+**1996+** · pit stops **2011+** · sprint **2021+**. **Zero of the 484 races before 1990 have lap
+data.**
+
+#### 6.5.4 Small multiples, and the scope→form rule
+
+The chart form is a function of the **time scope**, and it is not the user's choice to get wrong:
+
+| Scope | Form | Never |
+|---|---|---|
+| One season, ≤ 4 entities | per-round line or slope chart | — |
+| One season, > 4 entities | **small multiples**, one panel per entity, shared scales, 3 columns desktop / 2 tablet / 1 mobile | a 10-series spaghetti line |
+| A season range (2–10 seasons) | per-season line, one point per season | per-round across a range |
+| Full career / cross-era | per-season, and **always** with the normalisation note of §6.4a | per-round across 20 years |
+
+**Shared scales are mandatory in small multiples**, and the shared domain is stated once above the
+grid. Independent y-axes per panel is the same lie as a truncated bar axis.
+
+#### 6.5.5 The table view — in the same place, on every chart
+
+Every chart has a **"Table" toggle in its header**, beside the title, as a two-segment control
+(`Chart` / `Table`). Not a link, not a modal, not a separate route: the table replaces the plot **in
+place**, keeping the header, the filters and the caption. Three reasons this location is specified
+rather than left open:
+
+1. It is the discharge of §3.2's contrast WARN, so it must be reachable in one action from any chart.
+2. It is how a screen-reader user reads the data. A `<table>` with `<caption>`, `<th scope>` and
+   `--font-mono` tabular numerals is a better rendering for them than any `aria` narration of an SVG.
+3. Consistency is the point. A toggle that moves between surfaces is a toggle nobody finds twice.
+
+The SVG itself carries `role="img"` and an `aria-label` giving the chart's job and its headline
+reading — never a description of its appearance — plus `aria-describedby` pointing at the caption.
+
+#### 6.5.6 Texture, print, and the CVD preference
+
+Rung 4's 45° hatch is available on demand, not only on collision:
+
+- A **"Patterns" toggle** sits beside the table toggle. It promotes every series to rung 4 at once.
+  This is the CVD and print affordance, and it is a user control rather than a media query because
+  colour-vision deficiency is not something a browser reports.
+- `@media print`: patterns **on** unconditionally, plot area to `transparent`, gridlines to
+  `--border-strong`, and the table view rendered **after** the chart rather than instead of it.
+
+### 6.6 Per-chart specifications — the queue, and what each needs
+
+Specified as each surface lands, in `PLAN.md`, through §6.1's six steps. Listed here so the kit's
+scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
+
+| Chart | Job | Form | Primitives beyond `scaleLinear` |
+|---|---|---|---|
+| Championship progression | change over time | per-round cumulative line, **position axis inverted** | `scalePoint`, `d3-shape.line` |
+| Points gap to leader | change over time, polarity | per-round line, zero baseline = the leader | `d3-shape.area` |
+| Position chart (grid → finish) | change, per race | slope chart, 2 categorical positions | `scalePoint` |
+| Lap-time trace | change over time, dense | per-lap line, **1996+ only** | `d3-array.bisector` |
+| Pace degradation | change over time | per-lap scatter + a fitted trend line | none (fit is arithmetic) |
+| Pit timeline | magnitude, sequence | horizontal bar per stop, **2011+ only** | `scaleBand` |
+| Stint timeline | sequence | stacked horizontal bar | `d3-shape.stack` |
+| Records leaderboard | magnitude + identity | horizontal bar, direct-labelled | `scaleBand` |
+| Head-to-head | polarity | single diverging bar, centred at 0 | `scaleBand` |
+| Season heat map | magnitude across two categories | cell grid, per-mark tooltip | `scaleBand` × 2 |
+
+**Not in this list, and not to be added:** anything requiring tyre compounds, weather, sector times,
+telemetry or practice analysis. None of it exists in the data (`REQUIREMENTS.md` §6), and 423 FP1
+sessions hold 698 entries with no times at all.
 
 ---
 
@@ -1697,12 +2106,44 @@ themes, every separation floor passes, the background field is inside a corridor
 tokens' own floors rather than chosen, and — unlike every previous palette in this document —
 **there is not one residual CVD failure to mitigate.**
 
-**Still to validate in F1:** the derived per-theme chart-safe brand variants (§3.3 rule 6), the
+**Still to validate in F1:** ~~the derived per-theme chart-safe brand variants (§3.3 rule 6), the
 deterministic fallback ramp for the 202 colourless teams (§3.1), and the collision-detection
-thresholds (§3.3 rule 4). _The old constraint that the fallback ramp must exclude the Signal hue band
-(h 340–360) is **withdrawn** — there is no Signal hue any more. The replacement constraint is that a
-fallback ramp entry must clear OkLCh chroma **0.05**, so a colourless team is never painted something
-that reads as the achromatic interface accent._
+thresholds (§3.3 rule 4)~~ — **all three closed by §9.2.3 below, 2026-08-07.** _The old constraint that
+the fallback ramp must exclude the Signal hue band (h 340–360) is **withdrawn** — there is no Signal
+hue any more. The replacement constraint is that a fallback ramp entry must clear OkLCh chroma
+**0.05**, so a colourless team is never painted something that reads as the achromatic interface
+accent._
+
+#### 9.2.3 The entity palette — the ramp, the brand variants, the teammate pair, 2026-08-07
+
+Run: `npm run validate:palette` → V-23 … V-28, after the V-1 calibration block passes. Gates the
+entity colour layer of §3.3a and §6.4a; every figure in `src/styles/entity.css` is emitted by the same
+script (`… tokens`) from the same search, so the record and the stylesheet cannot part company.
+
+| Ref | What | Result |
+|---|---|---|
+| **V-23** | **Ramp search** — the pool under the per-entry gates | **158 admissible of 360** (hue, tier) candidates at 6° × 6 tiers. Rejected: **174** inside a reserved timing hue band (yellow 92 ± 30, green 148 ± 30, purple 305 ± 30), **20** with no in-gamut solution clearing C ≥ 0.05 and 3:1 on raised **and** sunken, **8** within ΔE 15 of a timing ink, **0** within ΔE 15 of chart furniture. **Tier A = 6, tier B = +6, total N = 12** |
+| **V-24** | **Pairwise separation inside the ramp** (worse theme, worse CVD model) | **Tier A alone: min normal ΔE 21.87** (floor 15) **PASS**, **min CVD ΔE 9.12** (floor 8) **PASS**. **All 12: min normal ΔE 15.23 PASS**; min CVD ΔE 0.35 **REPORTED, ladder-carried** — **14 of 66 pairs** below CVD 8, which is precisely §6.4's remit. **No near-misses exist by construction**: two entities are the same slot or ≥ 15 apart |
+| **V-25** | Ramp vs the reserved sets and the chart furniture | vs **timing ink** min normal ΔE **17.02** (floor 15) **PASS** · vs **chart furniture** min normal ΔE **19.40** (floor 15) **PASS** · vs **status ink** min normal ΔE 3.67 **REPORTED**, per §3.4.3's own posture: the status set fails CVD 7.5 against *itself* (`caution ↔ critical`), which is why a status colour never appears without an icon and a label, so it is not a floor a series colour can be held to |
+| **V-26** | **Brand chart variants** (§3.3 rule 6) — hue and chroma held, lightness moved the minimum distance into band | **PASS** for all 10 chromatic brands, both themes, ≥ 3:1 on raised and sunken. Largest lightness move: **Mercedes light, L 0.786 → 0.624 (ΔL 0.162)**. Haas and Cadillac get **no variant**: OkLCh C 0.0056 / 0.0043, below the floor. **The ramp is deliberately NOT gated against these variants** — the brand set does not clear ΔE 15 against *itself* (min **4.71**, RB ↔ Red Bull; **8 of 45 pairs** below 15), and gating it was measured to cost the ramp two thirds of its size (N 6 → 3, below the comparison cap of 4). Cross-source worst case, ramp ↔ brand variant: normal ΔE **2.36** (ramp #11 ↔ Mercedes) — **REPORTED, ladder-carried** |
+| **V-27 G-27a** | **Teammate shade pair** — the chosen pair clears both floors wherever two admissible shades exist | **PASS. 43 pairs.** Worst normal ΔE **17.27** (Sauber dark, floor 15) · worst CVD ΔE **14.18** (Sauber dark, floor 8) — **1.15× and 1.77× the floors**. This is the gate the previous construction failed at **13.63**; the fix was the construction, not the floor |
+| **V-27** | **Ladder ceiling** — how many mutually separated shades one hue can supply | **REPORTED: light mode max 2, dark mode max 3.** Light sets the cap because its band's usable top is cut by the 3:1-against-white requirement. Dark's third shade is **unusable** — a colour assignment whose count changed with the theme would be incoherent. So the pair is **capped at 2** and beyond two drivers of one team colour is exhausted outright (§6.4a property 4) |
+| **V-27 G-27b** | Every ramp entry is shade-pair-available in **both** themes | **PASS — 24 of 24 theme-slots paired.** Gated rather than reported because the ramp's hues are this design's own choice: **41 of the 60 hues** on the wheel are splittable, so shipping an unsplittable entry would be a self-inflicted limitation rather than a fact of the sport |
+| **V-27 G-27c** | Every shade independently clears the full plotting gate set | **PASS.** chroma **0.057** (floor 0.05) · contrast **3.00:1** (floor 3.0) · vs timing ink ΔE **15.08** (floor 15, worst = Aston Martin dark `#79E4B9` ↔ green) · vs chart furniture ΔE **16.46** (floor 15). vs status ink ΔE 2.24 **REPORTED**, per V-25's reasoning. *Construction claims are exactly what rots, which is why these are asserted rather than assumed from how the shades were built* |
+| **V-27 G-27e** | The pair is an **entity** property, not a per-theme one | **PASS — 0 entities ship lopsided.** The raw search splits **Sauber in dark only**; `pairBothThemes()` withholds it from both. **Found by `entity.css.test.ts`, not reasoned out in advance.** Emitting per-theme availability would mean a reader watched the *encoding* change at sunset |
+| **V-27 G-27d** | **Attribution** — every impossibility must be caused by something we did not choose | **PASS — 1 of 1 attributable.** **Sauber light: exactly ONE admissible shade** (`#03A20C`, ΔE 15.13 from `--timing-green-ink`). Of 161 candidate lightnesses, **109 blocked by a timing ink**, 51 by contrast, 0 by chroma, 0 by furniture. With the timing gate lifted the pair reaches normal ΔE 25.75 / CVD 24.19 — so the cause is the **reserved timing convention**, which F1 fixed and this product cannot move. A pair lost to a contrast or gamut limit would be **our** defect and fails this gate |
+| **V-28** | **Identity swatch** — every ramp entry as a 10×10 chip and a 3px accent bar | **PASS. Worst 3.05:1** (slot #10 on light sunken, floor 3.0). Worth stating plainly: **6 of the 12 brand colours fail this in light mode** (§9.2 V-8) and **every ramp entry clears it on all three surfaces in both themes** — so a colourless team needs no identity-form workaround at all, which is a strictly better position than the branded teams are in |
+
+**Verdict: ACCEPTED.** No floor was moved. The one impossibility is measured, attributed to a
+constraint outside this product's gift, and answered with a **non-colour** channel that is mandatory
+for every team rather than a special case for the unlucky one.
+
+**The finding worth carrying forward.** Sauber's brand hue is 143 — inside the reserved green band —
+and in light mode a two-shade split is not merely tight but *impossible*. That is why §6.4a does not
+treat colour as the teammate channel at all. The general form of the lesson: **a floor that a reserved
+set cannot meet against itself cannot be imposed on everything that must coexist with it.** This
+document now applies that same argument in four places — §3.4.2 (timing hues), §3.4.3 (status),
+V-26 (brand variants) and V-27 G-27d — and it is the same argument each time.
 
 **The validator lives at `scripts/validate-palette.mjs`, run by `npm run validate:palette`.** It is
 pure arithmetic, needs no dependency, and **self-calibrates against the pre-CR-007 recorded figures on
@@ -1714,7 +2155,10 @@ It exits non-zero when any floor fails, so it is usable as a gate and not only a
 ## 10. Theming mechanics
 
 - Tokens are **CSS custom properties** on `:root`, overridden under `[data-theme="dark"]`, so
-  Tailwind, Recharts and visx all read the same values (`ARCHITECTURE.md` §2).
+  Tailwind and the SVG chart kit read the same values (`ARCHITECTURE.md` §2). _Corrected 2026-08-07:
+  this line named Recharts and visx, both rejected by `ARCHITECTURE.md` §10 #28._ SVG presentation
+  attributes are CSS properties, so `stroke: var(--ramp-3-plot)` re-resolves on a theme switch with
+  no re-render and no JS colour table — see §6.
 - Preference is `system | light | dark`, stored at `localStorage["f1a.theme"]`, default `system`.
 - `prefers-color-scheme` is honoured on first load, and continues to be honoured — while the
   preference is `system`, changing the OS setting changes the app live (`matchMedia` listener).
@@ -1748,3 +2192,4 @@ It exits non-zero when any floor fails, so it is usable as a gate and not only a
 | 2026-08-06 | **The five changes Rishabh asked for after running the CR-007 build.** (a) **§3.6 rewritten: the accent is monochrome** — the pole of the neutral scale, `#08090C` light / `#FFFFFF` dark. The eleven-step `--signal-*` hue-350 ramp is **deleted from the product**; the aliases are declared directly as hexes. Emphasis moved to inversion, absolute contrast, typographic weight and motion, and **every accent mark gained 3.6–5.5× separation** from its background (§9.2.2 V-18). Two CR-007 placements could not survive an achromatic accent and were re-specified rather than kept, because near-black beside `--ink-primary` is ΔE ≈ 5: the wordmark's `1` became an inverted `F1` badge, and the landing headline's final word became a 2–3px outline behind an `@supports (-webkit-text-stroke)` guard. **V-10 … V-17 are retained for the record but describe a retired palette.** (b) **§7.7 rebuilt.** The three gradient orbs, the 48px grid and the contrast plate are gone; a 22px two-density dot lattice, a **pointer lamp** that hardens the dots under the cursor, a vignette and a single attenuation veil replace them. Every alpha is bounded by a **luminance corridor solved from the tokens' own floors** (V-21), which is also why the two themes' fields are different shapes rather than inversions. Corrects a **validator modelling error**: `mix-blend-mode: overlay` was modelled as a straight-alpha tint and consumed the entire light-mode budget on its own (V-21a). **G-19 retired**; **G-21 repurposed** from orb parallax to the lamp. There is now **no `filter` anywhere** in `backdrop.css`, asserted. (c) **§7.8 rewritten.** Three definite dock faults fixed — labels that clipped mid-word because nothing hid `.dock-label`, a glyph 8px off-centre because `padding-left: 22px` forgot the rail's own padding while its comment claimed otherwise, and an accidental vertical geometry — plus one that could not be reproduced, whose mechanism was removed rather than trusted twice: hover and focus are now `:hover` / `:focus-within` in CSS. The active item became an **inverted pill**. (d) **§7.3 respecified.** The coverage chip was never broken; it was undiscoverable. It gains a noun, a completeness meter in `CoverageRuler`'s language, a `--border-control` boundary and a disclosure chevron, and its skeleton became the chip's own box. (e) **§4.6 G-7 rewritten, G-8 retired, G-25 / G-26 added**, and **§4.6.1 added** — a per-component motion table, which is the reconciliation of the `y: -1` / `-2` / 2px-shipped conflict the brief flagged. §3.5.2's three stacked interactive-expression tables collapsed to one. **§9.2.2: V-18 … V-22 recorded, all PASS, and for the first time in this document with no residual CVD failure at all** | designer |
 | 2026-08-06 | **The rail again — *"the menu bar is still broken … please fix that side bar, its really broken."*** Three further faults, **all consequences of the full-height geometry the previous entry introduced**, all found by reading a screenshot of the built shell and each now expressed as arithmetic over tokens so a unit test can hold it (jsdom performs no layout, so none of the three is otherwise testable). (a) **Fault 4 — the rail painted over the header and hid the wordmark**: `top: --size-dock-inset` put it 16px from the viewport top, inside the 56px header band, at `--z-dock` 40 over `--z-header` 30, so the header read "ANALYTICS" collapsed and nothing expanded. `top` is now `calc(--size-header + --size-dock-inset)`. **New §7.8.3** records the resolution that was rejected — a full-height rail with the header padded left — and why it cannot hold: the rail expands to 248px, so any fixed header padding loses the wordmark the moment the rail opens. A z-index swap is not a third option; it trades a hidden wordmark for a clipped destination. (b) **Fault 5 — every collapsed glyph sat at an x set by the length of its own hidden label.** `flex: none` on an item inside a `justify-content: center` slot sized the box by `max-content`, and an `opacity: 0` label paints nothing but **lays out fully**. Two silent consequences: expanded, the seven destinations sat at x ≈ 105 while the pin sat correctly at 49; and the G-3 indicator was underneath the overflowing pill, i.e. `--accent-mark` on `--accent-fill`, invisible. Fixed by `width: 100%` + `min-width: 0`, and the centring divisor becomes the new **`--size-dock-lane` (46, not 48)** — `border-box` takes the dock's own two borders out of `--size-dock` as well as its padding, so the previous divisor was 2px wide even before the label sizing. **New tokens: `--size-dock-hairline`, `--size-dock-lane`**; `--size-dock-item`'s description corrected, and the test that asserted `--size-dock − 2 × pad === --size-dock-item` — a **passing assertion of a false invariant** — inverted rather than deleted. (c) **Fault 6 — the collapsed pin read as an empty box**: contrast was not the cause (~8.6:1 dark, ~7.4:1 light), ink *area* was, so the box gains a resting `--border-subtle` inset ring and a `--accent-wash` pressed state, deliberately not the active pill's inversion. **No colour token changed → §9's recorded figures stand; `validate:palette` re-run anyway and PASS.** CSS 9.75 → **9.83 KB gzipped** | designer |
 | 2026-08-04 | **CR-005** (`PLAN.md` §5.5): the upstream-attribution constraint is removed from §7.3 as a forward obligation — both the release-blocker framing and the derived clause in the ban list. The §7.3 ban on refresh/update language is **retained on independent grounds** (`REQUIREMENTS.md` §2.2 — a currency surface must not assume today's calendar position). **No copy string changed**: the coverage phrasing survives on its own merits. No token, colour, typography, motion or component change → no §9 validation run | designer |
+| 2026-08-07 | **The entity colour layer, the chart language and chart motion — F1's three open colour/chart items closed.** (a) **New §3.3a: entity colour encoding.** The ramp is stated as **94% of the data**, not a fallback — 214 teams, 12 with a `primary_color`. Three roles are separated and named (`--team-<ref>` identity, `--*-plot`, `--*-plot-deep`/`-bright`); the ramp is **12 slots in two tiers of guarantee** with the collision-rate arithmetic (0.278 at N = 6 → 0.573 at N = 12); assignment is a stable hash of `team.reference`, never rank; **Haas and Cadillac get identity and no plotting colour** because their OkLCh chroma is 0.0056 / 0.0043 and a grey series is confusable with this product's achromatic chart furniture. §3.3 rules 4–6 move from "specified in F1" to specified. **CR-004's logo slot is designed and its block is stated**: `public/assets/teams/<reference>.svg`, monochrome-capable, **R2, Rishabh's, undelivered**, with the ladder differentiator as a sufficient interim rather than a placeholder box. (b) **`src/styles/entity.css` is generated, not authored** — `node scripts/validate-palette.mjs tokens`, with `scripts/entity-tokens.test.mjs` diffing the emitter against the file and `src/styles/entity.css.test.ts` asserting the 16 things a stylesheet can be wrong about while still looking fine. The ramp search is extracted into `selectRamp()` so the validator and the emitter cannot disagree. (c) **§6 rewritten.** The Recharts + visx premise is **superseded** (`ARCHITECTURE.md` §10 #28): **d3 primitives plus an in-repo kit**, with the five packages the kit needs and the four it must not use named, and every colour a `var()` so a theme switch needs no re-render. New: **§6.3** the chart furniture with tick-density rules as arithmetic, one axis line not two, and the inverted position axis; **§6.4** the collision ladder — four rungs, all non-colour, assigned by identity and never withdrawn; **§6.4a** the teammate treatment; **§6.5** the five plot-area states with real copy, small multiples as the scope→form rule, the table view's exact location, and the patterns/print affordance; **§6.6** the per-chart queue with each chart's primitives. Whether the kit lands in F1 or F2 is **⚑ flagged for Rishabh**. (d) **§4.6.2: G-27 … G-30**, replacing a one-line forward reference. Axis-anchored bar growth; a **single-tween left-to-right reveal via a `scaleX` transform on a `userSpaceOnUse` clip rect** — the previously specified `strokeDasharray` draw is **withdrawn**, because it reveals at constant arc speed and so reports gradient rather than time, needs `getTotalLength()` per path, and would need a second exception to §4.2; **G-29 makes "no motion on data update" a citable named entry**; **G-30 states that a readout snaps and never follows** — `m.pointer`'s 600ms catch-up is for decoration, and a lagging crosshair misreports which lap the reader is pointing at. (e) **§4.3 drift corrected against `src/lib/motion/tokens.ts`**: `stagger.bar`, the whole `dist` table and the whole `gesture` table existed in code and were missing from a section that claims to define the set once; the `stagger.cap`-as-`amount` mechanism is now stated; and **four references to `src/lib/motion.ts`, a path that has never existed**, are corrected. (f) **§9.2.3 records V-23 … V-28.** **No floor was moved.** The teammate split's 13.63 failure was fixed by rebuilding the construction — a **symmetric shade pair** at two admissible shades of one hue, replacing an anchor-plus-derivative that could not reach the floor from mid-band — reaching worst-case **normal ΔE 17.27 / CVD 14.18** against floors of 15 / 8. **The measurement that changed the design: Sauber's brand hue 143 sits inside the reserved green band and in light mode exactly ONE lightness in the whole plotting band clears ΔE 15 from `--timing-green-ink` (109 of 161 candidates blocked by it), so a two-shade split is impossible.** Colour is therefore **not** the teammate channel: marker, dash and direct label are mandatory for every team, and the shade pair is a redundant fourth channel. G-27e — that the pair is an entity property and not a per-theme one — was **found by a test, not by reasoning**: Sauber had a dark pair and no light one, which would have changed the *encoding* at sunset, and the dark pair is now deliberately discarded. `vite.config.ts` gains `entity.css` in `test.css.include`; without it vitest blanks the import **silently, even for `?raw`**, and 14 of 16 assertions passed against `''`. **Measured cost: render-blocking CSS 9.79 → 10.86 KB gzipped, 43.4% of the 25 KB budget** — the entity layer's 144 declarations cost **1.07 KB**. Initial JS unchanged at 160.25 / 250 KB; no dependency was added, because the layer is CSS and the emitter is a dev-time script. Suite 339 → **358 tests**, 3 consecutive green runs | designer |
