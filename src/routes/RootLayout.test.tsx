@@ -146,7 +146,14 @@ describe('the route table', () => {
     ['/', 'Settle the argument.'],
     ['/seasons', /season/i],
     ['/seasons/2024', /^2024 season/i],
-    ['/seasons/2024/races/3', 'Round 3'],
+    /*
+     * A regex for the same reason the two season rows are (F3, 2026-08-07): the race page's `h1` is
+     * the round *number* with the race name appended for screen readers, so its accessible name is
+     * data-dependent — and in this test's fixture the race query cannot resolve, so the masthead is
+     * in its own resolving state. What the route table asserts is that the path reaches the race
+     * page, and a level-1 heading naming a race or a round is that claim.
+     */
+    ['/seasons/2024/races/3', /race|round/i],
     ['/drivers', 'Drivers'],
     ['/drivers/max_verstappen', 'Driver'],
     ['/teams', 'Teams'],

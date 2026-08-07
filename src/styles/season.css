@@ -949,4 +949,130 @@
   .season-entity-chip:disabled {
     opacity: 0.4;
   }
+
+  /* ================================================================= the race page (F3)
+   *
+   * Deliberately in this file and not its own: a race page is the season hub's anatomy applied to a
+   * round — the same panel, the same eyebrow, the same standings table, the same identity bar. A
+   * second stylesheet would have been a second set of those decisions.
+   */
+
+  .race-masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .race-headline {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  /* The round number is the page's largest type, at the same step the season year uses — one
+   * hierarchy across both surfaces rather than two. §2.3 reserves `--display-2xl`/`3xl` for the
+   * landing headline, so this stops at `xl`. */
+  .race-round {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-lg);
+    font-stretch: var(--font-stretch-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--text-display-lg--font-weight);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
+  }
+
+  @media (min-width: 48rem) {
+    .race-round {
+      font-size: var(--text-display-xl);
+      letter-spacing: var(--text-display-xl--letter-spacing);
+      line-height: var(--text-display-xl--line-height);
+    }
+  }
+
+  .race-round-label {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+  }
+
+  .race-name {
+    max-width: 34ch;
+  }
+
+  /* Interpuncts between the meta items, drawn by CSS so the markup carries no decorative glyph. */
+  .race-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .race-meta > span + span::before {
+    content: '·';
+    margin-inline-end: calc(var(--spacing) * 3);
+    color: var(--ink-tertiary);
+  }
+
+  .race-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 6);
+    margin: 0;
+  }
+
+  .race-count {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+  }
+
+  .race-count-figure {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-display-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-display-xs--line-height);
+  }
+
+  /*
+   * The result column. Three kinds from `selectGapDisplay`, and the distinction is carried by ink
+   * weight rather than by colour: a retirement is not a status to be alarmed by (§3.4.3), it is the
+   * ordinary outcome of about a fifth of every race ever run.
+   */
+  .race-result {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .race-result[data-kind='total'] {
+    color: var(--ink-primary);
+  }
+
+  .race-result[data-kind='gap'] {
+    color: var(--ink-secondary);
+  }
+
+  /* `status` is a word, not a number — "Engine", "+1 Lap", "Collision" — so it wears the text face. */
+  .race-result[data-kind='status'] {
+    color: var(--ink-tertiary);
+    font-family: var(--font-text);
+    font-size: var(--text-xs);
+  }
+
+  .standings-table tbody tr[data-outcome='didNotStart'] .standings-name,
+  .standings-table tbody tr[data-outcome='didNotQualify'] .standings-name,
+  .standings-table tbody tr[data-outcome='disqualified'] .standings-name {
+    color: var(--ink-tertiary);
+  }
 }
