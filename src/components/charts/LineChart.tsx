@@ -18,6 +18,7 @@ import {
   placeDirectLabels,
   plotArea,
   timeTickCount,
+  withEndpoints,
   TICK_LABEL_SIZE,
   tooltipHeight,
   TOOLTIP_WIDTH,
@@ -212,7 +213,32 @@ export function LineChart({
     label: formatY(value),
   }));
 
-  const xTicks = xScale.ticks(timeTickCount(plot.innerWidth)).map((value) => ({
+  /*
+   * §6.3 — **the first and last value are always labelled.** `d3.ticks` picks round numbers inside
+   * the domain and ignores its endpoints, which on a 1-based sequence loses the two readings that
+   * frame every other one: `[1, 58]` yields `[5, 10 … 55]`, so neither the first lap nor the last
+   * appears. `withEndpoints` forces both in and drops any interior tick that would crowd them.
+   *
+   * The crowding gap is the widest label plus a space, converted from px into domain units here —
+   * where the scale is already known — so `geometry` stays free of scales and stays testable.
+   */
+  const xDomainMin = xs[0] ?? 0;
+  const xDomainMax = xs[xs.length - 1] ?? 1;
+  const widestXLabel = Math.max(
+    monoTextWidth(formatX(xDomainMin)),
+    monoTextWidth(formatX(xDomainMax)),
+  );
+  const xGapInDomain =
+    plot.innerWidth > 0
+      ? ((widestXLabel + TICK_LABEL_SIZE) * (xDomainMax - xDomainMin)) / plot.innerWidth
+      : 0;
+
+  const xTicks = withEndpoints(
+    xScale.ticks(timeTickCount(plot.innerWidth)),
+    xDomainMin,
+    xDomainMax,
+    xGapInDomain,
+  ).map((value) => ({
     offset: xScale(value),
     label: formatX(value),
   }));

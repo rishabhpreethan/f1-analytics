@@ -117,6 +117,45 @@ export function prefersHorizontalBars(labels: readonly string[]): boolean {
 export const POSITION_TICKS = [1, 5, 10, 15, 20] as const;
 
 /**
+ * **The first and last value on a sequence axis are always labelled.** _(added 2026-08-07, F3)_
+ *
+ * `d3`'s `ticks(n)` picks round numbers inside the domain and has no interest in its endpoints, and
+ * on a 1-based sequence that loses the two readings a reader most wants:
+ *
+ * | Domain | `ticks(11)` | What is missing |
+ * |---|---|---|
+ * | 22 rounds | `[2, 4, … 22]` | **round 1** — the start of the season |
+ * | 58 laps | `[5, 10, … 55]` | **lap 1 and lap 58** — the start and the finish of the race |
+ *
+ * The 22-round case is **live in the season hub**: it went unnoticed because 2026 has 10 completed
+ * rounds and `ticks` on `[1, 10]` happens to include 1. Any completed season starts its axis at
+ * round 2.
+ *
+ * "Where does this start and end" is not a decorative reading on a race or a season — it is the
+ * frame for every other value on the axis. So both endpoints are forced in, and any interior tick
+ * that would crowd one of them is dropped. **Dropping the interior tick and never the endpoint**:
+ * an interior tick is one of eleven equivalent references, an endpoint is the only one of its kind.
+ *
+ * `minGap` is in **domain units**, not pixels, which is what keeps this function free of scales and
+ * therefore testable — the caller converts its pixel gap once, where it already knows the scale.
+ */
+export function withEndpoints(
+  interior: readonly number[],
+  min: number,
+  max: number,
+  minGap: number,
+): number[] {
+  if (max <= min) return [min];
+  const kept = interior.filter(
+    (tick) => tick > min && tick < max && tick - min >= minGap && max - tick >= minGap,
+  );
+  /* Sorted, because the axis renderer assumes ascending order and this function must guarantee its
+   * own postcondition rather than inherit it. `d3.ticks` happens to return sorted values today, so
+   * nothing depends on the caller staying that way. */
+  return [min, ...kept, max].sort((a, b) => a - b);
+}
+
+/**
  * **Should this series draw markers?** §6.3 sets a ≥8px marker floor; at some density that floor
  * makes markers collide into a bead chain that hides the line it is meant to annotate.
  *

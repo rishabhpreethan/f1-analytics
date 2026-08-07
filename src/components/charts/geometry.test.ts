@@ -7,6 +7,7 @@ import {
   LAP_TIME_CEILING_FACTOR,
   MARKER_RING,
   shouldDrawMarkers,
+  withEndpoints,
   computeMargin,
   mountKey,
   positionTicksWithin,
@@ -409,5 +410,49 @@ describe('lapTimeCeiling', () => {
     const racingRange = 122_340 - FASTEST;
     const unclippedRange = 1_168_144 - FASTEST;
     expect(racingRange / unclippedRange).toBeLessThan(0.1);
+  });
+});
+
+/**
+ * §6.3's endpoint rule. The two cases are the real ones: `d3.ticks(11)` on a 22-round season yields
+ * `[2, 4 … 22]` and on a 58-lap race yields `[5, 10 … 55]`, so round 1, lap 1 and lap 58 all go
+ * unlabelled. The 22-round case was **already live in the season hub** and went unnoticed only
+ * because 2026 has 10 completed rounds and `ticks` on `[1, 10]` happens to include 1.
+ */
+describe('withEndpoints', () => {
+  it('adds round 1 to a season axis that d3 started at 2', () => {
+    expect(withEndpoints([2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22], 1, 22, 0)).toEqual([
+      1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22,
+    ]);
+  });
+
+  it('adds both the first and the last lap of a race', () => {
+    const ticks = withEndpoints([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], 1, 58, 0);
+    expect(ticks[0]).toBe(1);
+    expect(ticks[ticks.length - 1]).toBe(58);
+  });
+
+  it('drops an interior tick that crowds an endpoint, never the endpoint itself', () => {
+    // An interior tick is one of eleven equivalent references; an endpoint is the only one of its
+    // kind, so the endpoint always wins. Here `2` crowds `1` and `20` crowds `22`, and both go.
+    expect(withEndpoints([2, 10, 20], 1, 22, 3)).toEqual([1, 10, 22]);
+  });
+
+  it('keeps an interior tick that clears the gap at both ends', () => {
+    expect(withEndpoints([5, 10, 18], 1, 22, 3)).toEqual([1, 5, 10, 18, 22]);
+  });
+
+  it('never duplicates an endpoint that d3 already produced', () => {
+    expect(withEndpoints([1, 5, 10], 1, 10, 0)).toEqual([1, 5, 10]);
+  });
+
+  it('collapses a single-value domain rather than emitting a reversed pair', () => {
+    expect(withEndpoints([], 7, 7, 0)).toEqual([7]);
+  });
+
+  it('guarantees ascending order rather than inheriting it from the caller', () => {
+    // `d3.ticks` returns sorted values, so nothing depends on this today — but the axis renderer
+    // assumes ordering, and a function should hold its own postcondition.
+    expect(withEndpoints([30, 10, 20], 1, 58, 0)).toEqual([1, 10, 20, 30, 58]);
   });
 });
