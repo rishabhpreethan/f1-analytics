@@ -1354,6 +1354,28 @@ the pixel boundary and rasterises as two half-intensity rows, which is how a "1p
 looking like a 2px grey smear and the recessive furniture stops being recessive. Nothing in this
 project can *see* that — there is no rasteriser in the pipeline — so it is applied by rule.
 
+**Marker density is a rule too, and the ≥8px floor is what forces it** _(added 2026-08-07, F3)_. A
+modern race is **58 laps over ~800px — 13.8px between adjacent points**, and an 8px marker with its
+1.5px ring occupies 11px. So at race density the markers nearly touch, and at four series there are
+232 of them hiding the lines they annotate. `geometry.shouldDrawMarkers` draws them only when adjacent
+points are **≥ 2×** the marker's full width apart; below that the line is the signal and the crosshair
+is the readout. Twice and not once, because touching and nearly-touching are both illegible — the same
+reasoning §6.4's dash rung applies to its period.
+
+**A lap-time axis has a mandatory ceiling, and this is measured, not stylistic** _(added 2026-08-07)_.
+On 2026 R1 (one session, 1,003 lap rows): fastest **82.091s**, median 85.228s, p90 98.755s, p99
+122.340s — and **maximum 1,168.144s**, a lap spent stationary under a red flag. That is not bad data;
+it is what the lap took. But an axis that accommodates it compresses every racing lap into **7% of the
+plot**, so an unclipped trace is a chart of one stoppage rather than of pace.
+
+The ceiling is **`fastest × 1.5`** — 123.1s on that race, just above p99, so it holds 99% of laps
+including pit and traffic laps while excluding the two stoppage laps. A multiple of the session's own
+fastest lap rather than a percentile, because it is a **physical** bound (a lap 50% slower than the
+best is not racing) and therefore means the same thing on a 90-second street circuit as on a 40-second
+oval. **Laps above it are never silently dropped:** an off-scale caret at the ceiling in the series
+colour, a count in a note above the plot, and their exact values in the table view — which every chart
+has (§6.5.5), and which is what makes clipping honest rather than lossy.
+
 **Tick density is a rule, not a judgement.** The kit computes ticks from `scale.ticks(n)` where `n`
 comes from the axis length, so density is consistent across every chart in the product:
 
@@ -1667,6 +1689,48 @@ The chart form is a function of the **time scope**, and it is not the user's cho
 
 **Shared scales are mandatory in small multiples**, and the shared domain is stated once above the
 grid. Independent y-axes per panel is the same lie as a truncated bar axis.
+
+#### 6.5.4a The rank chart — the one permitted many-series line _(added 2026-08-07, F3)_
+
+**`REQUIREMENTS.md` RD-1 is a P0 that this document, as written, forbade.** It asks for a per-lap
+position chart with *"every driver, one line each; the whole race as one picture"* — 22 lines. §6.5.2
+caps a comparison at 4 and sends anything above it to small multiples, *"never a 10-series spaghetti
+line"*. A requirement and a design rule cannot both simply win, so this resolves it rather than
+letting whoever builds it choose.
+
+**The rule was right and its scope was wrong.** §6.5.2 was written about series whose **values can
+coincide** — ten cumulative-points lines genuinely occlude one another, and there is no reading to be
+had. A **rank** chart is a different form:
+
+1. **The domain is a bounded ordinal and every line occupies a distinct slot.** At any lap, 22 lines
+   sit at 22 different y positions. There is no occlusion to resolve — the thing that makes ten value
+   lines unreadable does not occur.
+2. **The reader's task is not "read driver X at lap 30".** It is to see the *shape* of the race: where
+   the order churned, where the pit windows fell, who climbed. That is a gestalt reading, and it is
+   the one reading that **needs** the whole field — four lines out of twenty-two would show four
+   drivers moving against an invisible background and would be actively misleading about why.
+3. **Identification is by endpoint, not by legend.** The grid order runs down the left edge and the
+   finishing order down the right, which is how every position chart in the sport is read.
+
+So a rank chart may plot the whole field, **under all five of these conditions** — they are what keep
+it a chart rather than a texture, and a rank chart missing any of them is a defect:
+
+| Condition | Why |
+|---|---|
+| **The measure axis is a bounded rank**, inverted, P1 at the top | This is what makes the exemption sound. A rank chart of a continuous measure is not a rank chart. |
+| **No markers** | 22 × 58 is 1,276 markers. `shouldDrawMarkers` already refuses at this density (§6.3) and this is the case it was written for. |
+| **Direct labels at *both* ends** — grid on the left, finish on the right | Replaces a 22-row legend, which would be taller than the plot. The legend requirement of §6.5.2 is discharged by these, and **only** in this form. |
+| **Hover isolates: the hovered line goes to full opacity, every other drops to `0.4`** | Opacity only, never a colour change (§6.5.1). This is what turns the texture back into a single readable line on demand. |
+| **Selection still caps at 4** | Selecting up to four promotes them to the full marker-and-dash treatment and dims the field behind them. **The full field is context; analysis is still ≤ 4.** This is the sentence that reconciles the exemption with §6.2 rather than overriding it. |
+
+**Colour does not carry 22 series and is not asked to.** The field is ~10 teams × 2 drivers, so the
+teammate shade pair (§6.4a) is doing its ordinary job at scale; two cars of one team are two shades of
+one hue, which is exactly the reading a race engineer wants. Beyond that, colour identifies the
+*team* and position identifies the *driver* — and the endpoint labels close the gap.
+
+**This exemption is for the rank chart and nothing else.** A lap-time trace is a continuous measure
+and stays capped at 4 (RD-2 says "multi-select", which is the cap by another name). If a future
+surface wants a many-series continuous chart, it goes to small multiples as §6.5.4 says.
 
 #### 6.5.5 The table view — in the same place, on every chart
 

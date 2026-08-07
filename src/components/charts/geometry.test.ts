@@ -3,6 +3,10 @@ import {
   AXIS_GAP,
   CATEGORY_COUNT_LIMIT,
   clampTooltip,
+  lapTimeCeiling,
+  LAP_TIME_CEILING_FACTOR,
+  MARKER_RING,
+  shouldDrawMarkers,
   computeMargin,
   mountKey,
   positionTicksWithin,
@@ -340,5 +344,70 @@ describe('positionTicksWithin', () => {
 describe('mountKey', () => {
   it('is stable by value where an array literal is not', () => {
     expect(mountKey(['a'], 10, 20)).toBe(mountKey(['a'], 10, 20));
+  });
+});
+
+/**
+ * §6.3's marker-density rule. The figures are the ones that forced it: a modern race is 58 laps, a
+ * plot is ~800px, and an 8px marker with a 1.5px ring occupies 11px.
+ */
+describe('shouldDrawMarkers', () => {
+  it('refuses at race density — 58 laps across 800px', () => {
+    // 13.8px apart against a 22px floor (2x the 11px marker). This is the case it exists for.
+    expect(shouldDrawMarkers(58, 800)).toBe(false);
+  });
+
+  it('draws at season density — 22 rounds across 800px', () => {
+    // 38px apart. The season hub's progression chart must keep its markers.
+    expect(shouldDrawMarkers(22, 800)).toBe(true);
+  });
+
+  it('requires TWICE the marker width, not once', () => {
+    const full = MARKER_SIZE + 2 * MARKER_RING;
+    // Exactly one marker width apart is refused; exactly two is accepted.
+    expect(shouldDrawMarkers(2, full)).toBe(false);
+    expect(shouldDrawMarkers(2, 2 * full)).toBe(true);
+  });
+
+  it('always draws a single point, which cannot collide with anything', () => {
+    expect(shouldDrawMarkers(1, 0)).toBe(true);
+  });
+
+  it('DRAWS on an unmeasured plot — "not yet measured" is not "too dense"', () => {
+    // `useChartSize` reports 0 until the ResizeObserver fires. Treating that as dense would drop
+    // every marker on the first paint and pop them in, and would make the marker layer absent in
+    // jsdom — where the "a null reading is a gap, not a zero" assertion depends on counting them.
+    expect(shouldDrawMarkers(58, 0)).toBe(true);
+  });
+});
+
+/**
+ * §6.3's lap-time ceiling. Measured on 2026 R1: fastest 82.091s, p99 122.340s, max 1168.144s — the
+ * last being a lap spent stationary under a red flag.
+ */
+describe('lapTimeCeiling', () => {
+  const FASTEST = 82_091;
+
+  it('sits just above the 99th percentile of a real race', () => {
+    // p99 was 122_340ms. The ceiling holds it; an unclipped axis would be set by the 1168s lap.
+    expect(lapTimeCeiling(FASTEST)).toBeGreaterThan(122_340);
+  });
+
+  it('excludes the stoppage lap that would otherwise set the axis', () => {
+    expect(lapTimeCeiling(FASTEST)).toBeLessThan(1_168_144);
+  });
+
+  it('is a multiple of the session fastest, so it scales across circuit lengths', () => {
+    // A 40s oval and a 90s street circuit get proportionate ceilings, which a fixed
+    // millisecond bound would not give.
+    expect(lapTimeCeiling(40_000) / 40_000).toBe(LAP_TIME_CEILING_FACTOR);
+    expect(lapTimeCeiling(90_000) / 90_000).toBe(LAP_TIME_CEILING_FACTOR);
+  });
+
+  it('compresses the racing range to under a tenth of the plot if NOT applied', () => {
+    // The arithmetic behind "7% of the plot", asserted so the rule keeps its justification.
+    const racingRange = 122_340 - FASTEST;
+    const unclippedRange = 1_168_144 - FASTEST;
+    expect(racingRange / unclippedRange).toBeLessThan(0.1);
   });
 });

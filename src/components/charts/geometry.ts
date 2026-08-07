@@ -117,6 +117,62 @@ export function prefersHorizontalBars(labels: readonly string[]): boolean {
 export const POSITION_TICKS = [1, 5, 10, 15, 20] as const;
 
 /**
+ * **Should this series draw markers?** §6.3 sets a ≥8px marker floor; at some density that floor
+ * makes markers collide into a bead chain that hides the line it is meant to annotate.
+ *
+ * Measured need (F3): a modern race is **58 laps over ~800px of plot — 13.8px between adjacent
+ * points**. An 8px marker with its 1.5px surface ring occupies 11px, so at 58 laps the markers
+ * nearly touch, and at four series it is 232 of them. The line is the signal at that density and
+ * the crosshair is the readout.
+ *
+ * The rule: markers are drawn only when adjacent points are at least **twice** the marker's full
+ * width apart. Twice, not once, because touching markers and *nearly* touching markers are both
+ * illegible — the same reasoning §6.4's dash rung uses for its period.
+ */
+export function shouldDrawMarkers(pointCount: number, axisLengthPx: number): boolean {
+  if (pointCount < 2) return true;
+  /*
+   * **An unmeasured plot draws its markers.** `useChartSize` reports 0 until the `ResizeObserver`
+   * fires, and "not yet measured" is not "too dense" — treating it as dense would drop every marker
+   * on the first paint and then pop them in, and it would make the whole marker layer absent in
+   * jsdom, where no test could then assert that a `null` reading is drawn as a gap. Same convention
+   * as everywhere else here: absent means no constraint stated, never the worst case.
+   */
+  if (axisLengthPx <= 0) return true;
+  const spacing = axisLengthPx / (pointCount - 1);
+  return spacing >= 2 * (MARKER_SIZE + 2 * MARKER_RING);
+}
+
+/** The `--size-mark-ring` figure, needed by `shouldDrawMarkers`'s spacing arithmetic. */
+export const MARKER_RING = 1.5;
+
+/**
+ * **The ceiling for a lap-time axis, and why one is mandatory rather than optional.**
+ *
+ * Measured on 2026 R1 (`lap`, one session, 1003 rows): fastest **82.091s**, median 85.228s, p90
+ * 98.755s, p99 122.340s — and **maximum 1168.144s**. That last value is a lap spent stationary
+ * under a red flag, and it is not an error in the data; it is what the lap took. But an axis that
+ * accommodates it compresses every racing lap into **7% of the plot**, so an unclipped lap-time
+ * trace is not a chart of pace, it is a chart of one stoppage.
+ *
+ * The ceiling is **`fastest × 1.5`**, which on that race is 123.1s — just above p99, so it holds
+ * 99% of laps including pit and traffic laps while excluding the two stoppage laps. A multiple of
+ * the session's own fastest lap rather than a percentile, because it is a *physical* bound (a lap
+ * 50% slower than the best is not racing) and it therefore means the same thing on a 90-second
+ * street circuit as on a 40-second oval.
+ *
+ * **Laps above the ceiling are never silently dropped.** They render as an off-scale caret at the
+ * ceiling in the series colour, they are counted in a note above the plot, and their exact values
+ * are in the table view — which every chart in this product has (§6.5.5), and which is what makes
+ * clipping honest rather than lossy.
+ */
+export const LAP_TIME_CEILING_FACTOR = 1.5;
+
+export function lapTimeCeiling(fastestMs: number): number {
+  return fastestMs * LAP_TIME_CEILING_FACTOR;
+}
+
+/**
  * §6.5.1's tooltip width, in px, and **it must equal `--size-tooltip` in `tokens.css`** —
  * `tokens.css.test.ts` asserts that, because nothing else could.
  *

@@ -11,6 +11,7 @@ import { SeriesTable } from './ChartTable';
 import {
   clampTooltip,
   computeMargin,
+  shouldDrawMarkers,
   measureTickCount,
   monoTextWidth,
   mountKey,
@@ -216,6 +217,11 @@ export function LineChart({
     label: formatX(value),
   }));
 
+  /* The densest series decides, not the average: one 58-lap series among three short ones still
+   * produces the collision. */
+  const densestSeries = Math.max(1, ...resolved.map((s) => s.points.length));
+  const drawMarkers = shouldDrawMarkers(densestSeries, plot.innerWidth);
+
   const path = d3line<{ x: number; y: number | null }>()
     .defined((p) => p.y !== null)
     .curve(curveLinear)
@@ -395,19 +401,26 @@ export function LineChart({
                     style={{ '--series': cssVar(s.plot) } as React.CSSProperties}
                   />
                 ))}
-                {resolved.map((s) =>
-                  s.points
-                    .filter((p) => p.y !== null)
-                    .map((p) => (
-                      <MarkerGlyph
-                        key={`${s.reference}-${String(p.x)}`}
-                        shape={s.marker}
-                        token={s.plot}
-                        x={xScale(p.x)}
-                        y={yScale(p.y ?? 0)}
-                      />
-                    )),
-                )}
+                {/*
+                 * §6.3 — **markers only where they fit.** At race density (58 laps over ~800px,
+                 * 13.8px apart against an 11px marker) they collide into a bead chain that hides
+                 * the line, and at four series there are 232 of them. Below the spacing floor the
+                 * line is the signal and the crosshair is the readout.
+                 */}
+                {drawMarkers &&
+                  resolved.map((s) =>
+                    s.points
+                      .filter((p) => p.y !== null)
+                      .map((p) => (
+                        <MarkerGlyph
+                          key={`${s.reference}-${String(p.x)}`}
+                          shape={s.marker}
+                          token={s.plot}
+                          x={xScale(p.x)}
+                          y={yScale(p.y ?? 0)}
+                        />
+                      )),
+                  )}
               </g>
             </g>
 
