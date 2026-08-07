@@ -434,19 +434,81 @@ describe('selectGapDisplay — a lapped finisher shows a deficit, never a durati
     ).toEqual({ kind: 'status', text: 'Not classified' });
   });
 
-  it('falls back to `detail` when the race distance is unknown', () => {
+  /**
+   * **The leak this block was rewritten for.** `outcome: 'lapped'` with
+   * `isClassified: false` used to fall past the derivation into the `detail` branch, and
+   * because 2026's `detail` is the bare category name, `"Lapped"` reached the screen — one
+   * row reading `Lapped` directly beneath ten reading `+1 Lap` / `+2 Laps` / `+3 Laps` on
+   * 2026 R1.
+   *
+   * Both real rows: **2026 R1 Stroll at 43 of 58 laps (74.1%)** and **2026 R7 Albon at 55 of
+   * 66 (83.3%)**, each below the sport's 90% threshold — so `isClassified: false` is the
+   * field that matches the distance covered, and neither may be handed a derived deficit.
+   */
+  it.each([
+    ['stroll', 43, 58, 5_067_834, '+15 Laps'],
+    ['albon', 55, 66, 5_589_120, '+11 Laps'],
+  ])(
+    '%s ran %i of %i laps unclassified and reads "Not classified", never the category name',
+    (driverRef, lapsCompleted, raceLaps, totalTimeMs, wouldHaveFabricated) => {
+      const result = selectGapDisplay(
+        makeClassificationRow({
+          driverRef,
+          position: 17,
+          outcome: 'lapped',
+          detail: 'Lapped',
+          isClassified: false,
+          lapsCompleted,
+          totalTimeMs,
+        }),
+        { leaderTimeMs: 5_212_331, raceLaps },
+      );
+      expect(result).toEqual({ kind: 'status', text: 'Not classified' });
+      // Neither the enum's spelling nor a deficit he did not run.
+      expect(result.text).not.toBe('Lapped');
+      expect(result.text).not.toBe(wouldHaveFabricated);
+    },
+  );
+
+  /**
+   * An unclassified row whose `detail` **does** state a figure keeps it: 26 rows, 1956–2014.
+   * A figure is the data's own answer, and the rule is "never render `detail` when it is
+   * silent on the figure" — not "never render `detail`".
+   */
+  it('keeps a stated figure even on an unclassified row', () => {
     expect(
       selectGapDisplay(
         makeClassificationRow({
+          position: null,
           outcome: 'lapped',
-          detail: 'Lapped',
-          isClassified: true,
-          lapsCompleted: 57,
-          totalTimeMs: 4_991_394,
+          detail: '+4 Laps',
+          isClassified: false,
+          lapsCompleted: 41,
+          totalTimeMs: null,
         }),
-        { leaderTimeMs: R6_LEADER, raceLaps: null },
+        { leaderTimeMs: R6_LEADER, raceLaps: 65 },
       ),
-    ).toEqual({ kind: 'status', text: 'Lapped' });
+    ).toEqual({ kind: 'status', text: '+4 Laps' });
+  });
+
+  /**
+   * Classified, `detail` silent, and no race distance to derive against. Unreachable on this
+   * data — the minimum derived deficit across all 362 rows that reach the derivation is 1 —
+   * and reachable only by a self-contradictory row. An em dash rather than the category name.
+   */
+  it('shows an em dash when it is classified, silent and the distance is unknown', () => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        outcome: 'lapped',
+        detail: 'Lapped',
+        isClassified: true,
+        lapsCompleted: 57,
+        totalTimeMs: 4_991_394,
+      }),
+      { leaderTimeMs: R6_LEADER, raceLaps: null },
+    );
+    expect(result).toEqual({ kind: 'status', text: '—' });
+    expect(result.text).not.toBe('Lapped');
   });
 
   /**
@@ -468,7 +530,49 @@ describe('selectGapDisplay — a lapped finisher shows a deficit, never a durati
       }),
       { leaderTimeMs: 5_212_331, raceLaps: 58 },
     );
-    expect(result).toEqual({ kind: 'status', text: 'Lapped' });
+    expect(result).toEqual({ kind: 'status', text: '—' });
+    expect(result.text).not.toBe('+0 Laps');
+    expect(result.text).not.toBe('Lapped');
+  });
+
+  /**
+   * **The invariant, stated over the whole input space rather than over examples.**
+   *
+   * `"Lapped"` is the `outcome` enum's own spelling. It is a *category name* standing where a
+   * magnitude belongs, and the reason it escaped once is that it arrived through a fallback
+   * nobody enumerated. So this asserts the property directly across every combination of the
+   * three `detail` shapes the data holds, both `isClassified` values, a null and a real race
+   * distance, and lap counts either side of the distance — 3 x 2 x 2 x 4 = 48 cases.
+   */
+  it('never returns the category name for ANY combination of the inputs', () => {
+    const details = ['+2 Laps', 'Lapped', 'Not classified'];
+    const distances: (number | null)[] = [null, 58];
+    const lapCounts = [43, 57, 58, 60];
+
+    let checked = 0;
+    for (const detail of details) {
+      for (const isClassified of [true, false]) {
+        for (const raceLaps of distances) {
+          for (const lapsCompleted of lapCounts) {
+            const result = selectGapDisplay(
+              makeClassificationRow({
+                outcome: 'lapped',
+                detail,
+                isClassified,
+                lapsCompleted,
+                totalTimeMs: 4_991_394,
+              }),
+              { leaderTimeMs: 5_212_331, raceLaps },
+            );
+            expect(result.text).not.toBe('Lapped');
+            expect(result.text).not.toBe('lapped');
+            expect(result.text.length).toBeGreaterThan(0);
+            checked += 1;
+          }
+        }
+      }
+    }
+    expect(checked).toBe(48);
   });
 });
 

@@ -270,6 +270,15 @@ export function selectClassificationView(race: Race): ClassificationRowView[] {
 const DETAIL_STATES_LAP_DEFICIT = /^\+\d+ Laps?$/;
 
 /**
+ * The label for a car that ran without earning a classified position.
+ *
+ * **The dataset's own word for this state, not copy chosen here** — 171 rows with
+ * `status = 1` and `is_classified = 0` carry exactly this string, 1950 to 2004. Spelled once
+ * because two eras spell the same state differently (trap 22) and the column must not.
+ */
+const NOT_CLASSIFIED = 'Not classified';
+
+/**
  * What the result column shows for one row — **decided by `outcome`, never by whether a
  * time happens to be present.**
  *
@@ -395,32 +404,75 @@ function finishedResult(
  * on all 484 pre-1990 pages that have none — to correct a single row, so it is recorded
  * here instead.
  *
- * ## Why `isClassified` gates the derivation
+ * ## Why `isClassified` decides, and why it is never `detail` that decides
  *
  * A deficit relative to the winner is a statement about a car that **holds a position**
- * (§6.6.1: *"`isClassified` decides whether he holds a position"*). 172 `lapped` rows read
- * `detail: 'Not classified'`, and 171 of them are `isClassified: false` — deriving there
- * would print "+13 Laps" over the data's own "Not classified". The one exception is 1972 R12
- * Lauda, `isClassified: true` at P19 on 49 laps while `detail` denies the classification;
- * he will read a derived deficit. One row of 26,093, and the row is self-contradictory at
- * source.
+ * (§6.6.1: *"`isClassified` decides whether he holds a position"*), so an unclassified car
+ * has no deficit to state and must not be given a derived one — `+15 Laps` for a car that
+ * stopped is the same false assertion as `+8 Laps` for Sainz.
+ *
+ * **`detail` is never returned unless it states a figure, and that is the rule this
+ * function is built on.** `session_entry.detail` is a *display* string but not a stable
+ * vocabulary (trap 22), and on the modern rows it degenerates into the category name
+ * `"Lapped"` — which is the `outcome` enum's own spelling, restated where a magnitude
+ * belongs. Rendering it put one row reading `Lapped` directly beneath ten reading
+ * `+1 Lap` / `+2 Laps` / `+3 Laps` on 2026 R1.
+ *
+ * The `status = 1` rows are **exhaustively** three `detail` shapes against two
+ * `isClassified` values, counted, and each of the six has its own answer:
+ *
+ * | `detail` | classified | rows | shows | why |
+ * |---|---|---|---|---|
+ * | `+N Laps` | yes | 7,253 | that string | the data states the figure |
+ * | `+N Laps` | no | 26 | that string | **still a figure**, so still the data's own answer |
+ * | `Lapped` | yes | 361 | a derived `+N Laps` | classified, and the data is silent |
+ * | `Lapped` | **no** | **2** | `Not classified` | unclassified: no deficit to claim, and the category name must not ship |
+ * | `Not classified` | no | 171 | `Not classified` | the same state, in the data's older words |
+ * | `Not classified` | yes | 1 | a derived `+N Laps` | 1972 R12 Lauda, self-contradictory at source |
+ *
+ * **`Not classified` is the dataset's own wording for that exact state**, not copy invented
+ * here: 171 rows with `status = 1` and `isClassified = 0` carry it verbatim, 1950–2004. The
+ * two 2026 rows are the identical state under the newer spelling, so mapping them onto it
+ * normalises two spellings of one state — the same thing this function already does for
+ * `+N Laps` versus `Lapped`, and for the same reason.
+ *
+ * Both are real and both are genuinely unclassified: **2026 R1 Stroll at 43 of 58 laps
+ * (74.1%) and 2026 R7 Albon at 55 of 66 (83.3%)**, each below the sport's 90% threshold. So
+ * where `status` and `isClassified` disagree on these rows, `isClassified` is the one that
+ * matches the distance actually covered.
  */
 function lappedResult(
   row: Pick<RaceClassificationRow, 'detail' | 'isClassified' | 'lapsCompleted'>,
   raceLaps: number | null,
 ): GapDisplay {
+  // 1. The data states the deficit — pass it through verbatim, whatever `isClassified` says.
+  //    A figure is the data's own answer and nothing here can improve on it.
   if (DETAIL_STATES_LAP_DEFICIT.test(row.detail)) {
     return { kind: 'status', text: row.detail };
   }
 
-  if (row.isClassified && raceLaps !== null) {
+  // 2. No classified position, so no deficit to state. **Checked before the derivation**,
+  //    which is the whole fix: it is the branch a `detail` of "Lapped" used to fall through.
+  if (!row.isClassified) {
+    return { kind: 'status', text: NOT_CLASSIFIED };
+  }
+
+  // 3. Classified, and the data is silent on the figure — derive it.
+  if (raceLaps !== null) {
     const deficit = raceLaps - row.lapsCompleted;
-    // `formatLapDeficit` returns an em dash below one lap; `detail` is the better answer
-    // than a dash, so a non-positive deficit falls through rather than being rendered.
     if (deficit >= 1) return { kind: 'status', text: formatLapDeficit(deficit) };
   }
 
-  return { kind: 'status', text: row.detail };
+  /*
+   * 4. Classified, silent, and no derivable deficit. **Unreachable on this data** — the
+   *    minimum derived deficit across all 362 rows that reach step 3 is 1 — and reachable
+   *    only by a row that contradicts itself: `status` says "down laps" while `lapsCompleted`
+   *    claims the winner's distance, or a classification row exists with no race distance.
+   *    An em dash is the product's existing "we cannot state this", and it is the honest
+   *    answer where every alternative would either fabricate a figure or print the category
+   *    name this function exists to keep off the screen.
+   */
+  return { kind: 'status', text: formatLapDeficit(0) };
 }
 
 /**

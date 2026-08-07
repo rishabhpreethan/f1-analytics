@@ -746,6 +746,71 @@ describe.skipIf(!hasDatabase)('race queries against the live database', () => {
   });
 
   /**
+   * **The `detail` shapes for `status = 1` are a closed set of three, and the selector has an
+   * answer for each against both `isClassified` values.** A fourth shape appearing in a
+   * refresh would reach `src/features/race/selectors.ts`'s `lapped` branch with no handling
+   * written for it — which is exactly how the bare word `"Lapped"` reached the screen on
+   * 2026 R1 — so the set is pinned here rather than assumed.
+   */
+  it('trap 22 — three `detail` shapes for a lapped row, and nothing else', () => {
+    const rows = getDb()
+      .prepare(
+        `SELECT se.detail AS detail, se.is_classified AS isClassified, COUNT(*) AS n
+           FROM session_entry se JOIN session s ON s.id = se.session_id
+          WHERE s.type = 'R' AND se.status = 1
+          GROUP BY se.detail, se.is_classified`,
+      )
+      .all() as { detail: string; isClassified: number; n: number }[];
+
+    const shape = (detail: string) => (/^\+\d+ Laps?$/.test(detail) ? 'states a figure' : detail);
+
+    const tally = new Map<string, number>();
+    for (const row of rows) {
+      const key = `${shape(row.detail)} | classified=${String(row.isClassified)}`;
+      tally.set(key, (tally.get(key) ?? 0) + row.n);
+    }
+
+    // Six combinations, exhaustive. `Lapped | classified=0` is the pair that leaked: two
+    // rows, 2026 R1 Stroll and 2026 R7 Albon, both below the 90% distance threshold.
+    expect(Object.fromEntries([...tally].sort())).toEqual({
+      'Lapped | classified=0': 2,
+      'Lapped | classified=1': 361,
+      'Not classified | classified=0': 171,
+      'Not classified | classified=1': 1,
+      'states a figure | classified=0': 26,
+      'states a figure | classified=1': 7253,
+    });
+  });
+
+  /**
+   * The two rows that leaked are genuinely unclassified, so `isClassified` is the field to
+   * trust where it disagrees with `status`. Both covered less than the sport's 90% of the
+   * winner's distance, which is the threshold that decides classification.
+   */
+  it('the two unclassified-but-lapped rows are both below the 90% distance threshold', () => {
+    const rows = getDb()
+      .prepare(
+        `WITH mx AS (
+           SELECT se.session_id AS sid, MAX(se.laps_completed) AS ml
+             FROM session_entry se JOIN session s ON s.id = se.session_id
+            WHERE s.type = 'R' GROUP BY se.session_id
+         )
+         SELECT se.laps_completed AS lc, mx.ml AS raceLaps
+           FROM session_entry se
+           JOIN session s ON s.id = se.session_id
+           JOIN mx ON mx.sid = se.session_id
+          WHERE s.type = 'R' AND se.status = 1
+            AND se.detail = 'Lapped' AND se.is_classified = 0`,
+      )
+      .all() as { lc: number; raceLaps: number }[];
+
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.lc / row.raceLaps).toBeLessThan(0.9);
+    }
+  });
+
+  /**
    * The derivation's basis: `raceLaps` is `max(laps_completed)`, and for it to be a lap
    * deficit against the winner it has to *be* the winner's lap count. Trap 21 makes
    * `laps_completed` unreliable in general, so this is asserted rather than assumed — and it
