@@ -1779,6 +1779,75 @@ scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
 telemetry or practice analysis. None of it exists in the data (`REQUIREMENTS.md` §6), and 423 FP1
 sessions hold 698 entries with no times at all.
 
+**One row above is now wrong and is corrected here rather than edited silently.** *"Position chart
+(grid → finish) — slope chart, 2 categorical positions"* describes a different chart from RD-1, which
+asks for **per-lap** position for the whole field. The slope chart is still worth having as a compact
+summary, but it is not RD-1 and it does not discharge it. RD-1's form is the rank chart of §6.5.4a.
+
+#### 6.6.1 F3 — the race page, specified _(2026-08-07)_
+
+**The surface is not built: `/api/races/:year/:round` does not exist yet.** These are specified first
+because the endpoint shape depends on them, and because a chart spec written after the data layer
+tends to accept whatever the data layer happened to return.
+
+**The organising problem is that one page spans four coverage boundaries.** Measured, one race per
+era, `session.type = 'R'`:
+
+| Season | Drivers | Lap rows | Pit stops | What the page can show |
+|---|---|---|---|---|
+| 1988 R1 | 26 | **0** | **0** | classification and grid only |
+| 1996 R1 | 20 | 812 | **0** | + every lap chart, no stops |
+| 2011 R1 | 22 | 1,083 | 45 | everything |
+| 2026 R1 | 22 | 1,003 | 32 | everything |
+
+So **the majority of the archive is the reduced page, not the full one** — 484 races before 1990 have
+no lap data at all. The page is therefore designed from the bottom up: the classification table is the
+spine and every chart is an addition that may be absent, each carrying §6.5.3's three-part copy. A
+race page that renders four empty plots for 1988 is the defect this ordering prevents.
+
+**RD-10 · Race classification** — the spine, and not a chart. Job: identity, order and outcome.
+Form: a `<table>`, same anatomy as the season hub's standings (§7). `status` decodes through
+`DATABASE.md` §3 — **`detail` for display, `status` for grouping** — and a DNF is `status IN (10, 11)`,
+never `position IS NULL`. Gaps come from the recorded time, and a lapped finisher shows `+1 Lap`, not a
+duration. Identity bar per row in the team colour. **Available 1950+, so it never has a no-coverage
+state.**
+
+**RD-1 · Position by lap** — the flagship. Job: change over time, whole field. Form: the **rank
+chart** of §6.5.4a, all five conditions binding. Marks: 2px lines, **no markers** (`shouldDrawMarkers`
+refuses at 58 laps and this is the case it was written for). Interaction: crosshair with a
+lap-indexed tooltip; hover isolates one line to full opacity and drops the field to `0.4`; selecting
+≤4 promotes them to marker-and-dash. Colour: team, with the teammate shade pair doing its ordinary
+job at scale. Accessibility: endpoint labels both ends, table view, `aria-live` readout. **1996+.**
+
+**RD-2 · Lap-time trace** — Job: change over time, dense, ≤4 drivers. Form: per-lap line, capped at
+4 by §6.5.2 (RD-2's "multi-select" is that cap by another name). Marks: no markers at race density.
+**The measure axis carries the mandatory ceiling of §6.3** — `fastest × 1.5`, off-scale laps as a
+caret at the ceiling plus a counted note, exact values in the table. Invalidated laps
+(`lap.is_deleted`) are **excluded from the series and stated in the note**, never plotted. **1996+.**
+
+**RD-7 · Pit stop timeline** — Job: magnitude and sequence. Form: horizontal bar per stop, `scaleBand`
+by driver, x = lap. Marks: bar length is duration; §6.3's 4px data-end on the far end only. **The same
+outlier problem as the lap trace and the same treatment**: durations in 2026 R1 run 17.6s to
+**1,081.6s**, so the axis is clipped and the note counts what is above it. Copy must carry the
+cross-era caveat — `DATABASE.md` §2.4: *"duration semantics vary across eras (some stationary time,
+some pit-lane transit)"*, so **durations are never compared across decades without it**. **2011+.**
+
+**RD-3 · Stint reconstruction** — Job: sequence. Form: stacked horizontal bar, one row per driver,
+`d3-shape.stack`. **This is the one kit form F3 needs that does not exist**; `BarChart` does not stack.
+2px surface gap between adjacent fills (§6.3) is what makes the stint boundaries legible without a
+stroke. **2011+, because stints are derived from pit stops** — and a 1996 race therefore shows lap
+charts with no stint layer, which is a designed state and not a gap.
+
+**RD-4 · Pace degradation** — Job: change over time, within a stint. Form: per-lap scatter plus a
+fitted trend line; the fit is arithmetic, not a primitive. **Two honesty requirements, both from
+`REQUIREMENTS.md` RD-4's own note:** pit laps and the lap immediately after are excluded from the fit,
+and **there is no safety-car flag in the data** — so a candidate SC period is detected heuristically
+and labelled **inferred**, never as fact, in a `--status-info` note above the plot. **2011+.**
+
+**Queued, not yet specified:** RD-5 gap to leader (P1), RD-6 position-change events (P1), RD-9
+consistency (P1), RD-8 and RD-12 (P2). RD-11 weekend session times needs `session.timestamp` and
+`session.timezone` and is a list, not a chart.
+
 ---
 
 ## 7. Components
