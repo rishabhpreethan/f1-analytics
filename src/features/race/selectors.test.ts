@@ -5,8 +5,10 @@ import {
   race1988Fixture,
   race1996Fixture,
   race2026Fixture,
+  race2026R6Fixture,
 } from '@schemas/race.fixture';
-import type { Race } from '@schemas/race';
+import type { Race, RaceOutcome } from '@schemas/race';
+import type { ClassificationReference } from './selectors';
 import {
   resolveRaceRef,
   selectClassificationKey,
@@ -222,46 +224,347 @@ describe('selectClassificationKey — driverRef alone is not unique within a rac
  * RD-10.
  * ================================================================================== */
 
-describe('selectGapDisplay — three kinds, because the sport shows three things', () => {
+/**
+ * **`selectGapDisplay` — the negative-gap regression, and the enum as the checklist.**
+ *
+ * The defect: `/seasons/2026/races/6` rendered six negative durations, down to
+ * `−2:02:28.126`, because the branch keyed on `totalTimeMs !== null` and a retiree's
+ * recorded time is their elapsed time *when they stopped* — smaller than the winner's.
+ *
+ * These tests are organised by `outcome` rather than by era, per `DESIGN_SYSTEM.md` §1.0b:
+ * `raceOutcomeSchema` has eight members, 2026 R6 exercises three, and the state that
+ * mattered was "non-finisher **with** a recorded time", which no era-chosen fixture had.
+ */
+
+/** The winner of 2026 R6. Every gap on that page is measured against this. */
+const R6_LEADER = 8_611_243;
+
+const ref = (over: Partial<ClassificationReference> = {}): ClassificationReference => ({
+  leaderTimeMs: R6_LEADER,
+  raceLaps: 78,
+  ...over,
+});
+
+describe('selectGapDisplay — a finisher is the only row a duration belongs on', () => {
   it('shows the winner a total time, not a gap to itself', () => {
     expect(
-      selectGapDisplay({ position: 1, totalTimeMs: 5_766_857, detail: 'Finished' }, 5_766_857),
+      selectGapDisplay(makeClassificationRow({ position: 1, totalTimeMs: 5_766_857 }), {
+        leaderTimeMs: 5_766_857,
+        raceLaps: 60,
+      }),
     ).toEqual({ kind: 'total', text: '1:36:06.857' });
   });
 
   it('shows a full-distance finisher the gap to the leader', () => {
     expect(
-      selectGapDisplay({ position: 2, totalTimeMs: 5_776_730, detail: 'Finished' }, 5_766_857),
+      selectGapDisplay(makeClassificationRow({ position: 2, totalTimeMs: 5_776_730 }), {
+        leaderTimeMs: 5_766_857,
+        raceLaps: 60,
+      }),
     ).toEqual({ kind: 'gap', text: '+9.873' });
-  });
-
-  /**
-   * The rule §6.6.1 states explicitly. 7,450 of 7,814 lapped finishers carry no duration,
-   * so `detail` is the ordinary source here — and a gap column that computed a duration
-   * anyway would be inventing one.
-   */
-  it('shows a lapped finisher its lap deficit from `detail`, never a duration', () => {
-    expect(
-      selectGapDisplay({ position: 6, totalTimeMs: null, detail: '+1 Lap' }, 5_766_857),
-    ).toEqual({
-      kind: 'status',
-      text: '+1 Lap',
-    });
-  });
-
-  it('shows a retirement its status text', () => {
-    expect(
-      selectGapDisplay({ position: null, totalTimeMs: null, detail: 'Engine' }, 5_766_857),
-    ).toEqual({ kind: 'status', text: 'Engine' });
   });
 
   it('falls back to a total time when no leader time exists at all', () => {
     expect(
-      selectGapDisplay({ position: 4, totalTimeMs: 100_000, detail: 'Finished' }, null),
-    ).toEqual({
-      kind: 'total',
-      text: '1:40.000',
-    });
+      selectGapDisplay(makeClassificationRow({ position: 4, totalTimeMs: 100_000 }), {
+        leaderTimeMs: null,
+        raceLaps: 58,
+      }),
+    ).toEqual({ kind: 'total', text: '1:40.000' });
+  });
+
+  /**
+   * One row in the archive: 1950 R7 Ascari, P2, `detail: 'Finished'`, no recorded time. An
+   * em dash in a column of times would read as a data gap; the recorded word does not.
+   */
+  it('falls back to `detail` for the one finisher with no recorded time', () => {
+    expect(
+      selectGapDisplay(
+        makeClassificationRow({ position: 2, totalTimeMs: null, detail: 'Finished' }),
+        ref(),
+      ),
+    ).toEqual({ kind: 'status', text: 'Finished' });
+  });
+});
+
+describe('selectGapDisplay — the regression: a non-finisher never gets a duration', () => {
+  /**
+   * The six rows from the report, with their real recorded times. Each one produced a
+   * negative duration; each must now read the word the data records.
+   */
+  it.each([
+    ['sainz', 8_012_889, 70, true, '−9:58.354'],
+    ['leclerc', 5_142_849, 64, false, '−57:48.394'],
+    ['stroll', 4_516_761, 56, false, '−1:08:14.482'],
+    ['norris', 3_396_709, 43, false, '−1:26:54.534'],
+    ['bearman', 2_217_098, 27, false, '−1:46:34.145'],
+    ['bottas', 1_263_117, 15, false, '−2:02:28.126'],
+  ])(
+    '%s retired with a recorded time and reads "Retired", not %s',
+    (driverRef, totalTimeMs, lapsCompleted, isClassified, wasRendering) => {
+      const result = selectGapDisplay(
+        makeClassificationRow({
+          driverRef,
+          position: 16,
+          outcome: 'mechanical',
+          detail: 'Retired',
+          isClassified,
+          lapsCompleted,
+          totalTimeMs,
+        }),
+        ref(),
+      );
+      expect(result).toEqual({ kind: 'status', text: 'Retired' });
+      expect(result.text).not.toBe(wasRendering);
+    },
+  );
+
+  /**
+   * **The case a `delta < 0` guard would have missed**, and the larger of the two: 372 rows
+   * across 67 pages where a non-finisher's time is *above* the winner's, so the subtraction
+   * is positive and entirely plausible. `+31.402` beside a retirement is not a small error,
+   * it is a meaningless number that reads as a real one.
+   */
+  it('refuses a plausible POSITIVE gap for a non-finisher, which a sign guard would have let through', () => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        position: null,
+        outcome: 'accident',
+        detail: 'Collision',
+        isClassified: false,
+        lapsCompleted: 40,
+        totalTimeMs: R6_LEADER + 31_402,
+      }),
+      ref(),
+    );
+    expect(result).toEqual({ kind: 'status', text: 'Collision' });
+    expect(result.text).not.toBe('+31.402');
+  });
+
+  /**
+   * Sainz is the row the ruling turns on. `isClassified: true` at 70 laps of 78, so he holds
+   * P16 — but his `outcome` is `mechanical`. He stopped on lap 70; he did not circulate
+   * eight laps down to the flag, so `+8 Laps` would assert something that did not happen.
+   * `isClassified` decides whether he holds a position, not what the result column says.
+   */
+  it('does not give a CLASSIFIED retiree a lap deficit — he retired, he was not lapped', () => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        position: 16,
+        outcome: 'mechanical',
+        detail: 'Retired',
+        isClassified: true,
+        lapsCompleted: 70,
+        totalTimeMs: 8_012_889,
+      }),
+      ref(),
+    );
+    expect(result).toEqual({ kind: 'status', text: 'Retired' });
+    expect(result.text).not.toBe('+8 Laps');
+  });
+});
+
+describe('selectGapDisplay — a lapped finisher shows a deficit, never a duration', () => {
+  /**
+   * Up to 2022 the data states the deficit itself, on 7,279 rows. It is passed through
+   * verbatim, so nothing here can disagree with the figure the dataset recorded.
+   */
+  it.each(['+1 Lap', '+2 Laps', '+15 Laps'])('passes through a stated deficit of %s', (detail) => {
+    expect(
+      selectGapDisplay(
+        makeClassificationRow({
+          position: 6,
+          outcome: 'lapped',
+          detail,
+          lapsCompleted: 59,
+          totalTimeMs: null,
+        }),
+        { leaderTimeMs: 5_766_857, raceLaps: 60 },
+      ),
+    ).toEqual({ kind: 'status', text: detail });
+  });
+
+  /**
+   * **From 2023 the data stops stating it** — every lapped finisher reads the bare word
+   * `"Lapped"`, on 363 rows, and those are almost exactly the 364 that carry a time. These
+   * are 2026 R1's real P7 and P14 over a 58-lap race: the rows that were rendering `+4.593`
+   * and `+8.487`, which look like ordinary gaps and mean nothing.
+   */
+  it.each([
+    ['bearman', 57, 4_991_394, '+1 Lap', '+4.593'],
+    ['colapinto', 56, 4_995_288, '+2 Laps', '+8.487'],
+  ])(
+    '%s is %i laps in and reads %s, not the duration %s it was showing',
+    (driverRef, lapsCompleted, totalTimeMs, expected, wasRendering) => {
+      const result = selectGapDisplay(
+        makeClassificationRow({
+          driverRef,
+          position: 7,
+          outcome: 'lapped',
+          detail: 'Lapped',
+          isClassified: true,
+          lapsCompleted,
+          totalTimeMs,
+        }),
+        { leaderTimeMs: 5_212_331, raceLaps: 58 },
+      );
+      expect(result).toEqual({ kind: 'status', text: expected });
+      expect(result.text).not.toBe(wasRendering);
+    },
+  );
+
+  /**
+   * 172 `lapped` rows read `detail: 'Not classified'`, and 171 are `isClassified: false`. A
+   * deficit relative to the winner is a claim about a car that holds a position, so those
+   * keep their own words rather than being handed a derived "+13 Laps".
+   */
+  it('leaves an unclassified row its own words rather than deriving a deficit', () => {
+    expect(
+      selectGapDisplay(
+        makeClassificationRow({
+          position: null,
+          outcome: 'lapped',
+          detail: 'Not classified',
+          isClassified: false,
+          lapsCompleted: 45,
+          totalTimeMs: null,
+        }),
+        ref(),
+      ),
+    ).toEqual({ kind: 'status', text: 'Not classified' });
+  });
+
+  it('falls back to `detail` when the race distance is unknown', () => {
+    expect(
+      selectGapDisplay(
+        makeClassificationRow({
+          outcome: 'lapped',
+          detail: 'Lapped',
+          isClassified: true,
+          lapsCompleted: 57,
+          totalTimeMs: 4_991_394,
+        }),
+        { leaderTimeMs: R6_LEADER, raceLaps: null },
+      ),
+    ).toEqual({ kind: 'status', text: 'Lapped' });
+  });
+
+  /**
+   * A car on the winner's lap is not a lapped car, so a derived deficit of zero is not
+   * `+0 Laps`. `lapsCompleted` disagrees with a driver's own lap rows on 105 of 11,720
+   * entries, which is exactly how a zero or negative deficit arrives here.
+   */
+  it.each([
+    [58, '58 laps of 58 — no deficit to state'],
+    [60, 'more laps than the race distance'],
+  ])('never prints "+0 Laps" or a negative deficit (%i laps: %s)', (lapsCompleted) => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        outcome: 'lapped',
+        detail: 'Lapped',
+        isClassified: true,
+        lapsCompleted,
+        totalTimeMs: 4_991_394,
+      }),
+      { leaderTimeMs: 5_212_331, raceLaps: 58 },
+    );
+    expect(result).toEqual({ kind: 'status', text: 'Lapped' });
+  });
+});
+
+/**
+ * §1.0b — the enum is the checklist. Every member gets a row, including the four that never
+ * occur in a race session today (`didNotQualify` occurs in none; `unknown` exists so a
+ * refresh introducing an undecoded `status` degrades honestly instead of joining a
+ * neighbour).
+ */
+describe('selectGapDisplay — exhaustive over raceOutcomeSchema, with a recorded time present', () => {
+  const OUTCOMES: readonly RaceOutcome[] = [
+    'finished',
+    'lapped',
+    'accident',
+    'mechanical',
+    'disqualified',
+    'didNotStart',
+    'didNotQualify',
+    'unknown',
+  ];
+
+  /**
+   * The property that makes the whole class of defect impossible: **give every outcome a
+   * time below the leader's, and none of them may render a duration.** This is the test that
+   * would have caught the original bug on any of the seven members, not just the two that
+   * happened to be on the page someone opened.
+   *
+   * `finished` is excluded and tested separately below — not as an exemption, but because on
+   * that one row a below-leader time means the *data* is wrong, and the deliberate choice is
+   * to show it rather than clamp it.
+   */
+  const NON_FINISHERS = OUTCOMES.filter((outcome) => outcome !== 'finished');
+
+  it.each(NON_FINISHERS)('outcome %s never renders a negative duration', (outcome) => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        position: 12,
+        outcome,
+        detail: 'Retired',
+        isClassified: false,
+        lapsCompleted: 15,
+        // Well below the leader — the exact shape that produced `−2:02:28.126`.
+        totalTimeMs: 1_263_117,
+      }),
+      ref(),
+    );
+    expect(result.text.startsWith('−')).toBe(false);
+    expect(result.text.startsWith('-')).toBe(false);
+  });
+
+  it.each(OUTCOMES)('outcome %s renders a non-empty result and never the em dash', (outcome) => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        position: 12,
+        outcome,
+        detail: 'Retired',
+        isClassified: true,
+        lapsCompleted: 70,
+        totalTimeMs: 8_012_889,
+      }),
+      ref(),
+    );
+    expect(result.text.length).toBeGreaterThan(0);
+    expect(result.text).not.toBe('—');
+  });
+
+  /**
+   * **The one place a negative gap is still possible, and it is intentional.** Every one of
+   * the 8,109 finishers carrying a time is at or above the winner's, counted — so this row
+   * cannot arise from today's data, and if it ever does it is upstream corruption. Clamping
+   * it would replace a visible defect with a plausible wrong number and hide the fact that
+   * the data needs fixing. `formatGap`'s `−` glyph is the report.
+   */
+  it('still shows a negative gap for a FINISHER below the leader, because that is a data defect', () => {
+    expect(
+      selectGapDisplay(
+        makeClassificationRow({ position: 2, outcome: 'finished', totalTimeMs: R6_LEADER - 1_000 }),
+        ref(),
+      ),
+    ).toEqual({ kind: 'gap', text: '−1.000' });
+  });
+
+  /** Only `finished` may produce a `total` or a `gap`. Everything else is a `status`. */
+  it.each(OUTCOMES)('outcome %s produces a duration kind only when it is `finished`', (outcome) => {
+    const result = selectGapDisplay(
+      makeClassificationRow({
+        position: 5,
+        outcome,
+        detail: 'Retired',
+        isClassified: true,
+        lapsCompleted: 78,
+        totalTimeMs: R6_LEADER + 6_271,
+      }),
+      ref(),
+    );
+    expect(result.kind === 'gap' || result.kind === 'total').toBe(outcome === 'finished');
   });
 });
 
@@ -301,6 +604,68 @@ describe('selectClassificationView', () => {
     );
     expect(senna?.row.position).toBeNull();
     expect(senna?.isRetirement).toBe(false);
+  });
+
+  /**
+   * **The reported page, end to end.** Nine of 2026 R6's twenty-two entries: the winner, the
+   * runner-up, the six retirements that carry a recorded time, and Verstappen, who retired
+   * with none and was the one row the original code got right.
+   *
+   * Before the fix these read `1:23:31.243`, `+6.271`, then `−9:58.354`, `−57:48.394`,
+   * `−1:08:14.482`, `−1:26:54.534`, `−1:46:34.145`, `−2:02:28.126`, `Retired`.
+   */
+  it('shapes 2026 R6 with no negative duration anywhere', () => {
+    const view = selectClassificationView(race2026R6Fixture);
+    expect(view.map((entry) => entry.gap)).toEqual([
+      { kind: 'total', text: '2:23:31.243' },
+      { kind: 'gap', text: '+6.271' },
+      { kind: 'status', text: 'Retired' },
+      { kind: 'status', text: 'Retired' },
+      { kind: 'status', text: 'Retired' },
+      { kind: 'status', text: 'Retired' },
+      { kind: 'status', text: 'Retired' },
+      { kind: 'status', text: 'Retired' },
+      { kind: 'status', text: 'Retired' },
+    ]);
+  });
+
+  /**
+   * Stated as a property rather than only as expected strings, because the property is what
+   * generalises to the 67 other pages that carry one of these rows.
+   */
+  it('produces no negative time on any of the four fixtures', () => {
+    for (const race of [race1988Fixture, race1996Fixture, race2026Fixture, race2026R6Fixture]) {
+      for (const entry of selectClassificationView(race)) {
+        expect(entry.gap.text.startsWith('−')).toBe(false);
+        expect(entry.gap.text.startsWith('-')).toBe(false);
+      }
+    }
+  });
+
+  /**
+   * The leader reference must come from a **finisher** at P1. All 1,162 P1 rows in the data
+   * are finishers with a time, so this changes nothing today — but 9 disqualified entries do
+   * carry a recorded time, and one of those at P1 must not become the reference every other
+   * row is measured against.
+   */
+  it('does not take the leader time from a P1 row that is not a finisher', () => {
+    const race: Race = {
+      ...race2026Fixture,
+      classification: [
+        makeClassificationRow({
+          position: 1,
+          outcome: 'disqualified',
+          detail: 'Disqualified',
+          isClassified: false,
+          totalTimeMs: 5_212_331,
+        }),
+        makeClassificationRow({ driverRef: 'hamilton', position: 2, totalTimeMs: 5_214_602 }),
+      ],
+    };
+    const view = selectClassificationView(race);
+    expect(view[0]?.gap).toEqual({ kind: 'status', text: 'Disqualified' });
+    // With no usable leader time, P2 shows its own total rather than a gap to a DSQ row.
+    expect(view[1]?.gap).toEqual({ kind: 'total', text: '1:26:54.602' });
   });
 
   it('gives a shared drive two distinct keys', () => {
