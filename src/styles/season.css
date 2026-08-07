@@ -864,6 +864,14 @@
     padding: calc(var(--spacing) * 4);
   }
 
+  /* The controls block: the filter row, then the selection field beneath it. Both **above** the plot
+   * in reading order and in the tab order; the panel above owns the chart itself. */
+  .season-controls {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 4);
+  }
+
   @media (min-width: 48rem) {
     .season-progression {
       padding: calc(var(--spacing) * 6);

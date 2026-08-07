@@ -1,4 +1,5 @@
 import { useParams } from 'react-router';
+import type { StandingsProgression } from '@schemas/season';
 import { DataUnavailableState } from '@/components/ui/DataUnavailableState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { StateCard } from '@/components/ui/StateCard';
@@ -7,6 +8,7 @@ import { useMeta } from '@/features/meta/useMeta';
 import { SeasonCalendar } from '@/features/season/SeasonCalendar';
 import { SeasonMasthead } from '@/features/season/SeasonMasthead';
 import { SeasonNotes } from '@/features/season/SeasonNotes';
+import { SeasonProgression } from '@/features/season/SeasonProgression';
 import { SeasonStandings } from '@/features/season/SeasonStandings';
 import {
   dialCells,
@@ -23,7 +25,12 @@ import {
   selectSeasonNotices,
   selectTeamStandings,
 } from '@/features/season/selectors';
-import { useRetrySeason, useSeason, useSeasons } from '@/features/season/useSeason';
+import {
+  useRetrySeason,
+  useSeason,
+  useSeasonStandings,
+  useSeasons,
+} from '@/features/season/useSeason';
 
 /**
  * `/seasons` and `/seasons/:year` — **one surface, two entry points** (`ARCHITECTURE.md` §5).
@@ -58,6 +65,13 @@ export function SeasonHub() {
 
   const seasons = useSeasons();
   const season = useSeason(year);
+  /*
+   * A **separate** query, matching the endpoint split: the progression is the larger payload (36 KB
+   * for 2024 against 15 KB) and only the chart needs it. Its failure is scoped to the chart —
+   * `SeasonProgression` renders its own `ErrorState` — because a calendar and two standings tables
+   * that loaded fine must not be taken down with it.
+   */
+  const standings = useSeasonStandings(year);
   const retry = useRetrySeason(year);
 
   const data = season.data;
@@ -124,6 +138,10 @@ export function SeasonHub() {
         teamStandings={teamStandings}
         asOfRound={data?.standings.asOfRound ?? null}
         isComplete={data?.isComplete ?? false}
+        progression={standings.data ?? null}
+        progressionPending={standings.isPending}
+        progressionError={standings.error?.code ?? null}
+        hasTeamStandings={data === undefined ? false : data.scoring.teamCounting !== 'none'}
       />
     </div>
   );
@@ -146,6 +164,10 @@ function SeasonBody({
   teamStandings,
   asOfRound,
   isComplete,
+  progression,
+  progressionPending,
+  progressionError,
+  hasTeamStandings,
 }: {
   season: ReturnType<typeof useSeason>;
   meta: ReturnType<typeof useMeta>;
@@ -159,6 +181,10 @@ function SeasonBody({
   teamStandings: readonly TeamStandingRow[];
   asOfRound: number | null;
   isComplete: boolean;
+  progression: StandingsProgression | null;
+  progressionPending: boolean;
+  progressionError: string | null;
+  hasTeamStandings: boolean;
 }) {
   // The fresh-clone case gets the instructional state, not an error card.
   const unavailable =
@@ -232,6 +258,22 @@ function SeasonBody({
         isComplete={isComplete}
         pending={pending}
       />
+
+      {/*
+       * Rendered only once the season itself is known: the chart's entity switch depends on whether
+       * the season had a Constructors' Championship, and offering a switch that then disappears is
+       * worse than the panel arriving a moment later.
+       */}
+      {year !== null && (
+        <SeasonProgression
+          year={year}
+          progression={progression}
+          pending={progressionPending}
+          errorCode={progressionError}
+          onRetry={retry}
+          hasTeamStandings={hasTeamStandings}
+        />
+      )}
     </>
   );
 }
