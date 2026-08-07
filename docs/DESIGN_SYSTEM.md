@@ -84,6 +84,24 @@ something present.** The mitigation generalises, and it is binding from here:
 query, a query result or a route parameter can be *absent* rather than *empty* — and the tell is a
 falsy check (`!width`, `?? 0`, `|| 1`) standing in for a three-state question.
 
+### 1.0b ⚠ Validate by state, not by era _(added 2026-08-07)_
+
+**The negative-gap defect above survived three rounds of review on the surface it was on.** 1988, 1996
+and 2026 were each captured, measured and signed off; the bug is on all of them and was visible on
+none, because it needs a row that is **both** a non-finisher **and** has a recorded elapsed time. 1988
+renders correctly for the wrong reason: those rows carry no `totalTimeMs`, so the faulty branch is
+unreachable there.
+
+**We were sampling the wrong dimension.** Era is a proxy for state and a bad one — it happens to vary
+coverage, so it feels like coverage is what is being tested. The states that mattered here were
+`finished` · `lapped` · `retired-with-a-time` · `retired-without-one`, and one era can contain all four
+while three eras can miss two.
+
+So: **enumerate the states a surface can render and check that they are each reachable in the fixture
+or the capture set.** For anything driven by a decoded enum — `outcome`, `gridStatus`, `adjustment`,
+`GapDisplay` — the enum *is* the checklist, and a case with no example is untested however many pages
+were opened. `raceOutcomeSchema` has eight members; 2026 R6 exercises three.
+
 ### 1.0a ⚠ The seam between two features is in nobody's scope _(added 2026-08-07)_
 
 **Rishabh asked "how do I go to the race page?" and the answer was that he could not.** The race deep
@@ -115,8 +133,9 @@ failure mode a feature-by-feature process produces by construction.
    the cancelled exception. These are cheap tests and they are the ones that would have caught it.
 
 **The seams still to build, so they are not rediscovered one question at a time:** driver → races,
-driver → teams, team → seasons, team → drivers, circuit → races, race → circuit, race → drivers, and
-compare → every entity it holds. Each is one feature's obligation to another, and each will be invisible
+driver → teams, team → seasons, team → drivers, circuit → races, **race → circuit**, **race → each of
+the drivers in its classification** (RD-10 names 22 entities and links to none of them), and compare →
+every entity it holds. Each is one feature's obligation to another, and each will be invisible
 to a review that reads one feature at a time.
 
 ### 1.1 The three decisions that produce the character
@@ -1995,9 +2014,42 @@ race page that renders four empty plots for 1988 is the defect this ordering pre
 **RD-10 · Race classification** — the spine, and not a chart. Job: identity, order and outcome.
 Form: a `<table>`, same anatomy as the season hub's standings (§7). `status` decodes through
 `DATABASE.md` §3 — **`detail` for display, `status` for grouping** — and a DNF is `status IN (10, 11)`,
-never `position IS NULL`. Gaps come from the recorded time, and a lapped finisher shows `+1 Lap`, not a
-duration. Identity bar per row in the team colour. **Available 1950+, so it never has a no-coverage
-state.**
+never `position IS NULL`. Identity bar per row in the team colour. **Available 1950+, so it never has a
+no-coverage state.**
+
+##### The RESULT column is keyed on `outcome`, never on the presence of a time _(ruled 2026-08-07)_
+
+This said only *"gaps come from the recorded time, and a lapped finisher shows `+1 Lap`"*, which was
+right about the lapped case and silent about every other one — and the silence shipped a defect.
+Measured on 2026 R6: **six rows rendered negative durations**, down to `−2:02:28.126` for Bottas.
+
+**The mechanism.** A retiree's `totalTimeMs` is their elapsed time *when they stopped*, which is
+**smaller** than the winner's — Bottas stopped on lap 15 at 1,263,117 ms against a winning
+8,611,243 ms — so `driverTotal − winnerTotal` is negative. The gap was being computed for drivers who
+never finished.
+
+**The table, and it is exhaustive on `raceOutcomeSchema`:**
+
+| `outcome` | RESULT shows | Why |
+|---|---|---|
+| `finished`, position 1 | the total time | The reference every other row is measured against |
+| `finished`, not position 1 | `+gap` to the leader | Same distance, so a duration is comparable |
+| `lapped` | **`+N Laps`**, never a duration | The result *is* a lap deficit. 7,450 of 7,814 carry no time — but **364 do**, and for those a gap of `+31.402s` would look entirely plausible and be meaningless |
+| `accident` · `mechanical` · `disqualified` · `didNotStart` · `didNotQualify` · `unknown` | `detail` — "Retired", "Engine", "Collision" | They have no result relative to the winner. A time here is not a smaller number, it is a **different quantity** |
+
+**Keying on `outcome` rather than guarding the subtraction is the point.** A guard (`if (delta < 0)`)
+would have fixed the six visible rows and left the `lapped`-with-a-time case wrong *and invisible*,
+because that one produces a plausible positive number. Deriving the branch from what the row **is**
+makes both impossible rather than caught.
+
+> **On the classified retiree, which is the interesting row and where I differ from the review.** Sainz
+> is `isClassified: true` at 70 laps against 78 — he covered enough distance to keep P16 — and the
+> suggestion was that he should therefore read `+8 Laps`. **He should read "Retired".** `outcome` is
+> `mechanical`: he did not circulate eight laps down to the flag, he stopped on lap 70, and `+8 Laps`
+> asserts something that did not happen. `outcome === 'lapped'` — status 1, *"classified, down laps"* —
+> is precisely and only the `+N Laps` case. `isClassified` decides whether he **holds a position**, not
+> what the result column says, and conflating the two is what made this look like a judgement call.
+> This is `DATABASE.md` §3's own discipline: **`status` for grouping, `detail` for display.**
 
 **RD-1 · Position by lap** — the flagship. Job: change over time, whole field. Form: the **rank
 chart** of §6.5.4a, all five conditions binding. Marks: 2px lines, **no markers** (`shouldDrawMarkers`
