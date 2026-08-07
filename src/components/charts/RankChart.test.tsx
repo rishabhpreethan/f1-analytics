@@ -240,15 +240,48 @@ describe('refinement 3 — the tooltip carries the analysis set, not all twenty'
 
 describe('the axis', () => {
   it('is the size of the field, not the deepest rank anybody reached', () => {
-    // A race where nobody ran below 12th still had 20 cars, and the axis should say so.
-    const front = FIELD.slice(0, 3);
-    renderRank({ series: front, fieldSize: 20, selected: [] });
-    expect(screen.getAllByText('P20').length).toBeGreaterThan(0);
+    /*
+     * A race where nobody ran below 12th still had 20 cars, and the axis should say so. Asserted on
+     * the **gridlines**, because the tick text is deliberately absent — `positionTicksWithin(1, 20)`
+     * is `[1, 5, 10, 15, 20]`, five gridlines, where a field of three would give one.
+     */
+    const { container } = renderRank({ series: FIELD.slice(0, 3), fieldSize: 20, selected: [] });
+    expect(container.querySelectorAll('.chart-grid-line')).toHaveLength(5);
   });
 
-  it('never emits a P0', () => {
+  it('draws fewer gridlines for a smaller field', () => {
+    const { container } = renderRank({ series: FIELD.slice(0, 3), fieldSize: 3, selected: [] });
+    expect(container.querySelectorAll('.chart-grid-line')).toHaveLength(1);
+  });
+
+  /**
+   * **The fix for the one real defect the capture found.** Five of sixty text nodes overlapped on
+   * 2026 R1 — `P1`×`LEC`, `P5`×`LIN`, `P10`×`ALO`, `P15`×`BOT`, `P20`×`STR` — and **zero were driver
+   * against driver**, so `placeDirectLabels` was right at 22 anchors and the collision *set* was
+   * incomplete: the y-axis tick labels share the same gutter.
+   *
+   * The overlap itself is a bounding-box fact and undecidable here. What is decidable is the fix:
+   * the gutter now holds one kind of label, because the ticks no longer render text.
+   */
+  it('renders no POSITION tick text — the label columns enumerate the scale', () => {
+    const { container } = renderRank();
+    const ticks = [...container.querySelectorAll('.chart-tick')].map((n) => n.textContent ?? '');
+    // Scoped to the measure axis: the **lap** axis keeps its labels, and an unscoped assertion
+    // caught them and failed. It is the left gutter that had two occupants, not every axis.
+    expect(ticks.filter((text) => /^P\d/.test(text))).toEqual([]);
+    expect(container.querySelectorAll('.chart-rank-label').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the gridlines, which are the only mid-plot reference to P5 / P10 / P15', () => {
+    const { container } = renderRank();
+    expect(container.querySelectorAll('.chart-grid-line').length).toBeGreaterThan(1);
+  });
+
+  it('titles the axis for a race, not for a championship', () => {
+    // "Championship position" was the season chart's label carried over onto a race page.
     renderRank();
-    expect(screen.queryByText('P0')).toBeNull();
+    expect(screen.getByText('Race position')).toBeTruthy();
+    expect(screen.queryByText('Championship position')).toBeNull();
   });
 
   it('labels the first and last lap, which d3 omits on a 1-based domain', () => {

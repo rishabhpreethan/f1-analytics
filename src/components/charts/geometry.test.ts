@@ -469,3 +469,23 @@ describe('nearestByOffset', () => {
     expect(ISOLATION_THRESHOLD).toBeLessThan(18);
   });
 });
+
+/**
+ * The arithmetic behind §6.5.4a's collision fix. `computeMargin` sizes the left gutter from whatever
+ * labels it is told will occupy it — so a rank chart passing its *driver* labels gets room for
+ * `Häkkinen`, where passing `P20` reserved room for four characters and let the driver labels run
+ * back over the ticks.
+ */
+describe('computeMargin — the left gutter holds what it is told it holds', () => {
+  it('reserves more for a surname than for a position tick', () => {
+    const forTicks = computeMargin({ measureLabels: ['P20'], hasMeasureTitle: true });
+    const forNames = computeMargin({ measureLabels: ['Häkkinen'], hasMeasureTitle: true });
+    expect(forNames.left).toBeGreaterThan(forTicks.left);
+  });
+
+  it('is driven by the WIDEST label, not the first or the last', () => {
+    const mixed = computeMargin({ measureLabels: ['VER', 'Häkkinen', 'HAM'] });
+    const longest = computeMargin({ measureLabels: ['Häkkinen'] });
+    expect(mixed.left).toBe(longest.left);
+  });
+});

@@ -31,9 +31,18 @@ export interface MeasureAxisProps {
   title?: string;
   /** Gridlines are perpendicular to the measure axis, and only to it. */
   grid?: boolean;
+  /**
+   * Draw the tick *text*. Gridlines are unaffected.
+   *
+   * `false` for exactly one case, §6.5.4a's rank chart: its driver labels at both ends **enumerate
+   * the scale in order**, top to bottom, so `P1 … P20` on the axis restates what the label columns
+   * already say — and it restates it *in the same gutter*, which is how five ticks came to overlap
+   * five driver labels. Deleting the duplication is the fix; making room for both would have kept it.
+   */
+  labels?: boolean;
 }
 
-export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProps) {
+export function MeasureAxis({ plot, ticks, title, grid = true, labels = true }: MeasureAxisProps) {
   return (
     <g aria-hidden="true">
       {grid &&
@@ -56,18 +65,19 @@ export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProp
         y2={plot.top + plot.innerHeight}
       />
 
-      {ticks.map((tick, i) => (
-        <text
-          key={`tick-${String(i)}`}
-          className="chart-tick"
-          x={plot.left - AXIS_GAP}
-          y={round(plot.top + tick.offset)}
-          textAnchor="end"
-          dominantBaseline="middle"
-        >
-          {tick.label}
-        </text>
-      ))}
+      {labels &&
+        ticks.map((tick, i) => (
+          <text
+            key={`tick-${String(i)}`}
+            className="chart-tick"
+            x={plot.left - AXIS_GAP}
+            y={round(plot.top + tick.offset)}
+            textAnchor="end"
+            dominantBaseline="middle"
+          >
+            {tick.label}
+          </text>
+        ))}
 
       {title !== undefined && (
         <text

@@ -8,6 +8,7 @@ import { CalendarDays } from '@/components/ui/icons';
 import { useMeta } from '@/features/meta/useMeta';
 import { RaceClassification } from '@/features/race/RaceClassification';
 import { RaceDataState } from '@/features/race/RaceDataState';
+import { LapTimeTrace, PitTimeline, StintChart } from '@/features/race/RaceLapCharts';
 import { RaceMasthead } from '@/features/race/RaceMasthead';
 import {
   resolveRaceRef,
@@ -16,7 +17,7 @@ import {
   selectRaceDataStates,
 } from '@/features/race/selectors';
 import { selectRankChart } from '@/features/race/series';
-import { useRace, useRaceLaps, useRetryRace } from '@/features/race/useRace';
+import { useRace, useRaceLaps, useRaceStints, useRetryRace } from '@/features/race/useRace';
 import { snapToPositionTick } from '@/features/season/progression';
 
 /**
@@ -53,12 +54,20 @@ export function RaceDeepDive() {
   const meta = useMeta();
   const race = useRace(address);
   const laps = useRaceLaps(race.data);
+  /* A third query, and it fires only when the payload says there are pit stops. 2021 R12 — the
+   * Belgian Grand Prix that ran two laps behind the safety car — has lap rows and no stops, which is
+   * the one race in the data where `hasPitData` is false inside its coverage window. */
+  const stints = useRaceStints(race.data);
   const retry = useRetryRace(address);
 
   /* The whole field is the default: §6.5.4a's rank chart plots the field as context and caps the
    * emphasised set at four. Nothing is selected until the reader chooses, so the resting state is the
    * shape of the race rather than an arbitrary four drivers. */
   const [selected, setSelected] = useState<string[]>([]);
+  /* RD-2's selection is separate from RD-1's: bringing a driver forward in the rank chart and
+   * plotting their lap times are different questions, and sharing one list would make answering one
+   * silently change the other. */
+  const [traced, setTraced] = useState<string[]>([]);
 
   if (ref.status === 'invalid') {
     return (
@@ -217,6 +226,60 @@ export function RaceDeepDive() {
               )}
             </section>
           )}
+
+          {/*
+           * RD-2 — inside the lap window, so it shares the rank chart's availability. Its own
+           * section rather than a tab: §6.5.4 fixes the form by scope, and a reader comparing four
+           * drivers' pace wants the order chart still on screen above it.
+           */}
+          {states !== null && states.laps.kind === 'available' && laps.data !== undefined && (
+            <section className="season-section" aria-labelledby="race-pace-title">
+              <div>
+                <p className="season-eyebrow">
+                  <span className="accent-rule" aria-hidden="true" />
+                  The pace
+                </p>
+                <h2 id="race-pace-title" className="t-display-sm text-ink-primary mt-3">
+                  How fast they went
+                </h2>
+              </div>
+
+              <LapTimeTrace laps={laps.data} selected={traced} onSelect={setTraced} />
+            </section>
+          )}
+
+          {/*
+           * RD-3 and RD-7 — the **2011** boundary, which is a different one from RD-1's 1996. A 1996
+           * race therefore shows lap charts with no strategy layer, and that is a designed state
+           * rather than a gap: `RaceDataState` names which dataset is missing and from when it exists.
+           */}
+          <section className="season-section" aria-labelledby="race-strategy-title">
+            <div>
+              <p className="season-eyebrow">
+                <span className="accent-rule" aria-hidden="true" />
+                The strategy
+              </p>
+              <h2 id="race-strategy-title" className="t-display-sm text-ink-primary mt-3">
+                When they stopped
+              </h2>
+            </div>
+
+            {states !== null && states.pits.kind !== 'available' ? (
+              <RaceDataState title="Stints and pit stops" state={states.pits} />
+            ) : stints.error !== null ? (
+              <ErrorState
+                title="The strategy data could not load"
+                detail="Stints and pit stops are a separate request from the rest of this page."
+                code={stints.error.code}
+                onRetry={retry}
+              />
+            ) : stints.data === undefined ? null : (
+              <>
+                <StintChart stints={stints.data} />
+                <PitTimeline stints={stints.data} />
+              </>
+            )}
+          </section>
         </>
       )}
     </div>

@@ -152,8 +152,24 @@ export function RankChart({
   const deepest = fieldSize ?? Math.max(1, ...ranks);
 
   const yTicks0 = positionTicksWithin(1, deepest);
+
+  /*
+   * ⚠ **The left gutter is sized for the DRIVER labels, not for `P20`** — and that was the bug.
+   *
+   * The left-hand driver labels are drawn at `-AXIS_GAP` from the plot's left edge, into a gutter
+   * `computeMargin` had sized from the *tick* labels (~24px for "P20"). A three-letter code needs
+   * ~28px and a surname up to ~64px, so the labels ran back over the ticks: measured on 2026 R1,
+   * 5 overlaps out of 60 text nodes, every one a tick against a driver — `P1`×`LEC`, `P5`×`LIN`,
+   * `P10`×`ALO`, `P15`×`BOT`, `P20`×`STR`. **Zero driver-against-driver**, so `placeDirectLabels`
+   * was right at 22 anchors and the collision *set* was incomplete: the labels were placed correctly
+   * within their own space, in a space that had another occupant.
+   *
+   * The tick text is removed rather than accommodated (see `MeasureAxis`'s `labels` prop), so the
+   * gutter now holds one thing and is measured for it.
+   */
+  const labelWidths = series.map((s) => s.shortLabel ?? s.label);
   const margin = computeMargin({
-    measureLabels: yTicks0.map(formatRank),
+    measureLabels: labelWidths,
     hasCategoryLabels: true,
     hasMeasureTitle: true,
     hasCategoryTitle: xTitle !== undefined,
@@ -399,7 +415,9 @@ export function RankChart({
               </clipPath>
             </defs>
 
-            <MeasureAxis plot={plot} ticks={yTicks} title="Championship position" />
+            {/* `labels={false}`: the driver columns at both ends enumerate the scale. The gridlines
+             * stay, because they are the only mid-plot reference to P5/P10/P15. */}
+            <MeasureAxis plot={plot} ticks={yTicks} title="Race position" labels={false} />
             <CategoryAxis
               plot={plot}
               ticks={xTicks}
