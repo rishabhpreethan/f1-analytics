@@ -4,7 +4,10 @@ import {
   CATEGORY_COUNT_LIMIT,
   computeMargin,
   DIRECT_LABEL_MIN_GAP,
+  fmtCoord,
   labelStride,
+  MARKER_SIZE,
+  markerPath,
   measureTickCount,
   MONO_ADVANCE_EM,
   monoTextWidth,
@@ -197,5 +200,56 @@ describe('§6.5.2 — direct labels are pushed apart, and never off the chart', 
   it('handles the degenerate cases without throwing', () => {
     expect(placeDirectLabels([], bounds)).toEqual([]);
     expect(placeDirectLabels([50], bounds).map((p) => p.y)).toEqual([50]);
+  });
+});
+
+describe('§6.4 rung 2 — the four marker shapes are equal AREA, not equal width', () => {
+  /** Shoelace over the polygon a path command list describes. Curves are handled separately. */
+  const polygonArea = (d: string): number => {
+    const nums = d.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
+    const points: [number, number][] = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) points.push([nums[i] ?? 0, nums[i + 1] ?? 0]);
+    let sum = 0;
+    for (let i = 0; i < points.length; i += 1) {
+      const [x1, y1] = points[i] ?? [0, 0];
+      const [x2, y2] = points[(i + 1) % points.length] ?? [0, 0];
+      sum += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(sum) / 2;
+  };
+
+  it('encloses the same area for square, triangle and diamond as a circle of the same size', () => {
+    /*
+     * A square and a circle of the same *width* are not the same size to the eye — the square is
+     * about 27% heavier. A marker set where one shape reads as "more" is encoding magnitude by
+     * accident, on a channel that is supposed to carry identity only.
+     */
+    const target = Math.PI * (MARKER_SIZE / 2) ** 2;
+    for (const shape of ['square', 'triangle', 'diamond'] as const) {
+      // 1% tolerance: the path is emitted at two decimals, which is a real rounding of the shape.
+      expect(polygonArea(markerPath(shape)), shape).toBeCloseTo(target, 0);
+    }
+  });
+
+  it('draws a triangle centred on its centroid, not on its bounding box', () => {
+    // Otherwise a triangle sits visibly low against a circle on the same baseline.
+    const nums =
+      markerPath('triangle')
+        .match(/-?\d+(\.\d+)?/g)
+        ?.map(Number) ?? [];
+    const ys = nums.filter((_, i) => i % 2 === 1);
+    expect(Math.min(...ys)).toBeLessThan(0);
+    expect(Math.max(...ys)).toBeGreaterThan(0);
+    // The apex is twice as far from centre as the base, which is what "centroid" means here.
+    expect(Math.abs(Math.min(...ys))).toBeCloseTo(2 * Math.max(...ys), 1);
+  });
+
+  it('never emits a path smaller than the §6.3 floor', () => {
+    expect(MARKER_SIZE).toBeGreaterThanOrEqual(8);
+  });
+
+  it('rounds coordinates to two decimals rather than emitting 15 significant figures', () => {
+    expect(fmtCoord(1 / 3)).toBe('0.33');
+    expect(fmtCoord(-2.005)).toBe('-2');
   });
 });

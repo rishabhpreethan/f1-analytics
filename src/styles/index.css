@@ -12,6 +12,10 @@
  * component (Technical Spec §S.3.1, §S.3.4). */
 @import './motion.css';
 @import './backdrop.css';
+/* The chart kit (§6). After motion.css so the two reduced-motion chokepoints still win over
+ * anything it declares, and its own file rather than a section of this one because it is a whole
+ * visual language — axes, grid, marks, legend, tooltip, table view, five plot states and print. */
+@import './charts.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so

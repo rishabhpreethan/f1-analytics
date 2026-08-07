@@ -1,3 +1,5 @@
+import type { MarkerShape } from './ladder';
+
 /**
  * **Chart geometry — the arithmetic behind `DESIGN_SYSTEM.md` §6.3's furniture.**
  *
@@ -256,4 +258,55 @@ export function placeDirectLabels(
     };
   });
   return out;
+}
+
+/* ------------------------------------------------------------------ marker geometry (§6.4 rung 2)
+ *
+ * The four shapes are sized to **equal visual area**, not to an equal bounding box. A square and a
+ * circle of the same width are not the same size to the eye — the square is about 27% heavier — and
+ * a marker set where one shape reads as "more" is encoding magnitude by accident, on a channel that
+ * carries identity only. The circle is the reference; every other radius is derived so all four
+ * enclose the same area.
+ */
+
+/** §6.3's floor. Never smaller — a marker under 8px is not a hit target and barely a shape. */
+export const MARKER_SIZE = 8;
+
+const AREA = (size: number) => Math.PI * (size / 2) ** 2;
+
+/** The path for one shape, centred on the origin, at equal area to a circle of `size` across. */
+export function markerPath(shape: MarkerShape, size = MARKER_SIZE): string {
+  const area = AREA(size);
+  switch (shape) {
+    case 'square': {
+      const half = Math.sqrt(area) / 2;
+      /* Explicit L commands rather than the shorter H/V form: a path that is a plain list of
+       * (x, y) pairs is one a test can measure the area of, and equal area is the property that
+       * matters here. */
+      return `M${fmtCoord(-half)} ${fmtCoord(-half)}L${fmtCoord(half)} ${fmtCoord(-half)}L${fmtCoord(half)} ${fmtCoord(half)}L${fmtCoord(-half)} ${fmtCoord(half)}Z`;
+    }
+    case 'triangle': {
+      /* Equilateral, area = (√3/4)·s². Centred on its centroid rather than on its bounding box,
+       * or a triangle sits visibly low against a circle on the same baseline. */
+      const side = Math.sqrt((4 * area) / Math.sqrt(3));
+      const height = (Math.sqrt(3) / 2) * side;
+      const top = -(2 / 3) * height;
+      const bottom = height / 3;
+      return `M0 ${fmtCoord(top)}L${fmtCoord(side / 2)} ${fmtCoord(bottom)}L${fmtCoord(-side / 2)} ${fmtCoord(bottom)}Z`;
+    }
+    case 'diamond': {
+      const half = Math.sqrt(2 * area) / 2;
+      return `M0 ${fmtCoord(-half)}L${fmtCoord(half)} 0L0 ${fmtCoord(half)}L${fmtCoord(-half)} 0Z`;
+    }
+    case 'circle':
+    default: {
+      const r = size / 2;
+      return `M${fmtCoord(-r)} 0a${fmtCoord(r)} ${fmtCoord(r)} 0 1 0 ${fmtCoord(size)} 0a${fmtCoord(r)} ${fmtCoord(r)} 0 1 0 ${fmtCoord(-size)} 0Z`;
+    }
+  }
+}
+
+/** Two decimals. SVG path data with 15 significant figures is unreadable and gains nothing. */
+export function fmtCoord(n: number): string {
+  return String(Math.round(n * 100) / 100);
 }
