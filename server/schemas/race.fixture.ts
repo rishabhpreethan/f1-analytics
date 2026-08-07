@@ -1,4 +1,4 @@
-import type { Race, RaceLaps, RaceStints } from './race';
+import type { DriverLaps, LapRow, Race, RaceClassificationRow, RaceLaps, RaceStints } from './race';
 
 /**
  * Valid race payloads, used by the schema tests and by the client selector tests.
@@ -22,6 +22,71 @@ import type { Race, RaceLaps, RaceStints } from './race';
  * three laps where the race ran 58 — because a fixture's job is to exercise the shape,
  * and 1,003 rows in a source file is a shape nobody can read.
  */
+
+/* --------------------------------------------------------------------------- builders */
+
+/**
+ * Build one classification row from a **complete, valid** base.
+ *
+ * These builders exist because the obvious alternative does not typecheck and the reason
+ * is worth keeping: `{ ...fixture.classification[0], position: 2 }` looks like a partial
+ * override and is not one. `tsconfig` sets `noUncheckedIndexedAccess`, so an indexed read
+ * is `T | undefined`, spreading a possibly-undefined value makes **every** property
+ * optional, and the result is no longer assignable to `RaceClassificationRow`. Four tests
+ * were written that way and the suite passed while `tsc` failed — a green run and a red
+ * typecheck at once, which is precisely why they are separate gates.
+ *
+ * A builder over a full base is the fix rather than a cast: a cast would silence a
+ * disagreement between the fixture and the contract, and this keeps the contract enforced
+ * on every variant a test invents. Adding a required field to the schema now breaks
+ * *here*, once, instead of at every call site.
+ */
+export function makeClassificationRow(
+  over: Partial<RaceClassificationRow> = {},
+): RaceClassificationRow {
+  return {
+    driverRef: 'russell',
+    code: 'RUS',
+    forename: 'George',
+    surname: 'Russell',
+    teamRef: 'mercedes',
+    teamName: 'Mercedes',
+    carNumber: 63,
+    position: 1,
+    gridPosition: 1,
+    gridStatus: 'grid',
+    outcome: 'finished',
+    detail: 'Finished',
+    isClassified: true,
+    isEligibleForPoints: true,
+    points: 25,
+    lapsCompleted: 58,
+    totalTimeMs: 5_212_331,
+    ...over,
+  };
+}
+
+/** As `makeClassificationRow`, for a lap row. */
+export function makeLapRow(over: Partial<LapRow> & { lap: number }): LapRow {
+  return { position: 1, timeMs: 85_000, isDeleted: false, ...over };
+}
+
+/** As `makeClassificationRow`, for one driver's trace. */
+export function makeDriverLaps(over: Partial<DriverLaps> = {}): DriverLaps {
+  return {
+    driverRef: 'russell',
+    code: 'RUS',
+    surname: 'Russell',
+    teamRef: 'mercedes',
+    gridPosition: 1,
+    gridStatus: 'grid',
+    finishPosition: 1,
+    firstLap: 1,
+    lastLap: 58,
+    laps: [makeLapRow({ lap: 1 })],
+    ...over,
+  };
+}
 
 /* ----------------------------------------------------------- 1988 R1 — the reduced page */
 

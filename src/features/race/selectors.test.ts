@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { META_REAL } from '@schemas/meta.fixture';
-import { race1988Fixture, race1996Fixture, race2026Fixture } from '@schemas/race.fixture';
+import {
+  makeClassificationRow,
+  race1988Fixture,
+  race1996Fixture,
+  race2026Fixture,
+} from '@schemas/race.fixture';
 import type { Race } from '@schemas/race';
 import {
   resolveRaceRef,
@@ -302,8 +307,8 @@ describe('selectClassificationView', () => {
     const race: Race = {
       ...race1988Fixture,
       classification: [
-        { ...race1988Fixture.classification[0], driverRef: 'ascari', carNumber: 12 },
-        { ...race1988Fixture.classification[0], driverRef: 'ascari', carNumber: 34 },
+        makeClassificationRow({ driverRef: 'ascari', carNumber: 12 }),
+        makeClassificationRow({ driverRef: 'ascari', carNumber: 34 }),
       ],
     };
     const keys = selectClassificationView(race).map((entry) => entry.key);
@@ -331,8 +336,8 @@ describe('selectRaceCounts — derived from `status`, not from a null position',
     const race: Race = {
       ...race1988Fixture,
       classification: [
-        { ...race1988Fixture.classification[0], outcome: 'didNotStart', position: null },
-        race1988Fixture.classification[1],
+        makeClassificationRow({ outcome: 'didNotStart', position: null, isClassified: false }),
+        makeClassificationRow({ position: 1 }),
       ],
     };
     expect(selectRaceCounts(race)).toMatchObject({ entries: 2, starters: 1, nonStarters: 1 });
