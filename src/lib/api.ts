@@ -25,6 +25,27 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * Errors that will not resolve by asking again.
+ *
+ * A retry is only ever worth making when the same request could plausibly succeed. None
+ * of these can: a missing database will still be missing (on a fresh clone it will never
+ * resolve, and retrying only delays the designed state that says what to do about it), a
+ * year the dataset does not hold will still not be held, and a malformed parameter is
+ * malformed in the URL rather than in the network.
+ *
+ * Centralised here rather than repeated per hook because the failure of getting it wrong
+ * is invisible — a retried 404 looks identical to a slow one, and the reader waits twice
+ * as long for the same answer.
+ */
+export function isTerminalApiError(error: ApiRequestError): boolean {
+  return (
+    error.code === 'DATABASE_UNAVAILABLE' ||
+    error.code === 'NOT_FOUND' ||
+    error.code === 'INVALID_PARAM'
+  );
+}
+
 async function readJson(res: Response): Promise<unknown> {
   try {
     return await res.json();
