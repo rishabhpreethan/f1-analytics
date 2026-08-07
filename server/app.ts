@@ -3,6 +3,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { notFound, onError } from './errors';
 import { rateLimit } from './middleware/rateLimit';
 import { metaRoutes } from './routes/meta';
+import { seasonRoutes } from './routes/seasons';
 
 /**
  * The Hono application, exported without listening so tests can drive it directly.
@@ -73,6 +74,7 @@ app.use('/api/*', rateLimit());
 
 // 4. Routes. Handlers validate, call one named query, and return.
 app.route('/api', metaRoutes);
+app.route('/api', seasonRoutes);
 
 app.notFound(notFound);
 app.onError(onError);
