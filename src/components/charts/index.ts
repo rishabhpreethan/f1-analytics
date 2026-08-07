@@ -12,6 +12,7 @@ export { ChartFrame, type ChartFrameProps } from './ChartFrame';
 export { ChartLegend } from './ChartLegend';
 export { BarTable, SeriesTable, SpanTable } from './ChartTable';
 export { LineChart, type LineChartProps } from './LineChart';
+export { RankChart, type RankChartProps, type RankSeries } from './RankChart';
 export { SpanChart, type Span, type SpanChartProps, type SpanRow } from './SpanChart';
 export { COMPARISON_CAP } from './ladder';
 export type { BarDatum, PlotState, SeriesInput, SeriesPoint } from './types';

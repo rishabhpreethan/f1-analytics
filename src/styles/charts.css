@@ -335,6 +335,61 @@
     stroke-width: 1;
   }
 
+  /* ------------------------------------------------ the rank chart (§6.5.4a) */
+
+  /*
+   * **The resting split is what makes 22 lines legible without hovering anything.** The selection is
+   * the foreground at full weight; the field is context at 1px and 0.35 opacity, which reads as a
+   * shape showing the race's churn rather than as 22 competing lines. A chart that only resolved on
+   * hover would have failed for a screenshot, a printout and a keyboard.
+   */
+  .chart-rank-line {
+    fill: none;
+    stroke: var(--series);
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.35;
+    transition: opacity var(--dur-fast) var(--ease-enter);
+  }
+
+  .chart-rank-line[data-selected='true'] {
+    stroke-width: var(--size-mark-stroke);
+    opacity: 1;
+  }
+
+  /*
+   * Isolation is an **aid**: hovering raises one line of the field and drops its neighbours. Opacity
+   * only, never a colour change — a changed colour would break the identity the label just promised.
+   * The hovered line wins over the selected rule by source order at equal specificity.
+   */
+  .chart-rank[data-isolated='true'] .chart-rank-line {
+    opacity: 0.12;
+  }
+
+  .chart-rank[data-isolated='true'] .chart-rank-line[data-selected='true'] {
+    opacity: 0.45;
+  }
+
+  .chart-rank[data-isolated='true'] .chart-rank-line[data-hovered='true'] {
+    stroke-width: var(--size-mark-stroke);
+    opacity: 1;
+  }
+
+  /* The endpoint label. Text tokens, never the series colour (§6.2) — the selected ones step up to
+   * `--ink-primary` so the analysis set is findable in a column of twenty-two. */
+  .chart-rank-label {
+    fill: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--text-2xs--letter-spacing);
+  }
+
+  .chart-rank-label[data-selected='true'] {
+    fill: var(--ink-primary);
+  }
+
   /* §6.5.2 — the direct label is the primary identification at ≤4 series, and it wears TEXT
    * tokens, never the series colour (§6.2). Only the 12px leader line carries the entity hue. */
   .chart-direct-label {

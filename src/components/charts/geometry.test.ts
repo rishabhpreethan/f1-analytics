@@ -6,6 +6,8 @@ import {
   lapTimeCeiling,
   LAP_TIME_CEILING_FACTOR,
   MARKER_RING,
+  ISOLATION_THRESHOLD,
+  nearestByOffset,
   shouldDrawMarkers,
   withEndpoints,
   computeMargin,
@@ -454,5 +456,49 @@ describe('withEndpoints', () => {
     // `d3.ticks` returns sorted values, so nothing depends on this today — but the axis renderer
     // assumes ordering, and a function should hold its own postcondition.
     expect(withEndpoints([30, 10, 20], 1, 58, 0)).toEqual([1, 10, 20, 30, 58]);
+  });
+});
+
+/**
+ * §6.5.4a's isolation, as arithmetic. This exists as a pure function because the component version
+ * was untestable — `RankChart` derives each candidate's offset from a `d3` scale, and in jsdom every
+ * scale collapses to 0, so twenty lines are exactly equidistant from any pointer.
+ */
+describe('nearestByOffset', () => {
+  const FIELD = [
+    { reference: 'a', offset: 0 },
+    { reference: 'b', offset: 20 },
+    { reference: 'c', offset: 40 },
+  ];
+
+  it('picks the nearest candidate', () => {
+    expect(nearestByOffset(FIELD, 22, ISOLATION_THRESHOLD)).toBe('b');
+  });
+
+  it('returns null past the threshold — open space is hovering NOTHING', () => {
+    // Snapping to the closest line regardless would make isolation fire constantly and mean nothing.
+    expect(nearestByOffset([{ reference: 'a', offset: 0 }], 60, ISOLATION_THRESHOLD)).toBeNull();
+  });
+
+  it('accepts a candidate exactly at the threshold', () => {
+    expect(nearestByOffset([{ reference: 'a', offset: 0 }], 14, ISOLATION_THRESHOLD)).toBe('a');
+  });
+
+  it('breaks a tie toward the earlier candidate, which is the stable entity order', () => {
+    const tied = [
+      { reference: 'first', offset: 10 },
+      { reference: 'second', offset: 10 },
+    ];
+    expect(nearestByOffset(tied, 10, ISOLATION_THRESHOLD)).toBe('first');
+  });
+
+  it('returns null for an empty field rather than throwing', () => {
+    expect(nearestByOffset([], 0, ISOLATION_THRESHOLD)).toBeNull();
+  });
+
+  it('has a threshold forgiving enough for a 1px line', () => {
+    // Half a row at 20 cars in a 360px plot is 9px; 14 clears it without reaching the next line.
+    expect(ISOLATION_THRESHOLD).toBeGreaterThan(9);
+    expect(ISOLATION_THRESHOLD).toBeLessThan(18);
   });
 });

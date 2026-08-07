@@ -1762,6 +1762,54 @@ one hue, which is exactly the reading a race engineer wants. Beyond that, colour
 and stays capped at 4 (RD-2 says "multi-select", which is the cap by another name). If a future
 surface wants a many-series continuous chart, it goes to small multiples as §6.5.4 says.
 
+##### Three refinements from building it _(2026-08-07, `RankChart.tsx`)_
+
+The five conditions above were written before the component existed. Building it found that three of
+them were underspecified at 22 series, and each is resolved here rather than in the code alone.
+
+**1. The resting state must be legible; isolation is an aid, not a prerequisite.** A chart that only
+resolves when you hover it has failed for anyone reading a screenshot, printing it, or using a
+keyboard. So the foreground/background split is a **resting** attribute: the selected ≤4 are drawn at
+`--size-mark-stroke` and full opacity with their dash rungs, and the field at **1px and `opacity:
+0.35`**. That gives a readable foreground over a background that shows the race's churn as a shape,
+which is condition 5 made visual rather than merely stated. Isolation then drops the field to `0.12`
+and raises the hovered line — opacity only, never a colour change.
+
+**2. Both-end labels are capacity-checked, not assumed.** Condition 3 made them a condition of the
+exemption; at 22 series **the labels are the dense part, not the lines**. `geometry.labelCapacity`
+settles it arithmetically at §6.5.2's 16px pitch:
+
+| Plot height | Capacity | 22 series |
+|---|---|---|
+| `--size-plot-lg` 360 | 23 | **fits** |
+| `--size-plot-md` 288 | 19 | does not fit |
+| `--size-plot` 240 | 16 | does not fit |
+
+So the full field is labelled at desktop and not below it. Where it does not fit, **the selection is
+still always labelled**, plus P1 and the deepest classified runner — the two positions the eye goes to
+first — and the rest are identified by hover, by the table view, and by the position axis, which
+already states their rank. Labels are the driver's **code** where one exists (`VER`, `HAM`): the
+sport's own timing convention, and about a third the width of a surname. `abbreviation` covers 107 of
+881 drivers, so it falls back to the full label rather than assuming the modern era.
+
+**3. The tooltip carries the analysis set, not the field.** §6.5.1 asks for *"every series' value at
+that x, in ONE tooltip"* — which at 22 series is a tooltip taller than the plot it covers. That rule
+exists so a reader does not have to chase per-series tooltips, and one tooltip carrying the selection
+plus the hovered line satisfies it. The full field at that lap is in the table. **The rows sort
+ascending**, not descending as §6.5.1 says: on a rank axis a lower number is better, and descending
+would put last place at the top.
+
+> **One defect worth recording, because the test was green while the feature was dead.** Isolation was
+> first built as `onPointerEnter` on each `<path>`. It passed in jsdom — a test dispatches the event
+> straight at the element — and **could never have fired in a browser**: §6.5.1's hit target covers the
+> whole plot area and is painted *after* the marks, so it swallows every pointer event before a line
+> sees one. Isolation is now derived from the pointer's proximity to a line at the active x, through
+> the single hit target, via the pure `geometry.nearestByOffset` — which also made the choice testable,
+> since a component-level proximity test in jsdom compares offsets that have all collapsed to 0.
+>
+> This is the same shape as the tooltip resolving its transform against the wrong origin: **the code
+> was right about what it wanted and wrong about where it was.**
+
 #### 6.5.5 The table view — in the same place, on every chart
 
 Every chart has a **"Table" toggle in its header**, beside the title, as a two-segment control

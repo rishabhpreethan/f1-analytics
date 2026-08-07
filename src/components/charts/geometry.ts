@@ -228,6 +228,59 @@ export function lapTimeCeiling(fastestMs: number): number {
 }
 
 /**
+ * **Which series the pointer is nearest, within a threshold.** §6.5.4a's isolation, as arithmetic.
+ *
+ * Extracted from `RankChart` because the alternative was untestable: the component derives each
+ * candidate's offset from a `d3` scale, and in jsdom every scale collapses to 0, so a proximity test
+ * written against the component could only ever assert that everything is equidistant from
+ * everything. Given offsets, the choice is pure — and the choice is the part with rules in it.
+ *
+ * `null` past the threshold, deliberately: a pointer in open space between two lines is hovering
+ * *neither*, and snapping to the closest one regardless would make isolation fire constantly and
+ * mean nothing. Ties go to the earlier candidate, which is the stable entity order.
+ */
+export function nearestByOffset(
+  candidates: readonly { reference: string; offset: number }[],
+  pointerOffset: number,
+  thresholdPx: number,
+): string | null {
+  let best: { reference: string; distance: number } | null = null;
+  for (const candidate of candidates) {
+    const distance = Math.abs(candidate.offset - pointerOffset);
+    if (best === null || distance < best.distance) {
+      best = { reference: candidate.reference, distance };
+    }
+  }
+  return best !== null && best.distance <= thresholdPx ? best.reference : null;
+}
+
+/** §6.5.4a's isolation threshold. A 1px line needs a forgiving target; 14px is half a row at 20 cars. */
+export const ISOLATION_THRESHOLD = 14;
+
+/**
+ * **How many direct labels an axis of this length can hold**, at §6.5.2's 16px minimum gap.
+ *
+ * Needed because §6.5.4a's rank chart makes both-end labels a *condition* of plotting the whole
+ * field, and at 22 series the labels are the dense part rather than the lines. The arithmetic decides
+ * whether that condition is satisfiable rather than leaving it to be discovered on screen:
+ *
+ * | Plot height | Capacity at 16px | 22 series |
+ * |---|---|---|
+ * | `--size-plot-lg` 360 | 23 | **fits** |
+ * | `--size-plot-md` 288 | 19 | does not fit |
+ * | `--size-plot` 240 | 16 | does not fit |
+ *
+ * So a full field is labelled at desktop and not below it, which is a real breakpoint-dependent
+ * answer rather than a hope. `0` for an unmeasured axis is deliberately **not** returned — see §1.0:
+ * an unmeasured axis reports its full nominal capacity, because "not yet measured" must not read as
+ * "no room".
+ */
+export function labelCapacity(axisLengthPx: number, minGap = DIRECT_LABEL_MIN_GAP): number {
+  if (axisLengthPx <= 0) return Number.POSITIVE_INFINITY;
+  return Math.floor(axisLengthPx / minGap) + 1;
+}
+
+/**
  * A span's rounded-rectangle path, with **the radius on the row's outer ends only**.
  *
  * §6.3 rounds a bar's data-end and leaves the baseline square, because *"a bar rounded at the axis
