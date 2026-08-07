@@ -1510,6 +1510,27 @@ function shadePair(theme, h, C) {
 }
 
 /**
+ * **A shade pair is an entity property, not a per-theme one** — so it exists only when BOTH themes
+ * yield an admissible pair, and otherwise it exists in neither.
+ *
+ * This was found by `entity.css.test.ts`, not reasoned out in advance, and it is worth recording why
+ * the test was right. Sauber has an admissible pair in dark mode and none in light. Emitting what
+ * each theme could manage would mean a user switching theme watched the *encoding* change: two
+ * shades plus markers in dark, one shade plus markers in light. A reader who has learned that two
+ * lines of the same colour are one team would have to unlearn it at sunset. The channels a chart
+ * uses have to be a property of the data, and the theme is allowed to change how they look and
+ * nothing else.
+ *
+ * Returns `{ light, dark }` when both exist, otherwise `null` for both.
+ */
+function pairBothThemes(h, C) {
+  const light = shadePair('light', h, C).pair;
+  const dark = shadePair('dark', h, C).pair;
+  const ok = (p) => p !== null && p.dn >= 15 && p.dc >= 8;
+  return ok(light) && ok(dark) ? { light, dark } : { light: null, dark: null };
+}
+
+/**
  * The same search with the timing gate lifted. Its only job is **attribution**: when a hue has no
  * admissible pair, this says whether the reserved timing convention is what removed it — a
  * constraint the product did not choose and cannot move — or whether the cause is something in
@@ -1534,26 +1555,20 @@ function shadePairIgnoringTiming(theme, h, C) {
   return best;
 }
 
-function catramp() {
+/**
+ * **The ramp selection, extracted so the validator and the token emitter cannot disagree.**
+ *
+ * `catramp()` (V-23 … V-28) and `emitTokens()` both call this. Duplicating the search in the
+ * emitter was the obvious shortcut and would have recreated exactly the class of bug this file
+ * exists to prevent: a shipped stylesheet whose colours are *nearly* the ones that were validated.
+ *
+ * Deterministic in full — an exact maximum-clique for tier A, then a greedy extension whose ties
+ * break on pool order — so two runs on two machines return the same twelve entries.
+ */
+function selectRamp() {
   PLOT_TIERS = TIER_SETS[6];
   MIN_HUE_SEP = 40;
-  let failures = 0;
-  const V = (cond) => {
-    if (!cond) failures += 1;
-    return cond ? 'PASS' : 'FAIL';
-  };
-
   const { pool, rejected } = entityPool();
-  console.log(
-    '\n=== V-23  ENTITY RAMP SEARCH — the pool under the per-entry gates ===\n' +
-      `  ${pool.length} admissible of ${60 * PLOT_TIERS.light.length} (hue, tier) candidates at 6 deg x 6 tiers.\n` +
-      `  rejected: ${rejected.hueband} inside a reserved timing hue band (yellow 92+-30, green 148+-30, purple 305+-30),\n` +
-      `            ${rejected.nosolution} with no in-gamut solution clearing C >= 0.05 and 3:1 on raised AND sunken,\n` +
-      `            ${rejected.timing} within normal-vision dE 15 of a timing ink,\n` +
-      `            ${rejected.furniture} within normal-vision dE 15 of achromatic chart furniture.`,
-  );
-
-  /* ---- tier A: the CVD-hard clique ---- */
   const N = pool.length;
   const adjA = Array.from({ length: N }, () => new Uint8Array(N));
   const cvdM = Array.from({ length: N }, () => new Float64Array(N));
@@ -1576,7 +1591,7 @@ function catramp() {
     return worst === Infinity ? 0 : worst;
   });
 
-  /* ---- tier B: extend to 12 on the normal-vision floor alone ---- */
+  /* tier B: extend to 12 on the normal-vision floor alone */
   const chosen = [...tierA];
   const TARGET = 12;
   while (chosen.length < TARGET) {
@@ -1606,7 +1621,26 @@ function catramp() {
     chosen.push(bestIdx);
   }
 
-  const entries = chosen.map((i) => pool[i]);
+  return { pool, rejected, tierA, entries: chosen.map((i) => pool[i]), nrmM, cvdM, chosen };
+}
+
+function catramp() {
+  let failures = 0;
+  const V = (cond) => {
+    if (!cond) failures += 1;
+    return cond ? 'PASS' : 'FAIL';
+  };
+
+  const { pool, rejected, tierA, entries } = selectRamp();
+  console.log(
+    '\n=== V-23  ENTITY RAMP SEARCH — the pool under the per-entry gates ===\n' +
+      `  ${pool.length} admissible of ${60 * PLOT_TIERS.light.length} (hue, tier) candidates at 6 deg x 6 tiers.\n` +
+      `  rejected: ${rejected.hueband} inside a reserved timing hue band (yellow 92+-30, green 148+-30, purple 305+-30),\n` +
+      `            ${rejected.nosolution} with no in-gamut solution clearing C >= 0.05 and 3:1 on raised AND sunken,\n` +
+      `            ${rejected.timing} within normal-vision dE 15 of a timing ink,\n` +
+      `            ${rejected.furniture} within normal-vision dE 15 of achromatic chart furniture.`,
+  );
+
   console.log(
     `\n  TIER A (colour alone separates, every viewer): N = ${tierA.length}` +
       `   TIER B extension: +${entries.length - tierA.length}   TOTAL N = ${entries.length}`,
@@ -1848,6 +1882,43 @@ function catramp() {
     );
   }
 
+  /* The ladder ceiling — REPORTED, because it sets the cap in §3.3a and must not be assumed. */
+  {
+    const ladderMax = (theme, h, C) => {
+      const { shades } = plottableShades(theme, h, C);
+      const s = shades.filter((_, i) => i % 2 === 0); // 0.004 steps: enough resolution, 4x faster
+      let best = Math.min(s.length, 1);
+      for (let i = 0; i < s.length; i++)
+        for (let j = i + 1; j < s.length; j++) {
+          if (dE(s[i].hex, s[j].hex) < 15 || minCVD(s[i].hex, s[j].hex) < 8) continue;
+          best = Math.max(best, 2);
+          for (let k = j + 1; k < s.length; k++) {
+            if (dE(s[i].hex, s[k].hex) < 15 || minCVD(s[i].hex, s[k].hex) < 8) continue;
+            if (dE(s[j].hex, s[k].hex) < 15 || minCVD(s[j].hex, s[k].hex) < 8) continue;
+            return 3;
+          }
+        }
+      return best;
+    };
+    const per = plotEntities.map((e) => ({
+      name: e.name,
+      light: ladderMax('light', e.h, e.C),
+      dark: ladderMax('dark', e.h, e.C),
+    }));
+    const maxLight = Math.max(...per.map((p) => p.light));
+    const maxDark = Math.max(...per.map((p) => p.dark));
+    console.log(
+      `  ---    LADDER CEILING (reported) — how many mutually separated shades ONE hue can supply:\n` +
+        `         light mode max ${maxLight} across all ${per.length} entities; dark mode max ${maxDark}.\n` +
+        `         **The cap is 2, and light mode sets it.** Light's plotting band is nominally as wide as\n` +
+        `         dark's, but its usable top is cut by the 3:1-against-white requirement, so a third shade\n` +
+        `         cannot be fitted at the floor. Dark mode reaching ${maxDark} is not usable: a colour\n` +
+        `         assignment whose *count* changed with the theme would be incoherent.\n` +
+        `         Design consequence, stated in §3.3a: beyond TWO drivers of one team in one plot, colour\n` +
+        `         is exhausted and the marker/dash/label channels carry the distinction alone.`,
+    );
+  }
+
   /* G-27b — the ramp is ours to choose, so every entry must be splittable in both themes. */
   {
     const rampPaired = paired.filter((p) => p.kind === 'ramp');
@@ -1901,6 +1972,31 @@ function catramp() {
         `         vs chart furniture dE ${n(worstFurn)} (floor 15) ${V(worstFurn >= 15)}\n` +
         `         vs status ink dE ${n(worstStatus)} REPORTED (§3.4.3 posture: a status colour never\n` +
         `         appears without an icon and a label, so it is not a floor a series is held to)  worst ${worstStatusW}`,
+    );
+  }
+
+  /* G-27e — the pair is an entity property, so it must be available in both themes or in neither. */
+  {
+    const byName = new Map();
+    for (const p of paired) byName.set(p.name, (byName.get(p.name) ?? 0) + 1);
+    const lopsided = [...byName].filter(([, count]) => count === 1).map(([nm]) => nm);
+    // Gated on what the EMITTER will actually ship, not on the raw search. `pairBothThemes` is the
+    // function that has to hold the line; flipping its AND to an OR must fail here.
+    const shipsLopsided = plotEntities.filter((e) => {
+      const both = pairBothThemes(e.h, e.C);
+      return (both.light === null) !== (both.dark === null);
+    });
+    console.log(
+      `  G-27e  the shade pair is an ENTITY property, not a per-theme one — available in both themes\n` +
+        `         or withheld from both. Raw search splits in exactly one theme: ` +
+        `${lopsided.length ? lopsided.join(', ') : 'none'}.\n` +
+        `         What pairBothThemes() ships lopsided: ${shipsLopsided.length} ${V(shipsLopsided.length === 0)}\n` +
+        `         Found by entity.css.test.ts, not reasoned out in advance: Sauber has an admissible pair\n` +
+        `         in dark and none in light, and emitting what each theme could manage would mean a reader\n` +
+        `         watched the ENCODING change at sunset — two shades plus markers in dark, one shade plus\n` +
+        `         markers in light. The channels a chart uses are a property of the data; the theme is\n` +
+        `         allowed to change how they look and nothing else. Sauber's dark pair is therefore\n` +
+        `         withheld, which is what the emitter now does.`,
     );
   }
 
@@ -1975,7 +2071,130 @@ function catramp() {
   return entries;
 }
 
+/* ================================================================ V-29  TOKEN EMITTER
+ * `node scripts/validate-palette.mjs tokens` prints `src/styles/entity.css` on stdout.
+ *
+ * **The stylesheet is generated, never typed.** 144 hex values across two themes is well past the
+ * point where transcription is reliable, and a mistyped hex is invisible: it still renders, it is
+ * still roughly the right colour, and every figure recorded in §9.2.3 silently stops describing
+ * what ships. `entity.css.test.ts` re-runs this emitter and diffs it against the committed file, so
+ * the two cannot drift without a red test.
+ */
+function emitTokens() {
+  const { tierA, entries } = selectRamp();
+  const out = [];
+  // Lower-cased because that is the house style every other stylesheet is already in, which is to
+  // say: it is what `prettier --check` enforces. The emitter has to agree with the formatter or
+  // `entity.css` cannot be both generated and format-clean.
+  const p = (s = '') => out.push(s.replace(/#[0-9A-F]{6}\b/g, (h) => h.toLowerCase()));
+
+  const brandPlot = {};
+  const brandPair = {};
+  for (const [team, hex] of Object.entries(BRAND)) {
+    const o = oklch(hex);
+    if (o.C < 0.05) continue;
+    brandPlot[team] = {
+      light: brandChartVariant('light', hex),
+      dark: brandChartVariant('dark', hex),
+    };
+    brandPair[team] = pairBothThemes(o.h, o.C);
+  }
+  const rampPair = entries.map((e) => pairBothThemes(e.h, 0.4));
+
+  p('/*');
+  p(' * ENTITY COLOUR — generated. Do not hand-edit.');
+  p(' *');
+  p(' *   node scripts/validate-palette.mjs tokens > src/styles/entity.css');
+  p(' *');
+  p(' * Specified in docs/DESIGN_SYSTEM.md §3.3a; every figure gated by §9.2.3 V-23 … V-29.');
+  p(' * `entity.css.test.ts` re-runs the emitter and diffs it against this file, so a hand edit');
+  p(' * here fails a test rather than quietly invalidating the validation record.');
+  p(' *');
+  p(' * THREE ROLES PER ENTITY, and mixing them up is the mistake this comment exists to prevent:');
+  p(
+    ' *   `--team-<ref>`           IDENTITY. The true brand colour, theme-invariant. Swatches, accent',
+  );
+  p(
+    ' *                            bars, header bands — always beside a name (§3.3). Never a chart mark.',
+  );
+  p(' *   `--*-plot`               The entity plotting colour: one series, one entity.');
+  p(
+    ' *   `--*-plot-deep`          The teammate shade pair (§6.4a). Two drivers of one team, ordered by',
+  );
+  p(' *   `--*-plot-bright`        `driver.reference` ascending: lower takes `deep`.');
+  p(' *');
+  p(
+    ' * Haas and Cadillac have an identity colour and NO plotting colour: both are below the OkLCh',
+  );
+  p(' * chroma floor (0.0056 / 0.0043), so they read as grey and would be confusable with this');
+  p(" * product's achromatic chart furniture. They plot from the ramp like any colourless team.");
+  p(' */');
+  p();
+
+  const block = (theme, selector) => {
+    p(`${selector} {`);
+    p(
+      `  /* ---- identity: the true brand colour (${theme === 'light' ? 'theme-invariant, declared once per block so a consumer never has to know' : 'repeated so both blocks declare the same names'}) */`,
+    );
+    for (const [team, hex] of Object.entries(BRAND)) p(`  --team-${team}: ${hex};`);
+    p();
+    p('  /* ---- brand plotting variants: hue and chroma held, lightness moved the minimum');
+    p("   * distance into this theme's plotting band (§3.3 rule 6). */");
+    for (const [team, v] of Object.entries(brandPlot)) {
+      const pair = brandPair[team][theme];
+      p(`  --team-${team}-plot: ${v[theme].hex};`);
+      if (pair) {
+        p(`  --team-${team}-plot-deep: ${pair.deep.hex};`);
+        p(`  --team-${team}-plot-bright: ${pair.bright.hex};`);
+      } else {
+        p(
+          `  /* --team-${team}-plot-deep / -bright: DELIBERATELY ABSENT, in both themes. Brand hue`,
+        );
+        p(
+          `   * ${n(oklch(BRAND[team]).h, 0)} sits inside the reserved timing green band, and in LIGHT mode exactly one`,
+        );
+        p(
+          `   * lightness in the whole plotting band clears dE 15 from --timing-green-ink, so a pair is`,
+        );
+        p(
+          `   * impossible there. A pair is available in dark mode and is withheld anyway: the shade pair`,
+        );
+        p(
+          `   * is an entity property, not a per-theme one, and an encoding that changed with the theme`,
+        );
+        p(
+          `   * would make a reader unlearn it at sunset. §6.4a's marker, dash and direct-label channels`,
+        );
+        p(
+          `   * carry this team's teammate comparison alone — which is why they are mandatory for every`,
+        );
+        p(`   * team rather than a fallback for this one. See §9.2.3 V-27 G-27d. */`);
+      }
+    }
+    p();
+    p('  /* ---- the fallback ramp: 12 slots for the 202 of 214 teams with no brand colour.');
+    p('   * Tier A (1-6) is separated by colour alone for every viewer; tier B (7-12) clears the');
+    p('   * normal-vision floor and hands its CVD pairs to the runtime ladder (§6.4). */');
+    rampPair.forEach((pair, i) => {
+      p(
+        `  --ramp-${i + 1}-plot: ${entries[i][theme]}; /* tier ${i < tierA.length ? 'A' : 'B'}, OkLCh hue ${entries[i].h} */`,
+      );
+      p(`  --ramp-${i + 1}-plot-deep: ${pair[theme].deep.hex};`);
+      p(`  --ramp-${i + 1}-plot-bright: ${pair[theme].bright.hex};`);
+    });
+    p('}');
+  };
+
+  block('light', ':root');
+  p();
+  block('dark', "[data-theme='dark']");
+  return out.join('\n');
+}
+
 /* ================================================================ main */
+if (mode === 'tokens') {
+  console.log(emitTokens());
+}
 if (mode === 'calibrate' || mode === 'all') calibration();
 if (mode === 'mono' || mode === 'all') mono();
 if (mode === 'catramp' || mode === 'all') catramp();

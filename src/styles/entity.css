@@ -1,0 +1,210 @@
+/*
+ * ENTITY COLOUR — generated. Do not hand-edit.
+ *
+ *   node scripts/validate-palette.mjs tokens > src/styles/entity.css
+ *
+ * Specified in docs/DESIGN_SYSTEM.md §3.3a; every figure gated by §9.2.3 V-23 … V-29.
+ * `entity.css.test.ts` re-runs the emitter and diffs it against this file, so a hand edit
+ * here fails a test rather than quietly invalidating the validation record.
+ *
+ * THREE ROLES PER ENTITY, and mixing them up is the mistake this comment exists to prevent:
+ *   `--team-<ref>`           IDENTITY. The true brand colour, theme-invariant. Swatches, accent
+ *                            bars, header bands — always beside a name (§3.3). Never a chart mark.
+ *   `--*-plot`               The entity plotting colour: one series, one entity.
+ *   `--*-plot-deep`          The teammate shade pair (§6.4a). Two drivers of one team, ordered by
+ *   `--*-plot-bright`        `driver.reference` ascending: lower takes `deep`.
+ *
+ * Haas and Cadillac have an identity colour and NO plotting colour: both are below the OkLCh
+ * chroma floor (0.0056 / 0.0043), so they read as grey and would be confusable with this
+ * product's achromatic chart furniture. They plot from the ramp like any colourless team.
+ */
+
+:root {
+  /* ---- identity: the true brand colour (theme-invariant, declared once per block so a consumer never has to know) */
+  --team-alpine: #00a1e8;
+  --team-aston_martin: #229971;
+  --team-audi: #ff2d00;
+  --team-cadillac: #aaaaad;
+  --team-ferrari: #ed1131;
+  --team-haas: #9c9fa2;
+  --team-mclaren: #f47600;
+  --team-mercedes: #00d7b6;
+  --team-rb: #6c98ff;
+  --team-red_bull: #4781d7;
+  --team-sauber: #01c00e;
+  --team-williams: #1868db;
+
+  /* ---- brand plotting variants: hue and chroma held, lightness moved the minimum
+   * distance into this theme's plotting band (§3.3 rule 6). */
+  --team-alpine-plot: #0693d4;
+  --team-alpine-plot-deep: #004d72;
+  --team-alpine-plot-bright: #0693d4;
+  --team-aston_martin-plot: #229971;
+  --team-aston_martin-plot-deep: #01563d;
+  --team-aston_martin-plot-bright: #289d75;
+  --team-audi-plot: #fe2e03;
+  --team-audi-plot-deep: #861301;
+  --team-audi-plot-bright: #ff4628;
+  --team-ferrari-plot: #ed1131;
+  --team-ferrari-plot-deep: #8a0117;
+  --team-ferrari-plot-bright: #ff444b;
+  --team-mclaren-plot: #dd6b02;
+  --team-mclaren-plot-deep: #713402;
+  --team-mclaren-plot-bright: #dd6b02;
+  --team-mercedes-plot: #099d85;
+  --team-mercedes-plot-deep: #005446;
+  --team-mercedes-plot-bright: #099d85;
+  --team-rb-plot: #5d87ed;
+  --team-rb-plot-deep: #1c3d9c;
+  --team-rb-plot-bright: #5d87ed;
+  --team-red_bull-plot: #4781d7;
+  --team-red_bull-plot-deep: #044393;
+  --team-red_bull-plot-bright: #518be2;
+  --team-sauber-plot: #03a20c;
+  /* --team-sauber-plot-deep / -bright: DELIBERATELY ABSENT, in both themes. Brand hue
+   * 143 sits inside the reserved timing green band, and in LIGHT mode exactly one
+   * lightness in the whole plotting band clears dE 15 from --timing-green-ink, so a pair is
+   * impossible there. A pair is available in dark mode and is withheld anyway: the shade pair
+   * is an entity property, not a per-theme one, and an encoding that changed with the theme
+   * would make a reader unlearn it at sunset. §6.4a's marker, dash and direct-label channels
+   * carry this team's teammate comparison alone — which is why they are mandatory for every
+   * team rather than a fallback for this one. See §9.2.3 V-27 G-27d. */
+  --team-williams-plot: #1868db;
+  --team-williams-plot-deep: #014198;
+  --team-williams-plot-bright: #3b88fe;
+
+  /* ---- the fallback ramp: 12 slots for the 202 of 214 teams with no brand colour.
+   * Tier A (1-6) is separated by colour alone for every viewer; tier B (7-12) clears the
+   * normal-vision floor and hands its CVD pairs to the runtime ladder (§6.4). */
+  --ramp-1-plot: #a1012d; /* tier A, OkLCh hue 18 */
+  --ramp-1-plot-deep: #890024;
+  --ramp-1-plot-bright: #fe435e;
+  --ramp-2-plot: #bb6801; /* tier A, OkLCh hue 60 */
+  --ramp-2-plot-deep: #925002;
+  --ramp-2-plot-bright: #cf7402;
+  --ramp-3-plot: #046457; /* tier A, OkLCh hue 180 */
+  --ramp-3-plot-deep: #035449;
+  --ramp-3-plot-bright: #069c89;
+  --ramp-4-plot: #028eaf; /* tier A, OkLCh hue 222 */
+  --ramp-4-plot-deep: #025064;
+  --ramp-4-plot-bright: #0797ba;
+  --ramp-5-plot: #0029c2; /* tier A, OkLCh hue 264 */
+  --ramp-5-plot-deep: #0029c2;
+  --ramp-5-plot-bright: #5086fe;
+  --ramp-6-plot: #7c016a; /* tier A, OkLCh hue 336 */
+  --ramp-6-plot-deep: #7c016a;
+  --ramp-6-plot-bright: #fc02db;
+  --ramp-7-plot: #834001; /* tier B, OkLCh hue 54 */
+  --ramp-7-plot-deep: #703500;
+  --ramp-7-plot-bright: #d96e02;
+  --ramp-8-plot: #025990; /* tier B, OkLCh hue 246 */
+  --ramp-8-plot-deep: #004b7b;
+  --ramp-8-plot-bright: #0090e6;
+  --ramp-9-plot: #c70289; /* tier B, OkLCh hue 348 */
+  --ramp-9-plot-deep: #810157;
+  --ramp-9-plot-bright: #ff25b2;
+  --ramp-10-plot: #ff4330; /* tier B, OkLCh hue 30 */
+  --ramp-10-plot-deep: #8a0700;
+  --ramp-10-plot-bright: #ff4532;
+  --ramp-11-plot: #089583; /* tier B, OkLCh hue 180 */
+  --ramp-11-plot-deep: #035449;
+  --ramp-11-plot-bright: #069c89;
+  --ramp-12-plot: #0878ff; /* tier B, OkLCh hue 258 */
+  --ramp-12-plot-deep: #004395;
+  --ramp-12-plot-bright: #3689ff;
+}
+
+[data-theme='dark'] {
+  /* ---- identity: the true brand colour (repeated so both blocks declare the same names) */
+  --team-alpine: #00a1e8;
+  --team-aston_martin: #229971;
+  --team-audi: #ff2d00;
+  --team-cadillac: #aaaaad;
+  --team-ferrari: #ed1131;
+  --team-haas: #9c9fa2;
+  --team-mclaren: #f47600;
+  --team-mercedes: #00d7b6;
+  --team-rb: #6c98ff;
+  --team-red_bull: #4781d7;
+  --team-sauber: #01c00e;
+  --team-williams: #1868db;
+
+  /* ---- brand plotting variants: hue and chroma held, lightness moved the minimum
+   * distance into this theme's plotting band (§3.3 rule 6). */
+  --team-alpine-plot: #00a1e8;
+  --team-alpine-plot-deep: #037ab0;
+  --team-alpine-plot-bright: #b0defe;
+  --team-aston_martin-plot: #229971;
+  --team-aston_martin-plot-deep: #008660;
+  --team-aston_martin-plot-bright: #79e4b9;
+  --team-audi-plot: #fe2e03;
+  --team-audi-plot-deep: #cf2301;
+  --team-audi-plot-bright: #ffc9bd;
+  --team-ferrari-plot: #ed1131;
+  --team-ferrari-plot-deep: #d50028;
+  --team-ferrari-plot-bright: #ffc8c3;
+  --team-mclaren-plot: #f47600;
+  --team-mclaren-plot-deep: #b05403;
+  --team-mclaren-plot-bright: #ffcbad;
+  --team-mercedes-plot: #01d7b6;
+  --team-mercedes-plot-deep: #058470;
+  --team-mercedes-plot-bright: #4bf7d4;
+  --team-rb-plot: #6d98fe;
+  --team-rb-plot-deep: #436bcd;
+  --team-rb-plot-bright: #c5d8fe;
+  --team-red_bull-plot: #4781d7;
+  --team-red_bull-plot-deep: #3770c4;
+  --team-red_bull-plot-bright: #c0d9fe;
+  --team-sauber-plot: #01c00e;
+  /* --team-sauber-plot-deep / -bright: DELIBERATELY ABSENT, in both themes. Brand hue
+   * 143 sits inside the reserved timing green band, and in LIGHT mode exactly one
+   * lightness in the whole plotting band clears dE 15 from --timing-green-ink, so a pair is
+   * impossible there. A pair is available in dark mode and is withheld anyway: the shade pair
+   * is an entity property, not a per-theme one, and an encoding that changed with the theme
+   * would make a reader unlearn it at sunset. §6.4a's marker, dash and direct-label channels
+   * carry this team's teammate comparison alone — which is why they are mandatory for every
+   * team rather than a fallback for this one. See §9.2.3 V-27 G-27d. */
+  --team-williams-plot: #1c6bde;
+  --team-williams-plot-deep: #1c6bde;
+  --team-williams-plot-bright: #c1d9fe;
+
+  /* ---- the fallback ramp: 12 slots for the 202 of 214 teams with no brand colour.
+   * Tier A (1-6) is separated by colour alone for every viewer; tier B (7-12) clears the
+   * normal-vision floor and hands its CVD pairs to the runtime ladder (§6.4). */
+  --ramp-1-plot: #f7054a; /* tier A, OkLCh hue 18 */
+  --ramp-1-plot-deep: #d3013d;
+  --ramp-1-plot-bright: #fec8c8;
+  --ramp-2-plot: #fea75a; /* tier A, OkLCh hue 60 */
+  --ramp-2-plot-deep: #a65c01;
+  --ramp-2-plot-bright: #fecca4;
+  --ramp-3-plot: #039c89; /* tier A, OkLCh hue 180 */
+  --ramp-3-plot-deep: #078474;
+  --ramp-3-plot-bright: #0ff9db;
+  --ramp-4-plot: #25d1ff; /* tier A, OkLCh hue 222 */
+  --ramp-4-plot-deep: #017e9c;
+  --ramp-4-plot-bright: #9ae4fe;
+  --ramp-5-plot: #2561fe; /* tier A, OkLCh hue 264 */
+  --ramp-5-plot-deep: #205dfe;
+  --ramp-5-plot-bright: #c4d8ff;
+  --ramp-6-plot: #c402a9; /* tier A, OkLCh hue 336 */
+  --ramp-6-plot-deep: #bf02a5;
+  --ramp-6-plot-bright: #ffc1ef;
+  --ramp-7-plot: #cb6705; /* tier B, OkLCh hue 54 */
+  --ramp-7-plot-deep: #ad5601;
+  --ramp-7-plot-bright: #ffcbab;
+  --ramp-8-plot: #048cdf; /* tier B, OkLCh hue 246 */
+  --ramp-8-plot-deep: #0376be;
+  --ramp-8-plot-bright: #b6dcfe;
+  --ramp-9-plot: #ff6fc0; /* tier B, OkLCh hue 348 */
+  --ramp-9-plot-deep: #c70289;
+  --ramp-9-plot-bright: #fec4e0;
+  --ramp-10-plot: #febfb4; /* tier B, OkLCh hue 30 */
+  --ramp-10-plot-deep: #d41101;
+  --ramp-10-plot-bright: #fec9bf;
+  --ramp-11-plot: #02dbc1; /* tier B, OkLCh hue 180 */
+  --ramp-11-plot-deep: #078474;
+  --ramp-11-plot-bright: #0ff9db;
+  --ramp-12-plot: #96c0fe; /* tier B, OkLCh hue 258 */
+  --ramp-12-plot-deep: #006ae5;
+  --ramp-12-plot-bright: #c0d9fe;
+}

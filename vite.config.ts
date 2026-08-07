@@ -118,7 +118,17 @@ export default defineConfig({
      * Tailwind pipeline for no assertion. There is now an assertion, and it is one nothing
      * else in the pipeline can make: with no visual gate (CR-006), a component reaching for
      * a raw `--signal-*` step or hard-coding a z-index would otherwise reach review unseen.
+     *
+     * `entity.css` was added 2026-08-07 with the entity colour layer (§3.3a). It is a **generated**
+     * file, so the assertions on it are about what generation can get wrong and still look fine — a
+     * dark-block token that silently does not exist, an inverted `deep`/`bright` lightness ordering,
+     * a series colour that has drifted grey. Its byte-identity against the emitter is checked in
+     * `scripts/entity-tokens.test.mjs` instead, which can import `node:child_process`.
+     *
+     * **Removing an entry here does not fail loudly**, and that is the trap: the import returns `''`
+     * and set-equality or no-duplicate assertions pass vacuously. Each of the stylesheet tests
+     * therefore opens by asserting its own input is non-empty.
      */
-    css: { include: [/tokens\.css/, /motion\.css/, /backdrop\.css/, /index\.css/] },
+    css: { include: [/tokens\.css/, /motion\.css/, /backdrop\.css/, /index\.css/, /entity\.css/] },
   },
 });
