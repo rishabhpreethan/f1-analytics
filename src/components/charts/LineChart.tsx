@@ -17,6 +17,8 @@ import {
   mountKey,
   placeDirectLabels,
   plotArea,
+  fmtCoord,
+  offScalePath,
   timeTickCount,
   withEndpoints,
   TICK_LABEL_SIZE,
@@ -101,6 +103,18 @@ export interface LineChartProps {
    * the kit had no way to say it until now. Use `positionTicksWithin`.
    */
   yTickValues?: readonly number[];
+  /**
+   * §6.3 — clip the measure axis at this value, and mark every reading above it.
+   *
+   * Built for the lap-time trace, where it is **mandatory rather than optional**: 2026 R1's slowest
+   * lap is 1,168s against a fastest of 82s, so an unclipped axis compresses every racing lap into 7%
+   * of the plot. Readings above the ceiling are drawn at the ceiling with an off-scale caret, counted
+   * in a note the frame renders, and left exact in the table view — which is what makes the clipping
+   * honest rather than lossy.
+   */
+  yCeiling?: number;
+  /** Formats the ceiling for the off-scale note. Defaults to `formatY`. */
+  formatCeiling?: (value: number) => string;
 }
 
 const identity = (n: number) => String(n);
@@ -123,6 +137,8 @@ export function LineChart({
   zeroBaseline = false,
   yDomain,
   yTickValues,
+  yCeiling,
+  formatCeiling,
 }: LineChartProps) {
   const labelX = formatXLong ?? formatX;
   const clipId = useId().replace(/:/g, '');
@@ -157,13 +173,30 @@ export function LineChart({
     points: series[i]?.points ?? [],
   }));
 
+  /*
+   * §6.3's ceiling, applied **before** the domain is derived — which is the whole point. Clipping
+   * after the axis had already been sized by a 1,168-second lap would change nothing. A clipped
+   * reading keeps its x and is flagged, so the caret is drawn at its own lap rather than the line
+   * simply breaking.
+   */
+  const clipped = resolved.map((s) => ({
+    ...s,
+    points: s.points.map((p) =>
+      yCeiling !== undefined && p.y !== null && p.y > yCeiling
+        ? { x: p.x, y: yCeiling, offScale: true }
+        : { x: p.x, y: p.y, offScale: false },
+    ),
+  }));
+  const offScaleCount = clipped.reduce(
+    (total, s) => total + s.points.filter((p) => p.offScale).length,
+    0,
+  );
+
   /* The union of every x any series has a reading for, ascending. A driver who joined at round 5
    * must not truncate the axis to rounds 5+. */
-  const xs = [...new Set(resolved.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
+  const xs = [...new Set(clipped.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
 
-  const ys = resolved.flatMap((s) =>
-    s.points.map((p) => p.y).filter((y): y is number => y !== null),
-  );
+  const ys = clipped.flatMap((s) => s.points.map((p) => p.y).filter((y): y is number => y !== null));
 
   const yMin =
     yDomain?.[0] ?? (zeroBaseline ? Math.min(0, ...ys) : Math.min(...(ys.length > 0 ? ys : [0])));
@@ -362,6 +395,9 @@ export function LineChart({
       {...(stateCopy === undefined ? {} : { stateCopy })}
       patterns={patterns}
       onPatternsChange={setPatterns}
+      {...(yCeiling === undefined || offScaleCount === 0
+        ? {}
+        : { offScale: { count: offScaleCount, ceiling: (formatCeiling ?? formatY)(yCeiling) } })}
       legend={<ChartLegend series={resolved} emptyReferences={emptyReferences} />}
       table={
         <SeriesTable
@@ -418,7 +454,7 @@ export function LineChart({
 
             <g className="chart-marks" clipPath={`url(#${clipId})`}>
               <g transform={`translate(${String(plot.left)} ${String(plot.top)})`}>
-                {resolved.map((s) => (
+                {clipped.map((s) => (
                   <path
                     key={s.reference}
                     className="chart-line"
@@ -447,6 +483,25 @@ export function LineChart({
                         />
                       )),
                   )}
+                {/*
+                 * §6.3's off-scale carets. Drawn **regardless of marker density** — unlike a marker,
+                 * a caret is not one of a series of equivalent readings, it is a statement that this
+                 * reading is not where it appears. Suppressing it at race density would remove the
+                 * only visible sign that the axis is clipped.
+                 */}
+                {clipped.map((s) =>
+                  s.points
+                    .filter((p) => p.offScale)
+                    .map((p) => (
+                      <path
+                        key={`${s.reference}-off-${String(p.x)}`}
+                        className="chart-offscale"
+                        d={offScalePath()}
+                        transform={`translate(${fmtCoord(xScale(p.x))} ${fmtCoord(yScale(p.y ?? 0))})`}
+                        style={{ '--series': cssVar(s.plot) } as React.CSSProperties}
+                      />
+                    )),
+                )}
               </g>
             </g>
 

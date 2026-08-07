@@ -54,6 +54,36 @@ perceived speed.
 vocabulary, one chart language. A page needing something new means the system gains a token — never
 that a page gains an exception.
 
+### 1.0 ⚠ The default-vs-measured trap — the one bug class that has recurred _(added 2026-08-07)_
+
+**A default value and a measured value are indistinguishable at the point of use, and treating the
+default as real is the most repeated defect in this project.** Three instances, in three unrelated
+subsystems, all found by looking at the screen rather than by a test:
+
+| Where | The zero | What it was read as | What shipped |
+|---|---|---|---|
+| **Motion** (§4.6.1) | a `ScrollTrigger` that had not fired | an authored `opacity: 0` | the loading skeletons were invisible, so a cold load showed a heading and an empty page |
+| **Charts** (§6.3) | `useChartSize` reporting width `0` before the `ResizeObserver` fires | a *measured* width of 0 px, therefore "too dense for markers" | every marker dropped on first paint, then popped in — and the marker layer absent in jsdom, where the test that a `null` reading draws as a gap counts markers |
+| **Axes** (§6.3) | a domain of `[1, n]` | `1` being an interior value like any other | `d3.ticks` never labelled it, so **every completed season's progression axis started at round 2** |
+
+The three look nothing alike and are the same bug: **something absent was given the meaning of
+something present.** The mitigation generalises, and it is binding from here:
+
+1. **Name the unmeasured case explicitly.** `if (axisLengthPx <= 0)` is a branch, not a coincidence.
+   A function that cannot tell "not yet known" from "known to be zero" has to be given the
+   distinction.
+2. **Take the permissive branch.** Absent means *no constraint stated* — never the worst case. This is
+   the same convention `prefersReducedMotion()` already uses for a missing `matchMedia`, and the same
+   one `resolveSeasonYear` uses for a year it cannot range-check.
+3. **Assert the permissive branch by name.** `it('DRAWS on an unmeasured plot — "not yet measured" is
+   not "too dense"')` is the test that stops the next author from "tidying up" the guard.
+4. **A resting CSS state is always the final, readable state** (MR-2). Entrance motion is authored
+   `from`, never `to`-from-hidden, so a tween that never runs leaves content visible.
+
+**On this evidence there will be a fourth.** The places to look are anywhere a measurement, a media
+query, a query result or a route parameter can be *absent* rather than *empty* — and the tell is a
+falsy check (`!width`, `?? 0`, `|| 1`) standing in for a three-state question.
+
 ### 1.1 The three decisions that produce the character
 
 Everything else follows from these.
@@ -1770,7 +1800,7 @@ scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
 | Lap-time trace | change over time, dense | per-lap line, **1996+ only** | `d3-array.bisector` |
 | Pace degradation | change over time | per-lap scatter + a fitted trend line | none (fit is arithmetic) |
 | Pit timeline | magnitude, sequence | horizontal bar per stop, **2011+ only** | `scaleBand` |
-| Stint timeline | sequence | stacked horizontal bar | `d3-shape.stack` |
+| Stint timeline | sequence | **span chart** — one row per entity, spans on a shared axis | `scaleBand` + `scaleLinear`. **Not `d3-shape.stack`** — see below |
 | Records leaderboard | magnitude + identity | horizontal bar, direct-labelled | `scaleBand` |
 | Head-to-head | polarity | single diverging bar, centred at 0 | `scaleBand` |
 | Season heat map | magnitude across two categories | cell grid, per-mark tooltip | `scaleBand` × 2 |
@@ -1779,10 +1809,30 @@ scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
 telemetry or practice analysis. None of it exists in the data (`REQUIREMENTS.md` §6), and 423 FP1
 sessions hold 698 entries with no times at all.
 
-**One row above is now wrong and is corrected here rather than edited silently.** *"Position chart
-(grid → finish) — slope chart, 2 categorical positions"* describes a different chart from RD-1, which
-asks for **per-lap** position for the whole field. The slope chart is still worth having as a compact
-summary, but it is not RD-1 and it does not discharge it. RD-1's form is the rank chart of §6.5.4a.
+**Two rows above were wrong and are corrected here rather than edited silently.**
+
+**Position chart.** *"Slope chart, 2 categorical positions"* describes a different chart from RD-1,
+which asks for **per-lap** position for the whole field. The slope chart is still worth having as a
+compact summary, but it is not RD-1 and does not discharge it. RD-1's form is the rank chart of
+§6.5.4a.
+
+**Stint timeline — `d3-shape.stack` was the wrong primitive.** `stack` sums sequential *values* to
+derive cumulative positions. A stint's boundaries are **already known**: `DATABASE.md` §6.7 derives
+them as `[1 … pit₁], (pit₁ … pit₂], … (pitₙ … end]`. Feeding spans through lengths, then cumulative
+sums, then back to positions is a round trip whose only possible contribution is error. The form is a
+**span chart** — `scaleBand` for the rows, `scaleLinear` for the measure — and `SpanChart.test.tsx`
+asserts on the module's source that `d3-shape` is never imported, so the decision cannot be quietly
+reversed. Two properties of it are design decisions rather than implementation:
+
+- **§6.3's 4px radius is on the row's outer ends only.** An interior boundary between two adjacent
+  spans is square, because a rounded interior edge implies a gap in the sequence that is not there —
+  the same argument §6.3 makes for a bar being square against its baseline, applied twice.
+- **Spans within a row are not differentiated by colour.** Alternating shades would spend the shade
+  pair, which §3.3a.1 reserves for the teammate case; alternating opacity would imply a magnitude on
+  a channel carrying sequence. The 2px surface gap and an in-span label carry it.
+- **The entrance is G-28's clip wipe, not G-27's growth.** A span beginning at lap 30 must not grow
+  from the plot's left edge: that animates its *start* moving, which is the one thing a sequence chart
+  must not say. A left-to-right reveal uncovers the timeline in the order the race happened.
 
 #### 6.6.1 F3 — the race page, specified _(2026-08-07)_
 

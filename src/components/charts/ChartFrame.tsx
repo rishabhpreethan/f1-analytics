@@ -50,6 +50,22 @@ export interface ChartFrameProps {
   patterns?: boolean;
   /** The state copy. Generated from `GET /api/meta`, never hardcoded — see §6.5.3. */
   stateCopy?: { title?: string; body: string; action?: ReactNode };
+  /**
+   * §6.3 — **the off-scale note, and it lives here rather than in the chart on purpose.**
+   *
+   * A clipped measure axis (a lap-time trace's `fastest × 1.5` ceiling) is only honest if two things
+   * are true: the reader can see **how many** readings are above the ceiling without hovering
+   * anything, and the exact values are one action away. The count is the note; the exact values are
+   * the table view — and the table toggle is **already** this component's, so the affordance that
+   * connects them has to be here too. A chart rendering its own note could state the count but could
+   * not offer the button, and "the table has the real numbers" would be true in the spec and
+   * invisible in the interface.
+   */
+  offScale?: {
+    count: number;
+    /** The ceiling, already formatted — e.g. `2:03.135`. The frame never formats a value. */
+    ceiling: string;
+  };
 }
 
 export function ChartFrame({
@@ -66,6 +82,7 @@ export function ChartFrame({
   patterns = false,
   onPatternsChange,
   stateCopy,
+  offScale,
 }: ChartFrameProps) {
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const captionId = useId();
@@ -140,6 +157,30 @@ export function ChartFrame({
           {note}
         </p>
       ))}
+
+      {/*
+       * §6.3's off-scale note. Rendered only in the chart view — in the table view every value is
+       * already on screen, so the note would be telling the reader about a ceiling that is not
+       * currently being applied to anything they can see.
+       */}
+      {offScale !== undefined && offScale.count > 0 && view === 'chart' && (
+        <p className="chart-note">
+          <span>
+            {offScale.count === 1
+              ? `1 lap is slower than ${offScale.ceiling} and is drawn at the top of the axis.`
+              : `${String(offScale.count)} laps are slower than ${offScale.ceiling} and are drawn at the top of the axis.`}
+          </span>{' '}
+          <button
+            type="button"
+            className="chart-note-action"
+            onClick={() => {
+              setView('table');
+            }}
+          >
+            Show exact times
+          </button>
+        </p>
+      )}
 
       {view === 'chart' ? (
         <div

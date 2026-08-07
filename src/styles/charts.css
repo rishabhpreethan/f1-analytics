@@ -261,6 +261,29 @@
     rx: var(--size-mark-radius);
   }
 
+  /* §6.6.1's span chart. A fill, not a stroke — the 2px gap between adjacent spans is the plot
+   * surface showing through, which is what §6.3 asks for. */
+  .chart-span {
+    fill: var(--series);
+  }
+
+  /* The in-span label wears TEXT tokens on an entity fill, so it needs the inverse ink rather than
+   * `--ink-primary` (§3.3a.4's computed on-colour rule). `--ink-inverse` is the one value that
+   * clears 4.5:1 against every plotting token, all of which sit in the mid-lightness band by
+   * construction (§9.1). */
+  .chart-span-label {
+    fill: var(--ink-inverse);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+
+  .chart-marks[data-dimmed='true'] .chart-span:not([data-active='true']) {
+    opacity: 0.4;
+    transition: opacity var(--dur-fast) var(--ease-enter);
+  }
+
   .chart-bar-foot {
     fill: var(--series);
   }
@@ -277,6 +300,33 @@
   .chart-hit {
     fill: transparent;
     stroke: none;
+  }
+
+  /*
+   * §6.3's off-scale caret. **Stroked, not filled**, and deliberately not one of the four marker
+   * shapes: those carry identity (rung 2 of the ladder) and reusing one would make a clipped lap
+   * look like a different series. A caret carries direction, which is a different channel.
+   */
+  .chart-offscale {
+    fill: none;
+    stroke: var(--series);
+    stroke-width: var(--size-mark-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* The affordance that makes a clipped axis lossless rather than lossy: it switches the frame to
+   * the table, where every exact value already is. Underlined at rest, like every inline link in
+   * the product (§7 `link`) — a bare coloured word does not read as a control. */
+  .chart-note-action {
+    color: var(--accent-ink);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .chart-note-action:hover {
+    color: var(--accent-ink-strong);
   }
 
   /* Rung 4 (§6.4 / §6.5.6) — a 45° hatch over the entity colour, at `--border-subtle`. */

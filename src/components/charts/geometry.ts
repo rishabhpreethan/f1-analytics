@@ -207,8 +207,66 @@ export const MARKER_RING = 1.5;
  */
 export const LAP_TIME_CEILING_FACTOR = 1.5;
 
+/**
+ * The off-scale glyph — an upward caret drawn at the ceiling where a reading exceeds it.
+ *
+ * **Deliberately not one of §6.3's four marker shapes.** Those four carry *identity* — they are
+ * rung 2 of the differentiator ladder — and reusing one here would make an off-scale lap look like a
+ * different series. A caret carries *direction*, which is a different channel entirely and is the
+ * standard convention for a clipped value in scientific charting.
+ *
+ * An open path, not a closed one: the caret is stroked in the series colour rather than filled, so
+ * it reads as an annotation on the line rather than as another datum on it.
+ */
+export function offScalePath(size = MARKER_SIZE): string {
+  const half = size / 2;
+  return `M ${fmtCoord(-half)} ${fmtCoord(half / 2)} L 0 ${fmtCoord(-half / 2)} L ${fmtCoord(half)} ${fmtCoord(half / 2)}`;
+}
+
 export function lapTimeCeiling(fastestMs: number): number {
   return fastestMs * LAP_TIME_CEILING_FACTOR;
+}
+
+/**
+ * A span's rounded-rectangle path, with **the radius on the row's outer ends only**.
+ *
+ * §6.3 rounds a bar's data-end and leaves the baseline square, because *"a bar rounded at the axis
+ * floats off it"*. A span row is the same argument applied twice: the row's first and last edges are
+ * where the sequence begins and ends, so they are rounded; an **interior** boundary between two
+ * adjacent spans is square, because a rounded interior edge implies a gap in the sequence that is not
+ * there. The 2px `--surface-sunken` gap is what separates them, and it is a gap in the *timeline*,
+ * not in the data.
+ *
+ * `rx` on a `<rect>` cannot express per-corner radii, which is the whole reason this returns a path.
+ */
+export function spanPath(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  ends: { leading: boolean; trailing: boolean },
+): string {
+  /* A span narrower than two radii cannot carry them without the curves meeting and inverting. */
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const rl = ends.leading ? r : 0;
+  const rt = ends.trailing ? r : 0;
+  const c = fmtCoord;
+
+  return [
+    `M ${c(x + rl)} ${c(y)}`,
+    `H ${c(x + width - rt)}`,
+    rt > 0 ? `A ${c(rt)} ${c(rt)} 0 0 1 ${c(x + width)} ${c(y + rt)}` : '',
+    `V ${c(y + height - rt)}`,
+    rt > 0 ? `A ${c(rt)} ${c(rt)} 0 0 1 ${c(x + width - rt)} ${c(y + height)}` : '',
+    `H ${c(x + rl)}`,
+    rl > 0 ? `A ${c(rl)} ${c(rl)} 0 0 1 ${c(x)} ${c(y + height - rl)}` : '',
+    `V ${c(y + rl)}`,
+    rl > 0 ? `A ${c(rl)} ${c(rl)} 0 0 1 ${c(x + rl)} ${c(y)}` : '',
+    'Z',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /**
