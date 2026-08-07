@@ -12,6 +12,7 @@ import {
   computeMargin,
   measureTickCount,
   monoTextWidth,
+  mountKey,
   placeDirectLabels,
   plotArea,
   timeTickCount,
@@ -60,7 +61,16 @@ export interface LineChartProps {
    * turns that into a lie (§6.3).
    */
   yTitle?: string;
+  /** The axis tick label. Terse — it has to fit a `--text-2xs` gutter. */
   formatX?: (x: number) => string;
+  /**
+   * The **tooltip and live-region** label for the same x. Falls back to `formatX`.
+   *
+   * Added in F2 (§6.5.1) because one formatter cannot serve both. The axis needs `R7`; the reader at
+   * a crosshair is asking *which race*, and `R7 · Belgian Grand Prix` is the answer — but putting
+   * that on the ticks would collide every label on the axis. Two questions, two formatters.
+   */
+  formatXLong?: (x: number) => string;
   formatY?: (y: number) => string;
   /**
    * §6.3 — a **position** axis (P1 … P20) is inverted, P1 at the top. In F1 up means faster and 1
@@ -69,6 +79,23 @@ export interface LineChartProps {
   invertY?: boolean;
   /** Force the measure axis through zero. Required for an area, optional for a line. */
   zeroBaseline?: boolean;
+  /**
+   * Pin the measure domain instead of deriving it from the data.
+   *
+   * Added in F2 for the position axis, which is the case that makes it necessary rather than
+   * convenient: the axis of a championship position chart is **the size of the field**, not the
+   * range the four selected drivers happened to occupy. Four drivers who ran 1st–6th all season
+   * must not get an axis that stops at P6, because the reader's question is how close to the front
+   * they were.
+   */
+  yDomain?: readonly [number, number];
+  /**
+   * Draw exactly these measure ticks. **`.nice()` is skipped when this is set**, which is the point:
+   * on a `[1, 22]` position domain `.nice()` extends outward and emits a **`P0` tick**, and there
+   * is no such championship position. §6.3 has always specified 1/5/10/15/20 for a position axis;
+   * the kit had no way to say it until now. Use `positionTicksWithin`.
+   */
+  yTickValues?: readonly number[];
 }
 
 const identity = (n: number) => String(n);
@@ -89,10 +116,14 @@ export function LineChart({
   xTitle,
   yTitle,
   formatX = identity,
+  formatXLong,
   formatY = identity,
   invertY = false,
   zeroBaseline = false,
+  yDomain,
+  yTickValues,
 }: LineChartProps) {
+  const labelX = formatXLong ?? formatX;
   const clipId = useId().replace(/:/g, '');
   const { ref, width, height } = useChartSize<HTMLDivElement>();
   const [patterns, setPatterns] = useState(false);
@@ -133,14 +164,24 @@ export function LineChart({
     s.points.map((p) => p.y).filter((y): y is number => y !== null),
   );
 
-  const yMin = zeroBaseline ? Math.min(0, ...ys) : Math.min(...(ys.length > 0 ? ys : [0]));
-  const yMax = zeroBaseline ? Math.max(0, ...ys) : Math.max(...(ys.length > 0 ? ys : [1]));
+  const yMin =
+    yDomain?.[0] ?? (zeroBaseline ? Math.min(0, ...ys) : Math.min(...(ys.length > 0 ? ys : [0])));
+  const yMax =
+    yDomain?.[1] ?? (zeroBaseline ? Math.max(0, ...ys) : Math.max(...(ys.length > 0 ? ys : [1])));
+
+  /*
+   * `.nice()` is applied only when the caller has NOT pinned the ticks. With explicit ticks, nicing
+   * is actively wrong: on a `[1, 22]` position domain it widens the domain to a round boundary and
+   * `1` — P1, the line the whole chart is read against — stops sitting on the axis edge.
+   */
+  const nice = yTickValues === undefined;
 
   /* Measure labels are needed before the margin, and the margin before the scales — so the domain
    * is niced first and the gutter is sized from the labels that will actually be drawn. */
   const provisionalHeight = height > 0 ? height : 240;
   const yTickCount = measureTickCount(provisionalHeight);
-  const yTicksProbe = scaleLinear().domain([yMin, yMax]).nice(yTickCount).ticks(yTickCount);
+  const probe = scaleLinear().domain([yMin, yMax]);
+  const yTicksProbe = yTickValues ?? (nice ? probe.nice(yTickCount) : probe).ticks(yTickCount);
   const measureLabels = yTicksProbe.map(formatY);
 
   const directLabelWidth = Math.max(
@@ -161,12 +202,12 @@ export function LineChart({
     .domain([xs[0] ?? 0, xs[xs.length - 1] ?? 1])
     .range([0, plot.innerWidth]);
 
-  const yScale = scaleLinear()
-    .domain([yMin, yMax])
-    .nice(yTickCount)
-    .range(invertY ? [0, plot.innerHeight] : [plot.innerHeight, 0]);
+  const yScaleBase = scaleLinear().domain([yMin, yMax]);
+  const yScale = (nice ? yScaleBase.nice(yTickCount) : yScaleBase).range(
+    invertY ? [0, plot.innerHeight] : [plot.innerHeight, 0],
+  );
 
-  const yTicks = yScale.ticks(yTickCount).map((value) => ({
+  const yTicks = (yTickValues ?? yScale.ticks(yTickCount)).map((value) => ({
     offset: yScale(value),
     label: formatY(value),
   }));
@@ -250,10 +291,24 @@ export function LineChart({
     .filter((s) => s.points.every((p) => p.y === null))
     .map((s) => s.reference);
 
+  /*
+   * **`mountKey`, not `resolved`.** `resolved` is rebuilt on every render, `useGSAP` compares deps
+   * by identity, and `useMotion` hard-codes `revertOnUpdate: true` — so this used to tear down and
+   * re-create G-28 on every render. `onPointerMove` sets state, so **dragging the pointer across
+   * the plot restarted the reveal continuously.** `ChartMountOptions.deps` documents the rule that
+   * broke: *"a chart's identity, never its data"*. `charts.motion.test.tsx` now asserts it with
+   * motion enabled, which is the only condition under which the bug exists.
+   */
   const { scope: motionScope } = useChartMount<HTMLDivElement>({
     origin: [plot.left, plot.top + plot.innerHeight],
     reveal: { x: plot.left, width: plot.innerWidth },
-    deps: [resolved, plot.innerWidth, plot.innerHeight],
+    deps: [
+      mountKey(
+        resolved.map((s) => s.reference),
+        plot.innerWidth,
+        plot.innerHeight,
+      ),
+    ],
   });
 
   return (
@@ -409,7 +464,8 @@ export function LineChart({
 
           {activeX !== null && (
             <div className="chart-tooltip" ref={tooltipRef}>
-              <p className="chart-tooltip-title">{formatX(activeX)}</p>
+              {/* `labelX`, not `formatX` — the reader at a crosshair is asking which race. */}
+              <p className="chart-tooltip-title">{labelX(activeX)}</p>
               {readings.map(({ series: s, value }) => (
                 <p className="chart-tooltip-row" key={s.reference}>
                   <span
@@ -434,7 +490,7 @@ export function LineChart({
           <p aria-live="polite" className="sr-only">
             {activeX === null
               ? ''
-              : `${formatX(activeX)}: ${readings
+              : `${labelX(activeX)}: ${readings
                   .map(
                     (r) => `${r.series.label} ${r.value === null ? 'no data' : formatY(r.value)}`,
                   )

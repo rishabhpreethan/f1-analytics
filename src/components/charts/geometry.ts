@@ -116,6 +116,47 @@ export function prefersHorizontalBars(labels: readonly string[]): boolean {
 /** §6.3 — a position axis is inverted, P1 at the top, ticks at 1, 5, 10, 15, 20. */
 export const POSITION_TICKS = [1, 5, 10, 15, 20] as const;
 
+/**
+ * §6.3's position ticks, clipped to the axis the chart actually has.
+ *
+ * **This exists because `scale.ticks()` cannot express a position axis and quietly produces a wrong
+ * one.** On a domain of `[1, 22]`, `scaleLinear().nice(4).ticks(4)` extends the domain outward to a
+ * round boundary and emits `0` — so the axis draws a **"P0" tick**, which is not a championship
+ * position and never was. A position axis is a fixed, editorial set of gridlines, not a computed
+ * one, and §6.3 has always said so; the kit simply had no way to say it.
+ *
+ * `1` is always included when it is in range, because P1 is the line the whole chart is read
+ * against. The rest are kept only if the field actually reaches them — a nine-car grid gets ticks
+ * at 1 and 5, not a gridline at P20 nobody occupies.
+ */
+export function positionTicksWithin(min: number, max: number): number[] {
+  const ticks = POSITION_TICKS.filter((tick) => tick >= min && tick <= max);
+  return [...ticks];
+}
+
+/**
+ * **A value-stable identity for a chart's mount animation.**
+ *
+ * `useMotion` hard-codes `revertOnUpdate: true` and `useGSAP` compares its dependency array by
+ * **identity**. So a dependency that is a freshly-built array or object — `resolved`, `data`,
+ * `plot` — changes on every render, and G-27/G-28 are torn down and re-created every time. That is
+ * not a theoretical concern: `LineChart` sets state on `pointermove`, so **dragging the pointer
+ * across the plot restarted the left-to-right reveal continuously.**
+ *
+ * Neither existing chart test could see it, because both force `matchMedia` to answer `reduce`, so
+ * no tween is ever created. A chart test suite that never creates a tween is not testing the
+ * charts' motion at all — which is the more important half of the finding.
+ *
+ * The fix is a **string**, compared by value, built from the things that legitimately re-mount a
+ * chart: which entities are plotted, and the plot area's measured size. `ChartMountOptions.deps`
+ * already documented the rule this violated — *"a chart's identity, never its data"*.
+ */
+export function mountKey(references: readonly string[], width: number, height: number): string {
+  /* `Math.round` so a sub-pixel `ResizeObserver` jitter of 0.5px does not re-run the mount. The
+   * reveal is a whole-plot wipe; it does not need sub-pixel fidelity to start from. */
+  return `${references.join('|')}@${String(Math.round(width))}x${String(Math.round(height))}`;
+}
+
 export interface PlotMargin {
   top: number;
   right: number;

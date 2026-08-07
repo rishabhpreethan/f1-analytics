@@ -1353,6 +1353,42 @@ label over ~12 characters, the bar chart is **horizontal**: categories run down 
 - A **position** axis (P1 … P20) is **inverted**, with P1 at the top. Never a numeric axis pointed the
   ordinary way: in F1, up means faster, and 1 is the best value. Ticks at 1, 5, 10, 15, 20.
 
+> **Three gaps the first real surface exposed, 2026-08-07 — recorded rather than worked around.**
+> Every one of them is a rule this section already stated that the kit had no way to express. That is
+> the specific failure mode CR-010 exists to catch, so all three are fixed in the kit, not in the
+> caller.
+>
+> **1. A position axis cannot be computed, and computing it produced a `P0`.** The tick rule above
+> says 1/5/10/15/20; `LineChart` derived its ticks from `scale.ticks(n)` after `.nice()`. On a
+> `[1, 22]` domain `.nice()` widens outward to a round boundary and emits **`0` — a championship
+> position that does not exist.** `geometry.positionTicksWithin(min, max)` now supplies §6.3's fixed
+> set clipped to the field, `LineChart` takes `yTickValues`, and **`.nice()` is skipped whenever ticks
+> are pinned** — with explicit ticks, nicing also pushes P1 off the axis edge it should sit on.
+>
+> **2. The measure domain is sometimes a property of the field, not of the data.** A position chart's
+> axis is the size of the grid; four drivers who ran 1st–6th all season must not get an axis that
+> stops at P6, because the reader's question is *how close to the front*. `LineChart` takes
+> `yDomain`. This is the one permitted override and it does **not** relax the bar/area zero rule,
+> which `BarChart` still enforces unconditionally.
+>
+> **3. §6.5.1's tooltip and the axis ticks need different formatters.** One `formatX` served both, so
+> a round axis read `R7` in the gutter *and* `R7` in the tooltip — but the reader at a crosshair is
+> asking **which race**, and `R7 · Belgian Grand Prix` is the answer. Putting that on the ticks would
+> collide every label on the axis. `LineChart` takes `formatXLong`, used by the tooltip title and by
+> the `aria-live` readout — so the screen-reader reading gains the race name too, which is the larger
+> of the two wins.
+
+**A chart's mount animation is keyed by a *value*, never by an array or object identity**
+_(added 2026-08-07)_. `useMotion` hard-codes `revertOnUpdate: true` and `useGSAP` compares deps by
+identity, so a dep that is rebuilt each render tears G-27/G-28 down and re-creates them **on every
+render**. `LineChart` sets state on `pointermove`, so this made dragging the pointer across a plot
+restart the reveal continuously — a defect neither chart test could see, because both force
+`prefers-reduced-motion: reduce` and therefore never create a tween at all. The key is
+`geometry.mountKey(references, width, height)`: a string, so it compares by value, built only from
+what legitimately re-mounts a chart. **`src/components/charts/charts.motion.test.tsx` runs with
+motion enabled and counts timelines**; a chart test suite that never creates a tween is not testing
+the charts' motion.
+
 ### 6.4 Runtime collision detection and the differentiator ladder
 
 Given the entities the user selected, compute pairwise perceptual distance on **the colours actually

@@ -5,7 +5,13 @@ import { CHART_BAR_ATTR, useChartMount } from '@/lib/motion/chart';
 import { CategoryAxis, MeasureAxis } from './Axis';
 import { ChartFrame } from './ChartFrame';
 import { BarTable } from './ChartTable';
-import { computeMargin, measureTickCount, plotArea, prefersHorizontalBars } from './geometry';
+import {
+  computeMargin,
+  measureTickCount,
+  mountKey,
+  plotArea,
+  prefersHorizontalBars,
+} from './geometry';
 import type { BarDatum, PlotState } from './types';
 import { useChartSize } from './useChartSize';
 
@@ -122,10 +128,22 @@ export function BarChart({
     label: d.label,
   }));
 
+  /*
+   * **`mountKey`, not `data`.** Every real caller builds its `data` array inline, so the array's
+   * identity changes on every render and `revertOnUpdate: true` re-ran G-27's bar growth each time.
+   * See the note in `LineChart` and `geometry.mountKey`. `horizontal` is folded into the key rather
+   * than passed separately, because it is a boolean and stable by value anyway.
+   */
   const { scope: motionScope } = useChartMount<HTMLDivElement>({
     orientation: horizontal ? 'row' : 'column',
     origin: horizontal ? [plot.left + zero, plot.top] : [plot.left, plot.top + zero],
-    deps: [data, plot.innerWidth, plot.innerHeight, horizontal],
+    deps: [
+      mountKey(
+        [...data.map((d) => d.key), horizontal ? 'row' : 'column'],
+        plot.innerWidth,
+        plot.innerHeight,
+      ),
+    ],
   });
 
   const tokenFor = (datum: BarDatum) =>
