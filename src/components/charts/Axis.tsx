@@ -37,9 +37,9 @@ export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProp
   return (
     <g aria-hidden="true">
       {grid &&
-        ticks.map((tick) => (
+        ticks.map((tick, i) => (
           <line
-            key={`grid-${String(tick.offset)}`}
+            key={`grid-${String(i)}`}
             className="chart-grid-line"
             x1={plot.left}
             x2={plot.left + plot.innerWidth}
@@ -56,9 +56,9 @@ export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProp
         y2={plot.top + plot.innerHeight}
       />
 
-      {ticks.map((tick) => (
+      {ticks.map((tick, i) => (
         <text
-          key={`tick-${String(tick.offset)}`}
+          key={`tick-${String(i)}`}
           className="chart-tick"
           x={plot.left - AXIS_GAP}
           y={round(plot.top + tick.offset)}
@@ -117,7 +117,7 @@ export function CategoryAxis({ plot, ticks, title, allowStride = true }: Categor
       {ticks.map((tick, i) =>
         i % stride === 0 ? (
           <text
-            key={`ctick-${String(tick.offset)}`}
+            key={`ctick-${String(i)}`}
             className="chart-tick"
             x={round(plot.left + tick.offset)}
             y={round(baseline + AXIS_GAP)}

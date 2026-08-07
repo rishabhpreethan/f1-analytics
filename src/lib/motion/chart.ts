@@ -24,8 +24,14 @@ import { useMotion, type MotionHandle } from './useMotion';
 /** The selector G-27 grows. A bar without it does not animate, which is a correct resting state. */
 export const CHART_BAR = '[data-motion="chart-bar"]';
 
-/** The selector G-28 wipes: the `<rect>` inside the mark layer's `<clipPath>`. */
-export const CHART_REVEAL = '[data-motion="chart-reveal"]';
+/** The `data-motion` value G-28 wipes, and the selector for it. Both exported so a component
+ * writes the attribute from the same constant the hook queries — a hand-typed pair that drifts is
+ * a chart whose reveal silently never runs. */
+export const CHART_REVEAL_ATTR = 'chart-reveal';
+export const CHART_REVEAL = `[data-motion="${CHART_REVEAL_ATTR}"]`;
+
+/** The `data-motion` value G-27 grows. */
+export const CHART_BAR_ATTR = 'chart-bar';
 
 export interface ChartMountOptions {
   /**

@@ -51,7 +51,7 @@ function stubMedia(trueFor: string) {
   }));
 }
 
-function Chart({ orientation = 'column' as const }) {
+function Chart({ orientation = 'column' }: { orientation?: 'column' | 'row' }) {
   const { scope } = useChartMount<HTMLDivElement>({
     orientation,
     origin: [40, 260],

@@ -147,6 +147,15 @@
     }
   }
 
+  /* The two nested wrappers a chart needs: one is GSAP's scope, the other is what the
+   * ResizeObserver measures. Both fill the plot area exactly, so the SVG's viewBox and the
+   * measured width describe the same box — a wrapper that shrank to its content would make the
+   * chart lay itself out against a width it is not being drawn at. */
+  .chart-mount {
+    height: 100%;
+    width: 100%;
+  }
+
   .chart-svg {
     display: block;
     width: 100%;
