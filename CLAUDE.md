@@ -23,7 +23,7 @@ page, `CommandDock`, theme, GSAP motion, 236 tests. `main` still holds only the 
 | `PLAN.md` | Short by design. Agents, flow, non-negotiables, commands. **Start here.** |
 | `REQUIREMENTS.md` | What the product must do; **§6 = what the data cannot support** |
 | `docs/ARCHITECTURE.md` | Stack, layering, API surface, **§7 security**, budgets. Owned by the senior engineer. |
-| `docs/DATABASE.md` | Schema, **§6 canonical queries**, **§7 the 14 traps** |
+| `docs/DATABASE.md` | Schema, **§6 canonical queries**, **§7 the traps** — 16 and counting; §7 states the current number |
 | `docs/DESIGN_SYSTEM.md` | Visual language, motion, chart conventions. Owned by the designer. |
 | `docs/archive/PLAN-F0-archive.md` | The old 5285-line plan, verbatim. **Never read whole** — only to recover the reasoning behind one specific decision. |
 
@@ -114,7 +114,7 @@ deliberate security posture (`ARCHITECTURE.md` §7), not an omission.
 
 ## 5. Data traps that cause silent, shipped bugs
 
-Full list: `docs/DATABASE.md` §7 (14 traps). The ones that bite hardest:
+Full list: `docs/DATABASE.md` §7 — **16 traps as of 2026-08-07, and the count grows as the data teaches us things. Read §7 for the current list, never a number quoted elsewhere.** The ones that bite hardest:
 
 | Trap | Rule |
 |---|---|
