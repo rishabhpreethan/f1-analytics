@@ -1,0 +1,150 @@
+# Continuous integration — the checks that used to run only on someone's laptop.
+#
+# There is no reviewer and no QA gate (ARCHITECTURE.md §10 #25), so this workflow is the only
+# thing that runs the suite on a machine that is not the author's. It deliberately does not
+# try to be a substitute for Rishabh looking at the running app: it cannot see layout, motion
+# or composition, because none of that is observable in jsdom.
+#
+# Supply chain: every action is pinned to a **full commit SHA**, not a tag. A tag is a mutable
+# pointer — `v7` can be moved onto any commit by whoever controls the repository — so pinning
+# to a tag would hand a third party arbitrary code execution in this workflow (S-14). The
+# human-readable version is kept in the trailing comment so an upgrade is a legible diff.
+name: CI
+
+on:
+  # Every branch, not just `main`. Work here lands on a feature branch and is often merged
+  # without a pull request, so a `main`-only trigger would test nothing until after the merge.
+  push:
+    branches: ['**']
+  # Covers a pull request from a fork, whose pushes do not run in this repository.
+  pull_request:
+
+# Least privilege. Without this the job inherits whatever the repository default is, which can
+# be read/write on the whole repository — for a workflow that only reads code and runs tests.
+permissions:
+  contents: read
+
+# A push and its pull request both trigger a run; cancel the superseded one rather than paying
+# for both.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck · lint · format · build · test
+    # `ubuntu-latest` rather than a pinned image: the thing that actually needs pinning is the
+    # Node version, and that comes from `.nvmrc` below. A pinned runner image eventually gets
+    # retired and fails the job for a reason unrelated to the code.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # One source of truth for the runtime. `.nvmrc` pins 22.23.2 and `package.json`
+          # `engines` enforces the >=22.22.0 floor (ARCHITECTURE.md §2.1).
+          node-version-file: .nvmrc
+          # setup-node v7 only enables caching automatically when package.json declares a
+          # `packageManager`; this project does not, so ask for it explicitly.
+          cache: npm
+
+      - name: Assert the runtime floor
+        # `engines` makes npm warn, not fail, unless `engine-strict` is set. This makes the
+        # floor a hard stop on the machine that matters, exactly as F0 task T1 does locally.
+        run: |
+          node -v
+          npm -v
+          node --eval "
+            const [maj, min] = process.versions.node.split('.').map(Number);
+            if (maj < 22 || (maj === 22 && min < 22)) {
+              console.error('Node ' + process.versions.node + ' is below the >=22.22.0 floor.');
+              process.exit(1);
+            }
+          "
+
+      - name: Install
+        # `ci` not `install`: it installs exactly the committed lockfile and fails if
+        # package.json and the lockfile disagree (S-7).
+        run: npm ci
+
+      - name: Typecheck
+        # `tsc -b --noEmit` via the script. NEVER bare `npx tsc --noEmit` — the root
+        # tsconfig.json is a solution file with `"files": []`, so it compiles nothing and
+        # always exits 0. It once hid 12 real errors.
+        run: npm run typecheck
+
+      # Every check below runs even after an earlier one fails, so one run reports everything
+      # that is wrong instead of one thing at a time. `!cancelled()` still honours a real
+      # cancellation, and a failed step still fails the job.
+      - name: Lint
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+      - name: Format check
+        if: ${{ !cancelled() }}
+        run: npm run format:check
+
+      - name: Build (includes the §8 performance-budget gate)
+        if: ${{ !cancelled() }}
+        # `npm run build` ends with `npm run check:budget`, so a bundle over the
+        # ARCHITECTURE.md §8 budget fails this step. That is deliberate rather than a separate
+        # step: a budget nothing enforces is a budget that gets missed, and putting the gate
+        # inside `build` means it also runs on the machine where the change was written. The
+        # gate prints which bucket, by how much, and the basis for the number. `npm run
+        # build:unchecked` is the escape hatch and it is named in the failure output.
+        #
+        # Deliberately **before** the test step. Two cases in `server/app.test.ts` read
+        # `dist/` — the canary that GSAP's `setAttribute('style', …)` survives minification
+        # (ARCHITECTURE.md §7.4) and the assertion that the built `index.html` carries no
+        # inline style or script. With no build they report as skipped and verify nothing;
+        # building first is two real assertions gained for no cost.
+        run: npm run build
+
+      - name: Test
+        if: ${{ !cancelled() }}
+        # The custom reporter registered in `vite.config.ts` prints, after the summary, every
+        # test that did **not** run and why the gate exists. This matters most here:
+        # `data/f1.db` is gitignored and will never be present on a runner, so the entire
+        # database-backed server suite skips — and a green run that silently tested none of it
+        # is the regression this reporter exists to prevent. It also writes to the job summary
+        # and raises a `::warning::` annotation, so the skip is visible without opening a log.
+        run: npm test
+
+      - name: Validate palette
+        if: ${{ !cancelled() }}
+        # DESIGN_SYSTEM.md §9.1: re-run whenever a colour moves. Cheap enough to run always,
+        # and running it always is what makes it a gate rather than a habit.
+        run: npm run validate:palette
+
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # A separate job on purpose. A new advisory published against an unchanged tree should be
+    # reported without making it look as though the code broke — and conversely a code failure
+    # should not be masked by an audit failure. ARCHITECTURE.md §7.1 permits no exception, so
+    # this job failing is a real block, not advisory.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Audit
+        run: npm audit --audit-level=high

@@ -161,7 +161,10 @@ and it is yours precisely because a selector is where a data trap gets violated 
 - Colour follows the entity, never its rank — a filter change must not repaint the survivors.
 - Categorical colours assigned in fixed order, never cycled.
 - Legend for ≥2 series; direct labels at ≤4 series; a table view for every chart.
-- Recharts for standard charts, visx for lap-level charts — the boundary is `ARCHITECTURE.md` §4.
+- **No charting library.** d3 primitives plus an in-repo kit — `ARCHITECTURE.md` §10 #28 supersedes the
+  old "Recharts + visx" split. `DESIGN_SYSTEM.md` §6.6 names the primitives each chart needs, and §6
+  names four that are forbidden. Nothing is installed yet; **the kit is built in F2, with the first
+  real chart**, so it has a consumer rather than being speculative.
 
 **Motion**
 - Use the shared presets in `lib/motion.ts` and the timings defined in `DESIGN_SYSTEM.md`.

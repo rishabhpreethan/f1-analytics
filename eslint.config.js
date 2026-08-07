@@ -78,9 +78,50 @@ export default tseslint.config(
 
   // Server and build tooling — Node globals.
   {
-    files: ['server/**/*.ts', 'vite.config.ts'],
+    files: ['server/**/*.ts', 'vite.config.ts', 'vitest.reporter.ts', 'vitest.reporter.test.ts'],
     languageOptions: {
       globals: globals.node,
+    },
+  },
+
+  // Repo tooling in `scripts/` is zero-dependency ESM run by Node directly (ARCHITECTURE §9).
+  //
+  // Before this block existed, **nothing in `scripts/` was linted at all**: every config
+  // object above declares an explicit `files` pattern, and flat config applies no rules to a
+  // file that matches none of them. Probed with a deliberately broken `.mjs` file — an unused
+  // binding and an assignment inside an `if` condition — and `eslint .` reported zero
+  // problems. Both of the gates that live here (the colour validator and the bundle-budget
+  // check) are things a silent bug would make quietly useless, so they get the same
+  // recommended rule set as everything else. No type-aware rules: they are plain JS and are
+  // not in a TypeScript project.
+  {
+    files: ['scripts/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
+
+  // ⛔ TEMPORARY, and owned by the `designer` — delete this block, do not extend it.
+  //
+  // Switching the rules on above immediately found three dead bindings in
+  // `scripts/validate-palette.mjs`, which is the `designer`'s file (DESIGN_SYSTEM §9.1 makes
+  // the validator design's, so a second pair of hands in it is exactly the drift CR-010
+  // removed). All three pre-exist in committed `main` (verified against 10d7014, so they are
+  // not in-flight work), and the file is under active edit, so they are named rather than
+  // located by line:
+  //
+  //   `stack` — an unused `over()`-folding helper
+  //   `F` — `FIELD[theme]`, computed and never read, in the V-22 glass block
+  //   `S` — `SURF[theme]`, same block, same
+  //
+  // None affects a reported figure: they are dead, not wrong, and `npm run validate:palette`
+  // still exits 0. The alternative to this override was leaving CI red on someone else's
+  // file, which would have blocked every branch. Three one-line deletions retire it.
+  {
+    files: ['scripts/validate-palette.mjs'],
+    rules: {
+      'no-unused-vars': 'off',
     },
   },
 

@@ -29,5 +29,8 @@
       "@schemas/*": ["server/schemas/*"]
     }
   },
-  "include": ["server", "vite.config.ts"]
+  // `vitest.reporter.ts` is Node code (fs, process, path) and, like `vitest.setup.ts` in
+  // the app project, it must belong to *some* project or ESLint's type-aware rules cannot
+  // parse it.
+  "include": ["server", "vite.config.ts", "vitest.reporter.ts", "vitest.reporter.test.ts"]
 }
