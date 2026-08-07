@@ -15,7 +15,6 @@ _Nothing in flight._
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 8 | F2 season hub — calendar, standings, championship progression. **Builds the chart kit** (d3 primitives, `DESIGN_SYSTEM.md` §6.6), and `src/lib/entityColor.ts`, whose contract is fixed in §3.3a.3 but which is not built | todo | — |
 | 9 | F3 race page — results, lap charts, pit stops | todo | — |
 | 10 | F4 driver pages · F5 team pages · F6 circuits | todo | — |
 | 11 | F7 compare — up to 4 entities across eras | todo | — |
@@ -48,3 +47,4 @@ _Nothing in flight._
 | 5 | Dock rail — header clearance, glyph lane, full-height geometry | ✅ 2026-08-06 · `471c6a6` |
 | 6 | Coverage chip explains itself — noun, boundary, meter, chevron | ✅ 2026-08-06 · `471c6a6` |
 | 7 | F1 design system — entity colour encoding, chart language, chart motion, palette validator, CI, enforced budgets | ✅ 2026-08-07 |
+| 8 | F2 season hub — calendar, standings, championship progression; the chart kit and `entityColor` mounted for the first time. **766 tests** | ✅ 2026-08-07 · `feat/season-hub` |
