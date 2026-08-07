@@ -4,6 +4,7 @@ import {
   race1988Fixture,
   race1996Fixture,
   race2026Fixture,
+  race2026R6Fixture,
   stints2026Fixture,
 } from './race.fixture';
 import {
@@ -23,6 +24,7 @@ describe('server/schemas/race — the contracts', () => {
     ['1988 R1 — classification only, the common case', race1988Fixture],
     ['1996 R1 — laps, no pit data', race1996Fixture],
     ['2026 R1 — everything', race2026Fixture],
+    ['2026 R6 — a retirement carrying a recorded elapsed time', race2026R6Fixture],
   ])('accepts %s', (_label, fixture) => {
     const parsed = raceSchema.safeParse(fixture);
     expect(parsed.error?.issues ?? []).toEqual([]);

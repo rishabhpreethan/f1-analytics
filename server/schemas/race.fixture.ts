@@ -7,14 +7,20 @@ import type { DriverLaps, LapRow, Race, RaceClassificationRow, RaceLaps, RaceSti
  * gives: a fixture captured from the implementation asserts only that the implementation
  * agrees with itself.
  *
- * **Three fixtures, because the race page spans three coverage regimes** and each one is
- * a state the surface has to render:
+ * **Four fixtures. Three span the coverage regimes; the fourth spans a *state* the other
+ * three cannot reach** — and that distinction is the whole lesson of the negative-gap
+ * defect (`DESIGN_SYSTEM.md` §1.0b):
  *
- * | Fixture | Real race | Regime |
+ * | Fixture | Real race | What it covers |
  * |---|---|---|
  * | `race1988Fixture` | 1988 R1, Brazil | classification only — no laps, no stops. **The common case: 484 races.** |
  * | `race1996Fixture` | 1996 R1, Australia | laps but no stops (pit data begins 2011) |
  * | `race2026Fixture` + `laps2026Fixture` + `stints2026Fixture` | 2026 R1, Australia | everything |
+ * | `race2026R6Fixture` | 2026 R6, Monaco | **a non-finisher that carries a recorded time** — the state all three above miss |
+ *
+ * The first three were chosen by era, which felt like sampling coverage and was not: the
+ * state that mattered was "retired, with an elapsed time on the row", and **none of the
+ * three had one**. Era is a proxy for state and a bad one.
  *
  * The figures are real. 1988 R1's top five and 2026 R1's pace distribution
  * (82,091 / 85,228 / 98,755 / 122,340 / 1,168,144 ms) were read out of the database, so
@@ -400,6 +406,221 @@ export const race2026Fixture: Race = {
       number: 7,
       startTime: '2026-03-08 04:00:00+00:00',
       timezone: 'Australia/Melbourne',
+      isCancelled: false,
+      entries: 22,
+      hasLapData: true,
+    },
+  ],
+  availability: { hasLapData: true, hasPitData: true },
+};
+
+/* ------------------------------- 2026 R6 — the retired-with-a-recorded-time regression */
+
+/**
+ * **2026 R6, Monaco — the page the negative-gap defect was reported on.**
+ *
+ * This fixture exists because the other three could not reproduce the bug. It needs a row
+ * that is **both** a non-finisher **and** carries a recorded elapsed time, and
+ * `race1988Fixture` has none: those rows are all `totalTimeMs: null`, so the faulty branch
+ * was unreachable there and 1988 rendered correctly for the wrong reason
+ * (`DESIGN_SYSTEM.md` §1.0b — validate by state, not by era).
+ *
+ * Every figure is read out of the database. The six retirements below produced, in order,
+ * `−9:58.354` · `−57:48.394` · `−1:08:14.482` · `−1:26:54.534` · `−1:46:34.145` ·
+ * `−2:02:28.126` — because a retiree's `time_ms` is their elapsed time **when they
+ * stopped**, which is *smaller* than the winner's 8,611,243 ms.
+ *
+ * Abbreviated to nine of the twenty-two entries: the winner, the runner-up, all six
+ * retirements that carry a time, and Verstappen, who retired on lap 0 with no time at all
+ * and is therefore the control — the one row the original code handled correctly.
+ *
+ * **Sainz is the interesting row.** `isClassified: true` at 70 laps of 78, so he holds P16
+ * — and his `outcome` is `mechanical`, not `lapped`. He must read "Retired": he stopped on
+ * lap 70 rather than circulating eight laps down to the flag, so `+8 Laps` would assert
+ * something that did not happen. §6.6.1 rules this explicitly.
+ *
+ * **This race has no lapped finisher at all** — all fifteen finishers completed 78 laps —
+ * which is exactly why the `lapped`-with-a-time state cannot be tested from here and is
+ * exercised separately against 2026 R1's real rows.
+ */
+export const race2026R6Fixture: Race = {
+  year: 2026,
+  round: 6,
+  name: 'Monaco Grand Prix',
+  date: '2026-06-07',
+  isCancelled: false,
+  circuit: {
+    ref: 'monaco',
+    name: 'Circuit de Monaco',
+    locality: 'Monte Carlo',
+    country: 'Monaco',
+    countryCode: 'MCO',
+  },
+  startTime: '2026-06-07 13:00:00+00:00',
+  timezone: 'Europe/Monaco',
+  hasResults: true,
+  raceLaps: 78,
+  classification: [
+    makeClassificationRow({
+      driverRef: 'antonelli',
+      code: 'ANT',
+      forename: 'Andrea Kimi',
+      surname: 'Antonelli',
+      teamRef: 'mercedes',
+      teamName: 'Mercedes',
+      carNumber: 12,
+      position: 1,
+      gridPosition: 1,
+      points: 25,
+      lapsCompleted: 78,
+      totalTimeMs: 8_611_243,
+    }),
+    makeClassificationRow({
+      driverRef: 'hamilton',
+      code: 'HAM',
+      forename: 'Lewis',
+      surname: 'Hamilton',
+      teamRef: 'ferrari',
+      teamName: 'Ferrari',
+      carNumber: 44,
+      position: 2,
+      gridPosition: 3,
+      points: 18,
+      lapsCompleted: 78,
+      totalTimeMs: 8_617_514,
+    }),
+    // Classified at P16 on 70 laps, and still a retirement. `isClassified` decides whether
+    // he holds a position; `outcome` decides what the result column says.
+    makeClassificationRow({
+      driverRef: 'sainz',
+      code: 'SAI',
+      forename: 'Carlos',
+      surname: 'Sainz',
+      teamRef: 'williams',
+      teamName: 'Williams',
+      carNumber: 55,
+      position: 16,
+      gridPosition: 12,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: true,
+      points: 0,
+      lapsCompleted: 70,
+      totalTimeMs: 8_012_889,
+    }),
+    makeClassificationRow({
+      driverRef: 'leclerc',
+      code: 'LEC',
+      forename: 'Charles',
+      surname: 'Leclerc',
+      teamRef: 'ferrari',
+      teamName: 'Ferrari',
+      carNumber: 16,
+      position: 17,
+      gridPosition: 4,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: false,
+      points: 0,
+      lapsCompleted: 64,
+      totalTimeMs: 5_142_849,
+    }),
+    makeClassificationRow({
+      driverRef: 'stroll',
+      code: 'STR',
+      forename: 'Lance',
+      surname: 'Stroll',
+      teamRef: 'aston_martin',
+      teamName: 'Aston Martin',
+      carNumber: 18,
+      position: 18,
+      gridPosition: 22,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: false,
+      points: 0,
+      lapsCompleted: 56,
+      totalTimeMs: 4_516_761,
+    }),
+    makeClassificationRow({
+      driverRef: 'norris',
+      code: 'NOR',
+      forename: 'Lando',
+      surname: 'Norris',
+      teamRef: 'mclaren',
+      teamName: 'McLaren',
+      carNumber: 1,
+      position: 19,
+      gridPosition: 8,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: false,
+      points: 0,
+      lapsCompleted: 43,
+      totalTimeMs: 3_396_709,
+    }),
+    makeClassificationRow({
+      driverRef: 'bearman',
+      code: 'BEA',
+      forename: 'Oliver',
+      surname: 'Bearman',
+      teamRef: 'haas',
+      teamName: 'Haas F1 Team',
+      carNumber: 87,
+      position: 20,
+      gridPosition: 19,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: false,
+      points: 0,
+      lapsCompleted: 27,
+      totalTimeMs: 2_217_098,
+    }),
+    makeClassificationRow({
+      driverRef: 'bottas',
+      code: 'BOT',
+      forename: 'Valtteri',
+      surname: 'Bottas',
+      teamRef: 'cadillac',
+      teamName: 'Cadillac F1 Team',
+      carNumber: 77,
+      position: 21,
+      gridPosition: 20,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: false,
+      points: 0,
+      lapsCompleted: 15,
+      // The worst row on the page: 1,263,117 ms against a winning 8,611,243 rendered
+      // `−2:02:28.126`.
+      totalTimeMs: 1_263_117,
+    }),
+    // The control: retired with no recorded time, so the original code reached `detail` and
+    // was right. Any fix has to leave this row alone.
+    makeClassificationRow({
+      driverRef: 'max_verstappen',
+      code: 'VER',
+      forename: 'Max',
+      surname: 'Verstappen',
+      teamRef: 'red_bull',
+      teamName: 'Red Bull',
+      carNumber: 3,
+      position: 22,
+      gridPosition: 2,
+      outcome: 'mechanical',
+      detail: 'Retired',
+      isClassified: false,
+      points: 0,
+      lapsCompleted: 0,
+      totalTimeMs: null,
+    }),
+  ],
+  weekend: [
+    {
+      type: 'R',
+      number: 7,
+      startTime: '2026-06-07 13:00:00+00:00',
+      timezone: 'Europe/Monaco',
       isCancelled: false,
       entries: 22,
       hasLapData: true,
