@@ -1,0 +1,881 @@
+/*
+ * THE SEASON HUB — `/seasons` and `/seasons/:year`.
+ *
+ * Its own file for the same reason `charts.css` is: it is a surface language rather than a
+ * component. The masthead, the dial, the calendar, the standings tables and the progression panel
+ * share one anatomy — **a panel with a display-face heading, an eyebrow rule, and rows carrying a
+ * 3px identity bar** — and that anatomy is defined once here.
+ *
+ * **Three rules this file exists to hold, rather than to leave to whoever writes the next row.**
+ *
+ * 1. **A team colour appears only beside a name** (§3.3a.1). Every `--identity` custom property in
+ *    this file paints a 3px bar or a 10px swatch that sits immediately left of a driver's or a
+ *    team's name. None of it paints a fill, a background, or a data mark.
+ * 2. **Every numeral is mono and tabular** (§2.4). A points column whose digits shift width reads
+ *    as broken, and that is the single most visible failure a standings table can have.
+ * 3. **No state on this surface is a fault except an error.** A cancelled round, a season with no
+ *    Constructors' Championship, a driver who scored nothing — none of them is painted with a
+ *    status colour (§3.4.3, §6.5.3). They are neutral: `--ink-tertiary`, `--border-subtle`,
+ *    `--surface-sunken`.
+ */
+
+@layer components {
+  /* ============================================================ the page and its sections */
+
+  .season {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 12);
+    padding-block: calc(var(--spacing) * 8) calc(var(--spacing) * 16);
+  }
+
+  @media (min-width: 48rem) {
+    .season {
+      padding-block: calc(var(--spacing) * 12) calc(var(--spacing) * 16);
+    }
+  }
+
+  .season-section {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 4);
+  }
+
+  /* The eyebrow that leads every section, matching the landing page's `accent-rule` idiom so the
+   * two surfaces read as one product. */
+  .season-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .season-panel {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    box-shadow: var(--elev-1-shadow);
+    overflow: hidden;
+  }
+
+  /* ================================================================= the masthead */
+
+  /*
+   * The arresting moment of the surface. The year is the largest type on the page at
+   * `--display-lg` / `--display-xl`, tabular so the four digits sit on an exact grid, and it is a
+   * **button** — the season picker's trigger — because the year is also the navigation.
+   *
+   * `--display-2xl` and `--display-3xl` are deliberately NOT used: §2.3 reserves both for the
+   * landing headline and says so explicitly. A hub that borrowed them would flatten the one
+   * hierarchy step the product has.
+   */
+  .season-masthead {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .season-headline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: calc(var(--spacing) * 4) calc(var(--spacing) * 6);
+  }
+
+  .season-year-group {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .season-year {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    border-radius: var(--radius-md);
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-lg);
+    font-stretch: var(--font-stretch-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--text-display-lg--font-weight);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
+    /* G-7's colour half, as a transition, so a reduced-motion reader still gets feedback. */
+    transition: color var(--dur-instant) var(--ease-enter);
+  }
+
+  .season-year:hover {
+    color: var(--accent-ink-strong);
+  }
+
+  .season-year svg {
+    flex: none;
+    color: var(--ink-tertiary);
+    transition: transform var(--dur-fast) var(--ease-move);
+  }
+
+  .season-year[aria-expanded='true'] svg {
+    transform: rotate(180deg);
+  }
+
+  @media (min-width: 48rem) {
+    .season-year {
+      font-size: var(--text-display-xl);
+      letter-spacing: var(--text-display-xl--letter-spacing);
+      line-height: var(--text-display-xl--line-height);
+    }
+  }
+
+  .season-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--size-control-sm);
+    height: var(--size-control-sm);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-md);
+    color: var(--ink-secondary);
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      border-color var(--dur-instant) var(--ease-enter),
+      color var(--dur-instant) var(--ease-enter);
+  }
+
+  .season-step:hover:not([data-disabled='true']) {
+    border-color: var(--accent-border);
+    background-color: var(--accent-wash);
+    color: var(--accent-ink);
+  }
+
+  /* An end of the range is a `<span>`, never a disabled anchor — the platform has no such thing,
+   * and an `<a>` without an `href` looks like a control while being unreachable by keyboard. */
+  .season-step[data-disabled='true'] {
+    color: var(--ink-tertiary);
+    opacity: 0.5;
+  }
+
+  /* -------------------------------------------------------------- the picker panel */
+
+  .season-picker {
+    position: relative;
+  }
+
+  .season-picker-panel {
+    position: absolute;
+    z-index: var(--z-overlay);
+    top: calc(100% + var(--spacing) * 2);
+    left: 0;
+    width: min(30rem, calc(100vw - var(--spacing) * 8));
+    max-height: 22rem;
+    overflow-y: auto;
+    padding: calc(var(--spacing) * 4);
+    border: 1px solid var(--elev-2-border);
+    border-radius: var(--radius-xl);
+    background-color: var(--surface-overlay);
+    box-shadow: var(--elev-2-shadow);
+    /* G-6's transform origin: the panel grows from the corner it is anchored to. */
+    transform-origin: top left;
+  }
+
+  .season-decade {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    padding-block: calc(var(--spacing) * 2);
+  }
+
+  .season-decade + .season-decade {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .season-decade-years {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: calc(var(--spacing) * 1);
+  }
+
+  @media (min-width: 48rem) {
+    .season-decade-years {
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+    }
+  }
+
+  .season-decade-year {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(var(--spacing) * 8);
+    border-radius: var(--radius-sm);
+    color: var(--ink-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      color var(--dur-instant) var(--ease-enter);
+  }
+
+  .season-decade-year:hover {
+    background-color: var(--accent-wash);
+    color: var(--accent-wash-ink);
+  }
+
+  .season-decade-year[aria-current='page'] {
+    background-color: var(--accent-fill);
+    color: var(--accent-on);
+  }
+
+  /* -------------------------------------------------------------- the dial */
+
+  /*
+   * **The whole calendar as one row of ticks.** Not a chart — no scale function, no axis; 24
+   * spans whose widths are equal. It exists because "24 calendar rows, 22 numbered rounds" is the
+   * single most surprising fact about the 2026 season, and a sentence explaining it is weaker
+   * than a row of marks in which two are visibly not like the others.
+   */
+  .season-dial {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: calc(var(--spacing) * 8);
+  }
+
+  .season-dial-cell {
+    flex: 1 1 0;
+    min-width: 2px;
+    border-radius: var(--radius-xs);
+    background-color: var(--border-subtle);
+    /* Raced rounds are full height; everything else is short, so the season's progress is legible
+     * as a silhouette before any colour or label is read. */
+    height: 40%;
+  }
+
+  .season-dial-cell[data-status='raced'] {
+    height: 100%;
+    background-color: var(--accent-mark);
+  }
+
+  .season-dial-cell[data-status='upcoming'] {
+    height: 55%;
+    background-color: var(--border-strong);
+    opacity: 0.5;
+  }
+
+  /* A cancelled round is drawn as a gap with a rule through it — present, and visibly not a
+   * round. Neutral, never a status colour: a cancelled race is a fact about the calendar. */
+  .season-dial-cell[data-status='cancelled'] {
+    height: 100%;
+    background-color: transparent;
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--border-strong) 0 1px,
+      transparent 1px 4px
+    );
+  }
+
+  .season-dial-scale {
+    display: flex;
+    justify-content: space-between;
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: var(--text-2xs--letter-spacing);
+  }
+
+  /* -------------------------------------------------------------- the title cards */
+
+  .season-titles {
+    display: grid;
+    gap: calc(var(--spacing) * 4);
+  }
+
+  @media (min-width: 48rem) {
+    .season-titles {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /*
+   * The identity bar. **This is the role team colour exists for** (§3.3a.1): 3px, immediately
+   * left of a name, never a fill. `--identity` is written by the component from
+   * `identityToken()`; nothing here knows a hex.
+   */
+  .season-title-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    padding: calc(var(--spacing) * 4) calc(var(--spacing) * 4) calc(var(--spacing) * 4)
+      calc(var(--spacing) * 5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    box-shadow: var(--elev-1-shadow);
+  }
+
+  .season-title-card::before {
+    content: '';
+    position: absolute;
+    inset-block: calc(var(--spacing) * 4);
+    inset-inline-start: 0;
+    width: var(--size-rule);
+    border-start-end-radius: var(--radius-xs);
+    border-end-end-radius: var(--radius-xs);
+    background-color: var(--identity, var(--border-strong));
+  }
+
+  .season-title-name {
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-sm);
+    font-stretch: var(--font-stretch-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--text-display-sm--font-weight);
+    line-height: var(--text-display-sm--line-height);
+  }
+
+  .season-title-figures {
+    display: flex;
+    gap: calc(var(--spacing) * 4);
+    padding-top: calc(var(--spacing) * 2);
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+  }
+
+  .season-title-figure {
+    display: flex;
+    align-items: baseline;
+    gap: calc(var(--spacing) * 1.5);
+  }
+
+  .season-title-figure b {
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  /* ================================================================= notices */
+
+  /*
+   * Every notice on this surface is **neutral**. None of the eight codes is a fault: a season with
+   * no Constructors' Championship, a best-4 scoring rule and two cancelled rounds are all facts
+   * about the sport's history. §3.4.3 reserves the status colours for states that need action,
+   * and painting 1950 amber would tell the reader something had gone wrong.
+   */
+  .season-notes {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .season-note {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .season-note svg {
+    flex: none;
+    margin-top: 1px;
+    color: var(--ink-tertiary);
+  }
+
+  .season-note-panel {
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+  }
+
+  /* ================================================================= the calendar */
+
+  .season-calendar {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /*
+   * The row grid. Mobile stacks the meta under the name; from `md` the four columns are
+   * `number · name+circuit · date · winners`, and the winner column is given the most room
+   * because it is the column the eye goes to.
+   */
+  .round-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: calc(var(--spacing) * 10) minmax(0, 1fr);
+    grid-template-areas:
+      'number name'
+      'number meta';
+    gap: calc(var(--spacing) * 1) calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4) calc(var(--spacing) * 3)
+      calc(var(--spacing) * 4);
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .round-row:last-child {
+    border-bottom: none;
+  }
+
+  .round-row:hover {
+    background-color: var(--surface-sunken);
+  }
+
+  @media (min-width: 48rem) {
+    .round-row {
+      grid-template-columns:
+        calc(var(--spacing) * 12) minmax(0, 1.4fr) calc(var(--spacing) * 24)
+        minmax(0, 1.6fr);
+      grid-template-areas: 'number name date winner';
+      align-items: center;
+      gap: calc(var(--spacing) * 4);
+      padding-inline: calc(var(--spacing) * 5);
+    }
+  }
+
+  /* The identity bar again — here it carries the winning team's colour, which is what turns a
+   * list of 22 rows into a season at a glance. Absent on upcoming and cancelled rows, because
+   * there is no entity for it to identify. */
+  .round-row::before {
+    content: '';
+    position: absolute;
+    inset-block: calc(var(--spacing) * 2);
+    inset-inline-start: 0;
+    width: var(--size-rule);
+    background-color: var(--identity, transparent);
+  }
+
+  .round-number {
+    grid-area: number;
+    align-self: start;
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-display-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-display-xs--line-height);
+    transition: color var(--dur-instant) var(--ease-enter);
+  }
+
+  @media (min-width: 48rem) {
+    .round-number {
+      align-self: center;
+    }
+  }
+
+  .round-row:hover .round-number {
+    color: var(--accent-ink);
+  }
+
+  .round-row[data-status='cancelled'] .round-number,
+  .round-row[data-status='upcoming'] .round-number {
+    color: var(--ink-tertiary);
+    opacity: 0.6;
+  }
+
+  .round-name {
+    grid-area: name;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: calc(var(--spacing) * 2);
+    color: var(--ink-primary);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+
+  .round-row[data-status='cancelled'] .round-name {
+    color: var(--ink-tertiary);
+  }
+
+  .round-circuit {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .round-meta {
+    grid-area: meta;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  }
+
+  .round-date {
+    grid-area: date;
+    color: var(--ink-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .round-winner {
+    grid-area: winner;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 1) calc(var(--spacing) * 3);
+    min-width: 0;
+  }
+
+  /*
+   * **Two winners is a real state, not a defensive branch.** 1951 R4, 1956 R1 and 1957 R5 were
+   * shared drives and both drivers are classified P1. They are rendered as two entries with a
+   * shared-drive marker between them, at the same weight — neither is the "real" winner.
+   */
+  .round-winner-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    min-width: 0;
+    color: var(--ink-primary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  .round-winner-team {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  .round-winner-shared {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  .round-pending {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  /* The swatch beside a name — the identity role again, at 10px. */
+  .entity-swatch {
+    display: inline-block;
+    flex: none;
+    width: var(--size-swatch);
+    height: var(--size-swatch);
+    border-radius: var(--radius-xs);
+    background-color: var(--identity, var(--border-strong));
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  .season-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-sunken);
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    padding-inline: calc(var(--spacing) * 1.5);
+    padding-block: calc(var(--spacing) * 0.5);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ------------------------------------------------------------- skeleton geometry (§7.5)
+   *
+   * Every block below mirrors the box it replaces, so the masthead and the calendar hold their
+   * height while the query resolves and nothing under them moves (G-12). Widths are in `ch` where
+   * they stand in for text, because a `ch` is the one unit that tracks the font actually loaded.
+   */
+  /* The year's own box while `/api/meta` resolves the default season, so the masthead does not
+   * grow by 60px when the year arrives. */
+  .skeleton-season-year {
+    display: inline-block;
+    height: var(--text-display-lg--line-height);
+    width: 4ch;
+    vertical-align: middle;
+  }
+
+  @media (min-width: 48rem) {
+    .skeleton-season-year {
+      height: var(--text-display-xl--line-height);
+    }
+  }
+
+  .skeleton-title-eyebrow {
+    height: var(--text-2xs--line-height);
+    width: 12ch;
+  }
+
+  .skeleton-title-name {
+    height: var(--text-display-sm--line-height);
+    width: 14ch;
+  }
+
+  .skeleton-title-detail {
+    height: var(--text-xs--line-height);
+    width: 9ch;
+  }
+
+  .skeleton-round-number {
+    height: var(--text-display-xs--line-height);
+    width: 2ch;
+  }
+
+  .skeleton-round-name {
+    height: var(--text-base--line-height);
+    width: 18ch;
+  }
+
+  .skeleton-round-date {
+    height: var(--text-xs--line-height);
+    width: 11ch;
+  }
+
+  .skeleton-round-winner {
+    height: var(--text-sm--line-height);
+    width: 16ch;
+  }
+
+  .skeleton-standings-row {
+    height: var(--text-base--line-height);
+    width: 100%;
+  }
+
+  /* ================================================================= standings */
+
+  /*
+   * §5.3 — a wide table scrolls **inside its own container**, with the leading identity column
+   * sticky and a `--border-strong` right edge on it. That is what keeps a 7-column standings
+   * table usable at 390px without the page itself scrolling sideways.
+   */
+  .standings-scroll {
+    overflow-x: auto;
+  }
+
+  .standings-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  .standings-table caption {
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    text-align: start;
+  }
+
+  .standings-table th,
+  .standings-table td {
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: start;
+    white-space: nowrap;
+  }
+
+  .standings-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--surface-sunken);
+    color: var(--ink-secondary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .standings-table tbody tr {
+    transition: background-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .standings-table tbody tr:hover {
+    background-color: var(--surface-sunken);
+  }
+
+  /* The position cell carries the identity bar, so the colour sits at the start of the row and
+   * immediately before the name — never as a row background. */
+  .standings-position {
+    position: relative;
+    width: calc(var(--spacing) * 14);
+    padding-inline-start: calc(var(--spacing) * 4) !important;
+    color: var(--ink-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .standings-position::before {
+    content: '';
+    position: absolute;
+    inset-block: calc(var(--spacing) * 1);
+    inset-inline-start: 0;
+    width: var(--size-rule);
+    background-color: var(--identity, var(--border-strong));
+  }
+
+  .standings-name {
+    color: var(--ink-primary);
+    font-size: var(--text-base);
+  }
+
+  .standings-code {
+    margin-inline-start: calc(var(--spacing) * 2);
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+  }
+
+  .standings-team {
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .standings-num {
+    text-align: end !important;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Points is the subject of the table, so it is the largest figure in the row. */
+  .standings-points {
+    color: var(--ink-primary);
+    font-size: var(--text-md);
+    font-weight: 500;
+  }
+
+  /* A zero recedes so the eye finds the values that are not zero. */
+  .standings-num[data-zero='true'] {
+    color: var(--ink-tertiary);
+  }
+
+  .standings-table tbody tr[data-adjustment='excluded'] .standings-position,
+  .standings-table tbody tr[data-adjustment='excluded'] .standings-name {
+    color: var(--ink-tertiary);
+  }
+
+  .standings-disclosure {
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .standings-disclosure summary {
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .standings-disclosure summary::marker {
+    color: var(--ink-tertiary);
+  }
+
+  .standings-unscored {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 1) calc(var(--spacing) * 3);
+    margin: 0;
+    padding: calc(var(--spacing) * 3) 0 0;
+    list-style: none;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  /* ================================================================= progression */
+
+  .season-progression {
+    padding: calc(var(--spacing) * 4);
+  }
+
+  @media (min-width: 48rem) {
+    .season-progression {
+      padding: calc(var(--spacing) * 6);
+    }
+  }
+
+  /* §6.5.1 — filters in ONE row above the plot, never inside it and never floating over it. */
+  .season-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  /*
+   * §6.5.2 caps a *comparison* at four and puts the selection in the filter row. A season has 22
+   * drivers, which cannot be one row of controls, so the selection is its own labelled row
+   * **beneath** the filters and above the plot. Recorded in `DESIGN_SYSTEM.md` §6.5.2 rather than
+   * bent quietly.
+   */
+  .season-select-field {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .season-select-legend {
+    padding: 0 0 calc(var(--spacing) * 2);
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .season-entity-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    height: var(--size-control-sm);
+    padding-inline: calc(var(--spacing) * 2.5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      border-color var(--dur-instant) var(--ease-enter),
+      color var(--dur-instant) var(--ease-enter);
+  }
+
+  .season-entity-chip:hover:not(:disabled) {
+    border-color: var(--accent-border);
+    color: var(--accent-ink);
+  }
+
+  .season-entity-chip[aria-pressed='true'] {
+    border-color: var(--accent-border);
+    background-color: var(--accent-wash);
+    color: var(--accent-wash-ink);
+  }
+
+  /* A chip that cannot be selected because the cap is reached is dimmed, not hidden: the cap has
+   * to be legible as a rule rather than as a control that stopped working. */
+  .season-entity-chip:disabled {
+    opacity: 0.4;
+  }
+}

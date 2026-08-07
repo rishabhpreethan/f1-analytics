@@ -164,6 +164,38 @@ export function ChevronDown(props: IconProps) {
   );
 }
 
+export function ChevronLeft(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m15 18-6-6 6-6" />
+    </Icon>
+  );
+}
+
+export function ChevronRight(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </Icon>
+  );
+}
+
+/**
+ * The season hub's notice glyph. `info` and not `alert-triangle`: none of the eight season
+ * notices is a fault (§3.4.3) — a best-4 scoring rule and a season with no Constructors'
+ * Championship are facts about the sport's history, and a warning triangle beside them would tell
+ * the reader something had gone wrong.
+ */
+export function Info(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </Icon>
+  );
+}
+
 export function Database(props: IconProps) {
   return (
     <Icon {...props}>

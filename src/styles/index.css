@@ -16,6 +16,10 @@
  * anything it declares, and its own file rather than a section of this one because it is a whole
  * visual language — axes, grid, marks, legend, tooltip, table view, five plot states and print. */
 @import './charts.css';
+/* The season hub (F2). Its own file for the same reason the chart kit has one: it is a surface
+ * language — masthead, dial, calendar rows, standings tables, progression panel — sharing one
+ * anatomy, and that anatomy is defined once rather than per component. */
+@import './season.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so
