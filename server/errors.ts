@@ -68,16 +68,38 @@ export function toErrorResponse(err: unknown): ErrorResponse {
   return { status: ERROR_STATUS.INTERNAL, body: errorBody('INTERNAL'), headers: {} };
 }
 
-export function onError(err: unknown, c: Context): Response {
-  // The one place detail is allowed to exist. An unavailable database is already
-  // explained once at startup, so it logs a single line rather than repeating a stack
-  // trace on every request — a fresh clone would otherwise drown the actionable
-  // message in noise.
+/**
+ * What the server prints for a throwable. Pure, so what reaches the console is asserted
+ * rather than hoped for.
+ *
+ * **A 4xx is not a fault and must not print a stack trace.** Before F2 there were no
+ * route parameters, so `ApiError` was only ever constructed by the rate limiter and this
+ * distinction could not be observed. With `:year` live, every mistyped URL produced ten
+ * frames of Hono internals and four absolute repository paths — per request, at up to 120
+ * requests a minute. That is not an S-6 leak (S-6 governs the response body, and detail
+ * to server logs is explicitly permitted) but it is worse operationally than a leak would
+ * be visible: a genuine 500 becomes unfindable in the noise, which is exactly when the
+ * trace is the thing you need.
+ *
+ * So a client error logs one line naming its code and status, a **server** error keeps
+ * the full object, and anything unrecognised keeps it too — an unknown throwable is by
+ * definition the case where the detail has not yet been understood.
+ */
+export function logLine(err: unknown): [string] | [string, unknown] {
   if (err instanceof DatabaseUnavailableError) {
-    console.error(`[api] request refused: the data is not available (${err.reason}).`);
-  } else {
-    console.error('[api] request failed:', err);
+    // Already explained once at startup, so a fresh clone does not drown the actionable
+    // message under one stack trace per request.
+    return [`[api] request refused: the data is not available (${err.reason}).`];
   }
+  if (err instanceof ApiError && err.status < 500) {
+    return [`[api] request rejected: ${err.code} (${String(err.status)}).`];
+  }
+  return ['[api] request failed:', err];
+}
+
+export function onError(err: unknown, c: Context): Response {
+  // The one place detail is allowed to exist.
+  console.error(...logLine(err));
   const { status, body, headers } = toErrorResponse(err);
   for (const [name, value] of Object.entries(headers)) c.header(name, value);
   return c.json(body, status);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseUnavailableError } from './db';
-import { ERROR_STATUS, apiError, toErrorResponse } from './errors';
+import { ERROR_STATUS, apiError, logLine, toErrorResponse } from './errors';
 import { ERROR_CODES, ERROR_MESSAGES, apiErrorSchema } from './schemas/error';
 
 describe('server/errors', () => {
@@ -69,5 +69,41 @@ describe('server/errors', () => {
   it('carries Retry-After only when the rate limiter set it', () => {
     expect(toErrorResponse(apiError('RATE_LIMITED', 42)).headers).toEqual({ 'Retry-After': '42' });
     expect(toErrorResponse(apiError('RATE_LIMITED')).headers).toEqual({});
+  });
+});
+
+/**
+ * What the process prints, as opposed to what it returns.
+ *
+ * Added in F2 because `:year` made the branch reachable: before it, `ApiError` was only
+ * ever constructed by the rate limiter, and a mistyped URL could not exist. Observed on a
+ * running server — `/api/seasons/abc` produced ten frames of Hono internals and four
+ * absolute repository paths, per request.
+ */
+describe('server/errors — what is logged (as distinct from what is returned)', () => {
+  it('logs a client error as one line, with no stack and no path', () => {
+    for (const code of ['INVALID_PARAM', 'NOT_FOUND', 'RATE_LIMITED'] as const) {
+      const line = logLine(apiError(code));
+      expect(line).toHaveLength(1);
+      expect(line[0]).toContain(code);
+      expect(line[0]).not.toMatch(/\bat \w+ \(|\/Users\/|node_modules/);
+    }
+  });
+
+  it('keeps the whole object for a 500, which is when the trace is the point', () => {
+    const internal = apiError('INTERNAL');
+    expect(logLine(internal)).toEqual(['[api] request failed:', internal]);
+  });
+
+  it('keeps the whole object for an unrecognised throwable', () => {
+    const boom = new Error('SQLITE_ERROR: no such table: season');
+    expect(logLine(boom)).toEqual(['[api] request failed:', boom]);
+    expect(logLine('a bare string')).toEqual(['[api] request failed:', 'a bare string']);
+  });
+
+  it('logs an unavailable database as one line naming the reason', () => {
+    expect(logLine(new DatabaseUnavailableError('missing'))).toEqual([
+      '[api] request refused: the data is not available (missing).',
+    ]);
   });
 });
