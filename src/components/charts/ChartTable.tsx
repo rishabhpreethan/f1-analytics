@@ -14,6 +14,87 @@ import type { BarDatum, ResolvedSeries } from './types';
  * proportional font is a column that looks like it is vibrating.
  */
 
+/**
+ * §6.5.5's table for a scatter with fitted trends (RD-4).
+ *
+ * **It carries the fit's slope AND its r², and the r² is the point.** The plot expresses the slope as
+ * an angle, which is persuasive and imprecise; the goodness-of-fit is not expressible on the plot at
+ * all. So the table is the only place a reader can see that a confident-looking line explains 12% of
+ * the variation — which is exactly the case where the chart deliberately does not draw it. A table
+ * that showed the slope alone would launder the same model the dashed line is trying to qualify.
+ */
+export interface ScatterTableProps {
+  groups: readonly {
+    reference: string;
+    label: string;
+    points: readonly { x: number; y: number }[];
+    fit?: { slope: number; intercept: number; r2: number; n: number } | null;
+  }[];
+  caption: string;
+  xLabel: string;
+  yLabel: string;
+  formatX: (x: number) => string;
+  formatY: (y: number) => string;
+}
+
+export function ScatterTable({
+  groups,
+  caption,
+  xLabel,
+  yLabel,
+  formatX,
+  formatY,
+}: ScatterTableProps) {
+  return (
+    <table className="chart-table">
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Group</th>
+          <th scope="col" data-numeric="true">
+            {xLabel}
+          </th>
+          <th scope="col" data-numeric="true">
+            {yLabel}
+          </th>
+          <th scope="col" data-numeric="true">
+            Trend
+          </th>
+          <th scope="col" data-numeric="true">
+            r²
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {groups.flatMap((group) =>
+          group.points.map((point, index) => (
+            <tr key={`${group.reference}-${String(point.x)}`}>
+              <th scope="row">{index === 0 ? group.label : ''}</th>
+              <td data-numeric="true">{formatX(point.x)}</td>
+              <td data-numeric="true">{formatY(point.y)}</td>
+              {/*
+               * The fit is a property of the group, not of a point, so it is stated once on the
+               * group's first row. An em-dash where there is none — fewer than three clean laps
+               * defines no line, and a zero slope would claim one.
+               */}
+              <td data-numeric="true">
+                {index === 0
+                  ? group.fit == null
+                    ? '—'
+                    : `${group.fit.slope >= 0 ? '+' : '−'}${formatY(Math.abs(group.fit.slope))}/lap`
+                  : ''}
+              </td>
+              <td data-numeric="true">
+                {index === 0 ? (group.fit == null ? '—' : group.fit.r2.toFixed(2)) : ''}
+              </td>
+            </tr>
+          )),
+        )}
+      </tbody>
+    </table>
+  );
+}
+
 export interface SeriesTableProps {
   series: readonly ResolvedSeries[];
   caption: string;

@@ -2104,10 +2104,43 @@ stroke. **2011+, because stints are derived from pit stops** — and a 1996 race
 charts with no stint layer, which is a designed state and not a gap.
 
 **RD-4 · Pace degradation** — Job: change over time, within a stint. Form: per-lap scatter plus a
-fitted trend line; the fit is arithmetic, not a primitive. **Two honesty requirements, both from
-`REQUIREMENTS.md` RD-4's own note:** pit laps and the lap immediately after are excluded from the fit,
-and **there is no safety-car flag in the data** — so a candidate SC period is detected heuristically
-and labelled **inferred**, never as fact, in a `--status-info` note above the plot. **2011+.**
+per-stint fitted trend (`ScatterChart`). **Available 1996+, not 2011+**: with no pit data there is still
+one implicit stint — the whole race — and a fit over it is the honest reduced answer rather than an
+absent section, so a 1996 race gets degradation without stint boundaries.
+
+**Three honesty rules, and they are the feature rather than decoration:**
+
+1. **The trend is dashed where the data is solid.** The points are what happened; a least-squares line
+   is a *claim* about them. Dash is the channel that survives a screenshot, a printout and greyscale —
+   the same reason §6.4's ladder spends dash rather than relying on colour. **A solid trend line through
+   a scatter is the most common way a chart launders a model into a fact.** The trend also renders
+   *before* the points, so the data sits on top of the model.
+2. **A fit that explains nothing is not drawn.** `fitLinear` returns `r2` and its own comment calls it
+   *"the honesty term"*: a four-lap stint will happily produce a confident-looking slope. So a trend is
+   drawn only at `r² ≥ TREND_R2_FLOOR` (**0.5** — the conventional weak-but-real threshold, and **a
+   judgement, not a measurement**, since there is no ground truth for tyre degradation here). **The r²
+   and the slope are in the table regardless**, so a reader can see that the line they are not being
+   shown would have explained 12% of the variation. A table stating the slope alone would launder the
+   same model the missing line is qualifying.
+3. **An inferred neutralisation is hatched, never filled, and named as inferred.** `REQUIREMENTS.md`
+   RD-4 and `DATABASE.md` §6.9 agree: **there is no safety-car flag anywhere in the data.** Hatch is
+   rung 4's channel and already means *"a different kind of thing"*, so it costs no new vocabulary; a
+   solid band would read as recorded fact. Consecutive flagged laps **merge into one band** — five
+   one-lap rects read as five incidents rather than one safety car.
+
+**The copy says "likely safety car or red flag" and never "safety car."** The heuristic cannot separate
+a safety car from a red flag, a virtual safety car, a wet restart or a lap behind a recovery vehicle;
+all of them mean the field was not racing, which is the property that disqualifies a lap from a pace
+metric, and none of them is in the data. The note states the **method** — laps ≥30% slower than the
+race's typical lap across the whole field — rather than presenting its output as a finding.
+
+**Excluded laps are counted, not silent.** Lap 1, every in-lap and every out-lap are dropped from the
+fits (§6.9), and the note says how many of how many — the same discipline the off-scale caret follows.
+
+> **The detection's accuracy is unverified by construction, not merely unmeasured.** There is no flag
+> to compare `SAFETY_CAR_RATIO` against, so no false-positive rate can be computed — not now, and not
+> after any amount of further work. The label is what carries that uncertainty, because nothing else
+> can. This distinction matters in the copy too: "inferred" is honest, "detected" would not be.
 
 **Queued, not yet specified:** RD-5 gap to leader (P1), RD-6 position-change events (P1), RD-9
 consistency (P1), RD-8 and RD-12 (P2). RD-11 weekend session times needs `session.timestamp` and

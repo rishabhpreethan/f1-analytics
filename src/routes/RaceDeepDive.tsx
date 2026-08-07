@@ -9,6 +9,7 @@ import { useMeta } from '@/features/meta/useMeta';
 import { RaceClassification } from '@/features/race/RaceClassification';
 import { RaceDataState } from '@/features/race/RaceDataState';
 import { LapTimeTrace, PitTimeline, StintChart } from '@/features/race/RaceLapCharts';
+import { PaceDegradation } from '@/features/race/RacePaceDegradation';
 import { RaceMasthead } from '@/features/race/RaceMasthead';
 import {
   resolveRaceRef,
@@ -245,6 +246,14 @@ export function RaceDeepDive() {
               </div>
 
               <LapTimeTrace laps={laps.data} selected={traced} onSelect={setTraced} />
+
+              {/*
+               * RD-4 sits with the pace rather than with the strategy, and it is inside the **lap**
+               * window rather than the pit one: with no stints there is still one implicit stint — the
+               * whole race — and a fit over it is the honest reduced answer rather than a missing
+               * section. So a 1996 race gets degradation without stint boundaries.
+               */}
+              <PaceDegradation laps={laps.data} stints={stints.data ?? null} />
             </section>
           )}
 

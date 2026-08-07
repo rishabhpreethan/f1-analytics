@@ -31,15 +31,26 @@ import { labelCapacity } from './geometry';
  * never reach the field, that the tooltip does not grow to 22 rows, and which series get labels when
  * the axis cannot hold them all.
  *
- * The fixture is a 20-car field over 58 laps — a real modern race shape.
+ * **The fixture is a 20-car field over `LAPS` laps, and `LAPS` is 8 rather than a race's 58.**
+ * Twenty series is load-bearing — it is what makes this a *many*-series chart and what
+ * `labelCapacity` is measured against — but the lap count is not: every assertion here is structural,
+ * and jsdom reports width 0 so the density rules take §1.0's permissive branch regardless of it.
+ *
+ * It was 58, which built 20 paths over 1,160 points on each of 24 tests. Measured: this file runs
+ * ~1.6 s alone, ~4.4 s under suite parallelism, and was observed at **10.6 s under contention** — an
+ * 8× spread, and the failures were **timeouts rather than assertions**. So the cost is contention for
+ * the worker pool, not weight, and the fix is a cheaper tree rather than a longer timeout: a raised
+ * timeout hides it, and CI is real and slower than this machine.
  */
+
+const LAPS = 8;
 
 const FIELD: RankSeries[] = Array.from({ length: 20 }, (_, i) => ({
   reference: `driver-${String(i + 1)}`,
   teamReference: `team-${String(Math.floor(i / 2) + 1)}`,
   label: `Driver ${String(i + 1)}`,
   shortLabel: `D${String(i + 1).padStart(2, '0')}`,
-  points: Array.from({ length: 58 }, (_, lap) => ({ x: lap + 1, y: i + 1 })),
+  points: Array.from({ length: LAPS }, (_, lap) => ({ x: lap + 1, y: i + 1 })),
 }));
 
 function renderRank(over: Partial<Parameters<typeof RankChart>[0]> = {}) {
@@ -104,7 +115,7 @@ describe('condition 2 — markers never reach the field', () => {
      * the structural half: the count can only ever come from the selection.
      */
     const { container } = renderRank({ selected: ['driver-1', 'driver-2'] });
-    expect(container.querySelectorAll('.chart-marker')).toHaveLength(2 * 58);
+    expect(container.querySelectorAll('.chart-marker')).toHaveLength(2 * LAPS);
   });
 });
 
@@ -287,7 +298,7 @@ describe('the axis', () => {
   it('labels the first and last lap, which d3 omits on a 1-based domain', () => {
     renderRank();
     expect(screen.getAllByText('1').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('58').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(String(LAPS)).length).toBeGreaterThan(0);
   });
 });
 

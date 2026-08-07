@@ -390,6 +390,35 @@
     fill: var(--ink-primary);
   }
 
+  /* ------------------------------------------------ scatter + fitted trend (RD-4) */
+
+  /*
+   * ⚠ **The trend is DASHED where the data is solid.** The points are what happened; the line is a
+   * least-squares claim about them. Dash is the channel that survives a screenshot, a printout and
+   * greyscale — the same reason §6.4's ladder spends dash rather than relying on colour. A solid trend
+   * line through a scatter is the most common way a chart launders a model into a fact.
+   *
+   * `6 3`, which is rung 3's first pattern, so the vocabulary is the one already in use.
+   */
+  .chart-trend {
+    fill: none;
+    stroke: var(--series);
+    stroke-width: var(--size-mark-stroke);
+    stroke-dasharray: 6 3;
+    stroke-linecap: round;
+    /* Slightly recessive: the data is the subject and the model is an annotation on it. */
+    opacity: 0.75;
+  }
+
+  /*
+   * **Hatched, never filled** — rung 4's channel, because these are laps a *heuristic* flagged and not
+   * laps the data records as neutralised. There is no safety-car flag anywhere in the data. A solid
+   * band would read as recorded fact; hatch already means "a different kind of thing" in this system.
+   */
+  .chart-band {
+    stroke: none;
+  }
+
   /* §6.5.2 — the direct label is the primary identification at ≤4 series, and it wears TEXT
    * tokens, never the series colour (§6.2). Only the 12px leader line carries the entity hue. */
   .chart-direct-label {
