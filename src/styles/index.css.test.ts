@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { TOOLTIP_WIDTH } from '@/components/charts/geometry';
 import { DOCK_GLYPH_SIZE, INDICATOR_LENGTH } from '@/components/layout/navItems';
 import INDEX_CSS from './index.css?raw';
 import TOKENS_CSS from './tokens.css?raw';
+import LEGEND_SRC from '@/components/charts/ChartLegend.tsx?raw';
 
 /**
  * The invariants that live **between** `index.css` and the JavaScript that writes into it.
@@ -95,13 +97,15 @@ function groupedSlotItemRule(): string {
   return match?.[1] ?? '';
 }
 
+/** A `--name: Npx;` declaration in `tokens.css`. */
+function pxToken(name: string): number {
+  const match = new RegExp(`${name}:\\s*(\\d+)px;`).exec(TOKENS);
+  expect(match, `${name} is missing from tokens.css, or is not a px length`).not.toBeNull();
+  return Number(match?.[1]);
+}
+
 describe('G-3 — the indicator length agrees between tokens.css and navItems.ts', () => {
-  /** A `--name: Npx;` declaration in `tokens.css`. */
-  function token(name: string): number {
-    const match = new RegExp(`${name}:\\s*(\\d+)px;`).exec(TOKENS);
-    expect(match, `${name} is missing from tokens.css, or is not a px length`).not.toBeNull();
-    return Number(match?.[1]);
-  }
+  const token = pxToken;
 
   it('mirrors INDICATOR_LENGTH in both orientations', () => {
     // The bar is centred on the active item by arithmetic in `CommandDock`, against a length
@@ -644,5 +648,42 @@ describe('the coverage ruler’s axis shares its column template with its rows',
     expect(INDEX).toContain('--ruler-columns:');
     expect([...INDEX.matchAll(/grid-template-columns:\s*var\(--ruler-columns\)/g)]).toHaveLength(2);
     expect(INDEX).not.toContain('grid-column: 1 / -1');
+  });
+});
+
+/**
+ * §6.5.1's tooltip width — a figure that exists in two places and must agree.
+ *
+ * `LineChart` flips the tooltip at the axis midpoint by subtracting this exact constant, so a box
+ * wider than it overhangs the plot's right edge. It was `min-width: 8rem` (128px) against a box that
+ * rendered 193px wide with four driver names in it.
+ *
+ * **Only the token half is asserted here, and the reason is worth recording:** `charts.css` cannot
+ * be read by a test at all. The Tailwind Vite plugin claims `?raw` imports of it and returns an
+ * **empty string** — verified, `charts.css?raw` has length 0 while `tokens.css?raw` has 29310 — so
+ * every CSS-text assertion against it would have passed vacuously. The rules that live in that file
+ * are guarded instead by `clampTooltip`'s unit tests and by the tooltip's inline origin, which is
+ * assertable in the DOM.
+ */
+describe('§6.5.1 — the chart tooltip width agrees between tokens.css and geometry.ts', () => {
+  it('mirrors TOOLTIP_WIDTH', () => {
+    expect(pxToken('--size-tooltip')).toBe(TOOLTIP_WIDTH);
+  });
+});
+
+/**
+ * §6.5.2's legend order — swatch, then key, then name. The swatch used to come last, where a
+ * wrapping one-row legend put it immediately before the *next* item's key, so it read as belonging
+ * to the wrong series.
+ */
+describe('§6.5.2 — the legend key precedes the name and the swatch precedes both', () => {
+  it('renders the identity swatch first', () => {
+    const item = /className="chart-legend-item"[\s\S]*?<\/li>/.exec(LEGEND_SRC)?.[0] ?? '';
+    const swatch = item.indexOf('chart-swatch');
+    const key = item.indexOf('<LegendKey');
+    const name = item.indexOf('entry.label');
+    expect(swatch).toBeGreaterThan(-1);
+    expect(swatch).toBeLessThan(key);
+    expect(key).toBeLessThan(name);
   });
 });

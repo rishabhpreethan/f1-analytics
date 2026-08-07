@@ -477,6 +477,13 @@
   --size-swatch: 10px; /* the identity chip (§3.3a.4) */
   --size-leader: 12px; /* §6.5.2's direct-label leader line */
   --size-hatch: 6px; /* rung 4's 45° hatch pitch */
+  /* §6.5.1's tooltip. **A fixed width, in px, and NOT a `min-width`** — the flip-at-the-midpoint
+   * arithmetic in `LineChart` subtracts this exact figure to place the tooltip on the left of the
+   * crosshair, so a box wider than the constant overhangs the plot. It was `min-width: 8rem` and
+   * rendered 193px wide with four driver names in it. `px` and not `rem` for the same reason
+   * `--size-dock-indicator` is: the JS arithmetic is in px and a root-font change would silently
+   * desynchronise the two. Pinned to `TOOLTIP_WIDTH` by `tokens.css.test.ts`. */
+  --size-tooltip: 200px;
 
   /* `--size-spotlight` (220) and `--size-card-lift` (2) are **removed**. G-8's pointer spotlight
    * is retired from the product and the capability card's 2px lift is superseded by G-25's

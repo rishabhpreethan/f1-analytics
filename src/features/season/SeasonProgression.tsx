@@ -77,6 +77,13 @@ export interface SeasonProgressionProps {
   onRetry: () => void;
   /** False for 1950–57: no Constructors' Championship, so the entity switch offers drivers only. */
   hasTeamStandings: boolean;
+  /**
+   * Decides the section heading, and it is a matter of fact rather than of tone.
+   *
+   * "How the title was decided" over a 2026 chart that stops at Round 10 states that the
+   * championship is settled. It is not. Caught in Rishabh's capture.
+   */
+  isComplete: boolean;
 }
 
 export function SeasonProgression({
@@ -86,6 +93,7 @@ export function SeasonProgression({
   errorCode,
   onRetry,
   hasTeamStandings,
+  isComplete,
 }: SeasonProgressionProps) {
   const [metric, setMetric] = useState<ProgressionMetric>('points');
   const [kind, setKind] = useState<SeriesKind>('driver');
@@ -122,11 +130,13 @@ export function SeasonProgression({
   const rounds = progression === null ? [] : selectRoundAxis(progression);
   const namer = roundNamer(progression?.rounds ?? []);
 
-  /* §6.3 — the position axis is the size of the field, not the range the selection occupies. */
-  const domain =
-    metric === 'position' && progression !== null
-      ? positionDomain(selectPositionSeries(progression, effectiveKind))
-      : null;
+  /*
+   * §6.3 — **P1 pinned, the bottom from the selection.** This used to pass the whole field, which put
+   * a P1–P20 axis under four title contenders in P1–P4 and left 80% of the plot empty. See
+   * `positionDomain` for why "how close to the front" is answered by P1 being on the axis rather
+   * than by rendering positions nobody in the selection held.
+   */
+  const domain = metric === 'position' ? positionDomain(series) : null;
 
   const state =
     errorCode !== null ? 'error' : pending ? 'loading' : series.length === 0 ? 'empty' : 'ready';
@@ -147,7 +157,7 @@ export function SeasonProgression({
           The season, plotted
         </p>
         <h2 id="season-progression-title" className="t-display-sm text-ink-primary mt-3">
-          How the title was decided
+          {isComplete ? 'How the title was decided' : 'How the title is being decided'}
         </h2>
       </div>
 

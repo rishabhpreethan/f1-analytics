@@ -1,5 +1,6 @@
 import type { SeriesInput } from '@/components/charts';
 import { COMPARISON_CAP } from '@/components/charts';
+import { POSITION_TICKS } from '@/components/charts/geometry';
 import type { ProgressionSeries, SeriesKind } from './selectors';
 
 /**
@@ -139,19 +140,47 @@ export function toSeriesInput(series: readonly ProgressionSeries[]): SeriesInput
 }
 
 /**
- * The measure domain and ticks for the **position** metric.
+ * The measure domain for the **position** metric: **P1, pinned, to just past the deepest position
+ * the selection actually reached.**
  *
- * The axis is the size of the field, not the range the selection occupies (§6.3, corrected
- * 2026-08-07): four drivers who ran 1st–6th all season must not get an axis that stops at P6,
- * because the reader's question is how close to the front they were. `null` when nothing is ranked,
- * which lets the chart fall back to its derived domain rather than inventing one.
+ * > **Reversed on seeing it, 2026-08-07.** This returned `[1, max(whole field)]`, on the argument
+ * > that "the axis is the size of the field, because the reader's question is how close to the front
+ * > they were". Rishabh's capture killed that argument: with four title contenders in P1–P4 against
+ * > a P1–P20 axis, **about 80% of the plot was empty** and it read as a chart that had failed to
+ * > load its lower half. The reasoning was also half wrong — *"how close to the front"* is answered
+ * > by **P1 being on the axis**, which pinning the top of the domain guarantees, and not by
+ * > rendering fifteen positions nobody in the selection ever held.
+ * >
+ * > So the rule is now: **the minimum is always P1** — the line the whole chart is read against,
+ * > and never derived from the data — and the maximum is the deepest position *in the selection*,
+ * > snapped up to the next §6.3 position tick so the axis ends on a labelled gridline rather than on
+ * > a data point. A comparison that includes a midfielder still gets a deep axis, because the
+ * > selection reaches there; a title fight gets a tight one.
+ * >
+ * > **This is not the truncation §6.3 forbids.** That rule is about *length* being the encoding —
+ * > a bar or an area, where a short axis inflates a difference. Position is an ordinal read off a
+ * > labelled axis, and every gridline says `P5`, `P10`. Nothing is exaggerated by the span.
+ *
+ * `null` when nothing in the selection is ranked, which lets the chart fall back to its derived
+ * domain rather than inventing one.
  */
 export function positionDomain(series: readonly ProgressionSeries[]): [number, number] | null {
   const values = series.flatMap((entry) =>
     entry.points.map((point) => point.value).filter((value): value is number => value !== null),
   );
   if (values.length === 0) return null;
-  return [1, Math.max(...values)];
+  return [1, snapToPositionTick(Math.max(...values))];
+}
+
+/**
+ * The next §6.3 position tick at or above `position`, so the axis ends on a labelled gridline.
+ *
+ * Beyond the last tick it falls back to the value itself — a 26-car field (1989 had them) must not
+ * be clipped to P20 just because the tick set stops there.
+ */
+export function snapToPositionTick(position: number): number {
+  const tick = POSITION_TICKS.find((candidate) => candidate >= position);
+  return tick ?? position;
 }
 
 /** `R7` for the axis gutter. Terse on purpose — it has to fit `--text-2xs`. */

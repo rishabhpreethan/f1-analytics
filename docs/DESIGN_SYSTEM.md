@@ -590,7 +590,30 @@ at 19.91 / 17.06:1.** That is the case the doubling exists for; see §3.6.3.
 Applied via `:focus-visible` only. Never removed, never replaced per-component, never a `whileFocus`
 motion substitute — motion is not a focus indicator.
 
-#### 3.5.2 Interactive expression — the shipped set
+##### 3.5.1a A control's pressed state is never carried by fill alone _(added 2026-08-07)_
+
+`.chart-seg`'s pressed segment used `--accent-fill` + `--accent-on` and nothing else. That inverts
+per theme — near-black on a pale container in light, **near-white on a near-black container in dark**
+— and in dark it left pressed and unpressed reading as almost the same weight, because both resolved
+to light content and only the fill distinguished them. Caught in Rishabh's dark-mode capture of the
+segmented controls; invisible in light mode, which is where all previous review happened.
+
+§3.4.2 already forbids colour as a sole carrier of meaning, and **a control's state is a meaning.**
+The whole design system applies that rule to charts and then this one control did not. So a
+segmented control's pressed state now carries **three** channels:
+
+| Channel | Pressed | Unpressed |
+|---|---|---|
+| Fill | `--accent-fill` | none |
+| Ink | `--accent-on` | **`--ink-tertiary`** |
+| Weight | 500 | 400 |
+
+**The unpressed recession is the one that actually fixes dark**, because it puts a real ink step
+between the two segments regardless of which way the fill inverts. It costs light mode nothing —
+`--ink-tertiary` still clears 4.5:1 there. This applies to every segmented control in the product,
+including `Chart`/`Table`, `Colour`/`Patterns` and the season hub's metric and championship switches.
+
+### 3.5.2 Interactive expression — the shipped set
 
 _Rewritten 2026-08-06 for the monochrome accent. The two superseded tables (the original achromatic
 set, and CR-007's hue-bearing set) are gone rather than stacked: three versions of one table is how a
@@ -1365,11 +1388,28 @@ label over ~12 characters, the bar chart is **horizontal**: categories run down 
 > set clipped to the field, `LineChart` takes `yTickValues`, and **`.nice()` is skipped whenever ticks
 > are pinned** — with explicit ticks, nicing also pushes P1 off the axis edge it should sit on.
 >
-> **2. The measure domain is sometimes a property of the field, not of the data.** A position chart's
-> axis is the size of the grid; four drivers who ran 1st–6th all season must not get an axis that
-> stops at P6, because the reader's question is *how close to the front*. `LineChart` takes
-> `yDomain`. This is the one permitted override and it does **not** relax the bar/area zero rule,
-> which `BarChart` still enforces unconditionally.
+> **2. The measure domain is sometimes a property of the selection, not of the data.** `LineChart`
+> takes `yDomain`. This is the one permitted override and it does **not** relax the bar/area zero
+> rule, which `BarChart` still enforces unconditionally.
+>
+> > **Reversed the same day, on seeing it render.** This first read *"the axis is the size of the
+> > grid; four drivers who ran 1st–6th must not get an axis that stops at P6, because the reader's
+> > question is how close to the front"* — and the season hub was built that way. Rishabh's capture
+> > killed it: with four title contenders in P1–P4 against a P1–P20 axis, **about 80% of the plot was
+> > empty** and it read as a chart that had failed to load its lower half.
+> >
+> > The argument was half wrong, and identifying which half is the useful part. *"How close to the
+> > front"* is answered by **P1 being on the axis** — not by rendering fifteen positions nobody in
+> > the selection ever held. So the rule is: **the minimum of a position axis is always P1, never
+> > derived from the data**, and the maximum is the deepest position *in the selection*, snapped up
+> > to the next position tick so the axis ends on a labelled gridline. A comparison including a
+> > midfielder still gets a deep axis; a title fight gets a tight one.
+> >
+> > **This is not the truncation this section forbids.** That rule is about *length* being the
+> > encoding — a bar or an area, where a short axis inflates a difference. A position is an ordinal
+> > read off a labelled axis where every gridline says `P5`, `P10`; nothing is exaggerated by the
+> > span. `snapToPositionTick` also does not clip a field deeper than the last tick, because 1989 had
+> > 26 cars.
 >
 > **3. §6.5.1's tooltip and the axis ticks need different formatters.** One `formatX` served both, so
 > a round axis read `R7` in the gutter *and* `R7` in the tooltip — but the reader at a crosshair is
@@ -1547,6 +1587,37 @@ dual axis: it makes an incomparable comparison look fine.
 **The tooltip is `--surface-overlay` at `--radius-md`, `--elev-2`, `--text-xs`, numerals `--font-mono`,
 and it never covers the mark it describes** — it flips side at the axis midpoint. It follows the
 pointer at `m.pointer`; under `reduce` it is positioned with a single `gsap.set` and snaps.
+
+> **Three tooltip rules added after it shipped wrong, 2026-08-07.** Rishabh captured the progression
+> chart mid-hover and the tooltip rendered **below the plot area, over the legend, clipped by the
+> panel edge**. Its content and its header were correct; only its position was wrong. Each rule below
+> is the fix for one cause.
+>
+> **1. The transform's origin is explicit, and it is declared on the element.** G-30 moves the
+> tooltip with `quickSetter(el, 'x'|'y', 'px')`, which writes a **transform** — measured from the
+> element's own box. With `position: absolute` and no `left`/`top`, that box sits at its **static
+> flow position**, after the `<svg>`, so every coordinate computed against `plot.top` was offset by
+> the whole height of the chart. `BarChart` never had the bug because it writes `left: 0; top: 0`
+> inline; `LineChart` relied on the stylesheet, and the stylesheet did not say it. **This is the same
+> class of failure as a spotlight written in `%` where the spec meant px:** a correct coordinate
+> resolved against the wrong origin.
+>
+> **2. It is flipped *and* clamped, on both axes.** The flip keeps the box off the mark; it says
+> nothing about containment. `geometry.clampTooltip` clamps into the plot rectangle after flipping —
+> in that order, because clamping first would undo the flip exactly at the edges where the flip
+> matters. It is pure, and it is the part of tooltip placement a test **can** decide without layout.
+>
+> **3. The width is a fixed token, never a `min-width`.** The flip subtracts an exact constant, so a
+> box wider than the constant overhangs the plot. It was `min-width: 8rem` (128px) against a box that
+> rendered 193px wide with four driver names in it. `--size-tooltip` (200px) and `TOOLTIP_WIDTH` are
+> tied together by `index.css.test.ts`.
+>
+> **Recorded limitation:** `charts.css` **cannot be read by any test in this repo.** The Tailwind Vite
+> plugin claims `?raw` imports of it and returns an **empty string** — measured, `charts.css?raw` has
+> length 0 while `tokens.css?raw` has 29310. Two assertions were written against its text and both
+> passed vacuously before this was noticed. Anything in that file which must be guarded has to be
+> guarded through a token, through a pure function, or through an inline style — which is the real
+> reason rule 1 puts the origin on the element rather than in the stylesheet.
 
 #### 6.5.2 Legend at ≥ 2 series, direct labels at ≤ 4 — and how they coexist
 

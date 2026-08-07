@@ -117,6 +117,70 @@ export function prefersHorizontalBars(labels: readonly string[]): boolean {
 export const POSITION_TICKS = [1, 5, 10, 15, 20] as const;
 
 /**
+ * §6.5.1's tooltip width, in px, and **it must equal `--size-tooltip` in `tokens.css`** —
+ * `tokens.css.test.ts` asserts that, because nothing else could.
+ *
+ * The tooltip flips side at the axis midpoint so it never covers the mark it describes, and the flip
+ * is `x - TOOLTIP_WIDTH`. So this is not a hint: if the rendered box is wider than the constant, the
+ * flipped tooltip overhangs the plot's right edge by the difference. It was a `min-width: 8rem`
+ * (128px) against a box that rendered 193px wide with four driver names in it.
+ */
+export const TOOLTIP_WIDTH = 200;
+
+/** How far the tooltip sits from the crosshair on the un-flipped side. */
+export const TOOLTIP_OFFSET = 12;
+
+/**
+ * The tooltip's position, **clamped inside the plot area on both axes** — not merely flipped
+ * horizontally at the midpoint.
+ *
+ * §6.5.1 asks for a tooltip that "never covers the mark it describes", and the flip alone delivers
+ * that. What the flip does *not* deliver is containment: at the extreme left the flipped box starts
+ * at a negative x, and at the extreme right the un-flipped box runs past the plot's edge. Both
+ * overflow the panel, which is what a chart's tooltip must never do — it is the one element that
+ * appears over the data and it has to stay on the data.
+ *
+ * Pure, and tested, because this is precisely the arithmetic jsdom **can** decide: no layout is
+ * needed to know whether a computed left edge is inside a known rectangle. The rendered box's
+ * height is not knowable here, so `height` is passed in as the caller's reserved figure.
+ */
+export function clampTooltip(
+  x: number,
+  plot: { left: number; top: number; innerWidth: number; innerHeight: number },
+  size: { width: number; height: number },
+): { x: number; y: number } {
+  /* Flip at the midpoint so the box never covers the mark, then clamp — in that order. Clamping
+   * first would let the clamp undo the flip at the edges, which is where the flip matters most. */
+  const flipped = x > plot.innerWidth / 2;
+  const wanted = plot.left + x + (flipped ? -size.width - TOOLTIP_OFFSET : TOOLTIP_OFFSET);
+
+  const minX = plot.left;
+  const maxX = Math.max(minX, plot.left + plot.innerWidth - size.width);
+
+  const minY = plot.top;
+  const maxY = Math.max(minY, plot.top + plot.innerHeight - size.height);
+
+  return {
+    x: Math.min(Math.max(wanted, minX), maxX),
+    y: Math.min(Math.max(plot.top + TOOLTIP_OFFSET, minY), maxY),
+  };
+}
+
+/**
+ * The tooltip's reserved height: a title line plus one row per series, padded.
+ *
+ * An estimate, and it is only ever used to keep the box inside the plot — so it is deliberately
+ * generous. Under-reserving would let a four-series tooltip hang out of the panel, which is the
+ * defect this exists to prevent; over-reserving only nudges it upward.
+ */
+export function tooltipHeight(rows: number): number {
+  const PADDING = 16;
+  const TITLE = 14;
+  const ROW = 20;
+  return PADDING + TITLE + rows * ROW;
+}
+
+/**
  * §6.3's position ticks, clipped to the axis the chart actually has.
  *
  * **This exists because `scale.ticks()` cannot express a position axis and quietly produces a wrong

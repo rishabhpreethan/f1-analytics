@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   AXIS_GAP,
   CATEGORY_COUNT_LIMIT,
+  clampTooltip,
   computeMargin,
+  mountKey,
+  positionTicksWithin,
+  tooltipHeight,
+  TOOLTIP_OFFSET,
   DIRECT_LABEL_MIN_GAP,
   fmtCoord,
   labelStride,
@@ -251,5 +256,89 @@ describe('§6.4 rung 2 — the four marker shapes are equal AREA, not equal widt
   it('rounds coordinates to two decimals rather than emitting 15 significant figures', () => {
     expect(fmtCoord(1 / 3)).toBe('0.33');
     expect(fmtCoord(-2.005)).toBe('-2');
+  });
+});
+
+/**
+ * §6.5.1's tooltip placement — **flipped AND clamped**, which is the arithmetic jsdom can decide
+ * without layout: no rendering is needed to know whether a computed left edge is inside a known
+ * rectangle. Rishabh's capture caught the tooltip rendering below the plot and clipped by the panel;
+ * the origin was fixed in `charts.css`, and this is what keeps it inside once it is there.
+ */
+describe('clampTooltip', () => {
+  const PLOT = { left: 48, top: 12, innerWidth: 800, innerHeight: 300 };
+  const SIZE = { width: 200, height: 100 };
+
+  it('offsets to the right of the crosshair in the left half', () => {
+    expect(clampTooltip(100, PLOT, SIZE).x).toBe(48 + 100 + TOOLTIP_OFFSET);
+  });
+
+  it('flips to the left of the crosshair past the midpoint, so it never covers the mark', () => {
+    expect(clampTooltip(600, PLOT, SIZE).x).toBe(48 + 600 - 200 - TOOLTIP_OFFSET);
+  });
+
+  it('never starts left of the plot area', () => {
+    // At x = 0 in the left half the un-flipped box is already inside; the case that used to
+    // overflow is a flip near the midpoint on a narrow plot.
+    const narrow = { left: 48, top: 12, innerWidth: 210, innerHeight: 300 };
+    expect(clampTooltip(110, narrow, SIZE).x).toBeGreaterThanOrEqual(narrow.left);
+  });
+
+  it('never ends right of the plot area', () => {
+    const placed = clampTooltip(800, PLOT, SIZE);
+    expect(placed.x + SIZE.width).toBeLessThanOrEqual(PLOT.left + PLOT.innerWidth);
+  });
+
+  it('sits inside the plot vertically, which is the axis the shipped bug got wrong', () => {
+    const placed = clampTooltip(400, PLOT, SIZE);
+    expect(placed.y).toBeGreaterThanOrEqual(PLOT.top);
+    expect(placed.y + SIZE.height).toBeLessThanOrEqual(PLOT.top + PLOT.innerHeight);
+  });
+
+  it('degrades to the plot origin rather than a negative coordinate when the box cannot fit', () => {
+    const tiny = { left: 48, top: 12, innerWidth: 80, innerHeight: 40 };
+    const placed = clampTooltip(40, tiny, SIZE);
+    expect(placed.x).toBe(tiny.left);
+    expect(placed.y).toBe(tiny.top);
+  });
+});
+
+describe('tooltipHeight', () => {
+  it('grows with the series count, because every series is in the one tooltip', () => {
+    expect(tooltipHeight(4)).toBeGreaterThan(tooltipHeight(1));
+  });
+
+  it('reserves generously — under-reserving is what lets the box hang out of the panel', () => {
+    expect(tooltipHeight(4)).toBeGreaterThanOrEqual(4 * 20);
+  });
+});
+
+/**
+ * §6.3's position ticks. The `P0` this prevents was a real emitted tick: `scaleLinear().nice(4)` on
+ * a `[1, 22]` domain widens outward to a round boundary and produces `0`.
+ */
+describe('positionTicksWithin', () => {
+  it('never emits P0', () => {
+    expect(positionTicksWithin(1, 22)).not.toContain(0);
+  });
+
+  it('always includes P1, the line the chart is read against', () => {
+    expect(positionTicksWithin(1, 22)[0]).toBe(1);
+    expect(positionTicksWithin(1, 5)).toContain(1);
+  });
+
+  it('drops ticks the field never reaches', () => {
+    // A nine-car grid gets no gridline at P20.
+    expect(positionTicksWithin(1, 9)).toEqual([1, 5]);
+  });
+
+  it("is §6.3's fixed editorial set, never a computed one", () => {
+    expect(positionTicksWithin(1, 20)).toEqual([1, 5, 10, 15, 20]);
+  });
+});
+
+describe('mountKey', () => {
+  it('is stable by value where an array literal is not', () => {
+    expect(mountKey(['a'], 10, 20)).toBe(mountKey(['a'], 10, 20));
   });
 });

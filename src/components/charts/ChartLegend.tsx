@@ -34,10 +34,15 @@ export function ChartLegend({ series, emptyReferences = [] }: ChartLegendProps) 
           key={entry.reference}
           data-empty={empty.has(entry.reference)}
         >
-          <LegendKey shape={entry.marker} dash={entry.dash} token={entry.plot} />
-          <span>{entry.label}</span>
           {/*
-           * The identity swatch, in the TRUE brand colour, beside the plotting key. The two are
+           * §6.5.2's order, literally: **swatch, then marker glyph and dash sample, then name.**
+           *
+           * The swatch used to come *last*, after the name — which read as belonging to the *next*
+           * legend item, because a wrapping one-row legend puts the next item's key immediately
+           * after it. Caught in Rishabh's capture of the progression chart: the red square after
+           * "Lewis Hamilton" looked like George Russell's.
+           *
+           * The swatch is the TRUE brand colour and the key is the plotting variant. They are
            * different roles (§3.3a.1) and showing both is what lets an F1 fan recognise the team
            * while still being able to find its line: a plotting variant of Mercedes is not the
            * colour anyone has on a cap.
@@ -47,6 +52,8 @@ export function ChartLegend({ series, emptyReferences = [] }: ChartLegendProps) 
             aria-hidden="true"
             style={{ '--series': cssVar(entry.identity) } as React.CSSProperties}
           />
+          <LegendKey shape={entry.marker} dash={entry.dash} token={entry.plot} />
+          <span>{entry.label}</span>
         </li>
       ))}
     </ul>

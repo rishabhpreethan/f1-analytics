@@ -385,3 +385,34 @@ describe('§6.4a — a teammate comparison arrives with marker and dash already 
     expect(new Set(dashes).size).toBe(2);
   });
 });
+
+/**
+ * §6.5.1's tooltip — **the origin its transform is measured from.**
+ *
+ * G-30 moves the tooltip with `gsap.quickSetter(el, 'x'|'y', 'px')`, which writes a transform. A
+ * transform is measured from the element's own box, so without an explicit origin the box sits at
+ * its **static flow position** — after the `<svg>`, below the plot area — and every coordinate the
+ * chart computed against `plot.top` is offset by the whole height of the chart. That shipped: the
+ * tooltip rendered under the plot, over the legend, clipped by the panel edge.
+ *
+ * This is the assertion that catches it, and it is only possible because the origin is inline: the
+ * Tailwind Vite plugin claims `?raw` imports of `charts.css` and returns an empty string, so no
+ * CSS-text test could have guarded it.
+ */
+describe('§6.5.1 — the tooltip is positioned from an explicit origin', () => {
+  it('declares left and top, so the GSAP transform starts at the container corner', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <LineChart series={SEASON} title="Points" ariaLabel="Points by round" />,
+    );
+
+    const hit = container.querySelector('.chart-hit');
+    expect(hit).toBeTruthy();
+    await user.pointer({ target: hit as Element, coords: { x: 10, y: 10 } });
+
+    const tooltip = container.querySelector<HTMLElement>('.chart-tooltip');
+    expect(tooltip, 'no tooltip rendered on pointer move').toBeTruthy();
+    expect(tooltip?.style.left).toBe('0px');
+    expect(tooltip?.style.top).toBe('0px');
+  });
+});

@@ -9,6 +9,7 @@ import { ChartFrame } from './ChartFrame';
 import { ChartLegend } from './ChartLegend';
 import { SeriesTable } from './ChartTable';
 import {
+  clampTooltip,
   computeMargin,
   measureTickCount,
   monoTextWidth,
@@ -17,6 +18,8 @@ import {
   plotArea,
   timeTickCount,
   TICK_LABEL_SIZE,
+  tooltipHeight,
+  TOOLTIP_WIDTH,
 } from './geometry';
 import { assignLadder, DASH_ARRAY, type LadderState } from './ladder';
 import { MarkerGlyph } from './MarkerGlyph';
@@ -99,10 +102,6 @@ export interface LineChartProps {
 }
 
 const identity = (n: number) => String(n);
-
-/** The tooltip's reserved width and its offset from the crosshair, both px. */
-const TOOLTIP_WIDTH = 168;
-const TOOLTIP_OFFSET = 12;
 
 export function LineChart({
   series,
@@ -244,9 +243,18 @@ export function LineChart({
     if (x === undefined) return;
     const readout = chartReadout(crosshairRef.current, tooltipRef.current);
     readout.crosshair(plot.left + xScale(x));
-    /* The tooltip flips side at the axis midpoint so it never covers the mark it describes. */
-    const flip = xScale(x) > plot.innerWidth / 2;
-    readout.tooltip(plot.left + xScale(x) + (flip ? -TOOLTIP_WIDTH : TOOLTIP_OFFSET), plot.top + 8);
+    /*
+     * **Flipped AND clamped, on both axes.** The flip keeps the box off the mark it describes; the
+     * clamp keeps it inside the plot. The flip alone was not enough — it left the box overflowing
+     * the panel at the extremes, and it said nothing at all about the vertical axis. Rishabh's
+     * capture caught the tooltip rendering below the plot and clipped by the panel edge; the origin
+     * fix in `charts.css` is what put it back inside, and this is what keeps it there.
+     */
+    const placed = clampTooltip(xScale(x), plot, {
+      width: TOOLTIP_WIDTH,
+      height: tooltipHeight(resolved.length),
+    });
+    readout.tooltip(placed.x, placed.y);
   };
 
   const onPointerMove = (event: React.PointerEvent<SVGRectElement>) => {
@@ -463,7 +471,23 @@ export function LineChart({
           </svg>
 
           {activeX !== null && (
-            <div className="chart-tooltip" ref={tooltipRef}>
+            <div
+              className="chart-tooltip"
+              ref={tooltipRef}
+              /*
+               * **The transform's origin, declared next to the code that depends on it.**
+               * G-30 writes `x`/`y` as a transform via `quickSetter`, and a transform is measured
+               * from the element's own box — so without an explicit origin the box sits at its
+               * static flow position, after the `<svg>`, and the tooltip renders *below* the plot.
+               * That shipped, and Rishabh's capture caught it.
+               *
+               * Inline rather than left to `charts.css` for two reasons: `BarChart` already does it
+               * this way and never had the bug, and an inline style is **assertable in jsdom**
+               * whereas `charts.css` is not — the Tailwind Vite plugin claims `?raw` imports of it
+               * and returns an empty string, so no CSS-text test could ever have guarded this.
+               */
+              style={{ left: 0, top: 0 }}
+            >
               {/* `labelX`, not `formatX` — the reader at a crosshair is asking which race. */}
               <p className="chart-tooltip-title">{labelX(activeX)}</p>
               {readings.map(({ series: s, value }) => (

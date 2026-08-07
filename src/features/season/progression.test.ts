@@ -8,6 +8,7 @@ import {
   formatRound,
   positionDomain,
   roundNamer,
+  snapToPositionTick,
   toSeriesInput,
   toggleSelection,
 } from './progression';
@@ -171,18 +172,35 @@ describe('the seam to the chart kit', () => {
   });
 });
 
-describe('the position axis', () => {
-  it('is the size of the field, not the range the selection occupies', () => {
-    // Antonelli and Hamilton ran 1st and 2nd; the axis still reaches Stroll's 17th, because the
-    // reader's question is how close to the front they were.
-    expect(positionDomain(selectPositionSeries(PROGRESSION, 'driver'))).toEqual([1, 17]);
+describe('the position axis — P1 pinned, the bottom from the SELECTION', () => {
+  it('tightens to a title fight rather than rendering fifteen empty positions', () => {
+    // Reversed on seeing it: a P1-P20 axis under drivers who ran P1-P2 left ~80% of the plot empty.
+    const titleFight = selectPositionSeries(PROGRESSION, 'driver', {
+      only: ['antonelli', 'hamilton'],
+    });
+    expect(positionDomain(titleFight)).toEqual([1, 5]);
   });
 
-  it('always starts at P1 — the line the whole chart is read against', () => {
-    const domain = positionDomain(
+  it('still goes deep when the selection actually goes deep', () => {
+    // Stroll reached P17, so the axis snaps up to the next position tick, P20.
+    expect(positionDomain(selectPositionSeries(PROGRESSION, 'driver'))).toEqual([1, 20]);
+  });
+
+  it('always starts at P1 — which is what answers "how close to the front"', () => {
+    const onlyStroll = positionDomain(
       selectPositionSeries(PROGRESSION, 'driver', { only: ['stroll'] }),
     );
-    expect(domain?.[0]).toBe(1);
+    expect(onlyStroll?.[0]).toBe(1);
+  });
+
+  it('ends on a labelled gridline, never on a bare data point', () => {
+    expect(snapToPositionTick(2)).toBe(5);
+    expect(snapToPositionTick(5)).toBe(5);
+    expect(snapToPositionTick(11)).toBe(15);
+  });
+
+  it('does not clip a field deeper than the last tick — 1989 had 26 cars', () => {
+    expect(snapToPositionTick(26)).toBe(26);
   });
 
   it('is null when nothing is ranked, so the chart falls back rather than inventing a domain', () => {

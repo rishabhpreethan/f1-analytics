@@ -272,6 +272,7 @@ function SeasonBody({
           errorCode={progressionError}
           onRetry={retry}
           hasTeamStandings={hasTeamStandings}
+          isComplete={isComplete}
         />
       )}
     </>
