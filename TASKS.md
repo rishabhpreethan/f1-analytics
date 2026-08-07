@@ -9,15 +9,13 @@ Status: `todo` · `doing` · `done`
 
 ## Now
 
-| # | Task | Status | Pushed |
-|---|---|---|---|
-| 7 | F1 design system — chart language, team-colour encoding, palette validator in CI | todo | — |
+_Nothing in flight._
 
 ## Next
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 8 | F2 season hub — calendar, standings, championship progression | todo | — |
+| 8 | F2 season hub — calendar, standings, championship progression. **Builds the chart kit** (d3 primitives, `DESIGN_SYSTEM.md` §6.6), and `src/lib/entityColor.ts`, whose contract is fixed in §3.3a.3 but which is not built | todo | — |
 | 9 | F3 race page — results, lap charts, pit stops | todo | — |
 | 10 | F4 driver pages · F5 team pages · F6 circuits | todo | — |
 | 11 | F7 compare — up to 4 entities across eras | todo | — |
@@ -31,11 +29,11 @@ Status: `todo` · `doing` · `done`
 | R2 | Team logos | todo |
 | R3 | App icons / favicon (a typographic placeholder ships meanwhile) | todo |
 
-## Open decision
+## Blocked on Rishabh
 
-| Item | Needs |
+| Item | Why |
 |---|---|
-| CSS budget | Sitting at **9.85 KB gz against a 10 KB cap** — 0.15 KB left, and the cap is not written in `ARCHITECTURE.md` §8. Raise it with a stated basis, or codify it as-is and accept that CSS work needs a budget conversation each time. |
+| **CR-004 — team logos where brand colours collide** | Needs **R2**. The slot is fully specified: `public/assets/teams/<reference>.svg`, 1:1, ≥64 viewBox, **single monochrome-capable path**. Monochrome is not an aesthetic preference — the colliding case is exactly where colour cannot be trusted, so a full-colour logo would reintroduce the collision inside the mark meant to resolve it. |
 
 ---
 
@@ -49,3 +47,4 @@ Status: `todo` · `doing` · `done`
 | 4 | Background rebuilt — dot lattice + pointer lamp, CSS-composited | ✅ 2026-08-06 · `471c6a6` |
 | 5 | Dock rail — header clearance, glyph lane, full-height geometry | ✅ 2026-08-06 · `471c6a6` |
 | 6 | Coverage chip explains itself — noun, boundary, meter, chevron | ✅ 2026-08-06 · `471c6a6` |
+| 7 | F1 design system — entity colour encoding, chart language, chart motion, palette validator, CI, enforced budgets | ✅ 2026-08-07 |
