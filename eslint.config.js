@@ -4,6 +4,43 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
+/**
+ * The chart substrate is four d3 modules and nothing else (ARCHITECTURE.md §10 #28).
+ * `DESIGN_SYSTEM.md` §6 names four that are forbidden and gives a reason for each; the
+ * reasons are reproduced here because a lint message is where someone will meet the rule.
+ *
+ * The `d3` meta-package is added to the same list even though §6 does not name it: it
+ * re-exports all thirty-odd modules, so a single `import { scaleLinear } from 'd3'` would
+ * pull `d3-geo`, `d3-delaunay`, `d3-selection` and the rest into the resolution graph and
+ * quietly defeat every measurement the decision rests on.
+ */
+const D3_RESTRICTED = [
+  {
+    name: 'd3',
+    message:
+      'Use the granular d3-scale / d3-shape / d3-array / d3-time-format packages — the meta-package re-exports modules ARCHITECTURE §10 #28 deliberately excluded.',
+  },
+  {
+    name: 'd3-axis',
+    message:
+      'Forbidden (DESIGN_SYSTEM §6): it writes DOM imperatively. Ticks are React output from scale.ticks().',
+  },
+  {
+    name: 'd3-selection',
+    message:
+      'Forbidden (DESIGN_SYSTEM §6): React owns the DOM. Two DOM writers in one subtree is the defect class this avoids.',
+  },
+  {
+    name: 'd3-transition',
+    message: 'Forbidden (DESIGN_SYSTEM §6): GSAP owns motion (ARCHITECTURE §10 #21, #22).',
+  },
+  {
+    name: 'd3-format',
+    message:
+      'Forbidden (DESIGN_SYSTEM §6): numerals go through @/lib/format. A second number formatter drifts on lap times. (It is present transitively under d3-scale; that is resolution, not an import site.)',
+  },
+];
+
 export default tseslint.config(
   {
     ignores: ['dist', 'coverage', 'node_modules', 'public/theme-init.js'],
@@ -52,6 +89,7 @@ export default tseslint.config(
                 'Import from @/lib/motion/gsap — one registration site (ARCHITECTURE §10 #21).',
             },
             { name: '@gsap/react', message: 'Import from @/lib/motion/gsap.' },
+            ...D3_RESTRICTED,
           ],
           patterns: ['gsap/*'],
         },
@@ -61,7 +99,12 @@ export default tseslint.config(
   {
     files: ['src/lib/motion/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': 'off',
+      // The gsap chokepoint is lifted here — this *is* the registration site. The d3
+      // restrictions are **re-stated rather than inherited**: ESLint replaces a rule's
+      // options wholesale when a later config sets the same rule, so a bare `'off'` here
+      // would have opened a hole in the chart-substrate rule for the one directory that
+      // has the most reason to reach for `d3-transition`.
+      'no-restricted-imports': ['error', { paths: [...D3_RESTRICTED] }],
     },
   },
 
