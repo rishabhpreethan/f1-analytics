@@ -165,10 +165,20 @@ function SeasonBody({
         title={`No ${String(year)} season`}
         code="NOT_FOUND"
       >
-        <p>
-          The record holds seasons from {meta.data?.seasons.firstYear ?? 1950} to{' '}
-          {meta.data?.seasons.latestYear ?? 2026}, and {year} is not one of them.
-        </p>
+        {/*
+         * **Both halves of the sentence have to stay true.** An earlier draft read "seasons run
+         * from X to Y, and {year} is not one of them", which contradicts itself for any year
+         * inside the range — and this state is *only* reachable for a year `resolveSeasonYear`
+         * could not range-check, because `/api/meta` had not answered yet. So it states the
+         * absence and then the range, rather than deriving one from the other.
+         */}
+        <p>There is no {year} season in the record.</p>
+        {meta.data !== undefined && (
+          <p>
+            It holds every season from {meta.data.seasons.firstYear} to{' '}
+            {meta.data.seasons.latestYear}.
+          </p>
+        )}
       </StateCard>
     );
   }
