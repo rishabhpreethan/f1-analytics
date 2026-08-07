@@ -190,7 +190,7 @@ export function useAxisAnchoredBars<T extends HTMLElement = HTMLElement>(): Moti
  * across the targets, so capping the total at `cap × each` gives items past the cap a shrinking
  * share rather than a growing queue — which is what keeps a long list inside the budget.
  */
-function staggerAmount(count: number, each: number): number {
+export function staggerAmount(count: number, each: number): number {
   return Math.min(count, stagger.cap) * each;
 }
 
