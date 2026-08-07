@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   AXIS_GAP,
+  AXIS_TITLE_LINE,
   CATEGORY_COUNT_LIMIT,
+  categoryPlotHeight,
   clampTooltip,
   MARKER_RING,
   ISOLATION_THRESHOLD,
+  labelCapacity,
   nearestByOffset,
   shouldDrawMarkers,
   withEndpoints,
@@ -487,5 +490,55 @@ describe('computeMargin — the left gutter holds what it is told it holds', () 
     const mixed = computeMargin({ measureLabels: ['VER', 'Häkkinen', 'HAM'] });
     const longest = computeMargin({ measureLabels: ['Häkkinen'] });
     expect(mixed.left).toBe(longest.left);
+  });
+});
+
+/**
+ * §6.3's rotation rule, completed. Rotating a chart whose category axis does not fit moves the problem
+ * to the **other** axis, and nothing checked the new capacity. Measured on 2026 R1's pit timeline: 32
+ * stops, labels 8 characters, so rotation fired correctly on count — and 32 rows in a 360px plot gave
+ * an 11.3px pitch against a 14px line-height, producing 31 overlaps across 40 text nodes.
+ */
+describe('categoryPlotHeight', () => {
+  it('keeps the token when the categories fit inside it', () => {
+    // 12 rows at 16px is 192, well inside 360.
+    expect(categoryPlotHeight(12, 360)).toBe(360);
+  });
+
+  it('grows past the token when they do not — 32 stops need 496, not 360', () => {
+    // 31 gaps of 16px between 32 anchors.
+    expect(categoryPlotHeight(32, 360)).toBe(496);
+  });
+
+  it('agrees with labelCapacity about where the boundary is', () => {
+    // The two must not disagree: one decides whether to grow, the other how far.
+    const capacity = labelCapacity(360);
+    expect(categoryPlotHeight(capacity, 360)).toBe(360);
+    expect(categoryPlotHeight(capacity + 8, 360)).toBeGreaterThan(360);
+  });
+
+  it('treats the token as a floor and never shrinks below it', () => {
+    expect(categoryPlotHeight(1, 360)).toBe(360);
+    expect(categoryPlotHeight(0, 360)).toBe(360);
+  });
+});
+
+/**
+ * The fourth "correct intent, wrong coordinate space", and it happened *inside the fix for the third*.
+ * Freeing the rank chart's gutter of position ticks let a 1996 surname collide with the rotated axis
+ * title — `Race position` × `Verstappen` — because `4` is a rounding allowance, not a separation.
+ */
+describe('computeMargin — the axis title is an occupant of the gutter, not a rounding allowance', () => {
+  it('reserves a full title line plus a gap, not 4px', () => {
+    const withTitle = computeMargin({ measureLabels: ['Verstappen'], hasMeasureTitle: true });
+    const without = computeMargin({ measureLabels: ['Verstappen'] });
+    expect(withTitle.left - without.left).toBe(AXIS_TITLE_LINE + AXIS_GAP);
+  });
+
+  it('leaves the labels clear of the title band', () => {
+    // The label's left edge is `left - AXIS_GAP - width`; the title band ends at AXIS_TITLE_LINE.
+    const width = monoTextWidth('Verstappen');
+    const { left } = computeMargin({ measureLabels: ['Verstappen'], hasMeasureTitle: true });
+    expect(left - AXIS_GAP - width).toBeGreaterThanOrEqual(AXIS_TITLE_LINE);
   });
 });

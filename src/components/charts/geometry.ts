@@ -106,6 +106,42 @@ export function labelStride(
 export const CATEGORY_COUNT_LIMIT = 7;
 export const CATEGORY_LABEL_LIMIT = 12;
 
+/**
+ * **The height a horizontal bar chart needs to label all of its categories.**
+ *
+ * §6.3 says that a category axis which does not fit **rotates the chart**. That is right and it is
+ * incomplete: rotating moves the fitting problem from the x axis to the y axis, where the capacity is
+ * different — and nothing checked the new one. Measured on 2026 R1's pit timeline: 32 stops, each
+ * label 8 characters, so `prefersHorizontalBars` correctly returned horizontal on **count** — and then
+ * 32 rows in a 360px plot gave an **11.3px pitch against a 14px line-height**, producing 31 overlaps
+ * across 40 text nodes. `labelCapacity(360)` is 23; 32 does not fit in either orientation.
+ *
+ * So the missing rule: **a horizontal bar chart's plot height is derived from its category count**, and
+ * the token is a floor rather than the value. A leaderboard grows and its panel scrolls; it does not
+ * crush its own labels. This also pre-answers F8's records charts, which are the same shape.
+ *
+ * §6.5.3's "the plot keeps its exact height in every state" still holds: the height is a function of
+ * the data the caller already has, so it does not change between loading, ready and empty for one
+ * dataset.
+ */
+export function categoryPlotHeight(
+  count: number,
+  floorPx: number,
+  minGap = DIRECT_LABEL_MIN_GAP,
+): number {
+  /*
+   * `count - 1`, and the `-1` is the whole reason this is written as the **inverse of
+   * `labelCapacity`** rather than as `count * minGap`.
+   *
+   * A row's label sits at its band centre, so *n* labels need *n − 1* gaps between them — the same
+   * anchor arithmetic `labelCapacity` uses in the other direction. Written as `count * minGap` the two
+   * functions disagreed at their own boundary: `labelCapacity(360)` says 23 labels fit, while
+   * `23 * 16 = 368` said 360 was too short for 23. A test comparing them caught it, which is the only
+   * thing that would have — both were individually plausible.
+   */
+  return Math.max(floorPx, Math.max(0, count - 1) * minGap);
+}
+
 export function prefersHorizontalBars(labels: readonly string[]): boolean {
   return (
     labels.length > CATEGORY_COUNT_LIMIT ||
@@ -462,8 +498,19 @@ export interface MarginInput {
 export function computeMargin(input: MarginInput): PlotMargin {
   const widest = input.measureLabels.reduce((max, label) => Math.max(max, monoTextWidth(label)), 0);
 
-  const left =
-    Math.ceil(widest) + AXIS_GAP + (input.hasMeasureTitle === true ? AXIS_TITLE_LINE + 4 : 0);
+  /*
+   * ⚠ **The title's band is `AXIS_TITLE_LINE + AXIS_GAP`, and the `+ 4` it replaces was the fourth
+   * "correct intent, wrong coordinate space" in this project — found *inside the fix for the third*.**
+   *
+   * Removing the rank chart's position ticks freed this gutter for its driver labels, and on 1996 R1
+   * a surname immediately collided with the rotated axis title: `Race position` × `Verstappen`. The
+   * gutter had a second occupant that was never counted, because 4px is not a separation, it is a
+   * rounding allowance — the rotated title occupies a full `AXIS_TITLE_LINE` of width and then needs
+   * a gap like any other neighbour. `Axis.tsx` draws it centred at `AXIS_TITLE_LINE / 2` so the band
+   * and the glyphs agree.
+   */
+  const titleBand = input.hasMeasureTitle === true ? AXIS_TITLE_LINE + AXIS_GAP : 0;
+  const left = Math.ceil(widest) + AXIS_GAP + titleBand;
 
   const bottom =
     (input.hasCategoryLabels === true ? TICK_LABEL_LINE + AXIS_GAP : 0) +

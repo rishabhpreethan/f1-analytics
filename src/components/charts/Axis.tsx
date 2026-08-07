@@ -1,4 +1,11 @@
-import { AXIS_GAP, labelStride, monoTextWidth, TICK_LABEL_SIZE, type PlotArea } from './geometry';
+import {
+  AXIS_GAP,
+  AXIS_TITLE_LINE,
+  labelStride,
+  monoTextWidth,
+  TICK_LABEL_SIZE,
+  type PlotArea,
+} from './geometry';
 
 /**
  * **The chart furniture** — `DESIGN_SYSTEM.md` §6.3, and every figure in it is a token.
@@ -85,7 +92,9 @@ export function MeasureAxis({ plot, ticks, title, grid = true, labels = true }: 
           /* Rotated about its own centre on the left edge. `transform` rather than `writing-mode`,
            * because `writing-mode: vertical-rl` rotates the glyphs of a title that contains
            * numerals and parentheses — "(s)" comes out lying on its side. */
-          transform={`translate(12 ${round(plot.top + plot.innerHeight / 2)}) rotate(-90)`}
+          /* Centred in the band `computeMargin` reserves for it — `AXIS_TITLE_LINE / 2`, not a
+           * literal 12, so the reservation and the glyphs cannot disagree. */
+          transform={`translate(${String(AXIS_TITLE_LINE / 2)} ${round(plot.top + plot.innerHeight / 2)}) rotate(-90)`}
           textAnchor="middle"
         >
           {title}

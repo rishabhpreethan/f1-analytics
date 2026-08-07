@@ -66,6 +66,18 @@ export interface ChartFrameProps {
     /** The ceiling, already formatted — e.g. `2:03.135`. The frame never formats a value. */
     ceiling: string;
   };
+  /**
+   * Override the plot area's height, in px. **The token is a floor, not the value.**
+   *
+   * For a horizontal bar chart whose category count exceeds what the token can label: §6.3 rotates a
+   * chart whose category axis does not fit, and rotating moves the problem to the *other* axis, where
+   * 32 rows in a 360px plot gave an 11.3px pitch against a 14px line-height. A leaderboard grows and
+   * its panel scrolls; it does not crush its own labels. Use `geometry.categoryPlotHeight`.
+   *
+   * §6.5.3 is not weakened: this is a function of the data the caller already has, so it is identical
+   * across loading, ready and empty for one dataset — which is the property that rule protects.
+   */
+  plotHeight?: number;
 }
 
 export function ChartFrame({
@@ -83,6 +95,7 @@ export function ChartFrame({
   onPatternsChange,
   stateCopy,
   offScale,
+  plotHeight,
 }: ChartFrameProps) {
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const captionId = useId();
@@ -188,6 +201,7 @@ export function ChartFrame({
           role="img"
           aria-label={ariaLabel}
           aria-describedby={caption === undefined ? undefined : captionId}
+          {...(plotHeight === undefined ? {} : { style: { height: `${String(plotHeight)}px` } })}
         >
           {showPlot && children}
           {state !== 'ready' && state !== 'loading' && stateCopy !== undefined && (

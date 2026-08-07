@@ -1379,6 +1379,21 @@ the reference and every other shape's dimension is derived to enclose the same a
 additionally centred on its **centroid** rather than its bounding box, or it sits visibly low against
 a circle at the same value. `geometry.test.ts` measures the emitted path by the shoelace formula.
 
+**The measure axis's title is an occupant of the gutter, not a rounding allowance** _(added
+2026-08-07)_. `computeMargin` reserved the widest tick label plus `4px` for the rotated title. 4px is
+not a separation, and the rotated title occupies a full `AXIS_TITLE_LINE` of width — so on 1996 R1 the
+rank chart's freed gutter put a surname straight into it: `Race position` × `Verstappen`. The band is
+now `AXIS_TITLE_LINE + AXIS_GAP` and `Axis.tsx` draws the title centred at `AXIS_TITLE_LINE / 2`, so
+the reservation and the glyphs cannot disagree.
+
+**This was the fourth instance of §1.0's sibling pattern — "correct intent, wrong coordinate space" —
+and it happened *inside the fix for the third*.** The generalisation, which is now the rule: **a
+position is only correct relative to a space, so anything asserting a position must also account for
+what else is in that space.** jsdom cannot see a bounding box, so this class is caught by measuring the
+rendered DOM, not by the test suite. The four: a tooltip transform against the static flow position; a
+`pointerenter` on a path under the hit rect; labels de-collided within their own set in a shared
+gutter; and a title band sized by a rounding allowance.
+
 **1px strokes are drawn on half-pixel coordinates.** An SVG line at an integer coordinate straddles
 the pixel boundary and rasterises as two half-intensity rows, which is how a "1px" gridline comes out
 looking like a 2px grey smear and the recessive furniture stops being recessive. Nothing in this
@@ -1419,6 +1434,27 @@ comes from the axis length, so density is consistent across every chart in the p
 labels are ~20% slower to read and force a taller axis gutter. With more than ~7 categories, or any
 label over ~12 characters, the bar chart is **horizontal**: categories run down the left in
 `--text-xs`, the measure runs along the bottom.
+
+> **And a rotated chart whose rows do not fit GROWS** _(added 2026-08-07, F3)_. The rule above was
+> right and incomplete: **rotating moves the fitting problem from the x axis to the y axis, where the
+> capacity is different — and nothing checked the new one.** Measured on 2026 R1's pit timeline: 32
+> stops, each label 8 characters, so rotation fired correctly on *count* — and then 32 rows in a 360px
+> plot gave an **11.3px pitch against a 14px line-height**, producing **31 overlaps across 40 text
+> nodes**. `labelCapacity(360)` is 23; 32 fits in neither orientation.
+>
+> So a horizontal bar chart's plot height is **derived from its category count**
+> (`geometry.categoryPlotHeight`), and `--size-plot-lg` is a **floor rather than the value**. A
+> leaderboard grows and its panel scrolls; it does not crush its own labels. This also pre-answers F8's
+> records charts, which are the same shape.
+>
+> §6.5.3's *"the plot keeps its exact height in every state"* is not weakened: the height is a function
+> of data the caller already holds, so it is identical across loading, ready and empty for one dataset —
+> which is the property that rule protects.
+>
+> **A note on how this was diagnosed, because both first guesses were wrong.** I predicted the failure
+> would be the rotation heuristic not firing; the reviewer read the raster the same way. It *had*
+> rotated. Only running the arithmetic showed the collision was vertical. **A prediction about where a
+> defect is does not survive contact with the measurement of what it is.**
 
 **Zero, and where the axis starts.**
 
