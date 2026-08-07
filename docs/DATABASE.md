@@ -194,8 +194,34 @@ cheapest table in the schema and the right source for any standings chart.
 
 To get final standings for a season, take the max `(round_number, session_number)` pair — see §6.
 
+> ⚠ **"After each points-scoring session" understates it.** From 2026 the table carries a snapshot
+> after **Q1, Q2 and Q3 as well**, which change nothing: 962 rows for 2026 against ~484 round-ends.
+> A per-round progression must take `max(session_number)` **within each round** — §6.5. Verified by
+> query: `session_number → session.type` maps to `R` (34,347 rows), `SR` (597) and `Q1`/`Q2`/`Q3`
+> (218 each, all 2026).
+
+**`is_eligible = 0` means the entity holds no ranked position**, not that it was ineligible to
+score. It is exactly co-extensive with `position IS NULL` on 13,701 of the 13,718 null-position
+rows; the other 17 are 1997 Michael Schumacher, excluded by adjustment while `is_eligible` stayed 1.
+Every `is_eligible = 0` row carries `points = 0`.
+
 #### `championship_adjustment` — 3 rows
-Points penalties. Effectively unpopulated; do not build features on it.
+Points penalties and championship exclusions. Effectively unpopulated as a *table* — but the
+adjustments it records **are already applied in the `driver_championship` / `team_championship`
+snapshots**, and that is the load-bearing fact. Verified row by row:
+
+| Season | Entity | `adjustment` | Effect visible in the snapshot |
+|---|---|---|---|
+| 1997 | `michael_schumacher` | `101` | 17 driver rows with `adjustment_type = 101`; keeps 78 points, `position` is NULL |
+| 2007 | `mclaren` | `102` | 17 team rows with `adjustment_type = 102`; 0 points beside 8 wins, `position` is NULL |
+| 2020 | `racing_point` | `1`, `points 15` | 17 team rows with `adjustment_type = 1`; reads **195**, the post-deduction figure in the record |
+
+**Therefore: annotate, never re-apply.** Subtracting the penalty again would double-count it —
+2020 Racing Point would read 180. Do not join this table to compute a standing; join it, if at
+all, only to explain one. `adjustment_type` itself is an undocumented enum (trap 14) and must not
+be displayed; derive `excluded` (adjusted **and** `position IS NULL`) versus `adjusted` from the
+row instead. Note that `position IS NULL` **on its own is not an adjustment** — 13,701 rows have
+one simply because the entity scored nothing.
 
 ### 2.6 Empty tables
 
@@ -368,13 +394,34 @@ SELECT EXISTS (
 
 ### 6.5 Championship progression for a season
 
+**One point per round, and the `last_of_round` CTE is what makes it one.** A bare
+`WHERE dc.year = ?` returns every snapshot the season wrote, and from 2026 that includes Q1, Q2
+and Q3 rows that carry the same totals as each other — 962 rows for 2026 where the progression
+has ~484. Plotting them produces flat repeats between rounds and a category axis with four entries
+per race.
+
+This is **not** §6.6's key. §6.6 takes the global maximum of `(round_number, session_number)` and
+answers "where did the season end up"; this takes the maximum *within each round* and answers
+"how did it get there".
+
 ```sql
-SELECT dc.round_number, d.reference AS driver_ref, d.abbreviation, dc.points, dc.position
+WITH last_of_round AS (
+  SELECT round_number, max(session_number) AS session_number
+  FROM driver_championship WHERE year = ? GROUP BY round_number
+)
+SELECT dc.round_number, d.reference AS driver_ref, d.abbreviation,
+       dc.points, dc.position, dc.adjustment_type
 FROM driver_championship dc
+JOIN last_of_round lr
+  ON lr.round_number = dc.round_number AND lr.session_number = dc.session_number
 JOIN driver d ON d.id = dc.driver_id
 WHERE dc.year = ?
-ORDER BY dc.round_number, dc.position;
+ORDER BY dc.round_number;
 ```
+
+`team_championship` takes the identical shape. A round with no snapshot is a race that has not
+happened — **absent from the axis, never a null point**, because a gap in a line reads as missing
+data (`REQUIREMENTS.md` §2.2).
 
 ### 6.6 Final standings for a season
 
@@ -403,6 +450,42 @@ ORDER BY ve.driver_ref, ps.number;
 ```
 
 Stint boundaries are derived in application code: `[1 … pit₁]`, `(pit₁ … pit₂]`, … `(pitₙ … end]`.
+
+### 6.7a Season calendar, with winners and lap availability
+
+The season hub's calendar. Two queries rather than one correlated subquery per column, because the
+winner is **not one row** — trap 16.
+
+```sql
+-- Numbered rounds. `r.number IS NOT NULL` is the partition, not `is_cancelled` (trap 15):
+-- it makes the numbered and unnumbered lists a *total* partition of the season's rounds,
+-- so no round can be dropped from both if that equivalence ever stops holding.
+SELECT r.number, r.name, r.date, c.reference AS circuit_ref, c.name AS circuit_name,
+       EXISTS (SELECT 1 FROM session ses JOIN session_entry se ON se.session_id = ses.id
+               WHERE ses.round_id = r.id AND ses.type = 'R')  AS has_results,
+       EXISTS (SELECT 1 FROM session ses
+               WHERE ses.round_id = r.id AND ses.type = 'SR') AS has_sprint,
+       EXISTS (SELECT 1 FROM session ses JOIN session_entry se ON se.session_id = ses.id
+               JOIN lap l ON l.session_entry_id = se.id
+               WHERE ses.round_id = r.id AND ses.type = 'R')  AS has_lap_data
+FROM round r
+JOIN season s ON s.id = r.season_id
+LEFT JOIN circuit c ON c.id = r.circuit_id
+WHERE s.year = ? AND r.number IS NOT NULL
+ORDER BY r.number;
+
+-- Winners. One row per round, except the three shared drives (trap 16), which return two.
+SELECT round_number, driver_ref, driver_code, forename, surname, team_ref, team_name, points
+FROM v_race
+WHERE year = ? AND round_number IS NOT NULL AND position = 1
+ORDER BY round_number, points DESC, surname;
+```
+
+`has_results` is what "completed" means — **never a comparison of `r.date` against today**. The
+dump can lag the real calendar by ~2 weeks, so a date test reports a race as run with nothing in
+it (`REQUIREMENTS.md` §2.5). `has_lap_data` is §6.4's rule per round and is the only `lap` access
+on this surface: bounded to one round's session entries, resolved through `idx_lap_entry`, and
+short-circuited by `EXISTS` (trap 7).
 
 ### 6.8 Teammate head-to-head — the fairest comparison available
 
@@ -445,6 +528,11 @@ lap time inflates beyond a threshold, and **label them inferred** — never as f
 
 ## 7. Traps — read before writing any query
 
+**There are 16.** `CLAUDE.md` and `.claude/agents/*.md` still say "the 14 traps"; this table is the
+authority and it has carried 15 since trap 15 was added. Trap 16 was found in F2 by querying rather
+than by reading. The count in those other files is stale — flagged rather than edited, because they
+are not this document's to change.
+
 | # | Trap | Rule |
 |---|---|---|
 | 1 | `has_time_data` is wrong in both directions | Test for `lap` rows (§6.4) |
@@ -462,6 +550,7 @@ lap time inflates beyond a threshold, and **label them inferred** — never as f
 | 13 | Future rounds in the current season | Not missing data; render as scheduled |
 | 14 | Undocumented enums (`role`, `eligibility`, `adjustment_type`) | Do not display |
 | 15 | Cancelled rounds have `round.number IS NULL` | All `is_cancelled = 1` rounds (2 rows, both 2026) carry a NULL `number`, so `ORDER BY r.number` sorts them **first** and they are not addressable by round number. Every round-number query needs `AND r.number IS NOT NULL`. A season's numbered-round count is `max(number)`, not `count(*)` — 2026 has 24 `round` rows but 22 numbered rounds. **On the data as it stands the equivalence is exact in both directions** — 0 rounds are cancelled-and-numbered, 0 are uncancelled-and-unnumbered, and `is_cancelled` is non-NULL on all 1,173 rows — so `AND r.number IS NOT NULL` excludes **exactly** the cancelled rounds and a redundant `AND r.is_cancelled = 0` is unnecessary. **Nothing in the schema enforces this**, so verify it after every refresh (§9) before relying on the number filter alone. |
+| 16 | **`position = 1` is not unique within a race** | **Three races have two winners**, and a query written as `... AND position = 1` with `.get()` instead of `.all()` silently keeps whichever row the planner returned first. They are shared drives, where two drivers shared one car and both were classified P1 with the win's points split between them: **1951 R4 French GP** (Fangio 5, Fagioli 4), **1956 R1 Argentine GP** (Fangio 5, Musso 4), **1957 R5 British GP** (Moss 5, Brooks 4). Counted directly: `GROUP BY round_id HAVING count(*) > 1` over `position = 1` returns exactly three `round_id` values across all 1,173 races. Any "winner of this round" field is therefore a **list**, and any per-race win tally must decide explicitly whether a shared drive is one win or two. The same shape can apply to any position, so a "who finished Nth" lookup carries the same rule. |
 
 ---
 

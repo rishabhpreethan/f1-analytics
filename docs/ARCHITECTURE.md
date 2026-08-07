@@ -265,9 +265,9 @@ same schemas.
 | Endpoint | Returns |
 |---|---|
 | `GET /api/meta` | data vintage, latest completed round, available season range |
-| `GET /api/seasons` | all seasons with round counts |
-| `GET /api/seasons/:year` | calendar + final/current standings |
-| `GET /api/seasons/:year/standings` | driver + team standings progression per round |
+| `GET /api/seasons` | ✅ **F2** — all 77 seasons: numbered round count, completed, cancelled, whether a constructors' championship existed |
+| `GET /api/seasons/:year` | ✅ **F2** — calendar (winners, sprint and lap-data flags per round), cancelled rounds as a separate list, current/final driver + team standings, and the season's championship-scoring rules |
+| `GET /api/seasons/:year/standings` | ✅ **F2** — driver + team progression, **one point per round**, ordered by final standing |
 | `GET /api/seasons/:year/races/:round` | classification, session list, weekend metadata |
 | `GET /api/seasons/:year/races/:round/laps` | lap traces (positions + times), invalid laps excluded |
 | `GET /api/seasons/:year/races/:round/stints` | pit stops + derived stint boundaries |
@@ -283,6 +283,28 @@ same schemas.
 - `404` for unknown slug, `400` for invalid param, `500` only for genuine faults.
 - Aggregate endpoints send `Cache-Control` — the dataset is immutable between refreshes.
 - Lap endpoints support optional `?drivers=` and `?fromLap=&toLap=` narrowing.
+
+**Four conventions settled in F2, when the first parameterised route landed.** They are written
+here rather than left in one route file, because the next resource will copy whatever it finds.
+
+1. **A path parameter is validated as the string it arrived as, then parsed. Never
+   `z.coerce.*`.** `:year` is `z.string().regex(/^\d{4}$/).transform(Number).pipe(...)`. Coercion
+   accepts `''` as 0, `' 1990 '`, `'1990.0'` and `'0x7c6'` as 1990 — four spellings of one
+   resource and one soft 404 (S-4: reject, do not coerce). Slug parameters follow the same shape
+   with their own pattern.
+2. **`400` and `404` answer different questions and must stay different.** A malformed parameter
+   is a 400; a *well-formed* one the dataset does not hold — year 2027, an unknown driver slug —
+   is a 404. Collapsing them tells a reader who typed a real year that they made a syntax error.
+   The range in the parameter schema is therefore the format's range (1950–2100), not the data's.
+3. **An error body never echoes the value that caused it.** Every message comes from
+   `ERROR_MESSAGES`, so `/api/seasons/1990'--` cannot put a SQL fragment on a page (S-6).
+   `server/routes/seasons.test.ts` asserts this on the exact byte.
+4. **In-process memoisation is for payloads that are global, small and requested on every
+   navigation.** `/api/seasons` (8 KB) is memoised; `/api/seasons/:year` (13–23 KB) and
+   `/api/seasons/:year/standings` (18–48 KB) are **not**, measured: 2.5–4.1 ms warm against a
+   50 ms p95 budget, where caching them would retain up to ~15 MB of JSON across the parameter's
+   bounded key space. The HTTP `Cache-Control` still covers the repeat-visit case. Revisit with a
+   measurement, not an intuition.
 
 ---
 
@@ -491,13 +513,15 @@ f1-analytics/
 │   ├── errors.ts            ApiError, error codes, non-leaking handler
 │   ├── middleware/          rate limit (S-13), cache headers
 │   ├── routes/              one module per resource
-│   ├── queries/             ALL SQL
+│   ├── queries/             ALL SQL, plus the pure row→payload builders each query
+│   │                        module exports so CI — which never has data/f1.db —
+│   │                        exercises the shaping rather than skipping all of it
 │   ├── schemas/             Zod response schemas — zod-only imports
 │   └── cache/               in-process memoisation for aggregates
 ├── src/                     React client
 │   ├── main.tsx
 │   ├── routes/              one module per surface
-│   ├── features/            feature hooks + pure selectors (meta, landing)
+│   ├── features/            feature hooks + pure selectors (meta, landing, season)
 │   ├── components/
 │   │   ├── layout/          shell: CommandDock, AtmosphereField
 │   │   ├── ui/
