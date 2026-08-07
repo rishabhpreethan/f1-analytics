@@ -21,13 +21,16 @@ export const seasonFixture: Season = {
       hasResults: true,
       hasSprint: false,
       hasLapData: true,
-      winner: {
-        driverRef: 'russell',
-        code: 'RUS',
-        forename: 'George',
-        surname: 'Russell',
-        team: { ref: 'mercedes', name: 'Mercedes' },
-      },
+      winners: [
+        {
+          driverRef: 'russell',
+          code: 'RUS',
+          forename: 'George',
+          surname: 'Russell',
+          team: { ref: 'mercedes', name: 'Mercedes' },
+          points: 25,
+        },
+      ],
     },
     {
       round: 2,
@@ -38,13 +41,16 @@ export const seasonFixture: Season = {
       hasResults: true,
       hasSprint: true,
       hasLapData: true,
-      winner: {
-        driverRef: 'antonelli',
-        code: 'ANT',
-        forename: 'Andrea Kimi',
-        surname: 'Antonelli',
-        team: { ref: 'mercedes', name: 'Mercedes' },
-      },
+      winners: [
+        {
+          driverRef: 'antonelli',
+          code: 'ANT',
+          forename: 'Andrea Kimi',
+          surname: 'Antonelli',
+          team: { ref: 'mercedes', name: 'Mercedes' },
+          points: 25,
+        },
+      ],
     },
     {
       round: 3,
@@ -55,7 +61,7 @@ export const seasonFixture: Season = {
       hasResults: false,
       hasSprint: false,
       hasLapData: false,
-      winner: null,
+      winners: [],
     },
   ],
   cancelledRounds: [
@@ -90,7 +96,7 @@ export const seasonFixture: Season = {
         points: 43,
         wins: 1,
         bestFinish: 1,
-        teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, starts: 2 }],
+        teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, entries: 2 }],
         adjustment: 'none',
       },
       {
@@ -103,7 +109,7 @@ export const seasonFixture: Season = {
         points: 33,
         wins: 1,
         bestFinish: 1,
-        teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, starts: 2 }],
+        teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, entries: 2 }],
         adjustment: 'none',
       },
       {
@@ -117,7 +123,7 @@ export const seasonFixture: Season = {
         wins: 0,
         bestFinish: null,
         teams: [
-          { ref: 'aston_martin', name: 'Aston Martin', firstRound: 1, lastRound: 2, starts: 2 },
+          { ref: 'aston_martin', name: 'Aston Martin', firstRound: 1, lastRound: 2, entries: 2 },
         ],
         adjustment: 'none',
       },
@@ -170,7 +176,7 @@ export const progressionFixture: StandingsProgression = {
       code: 'ANT',
       forename: 'Andrea Kimi',
       surname: 'Antonelli',
-      teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, starts: 2 }],
+      teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, entries: 2 }],
       adjustment: 'none',
       progression: [
         { round: 1, points: 18, position: 2 },
@@ -182,7 +188,7 @@ export const progressionFixture: StandingsProgression = {
       code: 'RUS',
       forename: 'George',
       surname: 'Russell',
-      teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, starts: 2 }],
+      teams: [{ ref: 'mercedes', name: 'Mercedes', firstRound: 1, lastRound: 2, entries: 2 }],
       adjustment: 'none',
       progression: [
         { round: 1, points: 25, position: 1 },

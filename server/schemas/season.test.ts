@@ -101,6 +101,43 @@ describe('a round is identified by its number', () => {
   it('accepts a scheduled round with no results and no winner', () => {
     expect(seasonRoundSchema.safeParse(seasonFixture.rounds[2]).success).toBe(true);
   });
+
+  /**
+   * Three races in the database have two `position = 1` rows — shared drives, verified by
+   * query: 1951 French GP, 1956 Argentine GP, 1957 British GP. The contract has to admit
+   * them or the second driver of each pair disappears without a trace.
+   */
+  it('accepts a shared drive — two winners splitting the points (1951 French GP)', () => {
+    const parsed = seasonRoundSchema.safeParse({
+      round: 4,
+      name: 'French Grand Prix',
+      date: '1951-07-01',
+      circuitRef: 'reims',
+      circuitName: 'Reims-Gueux',
+      hasResults: true,
+      hasSprint: false,
+      hasLapData: false,
+      winners: [
+        {
+          driverRef: 'fangio',
+          code: null,
+          forename: 'Juan',
+          surname: 'Fangio',
+          team: { ref: 'alfa', name: 'Alfa Romeo' },
+          points: 5,
+        },
+        {
+          driverRef: 'fagioli',
+          code: null,
+          forename: 'Luigi',
+          surname: 'Fagioli',
+          team: { ref: 'alfa', name: 'Alfa Romeo' },
+          points: 4,
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
 });
 
 /**

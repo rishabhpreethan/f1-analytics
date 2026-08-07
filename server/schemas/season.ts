@@ -140,7 +140,9 @@ export const roundWinnerSchema = z.strictObject({
   code: z.string().min(1).nullable(),
   forename: z.string().min(1),
   surname: z.string().min(1),
-  team: teamRefSchema.nullable(),
+  team: teamRefSchema,
+  /** Championship points from this race. Split between the drivers of a shared car. */
+  points: championshipPointsSchema,
 });
 
 export const seasonRoundSchema = z.strictObject({
@@ -165,7 +167,22 @@ export const seasonRoundSchema = z.strictObject({
    * 1990 have lap data.
    */
   hasLapData: z.boolean(),
-  winner: roundWinnerSchema.nullable(),
+  /**
+   * **An array, and that is not defensive over-engineering — three races really have two
+   * winners.** Shared drives: 1951 French GP (Fangio / Fagioli), 1956 Argentine GP
+   * (Fangio / Musso), 1957 British GP (Moss / Brooks). Both drivers of the shared car are
+   * classified P1 and split the win's points, which is why `points` is on the row and why
+   * the 1951 pair reads 5 and 4 rather than 8 and 8.
+   *
+   * Queried, not remembered: `position = 1` returns two rows for exactly three `round_id`
+   * values across all 1,173 races. A singular `winner` field would have picked one of each
+   * pair at the mercy of row order and lost Fagioli, Musso and Brooks silently.
+   *
+   * Ordered by points descending, then surname — so the driver credited with the greater
+   * share leads, and the order does not depend on the database's row order. Empty when the
+   * race has no classification yet; there is no null case to remember.
+   */
+  winners: z.array(roundWinnerSchema),
 });
 
 /**
@@ -180,13 +197,26 @@ export const cancelledRoundSchema = z.strictObject({
   circuitName: z.string().min(1).nullable(),
 });
 
-/** One team a driver raced for in a season, in the order they raced for them. */
+/**
+ * One team a driver raced for in a season, in the order they raced for them.
+ *
+ * The count is named `entries` and not `starts` **because the two canonical documents
+ * disagree about what a start is** and F2 is not the place to settle it:
+ * `REQUIREMENTS.md` §5.1 says *"appearing in race results, regardless of
+ * classification"*, while `DATABASE.md` §3 says `status IN (30, 40)` — withdrew, did not
+ * start, did not qualify — must be *excluded* from starts counts. `DATABASE.md` is the
+ * better answer on the merits and it is a **career-metric** decision that belongs with
+ * DR-2, where it will be load-bearing. Here the count exists only to order a driver's
+ * teams and pick their principal one, so it says what it actually counts — race entry
+ * rows — and cannot be misread as a career statistic. Raised for DR-2 rather than
+ * resolved silently.
+ */
 export const driverTeamSchema = z.strictObject({
   ref: entityRefSchema,
   name: z.string().min(1),
   firstRound: roundNumberSchema,
   lastRound: roundNumberSchema,
-  starts: z.number().int().positive(),
+  entries: z.number().int().positive(),
 });
 
 export const driverStandingSchema = z.strictObject({
