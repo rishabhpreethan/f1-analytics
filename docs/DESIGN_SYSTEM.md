@@ -415,6 +415,46 @@ either. The permitted identity forms are:
 | **Team header band** | brand colour band with the team name in a computed on-colour ink (`--ink-primary` or `--ink-inverse`, whichever reaches ≥4.5:1 against that specific colour — computed, not assumed) |
 | **Not permitted** | brand colour as the background of a text-only element without a computed on-colour ink; brand colour as the only difference between two adjacent interactive elements |
 
+#### 3.3a.5 An identity swatch may sit near a reserved timing colour — measured, and separated by **form**, not by hue _(added 2026-08-07)_
+
+Raised against the season hub's calendar, where Mercedes' teal chip sits eleven rows above nothing in
+particular but would, on a race page, sit on the same row as a purple fastest-lap time. The question
+is whether a green-ish identity chip can be misread as the reserved timing green. **Measured with
+`node scripts/validate-palette.mjs check`, both themes, recorded in §9.2.5:**
+
+| Identity swatch ↔ `--timing-green-ink` | normal ΔE | worst CVD ΔE |
+|---|---|---|
+| Mercedes `#00D7B6` ↔ light `#087B30` | **31.53** | **23.29** |
+| Mercedes `#00D7B6` ↔ dark `#47FF79` | **19.39** | **7.60** ✗ |
+| Sauber `#00E700` ↔ light `#087B30` | **32.52** | **26.43** |
+| Sauber `#00E700` ↔ dark `#47FF79` | **8.75** ✗ | **5.85** ✗ |
+
+**Sauber in dark mode fails both floors, and Mercedes fails the CVD floor.** The hunch pointed at
+Mercedes; the measurement says Sauber is nearly three times worse. That is the whole reason this is a
+measured entry and not a paragraph of reasoning.
+
+**The ruling: identity swatches are NOT gated against the timing set, and never will be.** Gating
+them would mean altering a team's true brand colour, which is the one and only thing an identity
+swatch exists to show — and §3.2 already permits identity collisions on the grounds that colour sits
+*beside a name*. Changing Sauber's green to clear a timing green would be the tail wagging the dog.
+
+**What carries the separation instead is form, and these three are binding:**
+
+1. **A reserved timing colour is never a fill on a swatch, a bar or a band.** It is **ink on a
+   numeral**, or a wash behind one, always attached to the value it qualifies. An identity colour is
+   the opposite: a solid 3px bar or 10×10 chip that **never contains text**. A reader distinguishes
+   "solid square with no text" from "coloured lap time" without needing the hues to be far apart.
+2. **An identity colour is never applied to a numeral**, and a timing colour is never applied to a
+   name. This is the same rule as §6.2's *"text wears text tokens, never the series colour"*, applied
+   to the identity role.
+3. **Any surface carrying both must carry the timing legend.** §3.4.2 already requires timing colours
+   to ship with a label; this section makes the legend's presence the *discharge* of this collision,
+   so a surface with timing colours and no legend is now a defect for two independent reasons.
+
+**Consequence for F3, stated now so it is not discovered later:** a race-results row will hold an
+identity chip and a timing-coloured lap time simultaneously. Rules 1–3 are what make that legible,
+and the row must not additionally tint the driver's name or the row background with either.
+
 ### 3.4 Reserved semantic colours — F1 timing convention, verified
 
 | Meaning | Colour | Rule |
@@ -992,6 +1032,29 @@ the authority when the prose disagrees.
 | Header hairline | — | **G-13** on scroll | — | — | border appears at the same threshold, no `scaleX` |
 | Scroll progress | — | **G-14** scrubbed | — | — | not rendered |
 | Link | — | **G-10** underline sweep | — | — | rest underline thickens instantly |
+| `SeasonMasthead` · `SeasonCalendar` | **G-2 only — no G-15.** See the two rules below | row surface step (calendar) | — | — | opacity only, from G-2 |
+
+##### Two rules G-15 was missing, and the capture that produced them _(2026-08-07)_
+
+Rishabh captured `/seasons/1951` about a second into a cold load. It showed the year and both
+section headings at low opacity and **nothing else** — no rows, no cards. It read as broken. The
+skeletons were not missing: they were rendering and holding their exact height. **They were inside
+G-15's stagger, so they started at `opacity: 0`.** Both rules below are binding from here.
+
+1. **A loading state is never animated in.** A skeleton exists to say *"this box is coming"*; a
+   skeleton fading in over `dur.base` says nothing for 200ms, which is most of the window a fast
+   query is visible for at all. `data-motion="reveal-item"` therefore **never goes on a skeleton or
+   on a container that holds one** — put it on resolved content, or leave the section unrevealed.
+2. **G-15 is for sections below the initial viewport, and only those.** It is a *scroll* reveal; a
+   section that is already on screen at first paint has nothing to reveal to, and gating its
+   visibility on `from(opacity: 0)` makes the trigger load-bearing for content being visible at all.
+   A section that can be in the first screen uses **G-2** — which already animates the whole route's
+   content as one block — and nothing else. Three staggered entrances on one screen is what made the
+   page look like it was assembling itself rather than arriving.
+
+The audit that follows from rule 2: on `/`, `HeroSection` correctly has no G-15 and `CoverageRuler`
+correctly has one. `CapabilityGrid` sits at the fold boundary and is left as it is, because its
+content is static — there is no query and therefore no skeleton, so rule 1 cannot bite it.
 
 #### 4.6.2 Chart motion — G-27 … G-30 _(specified 2026-08-07)_
 
@@ -2274,6 +2337,39 @@ practice and not only in principle. `entityColor.test.ts` pins eight real refere
 pure arithmetic, needs no dependency, and **self-calibrates against the pre-CR-007 recorded figures on
 every run** (§9.2.1), so a regression in the validator itself is caught rather than silently trusted.
 It exits non-zero when any floor fails, so it is usable as a gate and not only as a report.
+
+#### 9.2.5 Identity swatches against the reserved timing set — reported, not gated, 2026-08-07
+
+Raised on Rishabh's review of the season hub: Mercedes' teal identity chip looked close to the
+reserved timing green. **Measured rather than argued**, and the measurement disagreed with the hunch.
+
+```
+node scripts/validate-palette.mjs check \
+  'mercedes-brand=#00D7B6,sauber-brand=#00E700,timing-green=#087B30,timing-purple=#9E08F6,timing-yellow=#6A5606'
+node scripts/validate-palette.mjs check \
+  'mercedes-brand=#00D7B6,sauber-brand=#00E700,timing-green=#47FF79,timing-purple=#BB79FD,timing-yellow=#EABF17' --dark
+```
+
+| V | Pair | normal ΔE | worst CVD ΔE | Verdict |
+|---|---|---|---|---|
+| **V-31** | Mercedes ↔ timing green, **light** | 31.53 | 23.29 | clear of both floors |
+| **V-32** | Mercedes ↔ timing green, **dark** | 19.39 | **7.60** | below the CVD floor of 8 |
+| **V-33** | Mercedes ↔ timing purple / yellow, both themes | ≥ 39.07 | ≥ 21.97 | clear |
+| **V-34** | Sauber ↔ timing green, **light** | 32.52 | 26.43 | clear |
+| **V-35** | Sauber ↔ timing green, **dark** | **8.75** | **5.85** | below **both** floors |
+| **V-36** | Sauber ↔ timing yellow, **dark** | 32.66 | **2.25** | below the CVD floor |
+
+**Sauber is the worst case by a wide margin, not Mercedes.** V-35 and V-36 are the two real ones, and
+both are dark-mode-only — a consequence of the dark timing set being lifted into the same high-
+lightness band the brand teals and greens already occupy.
+
+**Not gated, deliberately** — §3.3a.5 gives the reasoning and the three form-level rules that carry
+the separation instead. Recorded here so the figures are on file rather than rediscovered, and so a
+future proposal to "fix" a brand colour meets the decision rather than the surprise.
+
+**These are identity tokens.** Every **plotting** token is already gated against the three timing
+inks at ΔE ≥ 15 / CVD ≥ 8 as a HARD check (§9.1 item 3) — which is exactly why Sauber has no
+admissible shade pair in light mode (§9.2.3 G-27d). Nothing in this entry weakens that.
 
 ---
 

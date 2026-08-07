@@ -3,7 +3,6 @@ import type { SeasonRound } from '@schemas/season';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cssVar, identityToken } from '@/lib/entityColor';
 import { formatIsoDate } from '@/lib/format';
-import { useSectionReveal } from '@/lib/motion/scroll';
 import { SeasonNotes } from './SeasonNotes';
 import { roundStatus, type CalendarEntry } from './presenters';
 import type { SeasonNotice } from './selectors';
@@ -49,6 +48,11 @@ import type { SeasonNotice } from './selectors';
  * **"Completed" means classification rows exist, never a date comparison.** The dump can lag the
  * real calendar by weeks — 2026 R11 has a date in the past and no results — so the split comes
  * from `hasResults` (REQUIREMENTS.md §2.5). A round with no results is *scheduled*, not empty.
+ *
+ * **No G-15, for the reason set out in `SeasonMasthead`**: at 1440×900 this section's heading is
+ * above the fold, so a scroll-gated reveal fires against nothing, and the reveal was wrapping the
+ * skeleton — which is why a cold load showed a heading and an empty page. `DESIGN_SYSTEM.md`
+ * §4.6.1 now states both rules.
  */
 
 /**
@@ -77,11 +81,9 @@ export function SeasonCalendar({
   markLapCoverage,
   pending,
 }: SeasonCalendarProps) {
-  const { scope } = useSectionReveal<HTMLElement>();
-
   return (
-    <section ref={scope} className="season-section" aria-labelledby="season-calendar-title">
-      <div data-motion="reveal-item">
+    <section className="season-section" aria-labelledby="season-calendar-title">
+      <div>
         <p className="season-eyebrow">
           <span className="accent-rule" aria-hidden="true" />
           The calendar
@@ -91,13 +93,9 @@ export function SeasonCalendar({
         </h2>
       </div>
 
-      {notices.length > 0 && (
-        <div data-motion="reveal-item">
-          <SeasonNotes notices={notices} />
-        </div>
-      )}
+      {notices.length > 0 && <SeasonNotes notices={notices} />}
 
-      <div className="season-panel" data-motion="reveal-item">
+      <div className="season-panel">
         {pending || entries === null ? (
           <CalendarSkeleton />
         ) : entries.length === 0 ? (

@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cssVar, identityToken } from '@/lib/entityColor';
-import { useSectionReveal } from '@/lib/motion/scroll';
 import { SeasonNotes } from './SeasonNotes';
 import { SeasonPicker } from './SeasonPicker';
 import type { DialCell, TitleCard } from './presenters';
@@ -27,6 +26,27 @@ import type { SeasonNotice } from './selectors';
  * **The team colour on a title card is a 3px bar beside a name** (§3.3a.1), never a fill and never
  * a chart mark. `identityToken()` is the only thing that resolves it, and it returns a token name —
  * no hex reaches this file.
+ *
+ * ---
+ *
+ * **⚠ No G-15 here, and that is a correction rather than an omission** _(2026-08-07, from
+ * Rishabh's capture of the loading window)_.
+ *
+ * This section used `useSectionReveal`, with the title cards and the dial as staggered
+ * `reveal-item`s. A capture taken about a second into a cold load showed the year and the section
+ * headings at low opacity and **nothing else on the page** — no rows, no cards. It read as broken,
+ * and the diagnosis is not a missing skeleton: the skeletons were rendering and holding their
+ * height correctly. **They were inside the reveal, so they started at `opacity: 0`.**
+ *
+ * Three things were wrong with that, and each is now a rule in `DESIGN_SYSTEM.md` §4.6.1:
+ *
+ * 1. **G-15 is a scroll reveal, and this section is never scrolled to.** It is the first thing on
+ *    the route. There is nothing to reveal *to*.
+ * 2. **A loading state must never be animated in.** A skeleton exists to say "this box is coming";
+ *    a skeleton fading in says nothing at all for its first 200ms, which is most of the window a
+ *    fast query is even visible for.
+ * 3. **G-2 already animates the route's content as one block.** Three staggered entrances on one
+ *    screen was the reason the page looked like it was assembling itself rather than arriving.
  */
 
 export interface SeasonMastheadProps {
@@ -61,13 +81,10 @@ export function SeasonMasthead({
   pending,
   failed = false,
 }: SeasonMastheadProps) {
-  // G-15. Authored `from` (MR-2), so a masthead whose trigger never fires is simply visible.
-  const { scope } = useSectionReveal<HTMLElement>();
-
   return (
-    <section ref={scope} className="season-masthead" aria-labelledby="season-title">
+    <section className="season-masthead" aria-labelledby="season-title">
       <div className="season-headline">
-        <div data-motion="reveal-item">
+        <div>
           <p className="season-eyebrow">
             <span className="accent-rule" aria-hidden="true" />
             Season
@@ -82,27 +99,19 @@ export function SeasonMasthead({
           </div>
         </div>
 
-        {progressLine !== null && (
-          <p className="t-sm text-ink-secondary pb-2" data-motion="reveal-item">
-            {progressLine}
-          </p>
-        )}
+        {progressLine !== null && <p className="t-sm text-ink-secondary pb-2">{progressLine}</p>}
       </div>
 
       {dial !== null && dial.length > 0 && year !== null && <SeasonDial cells={dial} year={year} />}
 
-      {notices.length > 0 && (
-        <div data-motion="reveal-item">
-          <SeasonNotes notices={notices} />
-        </div>
-      )}
+      {notices.length > 0 && <SeasonNotes notices={notices} />}
 
       {/*
        * Dropped entirely on failure. A skeleton that will never resolve is a promise the surface
        * cannot keep, and the error card below states what actually happened.
        */}
       {!failed && (
-        <div className="season-titles" data-motion="reveal-item">
+        <div className="season-titles">
           {pending ? (
             <>
               <TitleSkeleton />
@@ -135,15 +144,22 @@ function SeasonDial({ cells, year }: { cells: readonly DialCell[]; year: number 
       : `The ${String(year)} calendar: ${String(cells.length)} events, ${String(raced)} raced, ${String(cancelled)} cancelled.`;
 
   return (
-    <div className="flex flex-col gap-2" data-motion="reveal-item">
+    <div className="flex flex-col gap-2">
       <div className="season-dial" role="img" aria-label={summary}>
         {cells.map((cell) => (
           <span key={cell.key} className="season-dial-cell" data-status={cell.status} />
         ))}
       </div>
+      {/*
+       * **One caption, right-aligned, and no axis labels** _(corrected 2026-08-07)_. This carried a
+       * lone `01` under the first cell. A single number at one end of a track reads as an axis that
+       * failed to finish rendering rather than as a deliberate anchor — and the honest fix is not
+       * three labels but none: the ticks are ordinal and equal-width, so a scale adds no reading
+       * the caption does not already give. The caption states the count, the raced count and the
+       * cancelled count, which is the whole content of the mark.
+       */}
       <p className="season-dial-scale" aria-hidden="true">
-        <span>{cells[0]?.status === 'cancelled' ? '—' : '01'}</span>
-        <span>{summary}</span>
+        {summary}
       </p>
     </div>
   );

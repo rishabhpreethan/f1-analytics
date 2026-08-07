@@ -280,10 +280,11 @@
     );
   }
 
+  /* One caption at the trailing end. It used to be a two-item `space-between` row with a lone `01`
+   * at the leading end, which read as a half-rendered axis (2026-08-07). */
   .season-dial-scale {
-    display: flex;
-    justify-content: space-between;
     color: var(--ink-tertiary);
+    text-align: end;
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
