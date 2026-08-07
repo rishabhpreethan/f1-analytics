@@ -28,6 +28,23 @@ export const RATE_LIMIT = {
 
 export const META_CACHE_TTL_MS = 300_000;
 
+/**
+ * How long a season response may be treated as fresh by a client cache.
+ *
+ * An hour rather than `/api/meta`'s five minutes because the two age differently: meta
+ * carries the data-vintage indicator, which is the one thing that should refresh soon
+ * after a database refresh, while a completed season's calendar and standings are
+ * immutable and 1950's have been for 76 years.
+ *
+ * **Only `GET /api/seasons` is memoised in-process; the per-year payloads are not**, and
+ * that is measured rather than assumed. Warm, `/api/seasons/2026` reads in 2.5 ms and the
+ * heaviest progression (1953, 671 snapshot rows) in 4.1 ms, against a 50 ms p95 budget —
+ * so a server-side cache buys ~4 ms and costs up to ~15 MB of retained JSON across the
+ * bounded key space (`yearParamSchema` admits 151 years × 2 endpoints). The list is
+ * memoised because it is 8 KB, immutable, and fetched by every navigation.
+ */
+export const SEASON_CACHE_TTL_MS = 3_600_000;
+
 export const IS_TEST = process.env.NODE_ENV === 'test';
 
 /**

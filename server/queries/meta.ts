@@ -1,7 +1,7 @@
-import type { Database, Statement } from 'better-sqlite3';
 import { COVERAGE } from '../coverage';
-import { DatabaseUnavailableError, getDb } from '../db';
+import { DatabaseUnavailableError } from '../db';
 import type { Meta, RoundRef } from '../schemas/meta';
+import { prepared } from './prepared';
 
 /**
  * ALL SQL for `/api/meta` (ARCHITECTURE.md §3). Every statement is parameterised or
@@ -74,24 +74,6 @@ FROM round r
 JOIN season s ON s.id = r.season_id
 WHERE s.year = (SELECT max(year) FROM season)
 GROUP BY s.year`;
-
-/**
- * Lazily prepares a statement and keeps it for the life of the connection, so the
- * warm path is a prepared-statement execution. Re-prepares if the handle is replaced
- * (only happens in tests, via `__resetDb`).
- */
-function prepared(sql: string): () => Statement {
-  let statement: Statement | null = null;
-  let owner: Database | null = null;
-  return () => {
-    const db = getDb();
-    if (statement === null || owner !== db) {
-      statement = db.prepare(sql);
-      owner = db;
-    }
-    return statement;
-  };
-}
 
 export const Q_SEASON_RANGE = prepared(SQL_SEASON_RANGE);
 export const Q_LATEST_COMPLETED_ROUND = prepared(SQL_LATEST_COMPLETED_ROUND);

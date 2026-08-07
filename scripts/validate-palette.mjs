@@ -2191,7 +2191,227 @@ function emitTokens() {
   return out.join('\n');
 }
 
+/* ================================================================ V-30  ENTITY DATA EMITTER
+ * `node scripts/validate-palette.mjs entity-data` prints `src/lib/entityColorData.ts` on stdout.
+ *
+ * **Why the collision table is precomputed here rather than measured in the browser.**
+ * §6.4 requires runtime collision detection over "the colours actually assigned". Doing that
+ * literally would mean shipping CIEDE2000, two CVD models and a `getComputedStyle` read of every
+ * `--*-plot` custom property into the client — colour science in a chart component, on the main
+ * thread, on every render. It would also be **untestable**: jsdom resolves no custom properties at
+ * all, so `getComputedStyle(root).getPropertyValue('--ramp-3-plot')` returns `''` and every
+ * assertion about the ladder would be vacuous.
+ *
+ * The palette is a closed set. Every colour a mark can take is one of the tokens this file emits,
+ * so every pairwise distance is knowable now, by the same functions that gated the palette. What
+ * ships is one bit per pair.
+ *
+ * **A pair collides if it collides in EITHER theme**, on either floor (normal dE < 15, or
+ * worst-model CVD dE < 8) — `pairNormal`/`pairCvd` already take the worse theme. §6.4 said "the
+ * theme in force"; that would let a theme switch withdraw a dash pattern, which §6.4a property 3
+ * forbids for the shade pair for exactly the same reason. The encoding is a property of the
+ * entities, not of the time of day.
+ */
+function emitEntityData() {
+  const { tierA, entries } = selectRamp();
+
+  /* ---- the token universe, in canonical order: brand first, then the ramp. Order is the
+   * emitted contract — an index is stored in COLLISION_MASKS, so a reorder is a regeneration. */
+  const tokens = [];
+  const identityTeams = Object.keys(BRAND);
+  const plotTeams = [];
+  const shadePairTeams = [];
+
+  for (const [team, hex] of Object.entries(BRAND)) {
+    const o = oklch(hex);
+    if (o.C < 0.05) continue; // Haas, Cadillac: identity only, they plot from the ramp (§3.3a.1)
+    plotTeams.push(team);
+    const pair = pairBothThemes(o.h, o.C);
+    tokens.push({
+      name: `--team-${team}-plot`,
+      light: brandChartVariant('light', hex).hex,
+      dark: brandChartVariant('dark', hex).hex,
+    });
+    if (pair.light && pair.dark) {
+      shadePairTeams.push(team);
+      tokens.push({
+        name: `--team-${team}-plot-deep`,
+        light: pair.light.deep.hex,
+        dark: pair.dark.deep.hex,
+      });
+      tokens.push({
+        name: `--team-${team}-plot-bright`,
+        light: pair.light.bright.hex,
+        dark: pair.dark.bright.hex,
+      });
+    }
+  }
+
+  entries.forEach((e, i) => {
+    const pair = pairBothThemes(e.h, 0.4);
+    tokens.push({ name: `--ramp-${i + 1}-plot`, light: e.light, dark: e.dark });
+    tokens.push({
+      name: `--ramp-${i + 1}-plot-deep`,
+      light: pair.light.deep.hex,
+      dark: pair.dark.deep.hex,
+    });
+    tokens.push({
+      name: `--ramp-${i + 1}-plot-bright`,
+      light: pair.light.bright.hex,
+      dark: pair.dark.bright.hex,
+    });
+  });
+
+  /* ---- pairwise, both themes, both CVD models. Symmetric by construction. */
+  const N = tokens.length;
+  const WORDS = Math.ceil(N / 32);
+  const masks = Array.from({ length: N }, () => new Array(WORDS).fill(0));
+  let colliding = 0;
+  for (let i = 0; i < N; i++) {
+    for (let j = i + 1; j < N; j++) {
+      const dn = pairNormal(tokens[i], tokens[j]);
+      const dc = pairCvd(tokens[i], tokens[j]);
+      if (dn >= 15 && dc >= 8) continue;
+      colliding += 1;
+      masks[i][j >> 5] |= 1 << (j & 31);
+      masks[j][i >> 5] |= 1 << (i & 31);
+    }
+  }
+  const maskHex = (m) =>
+    m
+      .map((w) => (w >>> 0).toString(16).padStart(8, '0'))
+      .join('')
+      .toLowerCase();
+
+  const out = [];
+  const p = (s = '') => out.push(s);
+  const list = (name, doc, values) => {
+    for (const line of doc) p(line);
+    p(`export const ${name} = [`);
+    for (const v of values) p(`  '${v}',`);
+    p('] as const;');
+    p();
+  };
+
+  p('/*');
+  p(' * ENTITY COLOUR DATA — generated. Do not hand-edit.');
+  p(' *');
+  p(' *   node scripts/validate-palette.mjs entity-data > src/lib/entityColorData.ts');
+  p(' *');
+  p(
+    ' * The closed set of facts `src/lib/entityColor.ts` needs, taken from the same search and the',
+  );
+  p(' * same colour maths that produced `src/styles/entity.css` (§3.3a, §6.4). `entityColorData.');
+  p(' * test.ts` re-runs the emitter and diffs it, so these cannot drift from the stylesheet.');
+  p(' *');
+  p(' * NOTHING HERE IS A COLOUR. Not one hex value crosses into the client: §3.3a.3 fixes the');
+  p(
+    ' * contract as entity -> token NAME, so the theme keeps working and no colour is inlined into',
+  );
+  p(' * markup. What crosses is the palette’s *structure* — which tokens exist, and which pairs');
+  p(' * the palette did not promise to separate.');
+  p(' */');
+  p();
+
+  list(
+    'IDENTITY_TEAMS',
+    [
+      '/**',
+      ' * The team references carrying a `--team-<ref>` identity token: the true brand colour, used',
+      ' * beside a name and never as a chart mark (§3.3a.1). Every other team’s identity swatch is',
+      ' * its ramp slot, which V-28 gates at 3:1 on all three surfaces in both themes.',
+      ' */',
+    ],
+    identityTeams,
+  );
+
+  list(
+    'PLOT_TEAMS',
+    [
+      '/**',
+      ' * The team references carrying a `--team-<ref>-plot` token. **Two fewer than IDENTITY_TEAMS**:',
+      ' * Haas and Cadillac are below the OkLCh chroma floor, read as pure grey, and would be',
+      ' * confusable with this product’s achromatic chart furniture — so they plot from the ramp',
+      ' * exactly like a colourless team (§3.3a.1). That absence is deliberate and must not be',
+      ' * "completed for symmetry".',
+      ' */',
+    ],
+    plotTeams,
+  );
+
+  list(
+    'SHADE_PAIR_TEAMS',
+    [
+      '/**',
+      ' * The team references carrying `--team-<ref>-plot-deep` and `-bright` — the symmetric teammate',
+      ' * shade pair (§6.4a). Sauber is absent: its brand hue sits inside the reserved green timing',
+      ' * band, and in light mode exactly one lightness in the whole plotting band clears dE 15 from',
+      ' * `--timing-green-ink`, so no pair exists there. A pair exists in dark mode and is withheld,',
+      ' * because an encoding that changed with the theme would be unlearned at sunset.',
+      ' *',
+      ' * This is why marker shape, dash and direct label are MANDATORY for every team rather than a',
+      ' * fallback for this one: the shade pair is a redundant fourth channel, never the channel.',
+      ' */',
+    ],
+    shadePairTeams,
+  );
+
+  p('/** Fallback ramp slots (§3.3a.2): tier A is 1-' + tierA.length + ', tier B is the rest. */');
+  p(`export const RAMP_SIZE = ${entries.length};`);
+  p();
+  p(
+    '/** Slots separated by colour ALONE for every viewer — dE >= 15 normal AND >= 8 CVD, both themes. */',
+  );
+  p(`export const RAMP_TIER_A = ${tierA.length};`);
+  p();
+
+  list(
+    'PLOT_TOKENS',
+    [
+      '/**',
+      ' * Every colour a chart mark may take, in canonical order. **An index into this array is the',
+      ' * key COLLISION_MASKS is written against**, so reordering it without regenerating the masks',
+      ' * silently mislabels every collision.',
+      ' */',
+    ],
+    tokens.map((t) => t.name),
+  );
+
+  p('/**');
+  p(' * The collision adjacency of PLOT_TOKENS, as one bitmask per token.');
+  p(' *');
+  p(
+    ` * ${colliding} of the ${(N * (N - 1)) / 2} pairs collide. A pair collides when normal-vision CIEDE2000 is`,
+  );
+  p(
+    ' * below 15 **or** worst-model CVD CIEDE2000 is below 8 — the two floors the palette itself is',
+  );
+  p(
+    ' * built on, so a colliding pair is by definition one the palette never promised to separate. It',
+  );
+  p(
+    ' * is measured in BOTH themes and the worse taken, so the differentiator a pair earns does not',
+  );
+  p(' * change when the theme does (§6.4a property 3).');
+  p(' *');
+  p(
+    ' * Mask `i`, read left to right, is 8-hex-character words; word `w` holds tokens `32w .. 32w+31`',
+  );
+  p(
+    ' * with token `j` at bit `1 << (j & 31)`. `collides()` in `entityColor.ts` is the only reader.',
+  );
+  p(' */');
+  p('export const COLLISION_MASKS = [');
+  for (let i = 0; i < N; i++) p(`  '${maskHex(masks[i])}', // ${tokens[i].name}`);
+  p('] as const;');
+
+  return out.join('\n');
+}
+
 /* ================================================================ main */
+if (mode === 'entity-data') {
+  console.log(emitEntityData());
+}
 if (mode === 'tokens') {
   console.log(emitTokens());
 }

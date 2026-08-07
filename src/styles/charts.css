@@ -1,0 +1,570 @@
+/*
+ * THE CHART KIT — `DESIGN_SYSTEM.md` §6.
+ *
+ * Split out of `index.css` because it is a whole language rather than a component: axes, grid,
+ * marks, legend, tooltip, table view, five plot states and the print rendering. It is imported
+ * unlayered from `index.css` after `motion.css`, so the two reduced-motion chokepoints still win.
+ *
+ * **Every colour here is a `var()`, including inside the SVG.** SVG presentation attributes are
+ * CSS properties, so `stroke: var(--ramp-3-plot)` resolves through `[data-theme]` — a theme switch
+ * needs no re-render and no JavaScript colour table, and no component ever holds a literal hex.
+ * The entity token arrives on the element as `--series`, written once by the React component.
+ *
+ * **Recessive furniture is the rule the whole section is built on** (§6.2). The data is the
+ * subject: gridlines `--border-subtle`, axis `--border-strong`, ticks `--ink-tertiary` at
+ * `--text-2xs`. The single most common way a competent chart still looks like a spreadsheet is a
+ * box drawn around the data, so **the category axis gets no line at all** (§6.3).
+ */
+
+@layer components {
+  /* ------------------------------------------------------------------ the frame */
+
+  .chart {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .chart-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .chart-heading {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+    min-width: 0;
+  }
+
+  .chart-title {
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-xs);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-xs--font-weight);
+    letter-spacing: var(--text-display-xs--letter-spacing);
+    line-height: var(--text-display-xs--line-height);
+  }
+
+  .chart-subtitle {
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  /* §6.5.5 / §6.5.6 — the Table and Patterns toggles sit in the header, beside the title, on every
+   * chart in the product. A toggle that moves between surfaces is a toggle nobody finds twice. */
+  .chart-controls {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .chart-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 1px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+  }
+
+  .chart-seg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1);
+    height: calc(var(--size-control-sm) - 4px);
+    padding-inline: calc(var(--spacing) * 2);
+    border-radius: calc(var(--radius-md) - 2px);
+    /* The unpressed recession — see the note below. */
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    font-weight: 400;
+    line-height: var(--text-xs--line-height);
+    /* G-7's colour half, as a CSS transition, so a reduced-motion reader still gets feedback. */
+    transition:
+      background-color var(--dur-fast) var(--ease-enter),
+      color var(--dur-fast) var(--ease-enter);
+  }
+
+  .chart-seg-btn:hover {
+    color: var(--accent-ink);
+  }
+
+  /*
+   * ⚠ **The pressed state is carried by THREE channels, not by the fill alone**
+   * _(2026-08-07, from Rishabh's dark-mode capture)_.
+   *
+   * The fill inverts per theme — `#08090C` on a pale container in light, `#FFFFFF` on a near-black
+   * one in dark — and in dark that made pressed and unpressed read as almost the same weight,
+   * because both ended up light-on-dark and only the fill distinguished them. §3.4.2's rule is that
+   * a meaning is never carried by colour alone, and a control's *state* is a meaning; the whole
+   * design system applies that to charts and then this one control did not.
+   *
+   * So the three channels are: the **fill**, a **weight step** (500 against 400), and an
+   * **unpressed recession** to `--ink-tertiary`. The recession is what actually fixes dark: it puts
+   * a real ink step between the two segments regardless of which way the fill inverts, and it costs
+   * light mode nothing because `--ink-tertiary` still clears 4.5:1 there.
+   */
+  .chart-seg-btn[aria-pressed='true'] {
+    background-color: var(--accent-fill);
+    color: var(--accent-on);
+    font-weight: 500;
+  }
+
+  /* §6.4a — cross-era normalisation is made VISIBLE, never applied silently. A silently indexed
+   * axis is the same class of defect as a dual axis: it makes an incomparable comparison look
+   * fine. §6.5.3's partial-data note uses the same slot, for the same reason. */
+  .chart-note {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    border-radius: var(--radius-md);
+    background-color: var(--status-info-wash);
+    color: var(--status-info-ink);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .chart-caption {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+  }
+
+  /* ------------------------------------------------------------------ the plot area */
+
+  /*
+   * §6.5.3 — **the plot area keeps its exact height in every state**, so nothing reflows as a
+   * query resolves. The height is a token per breakpoint rather than a content-derived value for
+   * exactly that reason: loading → partial → empty must not move the page.
+   */
+  .chart-plot {
+    position: relative;
+    height: var(--size-plot);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+  }
+
+  @media (min-width: 48rem) {
+    .chart-plot {
+      height: var(--size-plot-md);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .chart-plot {
+      height: var(--size-plot-lg);
+    }
+  }
+
+  /* The two nested wrappers a chart needs: one is GSAP's scope, the other is what the
+   * ResizeObserver measures. Both fill the plot area exactly, so the SVG's viewBox and the
+   * measured width describe the same box — a wrapper that shrank to its content would make the
+   * chart lay itself out against a width it is not being drawn at. */
+  .chart-mount {
+    height: 100%;
+    width: 100%;
+  }
+
+  .chart-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* The plot area is recessed, so a mark's 3:1 floor is measured against `--surface-sunken`. */
+  .chart-plot-bg {
+    fill: var(--surface-sunken);
+  }
+
+  /* ------------------------------------------------------------------ furniture (§6.3) */
+
+  .chart-grid-line {
+    stroke: var(--border-subtle);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+  }
+
+  .chart-axis-line {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+  }
+
+  .chart-tick {
+    fill: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    /* §2.4 — tabular everywhere. Digits that shift width on an axis read as broken. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart-axis-title {
+    fill: var(--ink-secondary);
+    font-family: var(--font-text);
+    font-size: var(--text-xs);
+  }
+
+  .chart-crosshair {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    pointer-events: none;
+  }
+
+  .chart-reference-line {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+  }
+
+  /* ------------------------------------------------------------------ marks */
+
+  /*
+   * `--series` is the entity token, written by the component as a custom property. Nothing here
+   * knows which entity it is drawing, and no hex appears in markup or in this file.
+   */
+  .chart-line {
+    fill: none;
+    stroke: var(--series);
+    stroke-width: var(--size-mark-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .chart-area {
+    fill: var(--series);
+    fill-opacity: 0.16;
+    stroke: none;
+  }
+
+  .chart-marker {
+    fill: var(--series);
+    /* §6.3 — a 1.5px surface ring wherever marks overlap, which is what keeps two crossing
+     * series readable at the crossing rather than only away from it. */
+    stroke: var(--surface-sunken);
+    stroke-width: var(--size-mark-ring);
+  }
+
+  .chart-bar {
+    fill: var(--series);
+    /* The data-end is rounded on the FAR end only and square against the baseline (§6.3): a bar
+     * rounded at the axis floats off it, and length is the encoding. */
+    rx: var(--size-mark-radius);
+  }
+
+  .chart-bar-foot {
+    fill: var(--series);
+  }
+
+  /* §6.5.1 — the hovered mark keeps full opacity and its siblings drop. **Opacity only, never a
+   * colour change**: a changed colour would break the identity the swatch just promised. */
+  .chart-marks[data-dimmed='true'] .chart-bar:not([data-active='true']),
+  .chart-marks[data-dimmed='true'] .chart-line:not([data-active='true']) {
+    opacity: 0.4;
+    transition: opacity var(--dur-fast) var(--ease-enter);
+  }
+
+  /* §6.5.1 — the hit target is ≥24px on the cross-axis regardless of mark size. */
+  .chart-hit {
+    fill: transparent;
+    stroke: none;
+  }
+
+  /* Rung 4 (§6.4 / §6.5.6) — a 45° hatch over the entity colour, at `--border-subtle`. */
+  .chart-hatch-line {
+    stroke: var(--border-subtle);
+    stroke-width: 1;
+  }
+
+  /* §6.5.2 — the direct label is the primary identification at ≤4 series, and it wears TEXT
+   * tokens, never the series colour (§6.2). Only the 12px leader line carries the entity hue. */
+  .chart-direct-label {
+    fill: var(--ink-primary);
+    font-family: var(--font-text);
+    font-size: var(--text-xs);
+  }
+
+  .chart-leader {
+    stroke: var(--series);
+    stroke-width: 1;
+  }
+
+  /* ------------------------------------------------------------------ legend (§6.5.2) */
+
+  /*
+   * Present at ≥2 series even when direct labels make it redundant for identification: it is the
+   * only place the dash and marker rungs are STATED, so a reader can learn what the pattern means
+   * rather than infer it.
+   */
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chart-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    color: var(--ink-primary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  /* §6.5.3 — a series with no data in the window is struck through in the legend and named in a
+   * note above the plot. It is not removed: a missing row is a question, a struck row is an answer. */
+  .chart-legend-item[data-empty='true'] {
+    color: var(--ink-tertiary);
+    text-decoration: line-through;
+  }
+
+  .chart-legend-key {
+    display: inline-block;
+    flex: none;
+    height: 14px;
+    width: 34px;
+  }
+
+  /* §3.3a.4 — the identity chip: 10×10, `--radius-xs`, a 1px inset ring, always beside a label. */
+  .chart-swatch {
+    display: inline-block;
+    flex: none;
+    height: var(--size-swatch);
+    width: var(--size-swatch);
+    border-radius: var(--radius-xs);
+    background-color: var(--series);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  /* ------------------------------------------------------------------ tooltip (§6.5.1) */
+
+  /*
+   * ⚠ **`inset: 0 auto auto 0` is load-bearing, and its absence was a shipped defect**
+   * _(fixed 2026-08-07, from Rishabh's capture of the progression chart)_.
+   *
+   * G-30 positions this with `gsap.quickSetter(el, 'x'|'y', 'px')`, which writes a **transform**.
+   * A transform is measured from the element's own box, so without an explicit origin the box sits
+   * at its **static flow position** — after the `<svg>`, i.e. *below the plot area* — and every
+   * coordinate the chart computed against `plot.top` was then offset by the full height of the
+   * chart. The tooltip rendered under the plot, over the legend, clipped by the panel.
+   *
+   * `BarChart` never had the bug because it writes `left: 0; top: 0` inline beside its transform.
+   * `LineChart` relied on this file, and this file did not say it. That is the same class of
+   * failure as a spotlight written in `%` where the spec meant px: a correct coordinate resolved
+   * against the wrong origin.
+   */
+  .chart-tooltip {
+    position: absolute;
+    inset: 0 auto auto 0;
+    z-index: var(--z-overlay);
+    /* Tied to `TOOLTIP_WIDTH` in `geometry.ts` by `tokens.css.test.ts`. The flip-at-midpoint
+     * arithmetic subtracts that constant, so a tooltip wider than it overhangs the plot's right
+     * edge — which it did at `min-width: 8rem` against a 193px rendered box. */
+    width: var(--size-tooltip);
+    padding: calc(var(--spacing) * 2);
+    border: 1px solid var(--elev-2-border);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-overlay);
+    box-shadow: var(--elev-2-shadow);
+    color: var(--ink-primary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    pointer-events: none;
+  }
+
+  .chart-tooltip-title {
+    color: var(--ink-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+  }
+
+  .chart-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    padding-top: calc(var(--spacing) * 1);
+  }
+
+  .chart-tooltip-value {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ------------------------------------------------------------------ table view (§6.5.5) */
+
+  /*
+   * The table replaces the plot IN PLACE, keeping the header, the filters and the caption. It is
+   * the discharge of §3.2's contrast WARN, so it is reachable in one action from any chart, and it
+   * is how a screen-reader user reads the data — a real `<table>` beats any aria narration of SVG.
+   */
+  .chart-table-scroll {
+    height: var(--size-plot);
+    overflow: auto;
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+  }
+
+  @media (min-width: 48rem) {
+    .chart-table-scroll {
+      height: var(--size-plot-md);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .chart-table-scroll {
+      height: var(--size-plot-lg);
+    }
+  }
+
+  .chart-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  .chart-table caption {
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    text-align: left;
+  }
+
+  .chart-table th,
+  .chart-table td {
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+  }
+
+  .chart-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--surface-sunken);
+    color: var(--ink-secondary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /* Every numeral in the product is tabular (§2.4). In a table it is the difference between a
+   * column of times and a column that looks like it is vibrating. */
+  .chart-table td[data-numeric='true'],
+  .chart-table th[data-numeric='true'] {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .chart-table-swatch {
+    display: inline-block;
+    height: var(--size-swatch);
+    width: var(--size-swatch);
+    margin-right: calc(var(--spacing) * 2);
+    border-radius: var(--radius-xs);
+    background-color: var(--series);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+    vertical-align: -1px;
+  }
+
+  /* ------------------------------------------------------------------ the five states (§6.5.3) */
+
+  .chart-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 4);
+    text-align: center;
+  }
+
+  .chart-state-text {
+    max-width: 32rem;
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  /*
+   * **A no-coverage state is not an error and is never painted caution or critical** (§3.4.3).
+   * Absent lap data before 1996 is a property of the sport's history, not a fault of the product
+   * or of the reader, and a red panel says the opposite.
+   */
+  .chart-state[data-tone='neutral'] .chart-state-text {
+    color: var(--ink-tertiary);
+  }
+
+  .chart-boundary-line {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+  }
+
+  .chart-boundary-label {
+    fill: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+  }
+
+  /* §6.5.3 — loading renders the axes and gridlines immediately from the known domain and skeletons
+   * only the marks. The frame is never a spinner: the reader can already start reading the axes.
+   * The pulse is G-11, and `motion.css`'s chokepoint 1 stops it under `reduce`. */
+  .chart-skeleton-mark {
+    fill: var(--border-subtle);
+    /* 0.7 is G-11's resting opacity, so chokepoint 1 in motion.css stops the pulse dead and
+     * leaves exactly the reduced-motion state — no second declaration, no media query here. */
+    opacity: 0.7;
+    animation: skeleton-pulse var(--anim-skeleton) var(--ease-move) infinite alternate;
+  }
+
+  /* §6.5.6 — in print the table is rendered AFTER the chart rather than instead of it, so a
+   * printed page carries both the figure and its values. On screen it does not exist. */
+  .chart-table-print {
+    display: none;
+  }
+}
+
+/*
+ * §6.5.6 — print. Patterns on unconditionally, the plot area transparent so it does not lay ink
+ * over the whole figure, gridlines promoted to `--border-strong` because a subtle grid disappears
+ * at print contrast, and **the table rendered after the chart rather than instead of it**.
+ */
+@media print {
+  .chart-plot {
+    background-color: transparent;
+  }
+
+  .chart-plot-bg {
+    fill: none;
+  }
+
+  .chart-grid-line {
+    stroke: var(--border-strong);
+  }
+
+  .chart-controls {
+    display: none;
+  }
+
+  .chart-table-print {
+    display: block;
+  }
+}

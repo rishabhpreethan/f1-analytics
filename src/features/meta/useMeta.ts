@@ -1,6 +1,6 @@
 import { type UseQueryResult, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Meta, metaSchema } from '@schemas/meta';
-import { type ApiRequestError, apiGet } from '@/lib/api';
+import { type ApiRequestError, apiGet, isTerminalApiError } from '@/lib/api';
 
 export const metaQueryKey = ['meta'] as const;
 
@@ -18,7 +18,7 @@ export function useMeta(): UseQueryResult<Meta, ApiRequestError> {
     queryFn: () => apiGet('/api/meta', metaSchema),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
-    retry: (failureCount, error) => error.code !== 'DATABASE_UNAVAILABLE' && failureCount < 1,
+    retry: (failureCount, error) => !isTerminalApiError(error) && failureCount < 1,
   });
 }
 

@@ -89,7 +89,7 @@ Confirm all of the following. If any is missing, stop:
 - [ ] **Technical Spec** exists in the feature's `PLAN.md` section
 - [ ] **Design Spec** exists — needed only if your scope touches UI, which since CR-010 is unusual
 - [ ] You are on the correct feature branch: `git rev-parse --abbrev-ref HEAD`
-- [ ] You have read `docs/DATABASE.md` §6 (query patterns) and §7 (the 14 traps)
+- [ ] You have read `docs/DATABASE.md` §6 (query patterns) and §7 (the traps — read §7 for the count, it grows)
 - [ ] You have read `docs/ARCHITECTURE.md` §3 (layering) and §7 (security)
 
 ## ⚠ Your scope narrowed — CR-010, 2026-08-06
@@ -163,8 +163,10 @@ and it is yours precisely because a selector is where a data trap gets violated 
 - Legend for ≥2 series; direct labels at ≤4 series; a table view for every chart.
 - **No charting library.** d3 primitives plus an in-repo kit — `ARCHITECTURE.md` §10 #28 supersedes the
   old "Recharts + visx" split. `DESIGN_SYSTEM.md` §6.6 names the primitives each chart needs, and §6
-  names four that are forbidden. Nothing is installed yet; **the kit is built in F2, with the first
-  real chart**, so it has a consumer rather than being speculative.
+  names four that are forbidden. **Installed and vetted in F2** (§10 #29): `d3-array`, `d3-scale`,
+  `d3-shape`, `d3-time-format` — granular packages, not the `d3` meta-package, so the budget only pays
+  for what is used. `d3`, `d3-axis`, `d3-selection`, `d3-transition` and `d3-format` are **ESLint
+  errors**. The in-repo kit lives in `src/components/charts/`.
 
 **Motion**
 - Use the shared presets in `lib/motion.ts` and the timings defined in `DESIGN_SYSTEM.md`.

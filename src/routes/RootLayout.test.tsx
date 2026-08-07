@@ -133,10 +133,19 @@ describe('the route table', () => {
    * shared URL cannot reach, and every analytical state in this product is meant to be
    * addressable.
    */
-  const ROUTES: ReadonlyArray<[path: string, heading: string]> = [
+  /**
+   * The two season entries are **regular expressions, and that is the point** (F2, 2026-08-07).
+   * They used to be the placeholder's literal headings, `Current season` and `2024 Season`. The
+   * real surface's `h1` is the season *year*, which is a season picker — so its accessible name
+   * is data-dependent (`2026 season. Choose a different season.`) and would hard-code today's
+   * latest season into a routing test. What this test is for is that the path resolves to the
+   * season hub, and a level-1 heading naming a season is exactly that claim, stated in a way that
+   * does not break when the record is refreshed.
+   */
+  const ROUTES: ReadonlyArray<[path: string, heading: string | RegExp]> = [
     ['/', 'Settle the argument.'],
-    ['/seasons', 'Current season'],
-    ['/seasons/2024', '2024 Season'],
+    ['/seasons', /season/i],
+    ['/seasons/2024', /^2024 season/i],
     ['/seasons/2024/races/3', 'Round 3'],
     ['/drivers', 'Drivers'],
     ['/drivers/max_verstappen', 'Driver'],
@@ -166,7 +175,7 @@ describe('the route table', () => {
     // A redirect would be visible here as the wrong heading, or as a changed pathname.
     for (const [path, heading] of [
       ['/', 'Settle the argument.'],
-      ['/seasons', 'Current season'],
+      ['/seasons', /season/i],
     ] as const) {
       window.history.pushState({}, '', path);
       renderApp(

@@ -82,7 +82,7 @@ git diff main...HEAD
 - Colour only via `lib/teamColor.ts`; formatting only via `lib/format.ts`
 - No dependency added that is not in `ARCHITECTURE.md` §2
 
-### 1.4 Database correctness (`DATABASE.md` §7 — check all 14 traps)
+### 1.4 Database correctness (`DATABASE.md` §7 — check every trap listed there; the count grows)
 Verify each applicable trap by name:
 
 1. `has_time_data` not used as a gate — existence of `lap` rows tested instead

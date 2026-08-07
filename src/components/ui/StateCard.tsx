@@ -20,8 +20,15 @@ export interface StateCardProps {
   /** The mono chip, e.g. `DATABASE_UNAVAILABLE`. */
   code?: string;
   action?: ReactNode;
-  /** Headings must nest correctly: inside `main` the state card owns the `h1`. */
-  as?: 'h1' | 'h2';
+  /**
+   * Headings must nest correctly: inside `main` the state card owns the `h1`.
+   *
+   * `h3` and `h4` were added in F2. The union was `'h1' | 'h2'`, which was an F0 limit rather than a
+   * decision — the season hub puts a card inside a subsection whose own heading is an `h3`, and the
+   * whole reason this prop exists is that a state card must not break the document outline of
+   * whatever it lands in.
+   */
+  as?: 'h1' | 'h2' | 'h3' | 'h4';
 }
 
 export function StateCard({

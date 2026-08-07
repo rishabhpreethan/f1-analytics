@@ -460,6 +460,31 @@
                            * does not crush the headline */
   --size-progress: 2px; /* the scroll progress bar (G-14) */
   --size-magnet: 6px; /* G-9's clamp — mirrors MOTION.dist.magnet */
+  /* ---- charts (§6.3). Every figure the chart kit draws is one of these; a chart that sets a
+   * literal is a review failure. The three plot heights are **fixed per breakpoint on purpose**:
+   * §6.5.3 requires the plot area to keep its exact height through loading, empty, error, partial
+   * and no-coverage, so nothing reflows as a query resolves. A height that came from the content
+   * would reflow on every one of those transitions. */
+  --size-plot: 15rem; /* 240 — plot area height, mobile */
+  --size-plot-md: 18rem; /* 288 — ≥768 */
+  --size-plot-lg: 22.5rem; /* 360 — ≥1024 */
+  --size-mark-stroke: 2px; /* every line and area outline */
+  --size-mark-marker: 8px; /* marker across — the §6.3 floor, never smaller */
+  --size-mark-ring: 1.5px; /* the --surface-sunken ring where marks overlap */
+  --size-mark-hit: 24px; /* the invisible hit target; a 2px line is not one */
+  --size-mark-radius: 4px; /* the bar data-end, far end only (--radius-sm) */
+  --size-mark-gap: 2px; /* the surface gap between adjacent fills */
+  --size-swatch: 10px; /* the identity chip (§3.3a.4) */
+  --size-leader: 12px; /* §6.5.2's direct-label leader line */
+  --size-hatch: 6px; /* rung 4's 45° hatch pitch */
+  /* §6.5.1's tooltip. **A fixed width, in px, and NOT a `min-width`** — the flip-at-the-midpoint
+   * arithmetic in `LineChart` subtracts this exact figure to place the tooltip on the left of the
+   * crosshair, so a box wider than the constant overhangs the plot. It was `min-width: 8rem` and
+   * rendered 193px wide with four driver names in it. `px` and not `rem` for the same reason
+   * `--size-dock-indicator` is: the JS arithmetic is in px and a root-font change would silently
+   * desynchronise the two. Pinned to `TOOLTIP_WIDTH` by `tokens.css.test.ts`. */
+  --size-tooltip: 200px;
+
   /* `--size-spotlight` (220) and `--size-card-lift` (2) are **removed**. G-8's pointer spotlight
    * is retired from the product and the capability card's 2px lift is superseded by G-25's
    * perspective tilt (§3.5.2, §4.6). Recorded here rather than silently deleted, because both
