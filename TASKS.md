@@ -15,9 +15,9 @@ _Nothing in flight._
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 10 | F4 driver pages · F5 team pages · F6 circuits | todo | — |
 | 11 | F7 compare — up to 4 entities across eras | todo | — |
 | 12 | F8 records — cross-era leaderboards, normalised | todo | — |
+| 13 | Deferred from F4/F5/F6 (P1/P2): DR-6..9 driver team-history/circuit-form/reliability/pace, CN-5..7 team reliability/pit-crew/qualifying-pace, CI-4..6 circuit overtaking-index/pole-conversion/typical-strategy | todo | — |
 
 ## Waiting on Rishabh
 
@@ -48,3 +48,4 @@ _Nothing in flight._
 | 7 | F1 design system — entity colour encoding, chart language, chart motion, palette validator, CI, enforced budgets | ✅ 2026-08-07 · `main` |
 | 8 | F2 season hub — calendar, standings, championship progression; the chart kit and `entityColor` mounted for the first time | ✅ 2026-08-07 · `main` (`59cd4ac`) |
 | 9 | F3 race page — classification (trap-16 shared drives), rank/lap/pit charts on the new d3 chart kit, pace degradation with inferred safety-car bands. **1298 tests** | ✅ 2026-08-08 · `main` (`341d7a5`) |
+| 10 | F4/F5/F6 — driver, team and circuit pages (P0 scope). `CareerRibbon` shared across all three; the season/race pages now link driver and team names to them. **1699 tests** | ✅ 2026-08-08 · `main` (`2df6295`) |
