@@ -70,8 +70,10 @@ export function DriverSeasons({ seasons, driverName, pending }: DriverSeasonsPro
           </div>
         ) : seasons.length === 0 ? (
           <p className="t-sm text-ink-tertiary p-4">
-            No seasons are recorded for this driver. Every driver in this record has at least one
-            race entry, so this is a state you should not be able to reach.
+            {driverName} has no race entries on record. The record does hold drivers who were
+            entered for a Grand Prix but never took part — through a qualifying elimination, a
+            withdrawal, or a reserve role that never reached a race — so a name can exist here with
+            no season to show.
           </p>
         ) : (
           <div className="standings-scroll">
