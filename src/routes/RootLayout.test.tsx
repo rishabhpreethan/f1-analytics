@@ -13,6 +13,23 @@ import { App } from '@/App';
  * `503` must produce the instructional "no database found" state, and **no response
  * detail may reach the screen** — no path, no stack frame, no SQLite code. Asserting
  * that mechanically is cheaper than trusting it.
+ *
+ * ---
+ *
+ * **This file mounts `<App />` 19 times, and that is not the flake. Do not "fix" it.**
+ * The count looks alarming because the route table is 13 of them, and it has twice been
+ * proposed as the cause of the suite's intermittent failure under parallel execution. It
+ * is not, and the discriminating measurement is cheap to repeat: set `asyncUtilTimeout`
+ * to `1` in `vitest.setup.ts` and run this file. **2 of the 17 tests fail — the two
+ * error-state tests — and the other 15, the entire route table included, pass**, because
+ * they resolve on `findBy*`'s initial synchronous pass and never enter the bounded wait
+ * at all. Mounts that contribute nothing to the binding budget cannot be removed to widen
+ * it.
+ *
+ * What actually bound was `@testing-library/dom`'s `asyncUtilTimeout`, defaulting to
+ * 1000 ms and never set here, while the configuration claimed 15 s. The reasoning and the
+ * numbers are in `vitest.setup.ts` §3; this note exists so the next reader finds them from
+ * the file that looks guilty rather than repeating the investigation.
  */
 
 function errorResponse(code: string, message: string, status: number): Response {
