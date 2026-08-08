@@ -49,3 +49,4 @@ _Nothing in flight._
 | 8 | F2 season hub — calendar, standings, championship progression; the chart kit and `entityColor` mounted for the first time | ✅ 2026-08-07 · `main` (`59cd4ac`) |
 | 9 | F3 race page — classification (trap-16 shared drives), rank/lap/pit charts on the new d3 chart kit, pace degradation with inferred safety-car bands. **1298 tests** | ✅ 2026-08-08 · `main` (`341d7a5`) |
 | 10 | F4/F5/F6 — driver, team and circuit pages (P0 scope). `CareerRibbon` shared across all three; the season/race pages now link driver and team names to them. **1699 tests** | ✅ 2026-08-08 · `main` (`2df6295`) |
+| 14 | Driver/team/circuit index pages — the `/drivers`, `/teams`, `/circuits` list views the sidebar nav needed but never had; F4/F5/F6 built only the individual profile pages. Lists all entities including 63 drivers/9 teams/1 circuit with no race, marked honestly rather than hidden. **1878 tests** | ✅ 2026-08-08 · `main` (`f2a64a8`) |
