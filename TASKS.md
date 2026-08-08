@@ -15,7 +15,6 @@ _Nothing in flight._
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 9 | F3 race page — results, lap charts, pit stops | todo | — |
 | 10 | F4 driver pages · F5 team pages · F6 circuits | todo | — |
 | 11 | F7 compare — up to 4 entities across eras | todo | — |
 | 12 | F8 records — cross-era leaderboards, normalised | todo | — |
@@ -46,5 +45,6 @@ _Nothing in flight._
 | 4 | Background rebuilt — dot lattice + pointer lamp, CSS-composited | ✅ 2026-08-06 · `471c6a6` |
 | 5 | Dock rail — header clearance, glyph lane, full-height geometry | ✅ 2026-08-06 · `471c6a6` |
 | 6 | Coverage chip explains itself — noun, boundary, meter, chevron | ✅ 2026-08-06 · `471c6a6` |
-| 7 | F1 design system — entity colour encoding, chart language, chart motion, palette validator, CI, enforced budgets | ✅ 2026-08-07 |
-| 8 | F2 season hub — calendar, standings, championship progression; the chart kit and `entityColor` mounted for the first time. **766 tests** | ✅ 2026-08-07 · `feat/season-hub` |
+| 7 | F1 design system — entity colour encoding, chart language, chart motion, palette validator, CI, enforced budgets | ✅ 2026-08-07 · `main` |
+| 8 | F2 season hub — calendar, standings, championship progression; the chart kit and `entityColor` mounted for the first time | ✅ 2026-08-07 · `main` (`59cd4ac`) |
+| 9 | F3 race page — classification (trap-16 shared drives), rank/lap/pit charts on the new d3 chart kit, pace degradation with inferred safety-car bands. **1298 tests** | ✅ 2026-08-08 · `main` (`341d7a5`) |
