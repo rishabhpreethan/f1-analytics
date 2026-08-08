@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { laps2026Fixture, stints2026Fixture } from '@schemas/race.fixture';
-import type { DriverLaps, LapRow, RaceLaps, Stint } from '@schemas/race';
+import type { DriverLaps, LapRow, RaceLaps, RaceStints, Stint } from '@schemas/race';
 import {
   PACE_CEILING_MULTIPLE,
   SAFETY_CAR_RATIO,
@@ -8,6 +8,9 @@ import {
   median,
   paceCeilingMs,
   selectCleanLaps,
+  selectDefaultDegradationDriverRef,
+  selectDegradationStints,
+  selectDriverPaceDegradation,
   selectInferredSafetyCarLaps,
   selectOffScale,
   selectPaceDegradation,
@@ -491,5 +494,187 @@ describe('selectInferredSafetyCarLaps — inferred, and calibrated on 578 races'
       }),
     );
     expect(found.map((entry) => entry.lap)).toEqual([3, 5]);
+  });
+});
+
+/* ==================================================================================
+ * RD-4's opening state. The panel must not demonstrate its own degenerate case first.
+ * ================================================================================== */
+
+/** The r² floor `ScatterChart` draws at. Restated here, not imported: see the selector's doc. */
+const FLOOR = 0.5;
+
+function driverWith(driverRef: string, times: readonly number[]): DriverLaps {
+  return {
+    driverRef,
+    code: driverRef.slice(0, 3).toUpperCase(),
+    surname: driverRef,
+    teamRef: 'mercedes',
+    gridPosition: 1,
+    gridStatus: 'grid',
+    finishPosition: 1,
+    firstLap: 1,
+    lastLap: times.length,
+    laps: times.map((timeMs, index) => lap({ lap: index + 1, timeMs })),
+  };
+}
+
+/** Ten laps rising 200 ms each — a fit of r² 1, comfortably drawn. */
+const CLEAN_DEGRADATION = [95_000, 85_000, 85_200, 85_400, 85_600, 85_800, 86_000, 86_200, 86_400];
+
+/** Ten laps alternating about a flat mean — a real slope of ~0 and an r² near 0. */
+const SCATTER = [95_000, 85_000, 86_000, 85_000, 86_000, 85_000, 86_000, 85_000, 86_000];
+
+function raceLapsOf(drivers: readonly DriverLaps[]): RaceLaps {
+  return { ...laps2026Fixture, drivers: [...drivers] };
+}
+
+function stintsOf(entries: Record<string, Stint[]>): RaceStints {
+  return {
+    ...stints2026Fixture,
+    drivers: Object.entries(entries).map(([driverRef, stints]) => ({
+      driverRef,
+      code: driverRef.slice(0, 3).toUpperCase(),
+      surname: driverRef,
+      teamRef: 'mercedes',
+      lastLap: 9,
+      stops: [],
+      stints,
+    })),
+  };
+}
+
+describe('selectDegradationStints — the stints a fit runs over', () => {
+  it("uses the driver's own stints when the pit payload reaches this race", () => {
+    const own: Stint[] = [
+      { stint: 1, fromLap: 1, toLap: 5, laps: 5, endedByStop: 1 },
+      { stint: 2, fromLap: 6, toLap: 9, laps: 4, endedByStop: null },
+    ];
+    expect(
+      selectDegradationStints(driverWith('russell', SCATTER), stintsOf({ russell: own })),
+    ).toEqual(own);
+  });
+
+  /**
+   * 1996–2010: laps exist and pit stops do not. One implicit stint spanning the race is the
+   * honest reduced answer, and RD-4 is available across the whole lap window because of it.
+   */
+  it('falls back to one implicit stint over the whole race when there are no stints', () => {
+    expect(selectDegradationStints(driverWith('russell', SCATTER), null)).toEqual([
+      { stint: 1, fromLap: 1, toLap: 9, laps: 9, endedByStop: null },
+    ]);
+  });
+
+  it('falls back the same way for a driver the stint payload does not carry', () => {
+    expect(
+      selectDegradationStints(driverWith('hadjar', SCATTER), stintsOf({ russell: [] })),
+    ).toEqual([{ stint: 1, fromLap: 1, toLap: 9, laps: 9, endedByStop: null }]);
+  });
+
+  /**
+   * The degenerate stint this function exists to make unrepresentable: `Math.min()` over no
+   * laps is `Infinity`, and a `[Infinity, -Infinity]` stint renders as a *ready* chart with
+   * nothing in it rather than the empty state that explains itself.
+   */
+  it('is empty for a driver with no lap rows — never one Infinity-wide stint', () => {
+    expect(selectDegradationStints(driverWith('russell', []), null)).toEqual([]);
+  });
+});
+
+describe('selectDefaultDegradationDriverRef — RD-4 opens on a driver with a trend to show', () => {
+  it('skips a leader whose every stint fits below the floor', () => {
+    const laps = raceLapsOf([
+      driverWith('russell', SCATTER),
+      driverWith('antonelli', CLEAN_DEGRADATION),
+    ]);
+    expect(selectDefaultDegradationDriverRef(laps, null, FLOOR)).toBe('antonelli');
+  });
+
+  /**
+   * `raceLapsSchema` orders drivers by finishing position with the unclassified last, so
+   * scanning the payload in order is "the best finisher who has something to show" — the
+   * reason this imposes no sort of its own.
+   */
+  it('takes the first drawable driver in finishing order, not merely any drawable one', () => {
+    const laps = raceLapsOf([
+      driverWith('russell', SCATTER),
+      driverWith('antonelli', CLEAN_DEGRADATION),
+      driverWith('leclerc', CLEAN_DEGRADATION),
+    ]);
+    expect(selectDefaultDegradationDriverRef(laps, null, FLOOR)).toBe('antonelli');
+  });
+
+  it('keeps the leader when the leader is already drawable', () => {
+    const laps = raceLapsOf([
+      driverWith('russell', CLEAN_DEGRADATION),
+      driverWith('antonelli', CLEAN_DEGRADATION),
+    ]);
+    expect(selectDefaultDegradationDriverRef(laps, null, FLOOR)).toBe('russell');
+  });
+
+  /** A real race, not an error: every fit is weak, so the panel opens where it always did. */
+  it('falls back to the first driver when no driver in the race has a drawable fit', () => {
+    const laps = raceLapsOf([driverWith('russell', SCATTER), driverWith('antonelli', SCATTER)]);
+    expect(selectDefaultDegradationDriverRef(laps, null, FLOOR)).toBe('russell');
+  });
+
+  it('is null only when the race has no drivers at all', () => {
+    expect(selectDefaultDegradationDriverRef(raceLapsOf([]), null, FLOOR)).toBeNull();
+  });
+
+  /**
+   * The floor is the surface's to choose, so this must follow it rather than hold its own
+   * copy — a second authority on the number is exactly how the two would drift apart.
+   */
+  it('follows the floor it is given', () => {
+    const laps = raceLapsOf([
+      driverWith('russell', SCATTER),
+      driverWith('antonelli', CLEAN_DEGRADATION),
+    ]);
+    // At a floor of 0 every fit qualifies, so the leader is kept.
+    expect(selectDefaultDegradationDriverRef(laps, null, 0)).toBe('russell');
+    // Above 1 nothing can qualify, so the fallback applies — also the leader, by a different route.
+    expect(selectDefaultDegradationDriverRef(laps, null, 1.01)).toBe('russell');
+  });
+
+  /**
+   * **The property the split into `selectDriverPaceDegradation` exists to guarantee.** A
+   * driver chosen *because* it has a drawable trend must be drawable when drawn; if the scan
+   * and the render derived stints separately, this is the assertion that would break.
+   */
+  it('names a driver that is genuinely drawable when rendered the same way', () => {
+    const stints = stintsOf({
+      russell: [{ stint: 1, fromLap: 1, toLap: 9, laps: 9, endedByStop: null }],
+      antonelli: [{ stint: 1, fromLap: 1, toLap: 9, laps: 9, endedByStop: null }],
+    });
+    const field = [driverWith('russell', SCATTER), driverWith('antonelli', CLEAN_DEGRADATION)];
+    const laps = raceLapsOf(field);
+
+    const chosenRef = selectDefaultDegradationDriverRef(laps, stints, FLOOR);
+    const drawable = field
+      .filter((driver) =>
+        selectDriverPaceDegradation(driver, stints, selectPitLapsByDriver(stints)).some(
+          (entry) => entry.fit !== null && entry.fit.r2 >= FLOOR,
+        ),
+      )
+      .map((driver) => driver.driverRef);
+
+    expect(drawable).toContain(chosenRef);
+  });
+
+  /** The whole scan must survive the 1996–2010 window, where there is no stint payload. */
+  it('works with no stint payload at all — the 1996 case', () => {
+    const field = [driverWith('russell', SCATTER), driverWith('antonelli', CLEAN_DEGRADATION)];
+    const chosenRef = selectDefaultDegradationDriverRef(raceLapsOf(field), null, FLOOR);
+    const drawable = field
+      .filter((driver) =>
+        selectDriverPaceDegradation(driver, null, new Map()).some(
+          (entry) => entry.fit !== null && entry.fit.r2 >= FLOOR,
+        ),
+      )
+      .map((driver) => driver.driverRef);
+
+    expect(chosenRef).toBe('antonelli');
+    expect(drawable).toEqual(['antonelli']);
   });
 });

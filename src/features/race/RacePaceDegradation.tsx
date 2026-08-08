@@ -3,8 +3,9 @@ import { ScatterChart, TREND_R2_FLOOR } from '@/components/charts';
 import { formatDuration } from '@/lib/format';
 import type { RaceLaps, RaceStints } from '@schemas/race';
 import {
+  selectDefaultDegradationDriverRef,
+  selectDriverPaceDegradation,
   selectInferredSafetyCarLaps,
-  selectPaceDegradation,
   selectPitLapsByDriver,
   SAFETY_CAR_RATIO,
 } from './pace';
@@ -51,7 +52,22 @@ export function PaceDegradation({ laps, stints }: PaceDegradationProps) {
    * would be over incomparable windows.
    */
   const [driverRef, setDriverRef] = useState<string | null>(null);
-  const chosen = laps.drivers.find((d) => d.driverRef === driverRef) ?? laps.drivers[0];
+
+  /*
+   * **Until the reader picks, open on a driver who has something to show.** `laps.drivers[0]`
+   * is the winner, and on 2026 R1 the winner's every stint fits below the floor — so the panel
+   * opened as a bare scatter beneath a caption promising a dashed trend line, demonstrating its
+   * own degenerate case first. `selectDefaultDegradationDriverRef` scans finishing order for the
+   * first driver with a drawable fit and falls back to `drivers[0]` when no driver has one, which
+   * is a real race rather than an error. It is computed from the payload, never a named driver.
+   *
+   * Unmemoised on purpose: it is the same order of work as `selectInferredSafetyCarLaps` two
+   * lines below, which has always run per render, and both are bounded by a payload the server
+   * already bounds.
+   */
+  const defaultRef = selectDefaultDegradationDriverRef(laps, stints, TREND_R2_FLOOR);
+  const chosen =
+    laps.drivers.find((d) => d.driverRef === (driverRef ?? defaultRef)) ?? laps.drivers[0];
 
   const inferred = selectInferredSafetyCarLaps(laps);
   const bands = mergeAdjacent(inferred.map((slow) => slow.lap));
@@ -61,25 +77,14 @@ export function PaceDegradation({ laps, stints }: PaceDegradationProps) {
   /*
    * Stints come from the pit payload, which sits behind a *later* boundary than laps (2011 vs 1996).
    * With no stints there is still one implicit stint — the whole race — and a fit over it is the
-   * honest reduced answer rather than an absent section.
+   * honest reduced answer rather than an absent section. That resolution lives in
+   * `selectDegradationStints` rather than here, so the default-driver scan above and this render
+   * read the same stints: a driver chosen *because* it has a drawable trend must not then be drawn
+   * from a differently-derived set of stints that has none.
    */
-  const driverStints = stints?.drivers.find((d) => d.driverRef === chosen.driverRef)?.stints ?? [];
-  const pitLaps =
-    stints === null ? [] : (selectPitLapsByDriver(stints).get(chosen.driverRef) ?? []);
-  const wholeRace =
-    driverStints.length > 0
-      ? driverStints
-      : [
-          {
-            stint: 1,
-            fromLap: Math.min(...chosen.laps.map((l) => l.lap)),
-            toLap: Math.max(...chosen.laps.map((l) => l.lap)),
-            laps: chosen.laps.length,
-            endedByStop: null,
-          },
-        ];
-
-  const degradation = selectPaceDegradation(chosen, wholeRace, pitLaps);
+  const pitLapsByDriver =
+    stints === null ? new Map<string, number[]>() : selectPitLapsByDriver(stints);
+  const degradation = selectDriverPaceDegradation(chosen, stints, pitLapsByDriver);
 
   const groups = degradation.map((entry) => ({
     reference: `stint-${String(entry.stint.stint)}`,

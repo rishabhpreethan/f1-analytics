@@ -214,6 +214,104 @@ export function selectPaceDegradation(
   });
 }
 
+/**
+ * The stints a degradation fit runs over: the driver's own stints when the pit payload
+ * reaches this race, and otherwise **one implicit stint spanning the whole race**.
+ *
+ * Stints are derived from pit stops, so they begin in 2011 while laps begin in 1996. With
+ * no stints there is still one stint — the race — and a fit over it is the honest reduced
+ * answer rather than an absent section (`DESIGN_SYSTEM.md` §6.6, RD-4).
+ *
+ * **Empty for a driver with no lap rows**, which is the case that must not become one
+ * degenerate stint: `Math.min()` over no laps is `Infinity`, and a `[Infinity, -Infinity]`
+ * stint yields a group with zero points — a chart in its *ready* state with nothing in it,
+ * instead of the empty state that explains itself. Unreachable from the current payload
+ * (`buildDriverLaps` only emits a driver that has lap rows) and structural rather than
+ * checked-for, so it stays unreachable.
+ */
+export function selectDegradationStints(
+  driver: DriverLaps,
+  stints: RaceStints | null,
+): readonly Stint[] {
+  const own = stints?.drivers.find((entry) => entry.driverRef === driver.driverRef)?.stints ?? [];
+  if (own.length > 0) return own;
+  if (driver.laps.length === 0) return [];
+
+  let fromLap = Number.POSITIVE_INFINITY;
+  let toLap = Number.NEGATIVE_INFINITY;
+  for (const lap of driver.laps) {
+    if (lap.lap < fromLap) fromLap = lap.lap;
+    if (lap.lap > toLap) toLap = lap.lap;
+  }
+  return [{ stint: 1, fromLap, toLap, laps: driver.laps.length, endedByStop: null }];
+}
+
+/**
+ * One driver's per-stint degradation, resolved from the two race payloads.
+ *
+ * **This exists so that "which driver should we show?" and "what do we draw?" cannot
+ * disagree.** The default-driver scan below and the surface that renders the answer both
+ * call this, so a driver can never be chosen *because* it has a drawable trend and then
+ * rendered from a differently-derived set of stints that does not.
+ *
+ * @param pitLapsByDriver built once by `selectPitLapsByDriver`, because the scan calls this
+ *                        for every driver and rebuilding the map per driver would be
+ *                        quadratic in the field for no reason.
+ */
+export function selectDriverPaceDegradation(
+  driver: DriverLaps,
+  stints: RaceStints | null,
+  pitLapsByDriver: ReadonlyMap<string, number[]>,
+): StintDegradation[] {
+  return selectPaceDegradation(
+    driver,
+    selectDegradationStints(driver, stints),
+    pitLapsByDriver.get(driver.driverRef) ?? [],
+  );
+}
+
+/**
+ * The driver RD-4 opens on: **the first one, in finishing order, that has at least one
+ * stint whose fit is strong enough to be drawn.**
+ *
+ * The section's caption describes a dashed trend line. Opening on a driver whose every fit
+ * is below the floor showed a bare scatter under that caption — the panel demonstrating its
+ * own degenerate case as a first impression. Measured on 2026 R1, where the payload's first
+ * driver is the winner: Russell's two stints fit at r² 0.129 and 0.083, so nothing was
+ * drawn; 9 of the 20 drivers have a drawable stint and the first of them is Antonelli at
+ * 0.677.
+ *
+ * **Computed, never a named driver.** A hard-coded reference would be correct for one race
+ * and silently wrong for the other 1,172. `laps.drivers` is already ordered by finishing
+ * position with the unclassified last (`raceLapsSchema`), so scanning it in order means
+ * "the best finisher who has something to show" — which needs no sort of its own, and which
+ * is why this reads the payload's order rather than imposing one.
+ *
+ * @param trendFloor the r² at or above which a trend is drawn. **Passed in, not defaulted**:
+ *                   the number is a presentation judgement and `ScatterChart.TREND_R2_FLOOR`
+ *                   is its one authority. Importing it here would pull a React component
+ *                   into a pure module's graph and give the constant a second home.
+ * @returns the first driver in the payload when no driver has a drawable fit — a real race
+ *          state, not an error — and null only when the race has no drivers at all.
+ */
+export function selectDefaultDegradationDriverRef(
+  laps: RaceLaps,
+  stints: RaceStints | null,
+  trendFloor: number,
+): string | null {
+  const pitLapsByDriver =
+    stints === null ? new Map<string, number[]>() : selectPitLapsByDriver(stints);
+
+  for (const driver of laps.drivers) {
+    const degradation = selectDriverPaceDegradation(driver, stints, pitLapsByDriver);
+    if (degradation.some((entry) => entry.fit !== null && entry.fit.r2 >= trendFloor)) {
+      return driver.driverRef;
+    }
+  }
+
+  return laps.drivers[0]?.driverRef ?? null;
+}
+
 /* ============================================ RD-4's other honesty requirement: the SC */
 
 export interface InferredSlowLap {
