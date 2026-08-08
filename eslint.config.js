@@ -5,20 +5,25 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 /**
- * The chart substrate is four d3 modules and nothing else (ARCHITECTURE.md §10 #28).
- * `DESIGN_SYSTEM.md` §6 names four that are forbidden and gives a reason for each; the
- * reasons are reproduced here because a lint message is where someone will meet the rule.
+ * The chart substrate is **three** d3 modules and nothing else (ARCHITECTURE.md §10 #28,
+ * amended by #31). `DESIGN_SYSTEM.md` §6 names four that are forbidden and gives a reason
+ * for each; the reasons are reproduced here because a lint message is where someone will
+ * meet the rule.
  *
  * The `d3` meta-package is added to the same list even though §6 does not name it: it
  * re-exports all thirty-odd modules, so a single `import { scaleLinear } from 'd3'` would
  * pull `d3-geo`, `d3-delaunay`, `d3-selection` and the rest into the resolution graph and
  * quietly defeat every measurement the decision rests on.
+ *
+ * `d3-time-format` joins them (§10 #31): it was uninstalled in F3 having never been
+ * imported, and — exactly like `d3-format` — it stays **resolvable** as a transitive of
+ * `d3-scale`, so without a rule it would type-check and work.
  */
 const D3_RESTRICTED = [
   {
     name: 'd3',
     message:
-      'Use the granular d3-scale / d3-shape / d3-array / d3-time-format packages — the meta-package re-exports modules ARCHITECTURE §10 #28 deliberately excluded.',
+      'Use the granular d3-scale / d3-shape / d3-array packages — the meta-package re-exports modules ARCHITECTURE §10 #28 deliberately excluded.',
   },
   {
     name: 'd3-axis',
@@ -38,6 +43,11 @@ const D3_RESTRICTED = [
     name: 'd3-format',
     message:
       'Forbidden (DESIGN_SYSTEM §6): numerals go through @/lib/format. A second number formatter drifts on lap times. (It is present transitively under d3-scale; that is resolution, not an import site.)',
+  },
+  {
+    name: 'd3-time-format',
+    message:
+      'Uninstalled in F3 (ARCHITECTURE §10 #31): nothing in this product plots a real date axis — rounds and laps are integers. Dates go through @/lib/format. (Still resolvable as a transitive of d3-scale; that is resolution, not an import site.) If a date axis is genuinely needed, reinstate it with a §10 entry rather than importing what happens to resolve.',
   },
 ];
 

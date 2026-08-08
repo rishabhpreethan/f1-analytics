@@ -81,6 +81,17 @@ export default defineConfig({
      * single test measured locally is 717 ms (`RootLayout > distinguishes a rate limit`, a
      * jsdom mount plus two query retries). 15 s is ~21× that.
      *
+     * **Cause 2's diagnosis was wrong, and this number was never what fixed it** (measured
+     * 2026-08-08). `testTimeout` does not bound a `findBy*`: `@testing-library/dom` caps
+     * every one of them at its own `asyncUtilTimeout`, defaulting to **1000 ms**, and
+     * whichever expires first wins. So the suite's real per-assertion budget was 1 s
+     * throughout, and raising this from 5 s to 15 s could not have moved it. `render()` is
+     * synchronous and therefore genuinely covered here — but the async wait that follows it
+     * was not. `vitest.setup.ts` §3 now sets `asyncUtilTimeout` explicitly, with the
+     * measurements, and deliberately below this value so the inner budget expires first and
+     * the failure names the element that never appeared. **These two numbers are ordered on
+     * purpose; do not raise one without reading the other.**
+     *
      * **Why raising the timeout hides nothing:** no test in this suite asserts elapsed
      * wall-clock time. The only two time-sensitive suites — `server/cache/memo.test.ts` and
      * `server/middleware/rateLimit.test.ts` — drive `vi.useFakeTimers()`, and the motion

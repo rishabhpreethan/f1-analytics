@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   AXIS_GAP,
+  AXIS_TITLE_LINE,
   CATEGORY_COUNT_LIMIT,
+  categoryPlotHeight,
   clampTooltip,
+  MARKER_RING,
+  ISOLATION_THRESHOLD,
+  labelCapacity,
+  nearestByOffset,
+  shouldDrawMarkers,
+  withEndpoints,
   computeMargin,
   mountKey,
   positionTicksWithin,
@@ -340,5 +348,197 @@ describe('positionTicksWithin', () => {
 describe('mountKey', () => {
   it('is stable by value where an array literal is not', () => {
     expect(mountKey(['a'], 10, 20)).toBe(mountKey(['a'], 10, 20));
+  });
+});
+
+/**
+ * §6.3's marker-density rule. The figures are the ones that forced it: a modern race is 58 laps, a
+ * plot is ~800px, and an 8px marker with a 1.5px ring occupies 11px.
+ */
+describe('shouldDrawMarkers', () => {
+  it('refuses at race density — 58 laps across 800px', () => {
+    // 13.8px apart against a 22px floor (2x the 11px marker). This is the case it exists for.
+    expect(shouldDrawMarkers(58, 800)).toBe(false);
+  });
+
+  it('draws at season density — 22 rounds across 800px', () => {
+    // 38px apart. The season hub's progression chart must keep its markers.
+    expect(shouldDrawMarkers(22, 800)).toBe(true);
+  });
+
+  it('requires TWICE the marker width, not once', () => {
+    const full = MARKER_SIZE + 2 * MARKER_RING;
+    // Exactly one marker width apart is refused; exactly two is accepted.
+    expect(shouldDrawMarkers(2, full)).toBe(false);
+    expect(shouldDrawMarkers(2, 2 * full)).toBe(true);
+  });
+
+  it('always draws a single point, which cannot collide with anything', () => {
+    expect(shouldDrawMarkers(1, 0)).toBe(true);
+  });
+
+  it('DRAWS on an unmeasured plot — "not yet measured" is not "too dense"', () => {
+    // `useChartSize` reports 0 until the ResizeObserver fires. Treating that as dense would drop
+    // every marker on the first paint and pop them in, and would make the marker layer absent in
+    // jsdom — where the "a null reading is a gap, not a zero" assertion depends on counting them.
+    expect(shouldDrawMarkers(58, 0)).toBe(true);
+  });
+});
+
+/**
+ * §6.3's endpoint rule. The two cases are the real ones: `d3.ticks(11)` on a 22-round season yields
+ * `[2, 4 … 22]` and on a 58-lap race yields `[5, 10 … 55]`, so round 1, lap 1 and lap 58 all go
+ * unlabelled. The 22-round case was **already live in the season hub** and went unnoticed only
+ * because 2026 has 10 completed rounds and `ticks` on `[1, 10]` happens to include 1.
+ */
+describe('withEndpoints', () => {
+  it('adds round 1 to a season axis that d3 started at 2', () => {
+    expect(withEndpoints([2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22], 1, 22, 0)).toEqual([
+      1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22,
+    ]);
+  });
+
+  it('adds both the first and the last lap of a race', () => {
+    const ticks = withEndpoints([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], 1, 58, 0);
+    expect(ticks[0]).toBe(1);
+    expect(ticks[ticks.length - 1]).toBe(58);
+  });
+
+  it('drops an interior tick that crowds an endpoint, never the endpoint itself', () => {
+    // An interior tick is one of eleven equivalent references; an endpoint is the only one of its
+    // kind, so the endpoint always wins. Here `2` crowds `1` and `20` crowds `22`, and both go.
+    expect(withEndpoints([2, 10, 20], 1, 22, 3)).toEqual([1, 10, 22]);
+  });
+
+  it('keeps an interior tick that clears the gap at both ends', () => {
+    expect(withEndpoints([5, 10, 18], 1, 22, 3)).toEqual([1, 5, 10, 18, 22]);
+  });
+
+  it('never duplicates an endpoint that d3 already produced', () => {
+    expect(withEndpoints([1, 5, 10], 1, 10, 0)).toEqual([1, 5, 10]);
+  });
+
+  it('collapses a single-value domain rather than emitting a reversed pair', () => {
+    expect(withEndpoints([], 7, 7, 0)).toEqual([7]);
+  });
+
+  it('guarantees ascending order rather than inheriting it from the caller', () => {
+    // `d3.ticks` returns sorted values, so nothing depends on this today — but the axis renderer
+    // assumes ordering, and a function should hold its own postcondition.
+    expect(withEndpoints([30, 10, 20], 1, 58, 0)).toEqual([1, 10, 20, 30, 58]);
+  });
+});
+
+/**
+ * §6.5.4a's isolation, as arithmetic. This exists as a pure function because the component version
+ * was untestable — `RankChart` derives each candidate's offset from a `d3` scale, and in jsdom every
+ * scale collapses to 0, so twenty lines are exactly equidistant from any pointer.
+ */
+describe('nearestByOffset', () => {
+  const FIELD = [
+    { reference: 'a', offset: 0 },
+    { reference: 'b', offset: 20 },
+    { reference: 'c', offset: 40 },
+  ];
+
+  it('picks the nearest candidate', () => {
+    expect(nearestByOffset(FIELD, 22, ISOLATION_THRESHOLD)).toBe('b');
+  });
+
+  it('returns null past the threshold — open space is hovering NOTHING', () => {
+    // Snapping to the closest line regardless would make isolation fire constantly and mean nothing.
+    expect(nearestByOffset([{ reference: 'a', offset: 0 }], 60, ISOLATION_THRESHOLD)).toBeNull();
+  });
+
+  it('accepts a candidate exactly at the threshold', () => {
+    expect(nearestByOffset([{ reference: 'a', offset: 0 }], 14, ISOLATION_THRESHOLD)).toBe('a');
+  });
+
+  it('breaks a tie toward the earlier candidate, which is the stable entity order', () => {
+    const tied = [
+      { reference: 'first', offset: 10 },
+      { reference: 'second', offset: 10 },
+    ];
+    expect(nearestByOffset(tied, 10, ISOLATION_THRESHOLD)).toBe('first');
+  });
+
+  it('returns null for an empty field rather than throwing', () => {
+    expect(nearestByOffset([], 0, ISOLATION_THRESHOLD)).toBeNull();
+  });
+
+  it('has a threshold forgiving enough for a 1px line', () => {
+    // Half a row at 20 cars in a 360px plot is 9px; 14 clears it without reaching the next line.
+    expect(ISOLATION_THRESHOLD).toBeGreaterThan(9);
+    expect(ISOLATION_THRESHOLD).toBeLessThan(18);
+  });
+});
+
+/**
+ * The arithmetic behind §6.5.4a's collision fix. `computeMargin` sizes the left gutter from whatever
+ * labels it is told will occupy it — so a rank chart passing its *driver* labels gets room for
+ * `Häkkinen`, where passing `P20` reserved room for four characters and let the driver labels run
+ * back over the ticks.
+ */
+describe('computeMargin — the left gutter holds what it is told it holds', () => {
+  it('reserves more for a surname than for a position tick', () => {
+    const forTicks = computeMargin({ measureLabels: ['P20'], hasMeasureTitle: true });
+    const forNames = computeMargin({ measureLabels: ['Häkkinen'], hasMeasureTitle: true });
+    expect(forNames.left).toBeGreaterThan(forTicks.left);
+  });
+
+  it('is driven by the WIDEST label, not the first or the last', () => {
+    const mixed = computeMargin({ measureLabels: ['VER', 'Häkkinen', 'HAM'] });
+    const longest = computeMargin({ measureLabels: ['Häkkinen'] });
+    expect(mixed.left).toBe(longest.left);
+  });
+});
+
+/**
+ * §6.3's rotation rule, completed. Rotating a chart whose category axis does not fit moves the problem
+ * to the **other** axis, and nothing checked the new capacity. Measured on 2026 R1's pit timeline: 32
+ * stops, labels 8 characters, so rotation fired correctly on count — and 32 rows in a 360px plot gave
+ * an 11.3px pitch against a 14px line-height, producing 31 overlaps across 40 text nodes.
+ */
+describe('categoryPlotHeight', () => {
+  it('keeps the token when the categories fit inside it', () => {
+    // 12 rows at 16px is 192, well inside 360.
+    expect(categoryPlotHeight(12, 360)).toBe(360);
+  });
+
+  it('grows past the token when they do not — 32 stops need 496, not 360', () => {
+    // 31 gaps of 16px between 32 anchors.
+    expect(categoryPlotHeight(32, 360)).toBe(496);
+  });
+
+  it('agrees with labelCapacity about where the boundary is', () => {
+    // The two must not disagree: one decides whether to grow, the other how far.
+    const capacity = labelCapacity(360);
+    expect(categoryPlotHeight(capacity, 360)).toBe(360);
+    expect(categoryPlotHeight(capacity + 8, 360)).toBeGreaterThan(360);
+  });
+
+  it('treats the token as a floor and never shrinks below it', () => {
+    expect(categoryPlotHeight(1, 360)).toBe(360);
+    expect(categoryPlotHeight(0, 360)).toBe(360);
+  });
+});
+
+/**
+ * The fourth "correct intent, wrong coordinate space", and it happened *inside the fix for the third*.
+ * Freeing the rank chart's gutter of position ticks let a 1996 surname collide with the rotated axis
+ * title — `Race position` × `Verstappen` — because `4` is a rounding allowance, not a separation.
+ */
+describe('computeMargin — the axis title is an occupant of the gutter, not a rounding allowance', () => {
+  it('reserves a full title line plus a gap, not 4px', () => {
+    const withTitle = computeMargin({ measureLabels: ['Verstappen'], hasMeasureTitle: true });
+    const without = computeMargin({ measureLabels: ['Verstappen'] });
+    expect(withTitle.left - without.left).toBe(AXIS_TITLE_LINE + AXIS_GAP);
+  });
+
+  it('leaves the labels clear of the title band', () => {
+    // The label's left edge is `left - AXIS_GAP - width`; the title band ends at AXIS_TITLE_LINE.
+    const width = monoTextWidth('Verstappen');
+    const { left } = computeMargin({ measureLabels: ['Verstappen'], hasMeasureTitle: true });
+    expect(left - AXIS_GAP - width).toBeGreaterThanOrEqual(AXIS_TITLE_LINE);
   });
 });

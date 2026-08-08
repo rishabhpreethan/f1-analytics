@@ -80,3 +80,69 @@ if (typeof window !== 'undefined' && typeof HTMLElement !== 'undefined') {
     });
   }
 }
+
+/*
+ * -------------------------------------------- 3. asyncUtilTimeout, the budget that binds
+ *
+ * **`testTimeout: 15_000` in `vite.config.ts` never applied to a `findBy*`.** Every
+ * `findBy*` / `waitFor` is capped independently by `@testing-library/dom`'s
+ * `asyncUtilTimeout`, whose default is **1000 ms** (`dist/config.js` line 15) and which
+ * nothing in this repository had ever set. Whichever expires first wins, so the suite's
+ * real per-assertion budget was 1 s while its configuration claimed 15 s — and the failure
+ * it produces is *"Unable to find an element with the role…"*, which reads like a genuine
+ * assertion failure rather than a timeout. That is why the earlier flake was diagnosed as
+ * mount cost and answered by raising `testTimeout` from 5 s to 15 s: a change that, measured
+ * now, could not have helped.
+ *
+ * **What is actually inside the bounded window, measured** — `render()` is synchronous, so
+ * almost all of a mount's cost is outside it and covered by `testTimeout`. Instrumenting the
+ * full `<App />` mount, under 16 busy processes on 8 cores (~3× oversubscription):
+ *
+ * ```
+ *   landing, cold module graph   sync-render 319 ms   findBy 117 ms
+ *   landing, warm                sync-render 207 ms   findBy  58 ms
+ *   503, no retry                sync-render 200 ms   findBy 222 ms
+ *   429, one retry               sync-render 618 ms   findBy 440 ms   ← the worst
+ *   500, one retry               sync-render 204 ms   findBy 274 ms
+ * ```
+ *
+ * The worst bounded window in the suite is therefore **440 ms against 1000 ms** — 2.3×
+ * headroom on a machine at 3× load, which is the margin that was intermittently lost.
+ *
+ * The mechanism was confirmed rather than inferred: setting this to `1` fails
+ * `RootLayout.test.tsx` with `TestingLibraryElementError: Unable to find role="heading"…`,
+ * **not** a vitest timeout — which is what an intermittent CPU stall would have looked like,
+ * and why it would not have been read as one. It fails **2 of 17 tests**, and those two are
+ * exactly the failure-state tests above; the other 15, the whole route table included,
+ * resolve on `findBy*`'s initial synchronous pass and never enter the wait at all.
+ *
+ * **5000 ms, and the two constraints that pick it.** It is ~11× the worst measurement, the
+ * same kind of ratio `vite.config.ts` chose for `testTimeout`. And it stays *below*
+ * `testTimeout`, deliberately: the inner budget must expire first, or a stuck assertion
+ * surfaces as a bare test timeout instead of an error naming the element that never
+ * appeared. Ordering these two numbers is most of the point of setting this at all.
+ *
+ * **Why this hides nothing** — the same argument `vite.config.ts` makes, applied to the knob
+ * that was actually binding. No test in this suite asserts elapsed wall-clock time; the two
+ * time-sensitive server suites drive `vi.useFakeTimers()`, the motion tests assert duration
+ * *token values*, and `RootLayout.test.tsx` deliberately proves a retry happened via
+ * `toHaveBeenCalledTimes` rather than by waiting. A genuinely stuck `waitFor` still fails,
+ * 5 s later instead of 1 s. What this cannot do is turn a slow implementation green.
+ *
+ * **What was rejected, and why.** Cutting the number of `<App />` mounts in
+ * `RootLayout.test.tsx` — the file mounts 19 times, not the 7 it looks like, since the route
+ * table is 13 — does not address this: a warm mount contributes 58 ms to the bounded window,
+ * so removing ten of them recovers ~0.6 s spread across ten separate assertions, none of
+ * which was near the limit, while the three tests that *are* near it each already do the
+ * minimum mounts their claim needs. Splitting the file is worse still: every additional
+ * jsdom file pays its own environment (~334 ms) and import graph (~758 ms) and its own cold
+ * mount. The cause is a 1 s cap, not a mount count, so those fix the wrong thing.
+ *
+ * Imported dynamically inside the `window` guard because this file is a setup file for
+ * **every** test, and 50 of the 64 run in the `node` environment where a DOM library has no
+ * business being loaded.
+ */
+if (typeof window !== 'undefined') {
+  const { configure } = await import('@testing-library/dom');
+  configure({ asyncUtilTimeout: 5_000 });
+}

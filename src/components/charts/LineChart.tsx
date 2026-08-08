@@ -11,12 +11,16 @@ import { SeriesTable } from './ChartTable';
 import {
   clampTooltip,
   computeMargin,
+  shouldDrawMarkers,
   measureTickCount,
   monoTextWidth,
   mountKey,
   placeDirectLabels,
   plotArea,
+  fmtCoord,
+  offScalePath,
   timeTickCount,
+  withEndpoints,
   TICK_LABEL_SIZE,
   tooltipHeight,
   TOOLTIP_WIDTH,
@@ -99,6 +103,18 @@ export interface LineChartProps {
    * the kit had no way to say it until now. Use `positionTicksWithin`.
    */
   yTickValues?: readonly number[];
+  /**
+   * §6.3 — clip the measure axis at this value, and mark every reading above it.
+   *
+   * Built for the lap-time trace, where it is **mandatory rather than optional**: 2026 R1's slowest
+   * lap is 1,168s against a fastest of 82s, so an unclipped axis compresses every racing lap into 7%
+   * of the plot. Readings above the ceiling are drawn at the ceiling with an off-scale caret, counted
+   * in a note the frame renders, and left exact in the table view — which is what makes the clipping
+   * honest rather than lossy.
+   */
+  yCeiling?: number;
+  /** Formats the ceiling for the off-scale note. Defaults to `formatY`. */
+  formatCeiling?: (value: number) => string;
 }
 
 const identity = (n: number) => String(n);
@@ -121,6 +137,8 @@ export function LineChart({
   zeroBaseline = false,
   yDomain,
   yTickValues,
+  yCeiling,
+  formatCeiling,
 }: LineChartProps) {
   const labelX = formatXLong ?? formatX;
   const clipId = useId().replace(/:/g, '');
@@ -155,11 +173,30 @@ export function LineChart({
     points: series[i]?.points ?? [],
   }));
 
+  /*
+   * §6.3's ceiling, applied **before** the domain is derived — which is the whole point. Clipping
+   * after the axis had already been sized by a 1,168-second lap would change nothing. A clipped
+   * reading keeps its x and is flagged, so the caret is drawn at its own lap rather than the line
+   * simply breaking.
+   */
+  const clipped = resolved.map((s) => ({
+    ...s,
+    points: s.points.map((p) =>
+      yCeiling !== undefined && p.y !== null && p.y > yCeiling
+        ? { x: p.x, y: yCeiling, offScale: true }
+        : { x: p.x, y: p.y, offScale: false },
+    ),
+  }));
+  const offScaleCount = clipped.reduce(
+    (total, s) => total + s.points.filter((p) => p.offScale).length,
+    0,
+  );
+
   /* The union of every x any series has a reading for, ascending. A driver who joined at round 5
    * must not truncate the axis to rounds 5+. */
-  const xs = [...new Set(resolved.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
+  const xs = [...new Set(clipped.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
 
-  const ys = resolved.flatMap((s) =>
+  const ys = clipped.flatMap((s) =>
     s.points.map((p) => p.y).filter((y): y is number => y !== null),
   );
 
@@ -211,10 +248,40 @@ export function LineChart({
     label: formatY(value),
   }));
 
-  const xTicks = xScale.ticks(timeTickCount(plot.innerWidth)).map((value) => ({
+  /*
+   * §6.3 — **the first and last value are always labelled.** `d3.ticks` picks round numbers inside
+   * the domain and ignores its endpoints, which on a 1-based sequence loses the two readings that
+   * frame every other one: `[1, 58]` yields `[5, 10 … 55]`, so neither the first lap nor the last
+   * appears. `withEndpoints` forces both in and drops any interior tick that would crowd them.
+   *
+   * The crowding gap is the widest label plus a space, converted from px into domain units here —
+   * where the scale is already known — so `geometry` stays free of scales and stays testable.
+   */
+  const xDomainMin = xs[0] ?? 0;
+  const xDomainMax = xs[xs.length - 1] ?? 1;
+  const widestXLabel = Math.max(
+    monoTextWidth(formatX(xDomainMin)),
+    monoTextWidth(formatX(xDomainMax)),
+  );
+  const xGapInDomain =
+    plot.innerWidth > 0
+      ? ((widestXLabel + TICK_LABEL_SIZE) * (xDomainMax - xDomainMin)) / plot.innerWidth
+      : 0;
+
+  const xTicks = withEndpoints(
+    xScale.ticks(timeTickCount(plot.innerWidth)),
+    xDomainMin,
+    xDomainMax,
+    xGapInDomain,
+  ).map((value) => ({
     offset: xScale(value),
     label: formatX(value),
   }));
+
+  /* The densest series decides, not the average: one 58-lap series among three short ones still
+   * produces the collision. */
+  const densestSeries = Math.max(1, ...resolved.map((s) => s.points.length));
+  const drawMarkers = shouldDrawMarkers(densestSeries, plot.innerWidth);
 
   const path = d3line<{ x: number; y: number | null }>()
     .defined((p) => p.y !== null)
@@ -330,6 +397,9 @@ export function LineChart({
       {...(stateCopy === undefined ? {} : { stateCopy })}
       patterns={patterns}
       onPatternsChange={setPatterns}
+      {...(yCeiling === undefined || offScaleCount === 0
+        ? {}
+        : { offScale: { count: offScaleCount, ceiling: (formatCeiling ?? formatY)(yCeiling) } })}
       legend={<ChartLegend series={resolved} emptyReferences={emptyReferences} />}
       table={
         <SeriesTable
@@ -386,7 +456,7 @@ export function LineChart({
 
             <g className="chart-marks" clipPath={`url(#${clipId})`}>
               <g transform={`translate(${String(plot.left)} ${String(plot.top)})`}>
-                {resolved.map((s) => (
+                {clipped.map((s) => (
                   <path
                     key={s.reference}
                     className="chart-line"
@@ -395,16 +465,42 @@ export function LineChart({
                     style={{ '--series': cssVar(s.plot) } as React.CSSProperties}
                   />
                 ))}
-                {resolved.map((s) =>
+                {/*
+                 * §6.3 — **markers only where they fit.** At race density (58 laps over ~800px,
+                 * 13.8px apart against an 11px marker) they collide into a bead chain that hides
+                 * the line, and at four series there are 232 of them. Below the spacing floor the
+                 * line is the signal and the crosshair is the readout.
+                 */}
+                {drawMarkers &&
+                  resolved.map((s) =>
+                    s.points
+                      .filter((p) => p.y !== null)
+                      .map((p) => (
+                        <MarkerGlyph
+                          key={`${s.reference}-${String(p.x)}`}
+                          shape={s.marker}
+                          token={s.plot}
+                          x={xScale(p.x)}
+                          y={yScale(p.y ?? 0)}
+                        />
+                      )),
+                  )}
+                {/*
+                 * §6.3's off-scale carets. Drawn **regardless of marker density** — unlike a marker,
+                 * a caret is not one of a series of equivalent readings, it is a statement that this
+                 * reading is not where it appears. Suppressing it at race density would remove the
+                 * only visible sign that the axis is clipped.
+                 */}
+                {clipped.map((s) =>
                   s.points
-                    .filter((p) => p.y !== null)
+                    .filter((p) => p.offScale)
                     .map((p) => (
-                      <MarkerGlyph
-                        key={`${s.reference}-${String(p.x)}`}
-                        shape={s.marker}
-                        token={s.plot}
-                        x={xScale(p.x)}
-                        y={yScale(p.y ?? 0)}
+                      <path
+                        key={`${s.reference}-off-${String(p.x)}`}
+                        className="chart-offscale"
+                        d={offScalePath()}
+                        transform={`translate(${fmtCoord(xScale(p.x))} ${fmtCoord(yScale(p.y ?? 0))})`}
+                        style={{ '--series': cssVar(s.plot) } as React.CSSProperties}
                       />
                     )),
                 )}

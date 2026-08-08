@@ -416,3 +416,101 @@ describe('§6.5.1 — the tooltip is positioned from an explicit origin', () => 
     expect(tooltip?.style.top).toBe('0px');
   });
 });
+
+/**
+ * §6.3's clipped measure axis, and the two things that make it **honest rather than lossy**: the
+ * count is legible without hovering anything, and the exact values are one action away.
+ *
+ * The figures are 2026 R1's: fastest 82.091s, ceiling 123.137s, and a slowest lap of 1,168.144s
+ * spent stationary under a red flag. An axis that accommodated that lap would compress every racing
+ * lap into 7% of the plot.
+ */
+const WITH_STOPPAGE: SeriesInput[] = [
+  {
+    reference: 'verstappen',
+    teamReference: 'red_bull',
+    label: 'Verstappen',
+    points: [
+      { x: 1, y: 82_091 },
+      { x: 2, y: 1_168_144 },
+      { x: 3, y: 85_228 },
+    ],
+  },
+];
+
+describe('§6.3 — a clipped axis states what it clipped', () => {
+  const CEILING = 123_137;
+  const fmt = (ms: number) => `${String(Math.round(ms / 1000))}s`;
+
+  function renderClipped() {
+    return render(
+      <LineChart
+        series={WITH_STOPPAGE}
+        title="Lap times"
+        ariaLabel="Lap time by lap"
+        yCeiling={CEILING}
+        formatY={fmt}
+      />,
+    );
+  }
+
+  it('counts the off-scale readings in a note, without needing a hover', () => {
+    renderClipped();
+    expect(screen.getByText(/1 lap is slower than 123s/)).toBeTruthy();
+  });
+
+  it('pluralises the count', () => {
+    render(
+      <LineChart
+        series={[
+          {
+            ...(WITH_STOPPAGE[0] as SeriesInput),
+            points: [
+              { x: 1, y: 1_168_144 },
+              { x: 2, y: 900_000 },
+            ],
+          },
+        ]}
+        title="Lap times"
+        ariaLabel="Lap time by lap"
+        yCeiling={CEILING}
+        formatY={fmt}
+      />,
+    );
+    expect(screen.getByText(/2 laps are slower than 123s/)).toBeTruthy();
+  });
+
+  it('draws a caret for the clipped reading, and not an ordinary marker', () => {
+    const { container } = renderClipped();
+    expect(container.querySelectorAll('.chart-offscale')).toHaveLength(1);
+  });
+
+  it('says nothing at all when no reading exceeds the ceiling', () => {
+    render(<LineChart series={SEASON} title="Points" ariaLabel="Points" yCeiling={1_000_000} />);
+    expect(screen.queryByText(/slower than/)).toBeNull();
+  });
+
+  it('reaches the table view in one action — which is what makes clipping lossless', async () => {
+    const user = userEvent.setup();
+    renderClipped();
+    await user.click(screen.getByRole('button', { name: 'Show exact times' }));
+    // The table is the frame's other view; the exact 1,168s value lives there.
+    expect(screen.getByRole('button', { name: 'Table' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('withdraws the note in the table view, where nothing is clipped', async () => {
+    const user = userEvent.setup();
+    renderClipped();
+    await user.click(screen.getByRole('button', { name: 'Show exact times' }));
+    expect(screen.queryByText(/slower than 123s/)).toBeNull();
+  });
+
+  it('keeps the clipped reading in the series rather than dropping it', () => {
+    // A clipped value is *present*, just not where it appears — so the line does not break and the
+    // caret marks the right lap. jsdom collapses every coordinate to the origin, so what is
+    // decidable is the number of points the path was built from, not where they are.
+    const { container } = renderClipped();
+    const d = container.querySelector('.chart-line')?.getAttribute('d') ?? '';
+    expect(d.split('L')).toHaveLength(3);
+  });
+});

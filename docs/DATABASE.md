@@ -392,6 +392,31 @@ SELECT EXISTS (
 ) AS has_laps;
 ```
 
+### 6.4a A session's fastest lap — from `lap`, never from `fastest_lap_rank`
+
+**Trap 18.** The flag is absent on 133 race sessions that have lap rows and disagrees with the
+lap table on 5 more, so it cannot be the source. The fastest lap is a **pace metric**, so
+`is_deleted = 0` is mandatory (trap 8), and the tie-break is explicit so the answer does not
+depend on row order.
+
+```sql
+SELECT ve.driver_ref, l.number AS lap, l.time_ms
+FROM v_race ve
+JOIN lap l ON l.session_entry_id = ve.entry_id
+WHERE ve.year = ? AND ve.round_number = ?
+  AND l.is_deleted = 0 AND l.time_ms IS NOT NULL
+ORDER BY l.time_ms ASC, l.number ASC
+LIMIT 1;
+```
+
+**This is a property of the session, not of a selection**, and the distinction is load-bearing
+for any chart that scales an axis by it (`DESIGN_SYSTEM.md` §6.3 clips a lap-time axis at
+`fastest × 1.5`). A ceiling derived from the four drivers a reader has selected moves when the
+fourth is toggled, so the same race would show two different axes on its two lap charts. In
+practice `server/queries/race.ts` computes this **in the same pass as the traces**, from one
+query's rows, so the summary and the series cannot disagree — a stronger guarantee than two
+statements agreeing by rule.
+
 ### 6.5 Championship progression for a season
 
 **One point per round, and the `last_of_round` CTE is what makes it one.** A bare
@@ -528,10 +553,12 @@ lap time inflates beyond a threshold, and **label them inferred** — never as f
 
 ## 7. Traps — read before writing any query
 
-**There are 16.** `CLAUDE.md` and `.claude/agents/*.md` still say "the 14 traps"; this table is the
-authority and it has carried 15 since trap 15 was added. Trap 16 was found in F2 by querying rather
-than by reading. The count in those other files is stale — flagged rather than edited, because they
-are not this document's to change.
+**There are 22.** `CLAUDE.md` and `.claude/agents/*.md` still say "the 14 traps"; this table is the
+authority. Trap 16 was found in F2 by querying rather than by reading, **traps 17–21 were found
+in F3**, the first feature to touch `lap` and `pit_stop` in anger, and **trap 22 was found by a
+shipped display defect** — every one of them by running a query rather than by reading this
+document. The count in those other files is stale — flagged rather than edited, because they are not
+this document's to change.
 
 | # | Trap | Rule |
 |---|---|---|
@@ -551,6 +578,12 @@ are not this document's to change.
 | 14 | Undocumented enums (`role`, `eligibility`, `adjustment_type`) | Do not display |
 | 15 | Cancelled rounds have `round.number IS NULL` | All `is_cancelled = 1` rounds (2 rows, both 2026) carry a NULL `number`, so `ORDER BY r.number` sorts them **first** and they are not addressable by round number. Every round-number query needs `AND r.number IS NOT NULL`. A season's numbered-round count is `max(number)`, not `count(*)` — 2026 has 24 `round` rows but 22 numbered rounds. **On the data as it stands the equivalence is exact in both directions** — 0 rounds are cancelled-and-numbered, 0 are uncancelled-and-unnumbered, and `is_cancelled` is non-NULL on all 1,173 rows — so `AND r.number IS NOT NULL` excludes **exactly** the cancelled rounds and a redundant `AND r.is_cancelled = 0` is unnecessary. **Nothing in the schema enforces this**, so verify it after every refresh (§9) before relying on the number filter alone. |
 | 16 | **`position = 1` is not unique within a race** | **Three races have two winners**, and a query written as `... AND position = 1` with `.get()` instead of `.all()` silently keeps whichever row the planner returned first. They are shared drives, where two drivers shared one car and both were classified P1 with the win's points split between them: **1951 R4 French GP** (Fangio 5, Fagioli 4), **1956 R1 Argentine GP** (Fangio 5, Musso 4), **1957 R5 British GP** (Moss 5, Brooks 4). Counted directly: `GROUP BY round_id HAVING count(*) > 1` over `position = 1` returns exactly three `round_id` values across all 1,173 races. Any "winner of this round" field is therefore a **list**, and any per-race win tally must decide explicitly whether a shared drive is one win or two. The same shape can apply to any position, so a "who finished Nth" lookup carries the same rule. |
+| 17 | **`driver.reference` is not unique within a race either** | Trap 16's root cause with a different consequence, and it bites a **key** rather than a query. 40 races between 1950 and 1964 classify the same driver **twice or three times** — 1950 R7 lists Ascari twice, 1953 R2 lists Linden and Stevenson three times each — so `key={row.driverRef}` in a React list is wrong on 40 pages and renders fine on every other one. Counted directly, **`(driver_ref, car_number)` is unique in all 1,173 races** while `driver_ref` alone is not, so that pair is the identity of a classification row. **None of the 40 races has a `lap` row**, verified by query, which is what makes it safe for a lap-scale payload to key by `driver_ref` alone — and that safety is a fact about the dump, so re-verify it after a refresh rather than inferring it from the 1996 lap boundary. |
+| 18 | **`fastest_lap_rank` is incomplete _and_ disagrees with `lap`** | Do not use it to find a session's fastest lap; take `min(l.time_ms)` over `l.is_deleted = 0`. Measured: **578** race sessions hold lap rows but only **465** carry an entry with `fastest_lap_rank = 1`, so **133 sessions with lap data have no flagged fastest lap at all**, and 20 carry the flag with no lap rows. Worse, on **5 of the 445** sessions where both exist, the flagged driver's own fastest lap is **not** the session minimum — 2011 R9 by 1.517 s, 2015 R9 by 0.483 s, 2025 R2 by 0.385 s, 2012 R9 by 0.053 s, 2021 R3 by 0.016 s. `lap.is_entry_fastest_lap` is likewise absent on 2,785 race entries that have lap rows. The `lap` table is the authority; the flags are not. |
+| 19 | **`lap.is_deleted` is empty on every race lap — the filter is a no-op today** | `is_deleted = 1` on **2,199 of 717,764** lap rows and on **none of the 627,025 race lap rows**; all 2,199 are practice and qualifying, 2023 onward. So `AND l.is_deleted = 0` (trap 8) currently changes no race result, and **that is exactly why it must stay in every pace metric**: it is a no-op that one refresh can make load-bearing, and a metric that has to remember to add it later will not. It also means any UI that promises to mark invalidated laps will show nothing on a race page — state that rather than implying the feature works. |
+| 20 | **`session.timestamp` carries a midnight-UTC placeholder, not a time** | Every one of the 5,130 `session` rows has a non-NULL `timestamp`, and **before 2005 every one is exactly `00:00:00+00:00`** — a date with a zero time. Through 2021 only the **race** carries a real time (2010: 19 of 19 races do, 0 of 19 FP1s do); **from 2022 all 860 sessions do.** So publishing the raw value prints "FP1 · 00:00" on every practice session before 2022. Test the time component (`substr(timestamp, 12, 8) = '00:00:00'` → unknown) rather than a year threshold, which would be wrong in the other direction for 2005–2021. The test is a heuristic: a session that genuinely began at midnight UTC would read as unknown, and none exists in the data (0 of 860 in 2022–2026, where every time is real). |
+| 21 | **`laps_completed` and `scheduled_laps` are both unreliable for a lap count** | `session.scheduled_laps` is populated on **24 of 1,173** race sessions — unusable; the race distance is `max(laps_completed)` over the classification. And `session_entry.laps_completed` disagrees with `max(lap.number)` for that entry on **105 of 11,720** race entries with lap data, by up to **57 laps in either direction**; a **disqualified** entry reads `laps_completed = 0` while holding a pit stop on lap 29 (2024 R21 Hülkenberg, 2025 R2 Leclerc / Hamilton / Gasly, 2025 R4 Hülkenberg). So anything that must close a range at a driver's last lap — a stint, a trace's right edge — uses `max(lap.number)`, never `laps_completed`. Relatedly, **`pit_stop.number` disagrees with lap order on 3 race entries**, so order stops by the joined `lap.number` and treat `pit_stop.number` as a label. |
+| 22 | **`session_entry.detail` changes wording mid-archive, and stops stating the lap deficit in 2023** | §3 says *"use `detail` for display"* and that stands — but **`detail` is not a stable vocabulary across eras**, so a surface that renders it verbatim renders two different things either side of a boundary that belongs to the dataset rather than to the sport. Measured on `status = 1` (classified, down laps) in race sessions: `detail` reads **`+N Laps` on 7,279 rows, every one of them 2022 or earlier**, and the bare word **`Lapped` on 363 rows, every one of them 2023–2026** — a clean split at 2023 with no overlap in either direction. A further 172 rows read `Not classified`, all 2009 or earlier. **The 363 are almost exactly the 364 lapped finishers that carry a `time_ms`**, which is what made this a defect rather than a curiosity: the modern rows are both the ones with a usable time *and* the ones whose `detail` no longer states the deficit, so code that fell back to `detail` for a lap-down car produced `+1 Lap` on 1988 and the word `Lapped` on eleven consecutive rows of 2026 R1. **If a deficit must be shown for those rows it has to be derived**, and the derivation is `max(laps_completed) − laps_completed`: verified against the `lap` table on the 363, where the winner's `laps_completed` equals their `max(lap.number)` on **363 of 363** and the deficit agrees both ways on **362 of 363** (the exception is 2026 R9 Sainz, `laps_completed = 51` against 52 lap rows — trap 21's unreliability, reaching one row). **Prefer the recorded wording over the derivation wherever `detail` states a figure**: the two disagree on **23 of the 7,279** rows that state one, and `laps_completed` is the unreliable half. Do not extend the derivation to a row with `is_classified = 0` — a deficit relative to the winner is a claim about a car that holds a position, and 171 of the 172 `Not classified` rows are unclassified. **And never render `detail` verbatim when it is silent on the figure**, which is the trap's sharpest edge: for `status = 1` the shapes are a closed set of three against two `is_classified` values, and one of the six pairs — `detail = 'Lapped'` with `is_classified = 0`, **2 rows, 2026 R1 Stroll and 2026 R7 Albon** — has no figure and no classified position, so a fallback to `detail` prints the **`status` category's own name** where a magnitude belongs. Those two are genuinely unclassified (43 of 58 laps = 74.1% and 55 of 66 = 83.3%, both under the sport's 90% threshold), so **`is_classified` is the field to trust where it disagrees with `status = 1`'s "classified, down laps"**, and the display for that state is the data's own older wording, `Not classified` — used verbatim on 171 rows from 1950 to 2004. The six pairs and their counts are pinned in `server/queries/race.test.ts`, so a refresh introducing a fourth shape fails a test instead of reaching a screen. |
 
 ---
 
@@ -588,3 +621,41 @@ After any database refresh:
    **All three must be 0.** The third is not optional: if `is_cancelled` were ever NULL, the second
    count would skip those rows and appear to pass. If any is non-zero, every round-number query
    must add `AND r.is_cancelled = 0` and trap 15's text must be corrected before shipping.
+
+7. **Re-verify traps 17–21**, which are all counts this document asserts and F3's code relies on.
+   `server/queries/race.test.ts` asserts the first four against the live database, so running the
+   suite with `data/f1.db` present is the check — but the query is written out here because a
+   refresh may arrive before anyone runs it:
+
+   ```sql
+   SELECT
+     -- trap 17: no race with a repeated driver_ref may have a lap row
+     (SELECT count(*) FROM (SELECT session_id FROM v_race
+        GROUP BY session_id, driver_ref HAVING count(*) > 1) d
+      WHERE EXISTS (SELECT 1 FROM v_race ve JOIN lap l ON l.session_entry_id = ve.entry_id
+                    WHERE ve.session_id = d.session_id))                AS dup_driver_with_laps,
+     -- trap 19: race laps that are deleted, and race laps with no time
+     (SELECT count(*) FROM lap l JOIN session_entry se ON se.id = l.session_entry_id
+      JOIN session ses ON ses.id = se.session_id
+      WHERE ses.type = 'R' AND l.is_deleted = 1)                        AS deleted_race_laps,
+     (SELECT count(*) FROM lap l JOIN session_entry se ON se.id = l.session_entry_id
+      JOIN session ses ON ses.id = se.session_id
+      WHERE ses.type = 'R' AND l.time_ms IS NULL)                       AS untimed_race_laps,
+     -- trap 9 / the three-state grid: a NULL grid would read as a pit-lane start
+     (SELECT count(*) FROM session_entry se JOIN session ses ON ses.id = se.session_id
+      WHERE ses.type = 'R' AND se.grid IS NULL)                         AS null_grid,
+     -- trap 20: a session with a real time must never sit at exactly midnight UTC
+     (SELECT count(*) FROM session ses JOIN round r ON r.id = ses.round_id
+      JOIN season s ON s.id = r.season_id
+      WHERE s.year >= 2022 AND substr(ses.timestamp, 12, 8) = '00:00:00') AS midnight_modern;
+   ```
+
+   **All five must be 0.** `deleted_race_laps` becoming non-zero is the good case — it means trap
+   19's no-op has become load-bearing and the invalidated-lap states can finally render — but the
+   figures quoted in trap 19 and in `server/schemas/race.ts` need correcting when it happens.
+   `midnight_modern` becoming non-zero means trap 20's discriminator has a false positive and a
+   real session time is being discarded.
+
+8. Re-verify the percentile figures pinned in `server/queries/race.test.ts` (2026 R1's
+   82,091 / 85,228 / 98,755 / 122,340 / 1,168,144 ms). They are what `DESIGN_SYSTEM.md` §6.3's
+   axis-ceiling rule was derived from, so if they move, that section's arithmetic is stale.

@@ -6,7 +6,9 @@ import { CategoryAxis, MeasureAxis } from './Axis';
 import { ChartFrame } from './ChartFrame';
 import { BarTable } from './ChartTable';
 import {
+  categoryPlotHeight,
   computeMargin,
+  labelCapacity,
   measureTickCount,
   mountKey,
   plotArea,
@@ -101,6 +103,18 @@ export function BarChart({
         hasCategoryTitle: categoryTitle !== undefined,
       });
 
+  /*
+   * §6.3, completed: a rotated chart whose **row** pitch cannot carry its labels grows instead of
+   * crushing them. `height` is the measured plot; `needed` is what the categories require. Passing it
+   * back through the frame is what makes the container grow, so `useChartSize` measures the grown box
+   * on the next frame and the two agree rather than the SVG being drawn against a stale height.
+   */
+  const measuredHeight = height > 0 ? height : 0;
+  const needed =
+    horizontal && data.length > labelCapacity(measuredHeight)
+      ? categoryPlotHeight(data.length, measuredHeight)
+      : undefined;
+
   const plot = plotArea(width, height, margin);
 
   const band = scaleBand<string>()
@@ -158,6 +172,7 @@ export function BarChart({
       notes={notes}
       state={state}
       {...(stateCopy === undefined ? {} : { stateCopy })}
+      {...(needed === undefined ? {} : { plotHeight: needed })}
       table={
         <BarTable
           data={data}

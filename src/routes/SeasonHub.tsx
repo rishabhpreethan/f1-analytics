@@ -246,6 +246,7 @@ function SeasonBody({
         notices={noticesFor(notices, 'calendar')}
         markLapCoverage={markLapCoverage}
         pending={pending}
+        year={year ?? 0}
       />
 
       <SeasonStandings

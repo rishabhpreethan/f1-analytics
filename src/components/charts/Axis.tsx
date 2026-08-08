@@ -1,4 +1,11 @@
-import { AXIS_GAP, labelStride, monoTextWidth, TICK_LABEL_SIZE, type PlotArea } from './geometry';
+import {
+  AXIS_GAP,
+  AXIS_TITLE_LINE,
+  labelStride,
+  monoTextWidth,
+  TICK_LABEL_SIZE,
+  type PlotArea,
+} from './geometry';
 
 /**
  * **The chart furniture** — `DESIGN_SYSTEM.md` §6.3, and every figure in it is a token.
@@ -31,9 +38,18 @@ export interface MeasureAxisProps {
   title?: string;
   /** Gridlines are perpendicular to the measure axis, and only to it. */
   grid?: boolean;
+  /**
+   * Draw the tick *text*. Gridlines are unaffected.
+   *
+   * `false` for exactly one case, §6.5.4a's rank chart: its driver labels at both ends **enumerate
+   * the scale in order**, top to bottom, so `P1 … P20` on the axis restates what the label columns
+   * already say — and it restates it *in the same gutter*, which is how five ticks came to overlap
+   * five driver labels. Deleting the duplication is the fix; making room for both would have kept it.
+   */
+  labels?: boolean;
 }
 
-export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProps) {
+export function MeasureAxis({ plot, ticks, title, grid = true, labels = true }: MeasureAxisProps) {
   return (
     <g aria-hidden="true">
       {grid &&
@@ -56,18 +72,19 @@ export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProp
         y2={plot.top + plot.innerHeight}
       />
 
-      {ticks.map((tick, i) => (
-        <text
-          key={`tick-${String(i)}`}
-          className="chart-tick"
-          x={plot.left - AXIS_GAP}
-          y={round(plot.top + tick.offset)}
-          textAnchor="end"
-          dominantBaseline="middle"
-        >
-          {tick.label}
-        </text>
-      ))}
+      {labels &&
+        ticks.map((tick, i) => (
+          <text
+            key={`tick-${String(i)}`}
+            className="chart-tick"
+            x={plot.left - AXIS_GAP}
+            y={round(plot.top + tick.offset)}
+            textAnchor="end"
+            dominantBaseline="middle"
+          >
+            {tick.label}
+          </text>
+        ))}
 
       {title !== undefined && (
         <text
@@ -75,7 +92,9 @@ export function MeasureAxis({ plot, ticks, title, grid = true }: MeasureAxisProp
           /* Rotated about its own centre on the left edge. `transform` rather than `writing-mode`,
            * because `writing-mode: vertical-rl` rotates the glyphs of a title that contains
            * numerals and parentheses — "(s)" comes out lying on its side. */
-          transform={`translate(12 ${round(plot.top + plot.innerHeight / 2)}) rotate(-90)`}
+          /* Centred in the band `computeMargin` reserves for it — `AXIS_TITLE_LINE / 2`, not a
+           * literal 12, so the reservation and the glyphs cannot disagree. */
+          transform={`translate(${String(AXIS_TITLE_LINE / 2)} ${round(plot.top + plot.innerHeight / 2)}) rotate(-90)`}
           textAnchor="middle"
         >
           {title}

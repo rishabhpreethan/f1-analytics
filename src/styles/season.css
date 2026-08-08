@@ -420,10 +420,10 @@
   .round-row {
     position: relative;
     display: grid;
-    grid-template-columns: calc(var(--spacing) * 10) minmax(0, 1fr);
+    grid-template-columns: calc(var(--spacing) * 10) minmax(0, 1fr) calc(var(--spacing) * 5);
     grid-template-areas:
-      'number name'
-      'number meta';
+      'number name arrow'
+      'number meta arrow';
     gap: calc(var(--spacing) * 1) calc(var(--spacing) * 3);
     padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4) calc(var(--spacing) * 3)
       calc(var(--spacing) * 4);
@@ -435,8 +435,60 @@
     border-bottom: none;
   }
 
-  .round-row:hover {
+  .round-row:hover,
+  .round-row:focus-visible {
     background-color: var(--surface-sunken);
+  }
+
+  /*
+   * The rows are anchors now (numbered rounds only — a cancelled round has no number and therefore no
+   * address, trap 15). `color: inherit` and no underline, because the affordance is the whole row
+   * lifting plus the chevron, not link styling on five different pieces of text.
+   */
+  a.round-row {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /*
+   * §7.3.0's lesson, applied: *"it was not broken, it was undiscoverable, and that is worse."* The
+   * chevron is the standing "go here" gesture in this product — `x: 3` on hover, the same nudge the
+   * hero CTA and `CapabilityCard` use — so a row reads as navigable without a new visual language.
+   */
+  .round-arrow {
+    grid-area: arrow;
+    align-self: center;
+    justify-self: end;
+    flex: none;
+    color: var(--ink-tertiary);
+    opacity: 0;
+    transition:
+      opacity var(--dur-fast) var(--ease-enter),
+      transform var(--dur-fast) var(--ease-enter),
+      color var(--dur-fast) var(--ease-enter);
+  }
+
+  .round-row:hover .round-arrow,
+  .round-row:focus-visible .round-arrow {
+    color: var(--accent-ink);
+    opacity: 1;
+    transform: translateX(3px);
+  }
+
+  /* A cancelled row is not a link, so it never shows the affordance. */
+  li > .round-row .round-arrow {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .round-arrow {
+      transition: none;
+    }
+
+    .round-row:hover .round-arrow,
+    .round-row:focus-visible .round-arrow {
+      transform: none;
+    }
   }
 
   @media (min-width: 48rem) {
@@ -737,10 +789,16 @@
 
   /* The position cell carries the identity bar, so the colour sits at the start of the row and
    * immediately before the name — never as a row background. */
-  .standings-position {
+  /* Scoped to the table rather than `!important`. Both of this rule's overrides fight the generic
+   * `.standings-table th, td` declarations above, and specificity is the correct tool for that —
+   * `!important` in a stylesheet with no third-party CSS to defeat is only ever a specificity bug
+   * being papered over, and it removes the next author's ability to override it at all. */
+  .standings-table .standings-position {
     position: relative;
-    width: calc(var(--spacing) * 14);
-    padding-inline-start: calc(var(--spacing) * 4) !important;
+    /* 48, not 56: §5.1 names `14` as a review failure. A table cell's `width` is a hint, so
+     * the `Excluded` chip on the rows that carry one still widens it. */
+    width: calc(var(--spacing) * 12);
+    padding-inline-start: calc(var(--spacing) * 4);
     color: var(--ink-secondary);
     font-family: var(--font-mono);
     font-size: var(--text-base);
@@ -781,8 +839,8 @@
     text-overflow: ellipsis;
   }
 
-  .standings-num {
-    text-align: end !important;
+  .standings-table .standings-num {
+    text-align: end;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
@@ -942,5 +1000,131 @@
    * to be legible as a rule rather than as a control that stopped working. */
   .season-entity-chip:disabled {
     opacity: 0.4;
+  }
+
+  /* ================================================================= the race page (F3)
+   *
+   * Deliberately in this file and not its own: a race page is the season hub's anatomy applied to a
+   * round — the same panel, the same eyebrow, the same standings table, the same identity bar. A
+   * second stylesheet would have been a second set of those decisions.
+   */
+
+  .race-masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .race-headline {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  /* The round number is the page's largest type, at the same step the season year uses — one
+   * hierarchy across both surfaces rather than two. §2.3 reserves `--display-2xl`/`3xl` for the
+   * landing headline, so this stops at `xl`. */
+  .race-round {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-lg);
+    font-stretch: var(--font-stretch-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--text-display-lg--font-weight);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
+  }
+
+  @media (min-width: 48rem) {
+    .race-round {
+      font-size: var(--text-display-xl);
+      letter-spacing: var(--text-display-xl--letter-spacing);
+      line-height: var(--text-display-xl--line-height);
+    }
+  }
+
+  .race-round-label {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+  }
+
+  .race-name {
+    max-width: 34ch;
+  }
+
+  /* Interpuncts between the meta items, drawn by CSS so the markup carries no decorative glyph. */
+  .race-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .race-meta > span + span::before {
+    content: '·';
+    margin-inline-end: calc(var(--spacing) * 3);
+    color: var(--ink-tertiary);
+  }
+
+  .race-counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 6);
+    margin: 0;
+  }
+
+  .race-count {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+  }
+
+  .race-count-figure {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-display-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-display-xs--line-height);
+  }
+
+  /*
+   * The result column. Three kinds from `selectGapDisplay`, and the distinction is carried by ink
+   * weight rather than by colour: a retirement is not a status to be alarmed by (§3.4.3), it is the
+   * ordinary outcome of about a fifth of every race ever run.
+   */
+  .race-result {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .race-result[data-kind='total'] {
+    color: var(--ink-primary);
+  }
+
+  .race-result[data-kind='gap'] {
+    color: var(--ink-secondary);
+  }
+
+  /* `status` is a word, not a number — "Engine", "+1 Lap", "Collision" — so it wears the text face. */
+  .race-result[data-kind='status'] {
+    color: var(--ink-tertiary);
+    font-family: var(--font-text);
+    font-size: var(--text-xs);
+  }
+
+  .standings-table tbody tr[data-outcome='didNotStart'] .standings-name,
+  .standings-table tbody tr[data-outcome='didNotQualify'] .standings-name,
+  .standings-table tbody tr[data-outcome='disqualified'] .standings-name {
+    color: var(--ink-tertiary);
   }
 }

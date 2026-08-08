@@ -106,6 +106,42 @@ export function labelStride(
 export const CATEGORY_COUNT_LIMIT = 7;
 export const CATEGORY_LABEL_LIMIT = 12;
 
+/**
+ * **The height a horizontal bar chart needs to label all of its categories.**
+ *
+ * §6.3 says that a category axis which does not fit **rotates the chart**. That is right and it is
+ * incomplete: rotating moves the fitting problem from the x axis to the y axis, where the capacity is
+ * different — and nothing checked the new one. Measured on 2026 R1's pit timeline: 32 stops, each
+ * label 8 characters, so `prefersHorizontalBars` correctly returned horizontal on **count** — and then
+ * 32 rows in a 360px plot gave an **11.3px pitch against a 14px line-height**, producing 31 overlaps
+ * across 40 text nodes. `labelCapacity(360)` is 23; 32 does not fit in either orientation.
+ *
+ * So the missing rule: **a horizontal bar chart's plot height is derived from its category count**, and
+ * the token is a floor rather than the value. A leaderboard grows and its panel scrolls; it does not
+ * crush its own labels. This also pre-answers F8's records charts, which are the same shape.
+ *
+ * §6.5.3's "the plot keeps its exact height in every state" still holds: the height is a function of
+ * the data the caller already has, so it does not change between loading, ready and empty for one
+ * dataset.
+ */
+export function categoryPlotHeight(
+  count: number,
+  floorPx: number,
+  minGap = DIRECT_LABEL_MIN_GAP,
+): number {
+  /*
+   * `count - 1`, and the `-1` is the whole reason this is written as the **inverse of
+   * `labelCapacity`** rather than as `count * minGap`.
+   *
+   * A row's label sits at its band centre, so *n* labels need *n − 1* gaps between them — the same
+   * anchor arithmetic `labelCapacity` uses in the other direction. Written as `count * minGap` the two
+   * functions disagreed at their own boundary: `labelCapacity(360)` says 23 labels fit, while
+   * `23 * 16 = 368` said 360 was too short for 23. A test comparing them caught it, which is the only
+   * thing that would have — both were individually plausible.
+   */
+  return Math.max(floorPx, Math.max(0, count - 1) * minGap);
+}
+
 export function prefersHorizontalBars(labels: readonly string[]): boolean {
   return (
     labels.length > CATEGORY_COUNT_LIMIT ||
@@ -115,6 +151,201 @@ export function prefersHorizontalBars(labels: readonly string[]): boolean {
 
 /** §6.3 — a position axis is inverted, P1 at the top, ticks at 1, 5, 10, 15, 20. */
 export const POSITION_TICKS = [1, 5, 10, 15, 20] as const;
+
+/**
+ * **The first and last value on a sequence axis are always labelled.** _(added 2026-08-07, F3)_
+ *
+ * `d3`'s `ticks(n)` picks round numbers inside the domain and has no interest in its endpoints, and
+ * on a 1-based sequence that loses the two readings a reader most wants:
+ *
+ * | Domain | `ticks(11)` | What is missing |
+ * |---|---|---|
+ * | 22 rounds | `[2, 4, … 22]` | **round 1** — the start of the season |
+ * | 58 laps | `[5, 10, … 55]` | **lap 1 and lap 58** — the start and the finish of the race |
+ *
+ * The 22-round case is **live in the season hub**: it went unnoticed because 2026 has 10 completed
+ * rounds and `ticks` on `[1, 10]` happens to include 1. Any completed season starts its axis at
+ * round 2.
+ *
+ * "Where does this start and end" is not a decorative reading on a race or a season — it is the
+ * frame for every other value on the axis. So both endpoints are forced in, and any interior tick
+ * that would crowd one of them is dropped. **Dropping the interior tick and never the endpoint**:
+ * an interior tick is one of eleven equivalent references, an endpoint is the only one of its kind.
+ *
+ * `minGap` is in **domain units**, not pixels, which is what keeps this function free of scales and
+ * therefore testable — the caller converts its pixel gap once, where it already knows the scale.
+ */
+export function withEndpoints(
+  interior: readonly number[],
+  min: number,
+  max: number,
+  minGap: number,
+): number[] {
+  if (max <= min) return [min];
+  const kept = interior.filter(
+    (tick) => tick > min && tick < max && tick - min >= minGap && max - tick >= minGap,
+  );
+  /* Sorted, because the axis renderer assumes ascending order and this function must guarantee its
+   * own postcondition rather than inherit it. `d3.ticks` happens to return sorted values today, so
+   * nothing depends on the caller staying that way. */
+  return [min, ...kept, max].sort((a, b) => a - b);
+}
+
+/**
+ * **Should this series draw markers?** §6.3 sets a ≥8px marker floor; at some density that floor
+ * makes markers collide into a bead chain that hides the line it is meant to annotate.
+ *
+ * Measured need (F3): a modern race is **58 laps over ~800px of plot — 13.8px between adjacent
+ * points**. An 8px marker with its 1.5px surface ring occupies 11px, so at 58 laps the markers
+ * nearly touch, and at four series it is 232 of them. The line is the signal at that density and
+ * the crosshair is the readout.
+ *
+ * The rule: markers are drawn only when adjacent points are at least **twice** the marker's full
+ * width apart. Twice, not once, because touching markers and *nearly* touching markers are both
+ * illegible — the same reasoning §6.4's dash rung uses for its period.
+ */
+export function shouldDrawMarkers(pointCount: number, axisLengthPx: number): boolean {
+  if (pointCount < 2) return true;
+  /*
+   * **An unmeasured plot draws its markers.** `useChartSize` reports 0 until the `ResizeObserver`
+   * fires, and "not yet measured" is not "too dense" — treating it as dense would drop every marker
+   * on the first paint and then pop them in, and it would make the whole marker layer absent in
+   * jsdom, where no test could then assert that a `null` reading is drawn as a gap. Same convention
+   * as everywhere else here: absent means no constraint stated, never the worst case.
+   */
+  if (axisLengthPx <= 0) return true;
+  const spacing = axisLengthPx / (pointCount - 1);
+  return spacing >= 2 * (MARKER_SIZE + 2 * MARKER_RING);
+}
+
+/** The `--size-mark-ring` figure, needed by `shouldDrawMarkers`'s spacing arithmetic. */
+export const MARKER_RING = 1.5;
+
+/*
+ * **The lap-time ceiling used to be implemented here and is now `src/features/race/pace.ts`.**
+ *
+ * The *rule* is this design system's (§6.3): `fastest × 1.5`, off-scale readings carried as a caret
+ * plus a counted note, exact values in the table. The *implementation* belongs where the data is —
+ * `paceCeilingMs` handles a session with no timed lap (`null`, never 0, which is a lap time) and
+ * keys the ceiling to the **session** rather than to the chart's current selection, so toggling a
+ * fourth driver cannot move the axis. Mine did neither.
+ *
+ * Two constants with the same value in two modules is the drift this project has already paid for
+ * once (`--size-tooltip` against `TOOLTIP_WIDTH`, tied together by a test only after the fact). So
+ * this one is deleted rather than kept "for the kit": a chart takes `yCeiling` as a number and does
+ * not care where it came from, which is the correct seam.
+ */
+
+/**
+ * The off-scale glyph — an upward caret drawn at the ceiling where a reading exceeds it.
+ *
+ * **Deliberately not one of §6.3's four marker shapes.** Those four carry *identity* — they are
+ * rung 2 of the differentiator ladder — and reusing one here would make an off-scale lap look like a
+ * different series. A caret carries *direction*, which is a different channel entirely and is the
+ * standard convention for a clipped value in scientific charting.
+ *
+ * An open path, not a closed one: the caret is stroked in the series colour rather than filled, so
+ * it reads as an annotation on the line rather than as another datum on it.
+ */
+export function offScalePath(size = MARKER_SIZE): string {
+  const half = size / 2;
+  return `M ${fmtCoord(-half)} ${fmtCoord(half / 2)} L 0 ${fmtCoord(-half / 2)} L ${fmtCoord(half)} ${fmtCoord(half / 2)}`;
+}
+
+/**
+ * **Which series the pointer is nearest, within a threshold.** §6.5.4a's isolation, as arithmetic.
+ *
+ * Extracted from `RankChart` because the alternative was untestable: the component derives each
+ * candidate's offset from a `d3` scale, and in jsdom every scale collapses to 0, so a proximity test
+ * written against the component could only ever assert that everything is equidistant from
+ * everything. Given offsets, the choice is pure — and the choice is the part with rules in it.
+ *
+ * `null` past the threshold, deliberately: a pointer in open space between two lines is hovering
+ * *neither*, and snapping to the closest one regardless would make isolation fire constantly and
+ * mean nothing. Ties go to the earlier candidate, which is the stable entity order.
+ */
+export function nearestByOffset(
+  candidates: readonly { reference: string; offset: number }[],
+  pointerOffset: number,
+  thresholdPx: number,
+): string | null {
+  let best: { reference: string; distance: number } | null = null;
+  for (const candidate of candidates) {
+    const distance = Math.abs(candidate.offset - pointerOffset);
+    if (best === null || distance < best.distance) {
+      best = { reference: candidate.reference, distance };
+    }
+  }
+  return best !== null && best.distance <= thresholdPx ? best.reference : null;
+}
+
+/** §6.5.4a's isolation threshold. A 1px line needs a forgiving target; 14px is half a row at 20 cars. */
+export const ISOLATION_THRESHOLD = 14;
+
+/**
+ * **How many direct labels an axis of this length can hold**, at §6.5.2's 16px minimum gap.
+ *
+ * Needed because §6.5.4a's rank chart makes both-end labels a *condition* of plotting the whole
+ * field, and at 22 series the labels are the dense part rather than the lines. The arithmetic decides
+ * whether that condition is satisfiable rather than leaving it to be discovered on screen:
+ *
+ * | Plot height | Capacity at 16px | 22 series |
+ * |---|---|---|
+ * | `--size-plot-lg` 360 | 23 | **fits** |
+ * | `--size-plot-md` 288 | 19 | does not fit |
+ * | `--size-plot` 240 | 16 | does not fit |
+ *
+ * So a full field is labelled at desktop and not below it, which is a real breakpoint-dependent
+ * answer rather than a hope. `0` for an unmeasured axis is deliberately **not** returned — see §1.0:
+ * an unmeasured axis reports its full nominal capacity, because "not yet measured" must not read as
+ * "no room".
+ */
+export function labelCapacity(axisLengthPx: number, minGap = DIRECT_LABEL_MIN_GAP): number {
+  if (axisLengthPx <= 0) return Number.POSITIVE_INFINITY;
+  return Math.floor(axisLengthPx / minGap) + 1;
+}
+
+/**
+ * A span's rounded-rectangle path, with **the radius on the row's outer ends only**.
+ *
+ * §6.3 rounds a bar's data-end and leaves the baseline square, because *"a bar rounded at the axis
+ * floats off it"*. A span row is the same argument applied twice: the row's first and last edges are
+ * where the sequence begins and ends, so they are rounded; an **interior** boundary between two
+ * adjacent spans is square, because a rounded interior edge implies a gap in the sequence that is not
+ * there. The 2px `--surface-sunken` gap is what separates them, and it is a gap in the *timeline*,
+ * not in the data.
+ *
+ * `rx` on a `<rect>` cannot express per-corner radii, which is the whole reason this returns a path.
+ */
+export function spanPath(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  ends: { leading: boolean; trailing: boolean },
+): string {
+  /* A span narrower than two radii cannot carry them without the curves meeting and inverting. */
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const rl = ends.leading ? r : 0;
+  const rt = ends.trailing ? r : 0;
+  const c = fmtCoord;
+
+  return [
+    `M ${c(x + rl)} ${c(y)}`,
+    `H ${c(x + width - rt)}`,
+    rt > 0 ? `A ${c(rt)} ${c(rt)} 0 0 1 ${c(x + width)} ${c(y + rt)}` : '',
+    `V ${c(y + height - rt)}`,
+    rt > 0 ? `A ${c(rt)} ${c(rt)} 0 0 1 ${c(x + width - rt)} ${c(y + height)}` : '',
+    `H ${c(x + rl)}`,
+    rl > 0 ? `A ${c(rl)} ${c(rl)} 0 0 1 ${c(x)} ${c(y + height - rl)}` : '',
+    `V ${c(y + rl)}`,
+    rl > 0 ? `A ${c(rl)} ${c(rl)} 0 0 1 ${c(x + rl)} ${c(y)}` : '',
+    'Z',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 /**
  * §6.5.1's tooltip width, in px, and **it must equal `--size-tooltip` in `tokens.css`** —
@@ -267,8 +498,19 @@ export interface MarginInput {
 export function computeMargin(input: MarginInput): PlotMargin {
   const widest = input.measureLabels.reduce((max, label) => Math.max(max, monoTextWidth(label)), 0);
 
-  const left =
-    Math.ceil(widest) + AXIS_GAP + (input.hasMeasureTitle === true ? AXIS_TITLE_LINE + 4 : 0);
+  /*
+   * ⚠ **The title's band is `AXIS_TITLE_LINE + AXIS_GAP`, and the `+ 4` it replaces was the fourth
+   * "correct intent, wrong coordinate space" in this project — found *inside the fix for the third*.**
+   *
+   * Removing the rank chart's position ticks freed this gutter for its driver labels, and on 1996 R1
+   * a surname immediately collided with the rotated axis title: `Race position` × `Verstappen`. The
+   * gutter had a second occupant that was never counted, because 4px is not a separation, it is a
+   * rounding allowance — the rotated title occupies a full `AXIS_TITLE_LINE` of width and then needs
+   * a gap like any other neighbour. `Axis.tsx` draws it centred at `AXIS_TITLE_LINE / 2` so the band
+   * and the glyphs agree.
+   */
+  const titleBand = input.hasMeasureTitle === true ? AXIS_TITLE_LINE + AXIS_GAP : 0;
+  const left = Math.ceil(widest) + AXIS_GAP + titleBand;
 
   const bottom =
     (input.hasCategoryLabels === true ? TICK_LABEL_LINE + AXIS_GAP : 0) +

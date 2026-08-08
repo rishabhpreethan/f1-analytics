@@ -54,6 +54,90 @@ perceived speed.
 vocabulary, one chart language. A page needing something new means the system gains a token — never
 that a page gains an exception.
 
+### 1.0 ⚠ The default-vs-measured trap — the one bug class that has recurred _(added 2026-08-07)_
+
+**A default value and a measured value are indistinguishable at the point of use, and treating the
+default as real is the most repeated defect in this project.** Three instances, in three unrelated
+subsystems, all found by looking at the screen rather than by a test:
+
+| Where | The zero | What it was read as | What shipped |
+|---|---|---|---|
+| **Motion** (§4.6.1) | a `ScrollTrigger` that had not fired | an authored `opacity: 0` | the loading skeletons were invisible, so a cold load showed a heading and an empty page |
+| **Charts** (§6.3) | `useChartSize` reporting width `0` before the `ResizeObserver` fires | a *measured* width of 0 px, therefore "too dense for markers" | every marker dropped on first paint, then popped in — and the marker layer absent in jsdom, where the test that a `null` reading draws as a gap counts markers |
+| **Axes** (§6.3) | a domain of `[1, n]` | `1` being an interior value like any other | `d3.ticks` never labelled it, so **every completed season's progression axis started at round 2** |
+
+The three look nothing alike and are the same bug: **something absent was given the meaning of
+something present.** The mitigation generalises, and it is binding from here:
+
+1. **Name the unmeasured case explicitly.** `if (axisLengthPx <= 0)` is a branch, not a coincidence.
+   A function that cannot tell "not yet known" from "known to be zero" has to be given the
+   distinction.
+2. **Take the permissive branch.** Absent means *no constraint stated* — never the worst case. This is
+   the same convention `prefersReducedMotion()` already uses for a missing `matchMedia`, and the same
+   one `resolveSeasonYear` uses for a year it cannot range-check.
+3. **Assert the permissive branch by name.** `it('DRAWS on an unmeasured plot — "not yet measured" is
+   not "too dense"')` is the test that stops the next author from "tidying up" the guard.
+4. **A resting CSS state is always the final, readable state** (MR-2). Entrance motion is authored
+   `from`, never `to`-from-hidden, so a tween that never runs leaves content visible.
+
+**On this evidence there will be a fourth.** The places to look are anywhere a measurement, a media
+query, a query result or a route parameter can be *absent* rather than *empty* — and the tell is a
+falsy check (`!width`, `?? 0`, `|| 1`) standing in for a three-state question.
+
+### 1.0b ⚠ Validate by state, not by era _(added 2026-08-07)_
+
+**The negative-gap defect above survived three rounds of review on the surface it was on.** 1988, 1996
+and 2026 were each captured, measured and signed off; the bug is on all of them and was visible on
+none, because it needs a row that is **both** a non-finisher **and** has a recorded elapsed time. 1988
+renders correctly for the wrong reason: those rows carry no `totalTimeMs`, so the faulty branch is
+unreachable there.
+
+**We were sampling the wrong dimension.** Era is a proxy for state and a bad one — it happens to vary
+coverage, so it feels like coverage is what is being tested. The states that mattered here were
+`finished` · `lapped` · `retired-with-a-time` · `retired-without-one`, and one era can contain all four
+while three eras can miss two.
+
+So: **enumerate the states a surface can render and check that they are each reachable in the fixture
+or the capture set.** For anything driven by a decoded enum — `outcome`, `gridStatus`, `adjustment`,
+`GapDisplay` — the enum *is* the checklist, and a case with no example is untested however many pages
+were opened. `raceOutcomeSchema` has eight members; 2026 R6 exercises three.
+
+### 1.0a ⚠ The seam between two features is in nobody's scope _(added 2026-08-07)_
+
+**Rishabh asked "how do I go to the race page?" and the answer was that he could not.** The race deep
+dive — masthead, classification, four charts, the whole feature — was reachable only by typing a URL.
+`SeasonCalendar` rendered twenty-two rows carrying a round number, a grand prix name, a circuit, a date
+and a winner, and **not one of them was a link.**
+
+**Neither feature was wrong.** F2 was specified, built and reviewed against its own spec and is good.
+F3 was specified, built and reviewed against its own spec and is good. The path a reader takes *from one
+to the other* belonged to neither, so nobody walked it. That is a different failure from §1.0's — not
+"correct in the wrong space" but **"correct in isolation, unconnected in the whole"** — and it is the
+failure mode a feature-by-feature process produces by construction.
+
+**The rule, binding from here:**
+
+1. **A surface that names an entity another surface owns must link to it, and the link is part of *this*
+   surface's deliverable** — not the destination's. The calendar owes the race page its link; the race
+   page does not owe the calendar its inbound traffic.
+2. **Both directions are checked.** Here the back-link (`RaceMasthead` → `/seasons/:year`) existed and
+   the forward one did not, which is why "we have navigation between them" was true and useless.
+3. **A navigable element carries a visible affordance** (§7.3.0: *"it was not broken, it was
+   undiscoverable, and that is worse"*). Reuse the product's existing "go here" gesture — the `x: 3`
+   chevron nudge — rather than inventing a second one.
+4. **Not everything that names an entity can be linked, and the exceptions are principled.** A
+   cancelled round has no round number, so it has no address (trap 15) and is deliberately not a link.
+   An *upcoming* round is linked, because its race page is a real destination and treating a scheduled
+   race as unreachable would repeat `REQUIREMENTS.md` §2.2's mistake in the navigation.
+5. **Assert it.** `SeasonCalendar.test.tsx` checks the `href`, the accessible name, the affordance and
+   the cancelled exception. These are cheap tests and they are the ones that would have caught it.
+
+**The seams still to build, so they are not rediscovered one question at a time:** driver → races,
+driver → teams, team → seasons, team → drivers, circuit → races, **race → circuit**, **race → each of
+the drivers in its classification** (RD-10 names 22 entities and links to none of them), and compare →
+every entity it holds. Each is one feature's obligation to another, and each will be invisible
+to a review that reads one feature at a time.
+
 ### 1.1 The three decisions that produce the character
 
 Everything else follows from these.
@@ -1349,10 +1433,47 @@ the reference and every other shape's dimension is derived to enclose the same a
 additionally centred on its **centroid** rather than its bounding box, or it sits visibly low against
 a circle at the same value. `geometry.test.ts` measures the emitted path by the shoelace formula.
 
+**The measure axis's title is an occupant of the gutter, not a rounding allowance** _(added
+2026-08-07)_. `computeMargin` reserved the widest tick label plus `4px` for the rotated title. 4px is
+not a separation, and the rotated title occupies a full `AXIS_TITLE_LINE` of width — so on 1996 R1 the
+rank chart's freed gutter put a surname straight into it: `Race position` × `Verstappen`. The band is
+now `AXIS_TITLE_LINE + AXIS_GAP` and `Axis.tsx` draws the title centred at `AXIS_TITLE_LINE / 2`, so
+the reservation and the glyphs cannot disagree.
+
+**This was the fourth instance of §1.0's sibling pattern — "correct intent, wrong coordinate space" —
+and it happened *inside the fix for the third*.** The generalisation, which is now the rule: **a
+position is only correct relative to a space, so anything asserting a position must also account for
+what else is in that space.** jsdom cannot see a bounding box, so this class is caught by measuring the
+rendered DOM, not by the test suite. The four: a tooltip transform against the static flow position; a
+`pointerenter` on a path under the hit rect; labels de-collided within their own set in a shared
+gutter; and a title band sized by a rounding allowance.
+
 **1px strokes are drawn on half-pixel coordinates.** An SVG line at an integer coordinate straddles
 the pixel boundary and rasterises as two half-intensity rows, which is how a "1px" gridline comes out
 looking like a 2px grey smear and the recessive furniture stops being recessive. Nothing in this
 project can *see* that — there is no rasteriser in the pipeline — so it is applied by rule.
+
+**Marker density is a rule too, and the ≥8px floor is what forces it** _(added 2026-08-07, F3)_. A
+modern race is **58 laps over ~800px — 13.8px between adjacent points**, and an 8px marker with its
+1.5px ring occupies 11px. So at race density the markers nearly touch, and at four series there are
+232 of them hiding the lines they annotate. `geometry.shouldDrawMarkers` draws them only when adjacent
+points are **≥ 2×** the marker's full width apart; below that the line is the signal and the crosshair
+is the readout. Twice and not once, because touching and nearly-touching are both illegible — the same
+reasoning §6.4's dash rung applies to its period.
+
+**A lap-time axis has a mandatory ceiling, and this is measured, not stylistic** _(added 2026-08-07)_.
+On 2026 R1 (one session, 1,003 lap rows): fastest **82.091s**, median 85.228s, p90 98.755s, p99
+122.340s — and **maximum 1,168.144s**, a lap spent stationary under a red flag. That is not bad data;
+it is what the lap took. But an axis that accommodates it compresses every racing lap into **7% of the
+plot**, so an unclipped trace is a chart of one stoppage rather than of pace.
+
+The ceiling is **`fastest × 1.5`** — 123.1s on that race, just above p99, so it holds 99% of laps
+including pit and traffic laps while excluding the two stoppage laps. A multiple of the session's own
+fastest lap rather than a percentile, because it is a **physical** bound (a lap 50% slower than the
+best is not racing) and therefore means the same thing on a 90-second street circuit as on a 40-second
+oval. **Laps above it are never silently dropped:** an off-scale caret at the ceiling in the series
+colour, a count in a note above the plot, and their exact values in the table view — which every chart
+has (§6.5.5), and which is what makes clipping honest rather than lossy.
 
 **Tick density is a rule, not a judgement.** The kit computes ticks from `scale.ticks(n)` where `n`
 comes from the axis length, so density is consistent across every chart in the product:
@@ -1367,6 +1488,27 @@ comes from the axis length, so density is consistent across every chart in the p
 labels are ~20% slower to read and force a taller axis gutter. With more than ~7 categories, or any
 label over ~12 characters, the bar chart is **horizontal**: categories run down the left in
 `--text-xs`, the measure runs along the bottom.
+
+> **And a rotated chart whose rows do not fit GROWS** _(added 2026-08-07, F3)_. The rule above was
+> right and incomplete: **rotating moves the fitting problem from the x axis to the y axis, where the
+> capacity is different — and nothing checked the new one.** Measured on 2026 R1's pit timeline: 32
+> stops, each label 8 characters, so rotation fired correctly on *count* — and then 32 rows in a 360px
+> plot gave an **11.3px pitch against a 14px line-height**, producing **31 overlaps across 40 text
+> nodes**. `labelCapacity(360)` is 23; 32 fits in neither orientation.
+>
+> So a horizontal bar chart's plot height is **derived from its category count**
+> (`geometry.categoryPlotHeight`), and `--size-plot-lg` is a **floor rather than the value**. A
+> leaderboard grows and its panel scrolls; it does not crush its own labels. This also pre-answers F8's
+> records charts, which are the same shape.
+>
+> §6.5.3's *"the plot keeps its exact height in every state"* is not weakened: the height is a function
+> of data the caller already holds, so it is identical across loading, ready and empty for one dataset —
+> which is the property that rule protects.
+>
+> **A note on how this was diagnosed, because both first guesses were wrong.** I predicted the failure
+> would be the rotation heuristic not firing; the reviewer read the raster the same way. It *had*
+> rotated. Only running the arithmetic showed the collision was vertical. **A prediction about where a
+> defect is does not survive contact with the measurement of what it is.**
 
 **Zero, and where the axis starts.**
 
@@ -1668,6 +1810,104 @@ The chart form is a function of the **time scope**, and it is not the user's cho
 **Shared scales are mandatory in small multiples**, and the shared domain is stated once above the
 grid. Independent y-axes per panel is the same lie as a truncated bar axis.
 
+#### 6.5.4a The rank chart — the one permitted many-series line _(added 2026-08-07, F3)_
+
+**`REQUIREMENTS.md` RD-1 is a P0 that this document, as written, forbade.** It asks for a per-lap
+position chart with *"every driver, one line each; the whole race as one picture"* — 22 lines. §6.5.2
+caps a comparison at 4 and sends anything above it to small multiples, *"never a 10-series spaghetti
+line"*. A requirement and a design rule cannot both simply win, so this resolves it rather than
+letting whoever builds it choose.
+
+**The rule was right and its scope was wrong.** §6.5.2 was written about series whose **values can
+coincide** — ten cumulative-points lines genuinely occlude one another, and there is no reading to be
+had. A **rank** chart is a different form:
+
+1. **The domain is a bounded ordinal and every line occupies a distinct slot.** At any lap, 22 lines
+   sit at 22 different y positions. There is no occlusion to resolve — the thing that makes ten value
+   lines unreadable does not occur.
+2. **The reader's task is not "read driver X at lap 30".** It is to see the *shape* of the race: where
+   the order churned, where the pit windows fell, who climbed. That is a gestalt reading, and it is
+   the one reading that **needs** the whole field — four lines out of twenty-two would show four
+   drivers moving against an invisible background and would be actively misleading about why.
+3. **Identification is by endpoint, not by legend.** The grid order runs down the left edge and the
+   finishing order down the right, which is how every position chart in the sport is read.
+
+So a rank chart may plot the whole field, **under all five of these conditions** — they are what keep
+it a chart rather than a texture, and a rank chart missing any of them is a defect:
+
+| Condition | Why |
+|---|---|
+| **The measure axis is a bounded rank**, inverted, P1 at the top | This is what makes the exemption sound. A rank chart of a continuous measure is not a rank chart. |
+| **No markers** | 22 × 58 is 1,276 markers. `shouldDrawMarkers` already refuses at this density (§6.3) and this is the case it was written for. |
+| **Direct labels at *both* ends** — grid on the left, finish on the right | Replaces a 22-row legend, which would be taller than the plot. The legend requirement of §6.5.2 is discharged by these, and **only** in this form. |
+| **Hover isolates: the hovered line goes to full opacity, every other drops to `0.4`** | Opacity only, never a colour change (§6.5.1). This is what turns the texture back into a single readable line on demand. |
+| **Selection still caps at 4** | Selecting up to four promotes them to the full marker-and-dash treatment and dims the field behind them. **The full field is context; analysis is still ≤ 4.** This is the sentence that reconciles the exemption with §6.2 rather than overriding it. |
+
+**Colour does not carry 22 series and is not asked to.** The field is ~10 teams × 2 drivers, so the
+teammate shade pair (§6.4a) is doing its ordinary job at scale; two cars of one team are two shades of
+one hue, which is exactly the reading a race engineer wants. Beyond that, colour identifies the
+*team* and position identifies the *driver* — and the endpoint labels close the gap.
+
+**This exemption is for the rank chart and nothing else.** A lap-time trace is a continuous measure
+and stays capped at 4 (RD-2 says "multi-select", which is the cap by another name). If a future
+surface wants a many-series continuous chart, it goes to small multiples as §6.5.4 says.
+
+##### Three refinements from building it _(2026-08-07, `RankChart.tsx`)_
+
+The five conditions above were written before the component existed. Building it found that three of
+them were underspecified at 22 series, and each is resolved here rather than in the code alone.
+
+**1. The resting state must be legible; isolation is an aid, not a prerequisite.** A chart that only
+resolves when you hover it has failed for anyone reading a screenshot, printing it, or using a
+keyboard. So the foreground/background split is a **resting** attribute: the selected ≤4 are drawn at
+`--size-mark-stroke` and full opacity with their dash rungs, and the field at **1px and `opacity:
+0.35`**. That gives a readable foreground over a background that shows the race's churn as a shape,
+which is condition 5 made visual rather than merely stated. Isolation then drops the field to `0.12`
+and raises the hovered line — opacity only, never a colour change.
+
+**2. Both-end labels are capacity-checked, not assumed.** Condition 3 made them a condition of the
+exemption; at 22 series **the labels are the dense part, not the lines**. `geometry.labelCapacity`
+settles it arithmetically at §6.5.2's 16px pitch:
+
+| Plot height | Capacity | 22 series |
+|---|---|---|
+| `--size-plot-lg` 360 | 23 | **fits** |
+| `--size-plot-md` 288 | 19 | does not fit |
+| `--size-plot` 240 | 16 | does not fit |
+
+So the full field is labelled at desktop and not below it. Where it does not fit, **the selection is
+still always labelled**, plus P1 and the deepest classified runner — the two positions the eye goes to
+first — and the rest are identified by hover, by the table view, and by the position axis, which
+already states their rank. Labels come from `selectDriverShortLabel`: the driver's **code** where one exists
+(`VER`, `HAM`), the sport's own timing convention and about a third the width of a surname —
+otherwise the **surname**.
+
+> **The fallback is the common case for early lap-data races, not an edge case.** `abbreviation`
+> covers 107 of 881 drivers overall, and measured against the lap window specifically, **40 drivers
+> who have race lap data carry no code at all** — Häkkinen, Damon Hill, Frentzen, Irvine, Panis and
+> much of the 1996–2004 grid. So a label built from `code` alone would leave half a 1996 field
+> unlabelled. The fallback is the **surname** and never a three-letter abbreviation derived from it,
+> which would invent a convention the data does not carry. It widens the label gutter, which costs
+> nothing: §6.5.2's capacity arithmetic is a *vertical* pitch and is unaffected by label width.
+
+**3. The tooltip carries the analysis set, not the field.** §6.5.1 asks for *"every series' value at
+that x, in ONE tooltip"* — which at 22 series is a tooltip taller than the plot it covers. That rule
+exists so a reader does not have to chase per-series tooltips, and one tooltip carrying the selection
+plus the hovered line satisfies it. The full field at that lap is in the table. **The rows sort
+ascending**, not descending as §6.5.1 says: on a rank axis a lower number is better, and descending
+would put last place at the top.
+
+> **One defect worth recording, because the test was green while the feature was dead.** Isolation was
+> first built as `onPointerEnter` on each `<path>`. It passed in jsdom — a test dispatches the event
+> straight at the element — and **could never have fired in a browser**: §6.5.1's hit target covers the
+> whole plot area and is painted *after* the marks, so it swallows every pointer event before a line
+> sees one. Isolation is now derived from the pointer's proximity to a line at the active x, through
+> the single hit target, via the pure `geometry.nearestByOffset` — which also made the choice testable,
+> since a component-level proximity test in jsdom compares offsets that have all collapsed to 0.
+>
+> This is the same shape as the tooltip resolving its transform against the wrong origin: **the code
+> was right about what it wanted and wrong about where it was.**
+
 #### 6.5.5 The table view — in the same place, on every chart
 
 Every chart has a **"Table" toggle in its header**, beside the title, as a two-segment control
@@ -1706,7 +1946,7 @@ scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
 | Lap-time trace | change over time, dense | per-lap line, **1996+ only** | `d3-array.bisector` |
 | Pace degradation | change over time | per-lap scatter + a fitted trend line | none (fit is arithmetic) |
 | Pit timeline | magnitude, sequence | horizontal bar per stop, **2011+ only** | `scaleBand` |
-| Stint timeline | sequence | stacked horizontal bar | `d3-shape.stack` |
+| Stint timeline | sequence | **span chart** — one row per entity, spans on a shared axis | `scaleBand` + `scaleLinear`. **Not `d3-shape.stack`** — see below |
 | Records leaderboard | magnitude + identity | horizontal bar, direct-labelled | `scaleBand` |
 | Head-to-head | polarity | single diverging bar, centred at 0 | `scaleBand` |
 | Season heat map | magnitude across two categories | cell grid, per-mark tooltip | `scaleBand` × 2 |
@@ -1714,6 +1954,221 @@ scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
 **Not in this list, and not to be added:** anything requiring tyre compounds, weather, sector times,
 telemetry or practice analysis. None of it exists in the data (`REQUIREMENTS.md` §6), and 423 FP1
 sessions hold 698 entries with no times at all.
+
+**Two rows above were wrong and are corrected here rather than edited silently.**
+
+**Position chart.** *"Slope chart, 2 categorical positions"* describes a different chart from RD-1,
+which asks for **per-lap** position for the whole field. The slope chart is still worth having as a
+compact summary, but it is not RD-1 and does not discharge it. RD-1's form is the rank chart of
+§6.5.4a.
+
+**Stint timeline — `d3-shape.stack` was the wrong primitive.** `stack` sums sequential *values* to
+derive cumulative positions. A stint's boundaries are **already known**: `DATABASE.md` §6.7 derives
+them as `[1 … pit₁], (pit₁ … pit₂], … (pitₙ … end]`. Feeding spans through lengths, then cumulative
+sums, then back to positions is a round trip whose only possible contribution is error. The form is a
+**span chart** — `scaleBand` for the rows, `scaleLinear` for the measure — and `SpanChart.test.tsx`
+asserts on the module's source that `d3-shape` is never imported, so the decision cannot be quietly
+reversed. Two properties of it are design decisions rather than implementation:
+
+- **§6.3's 4px radius is on the row's outer ends only.** An interior boundary between two adjacent
+  spans is square, because a rounded interior edge implies a gap in the sequence that is not there —
+  the same argument §6.3 makes for a bar being square against its baseline, applied twice.
+- **Spans within a row are not differentiated by colour.** Alternating shades would spend the shade
+  pair, which §3.3a.1 reserves for the teammate case; alternating opacity would imply a magnitude on
+  a channel carrying sequence. The 2px surface gap and an in-span label carry it.
+- **The entrance is G-28's clip wipe, not G-27's growth.** A span beginning at lap 30 must not grow
+  from the plot's left edge: that animates its *start* moving, which is the one thing a sequence chart
+  must not say. A left-to-right reveal uncovers the timeline in the order the race happened.
+
+#### 6.6.1 F3 — the race page, specified _(2026-08-07)_
+
+**The endpoints are `GET /api/seasons/:year/races/:round`** and its two companions,
+`…/laps` and `…/stints`.
+
+> **Correction, 2026-08-07.** This section first named a flat `/api/races/:year/:round`. That was
+> wrong and it was mine: `ARCHITECTURE.md` §6 has specified the **hierarchical** form since F0, and it
+> mirrors the client route `/seasons/:year/races/:round` — a race is addressed *through* its season
+> because that is how the data is keyed and how a reader arrives. The engineer built the documented
+> form and raised the conflict rather than silently satisfying one side, which is the right handling;
+> a design document inventing an API path is not an authority, and this one was invented by analogy
+> with `/api/seasons`.
+
+The charts below were specified before the data layer existed, deliberately: a chart spec written
+afterwards tends to accept whatever the data layer happened to return.
+
+**The organising problem is that one page spans four coverage boundaries.** Measured, one race per
+era, `session.type = 'R'`:
+
+| Season | Drivers | Lap rows | Pit stops | What the page can show |
+|---|---|---|---|---|
+| 1988 R1 | 26 | **0** | **0** | classification and grid only |
+| 1996 R1 | 20 | 812 | **0** | + every lap chart, no stops |
+| 2011 R1 | 22 | 1,083 | 45 | everything |
+| 2026 R1 | 22 | 1,003 | 32 | everything |
+
+So **the majority of the archive is the reduced page, not the full one** — 484 races before 1990 have
+no lap data at all. The page is therefore designed from the bottom up: the classification table is the
+spine and every chart is an addition that may be absent, each carrying §6.5.3's three-part copy. A
+race page that renders four empty plots for 1988 is the defect this ordering prevents.
+
+**RD-10 · Race classification** — the spine, and not a chart. Job: identity, order and outcome.
+Form: a `<table>`, same anatomy as the season hub's standings (§7). `status` decodes through
+`DATABASE.md` §3 — **`detail` for display, `status` for grouping** — and a DNF is `status IN (10, 11)`,
+never `position IS NULL`. Identity bar per row in the team colour. **Available 1950+, so it never has a
+no-coverage state.**
+
+##### The RESULT column is keyed on `outcome`, never on the presence of a time _(ruled 2026-08-07)_
+
+This said only *"gaps come from the recorded time, and a lapped finisher shows `+1 Lap`"*, which was
+right about the lapped case and silent about every other one — and the silence shipped a defect.
+Measured on 2026 R6: **six rows rendered negative durations**, down to `−2:02:28.126` for Bottas.
+
+**The mechanism.** A retiree's `totalTimeMs` is their elapsed time *when they stopped*, which is
+**smaller** than the winner's — Bottas stopped on lap 15 at 1,263,117 ms against a winning
+8,611,243 ms — so `driverTotal − winnerTotal` is negative. The gap was being computed for drivers who
+never finished.
+
+**The table, and it is exhaustive on `raceOutcomeSchema`:**
+
+| `outcome` | RESULT shows | Why |
+|---|---|---|
+| `finished`, position 1 | the total time | The reference every other row is measured against |
+| `finished`, not position 1 | `+gap` to the leader | Same distance, so a duration is comparable |
+| `lapped` | **`+N Laps`**, never a duration | The result *is* a lap deficit. 7,450 of 7,814 carry no time — but **364 do**, and for those a gap of `+31.402s` would look entirely plausible and be meaningless |
+| `accident` · `mechanical` · `disqualified` · `didNotStart` · `didNotQualify` · `unknown` | `detail` — "Retired", "Engine", "Collision" | They have no result relative to the winner. A time here is not a smaller number, it is a **different quantity** |
+
+**Keying on `outcome` rather than guarding the subtraction is the point.** A guard (`if (delta < 0)`)
+would have fixed the six visible rows and left the `lapped`-with-a-time case wrong *and invisible*,
+because that one produces a plausible positive number. Deriving the branch from what the row **is**
+makes both impossible rather than caught.
+
+> **On the classified retiree, which is the interesting row and where I differ from the review.** Sainz
+> is `isClassified: true` at 70 laps against 78 — he covered enough distance to keep P16 — and the
+> suggestion was that he should therefore read `+8 Laps`. **He should read "Retired".** `outcome` is
+> `mechanical`: he did not circulate eight laps down to the flag, he stopped on lap 70, and `+8 Laps`
+> asserts something that did not happen. `outcome === 'lapped'` — status 1, *"classified, down laps"* —
+> is precisely and only the `+N Laps` case. `isClassified` decides whether he **holds a position**, not
+> what the result column says, and conflating the two is what made this look like a judgement call.
+> This is `DATABASE.md` §3's own discipline: **`status` for grouping, `detail` for display.**
+
+**RD-1 · Position by lap** — the flagship. Job: change over time, whole field. Form: the **rank
+chart** of §6.5.4a, all five conditions binding. Marks: 2px lines, **no markers** (`shouldDrawMarkers`
+refuses at 58 laps and this is the case it was written for). Interaction: crosshair with a
+lap-indexed tooltip; hover isolates one line to full opacity and drops the field to `0.4`; selecting
+≤4 promotes them to marker-and-dash. Colour: team, with the teammate shade pair doing its ordinary
+job at scale. Accessibility: endpoint labels both ends, table view, `aria-live` readout. **1996+.**
+
+**RD-2 · Lap-time trace** — Job: change over time, dense, ≤4 drivers. Form: per-lap line, capped at
+4 by §6.5.2 (RD-2's "multi-select" is that cap by another name). Marks: no markers at race density.
+**The measure axis carries the mandatory ceiling of §6.3** — `fastest × 1.5`, off-scale laps as a
+caret at the ceiling plus a counted note, exact values in the table. The ceiling is a property of the
+**session**, so toggling a fourth driver cannot move the axis. **1996+.**
+
+> **Correction: the invalidated-lap note is withdrawn.** This said invalidated laps
+> (`lap.is_deleted`) are *"excluded from the series and stated in the note"*. Trap 19 measures
+> `is_deleted = 1` on **2,199 of 717,764 lap rows and on none of the 627,025 race lap rows** — every
+> flagged row is practice or qualifying, 2023 onward. So the note would have been **permanently
+> empty on every race page**, which is worse than absent: it implies a feature that is working and
+> finding nothing. The trap-8 filter stays in every pace metric, because it is a no-op that one
+> refresh can make load-bearing and a metric that must remember to add it later will not — but the
+> *interface* promises nothing it cannot show.
+
+**RD-7 · Pit stop timeline** — Job: magnitude and sequence. Form: horizontal bar per stop, `scaleBand`
+by driver, x = lap. Marks: bar length is duration; §6.3's 4px data-end on the far end only. Durations
+in 2026 R1 run 17.6 s to **1,081.6 s**, so the axis is clipped and the note counts what is above it.
+Copy must carry the cross-era caveat — `DATABASE.md` §2.4: *"duration semantics vary across eras
+(some stationary time, some pit-lane transit)"* — so **durations are never compared across decades
+without it**. **2011+.**
+
+> **Correction: the pit ceiling is `median × 2`, not the lap trace's `fastest × 1.5`.** I carried the
+> 1.5 across by analogy and **the analogy does not hold**, which is measurable rather than arguable:
+>
+> | Ceiling | Stops clipped | Races affected | 2026 R1 |
+> |---|---|---|---|
+> | `fastest × 1.5` | **1,910 of 12,582 (15.2%)** | 217 of 319 | clips 7 of 32, five of them ordinary 27–36 s stops |
+> | `median × 2` | **457 of 12,582 (3.6%)** | 79 of 319 | clips exactly the two red-flag stops, keeps the 34.6 s p90 on scale |
+>
+> **The references differ in kind.** A fastest *lap* is a capability — every other lap of that race is
+> an attempt at the same thing, so 1.5× bounds the honest range. A fastest *stop* is one best case that
+> legitimate stops exceed widely, because `duration_ms` mixes stationary time with pit-lane transit
+> across eras: `p90 / fastest` has a median of 1.27 and a p90 of **1.95**. A ceiling anchored to the
+> best case therefore clips normal work. The median is the centre of the distribution rather than its
+> edge, so `× 2` bounds the same *shape* of range that `× 1.5` bounds for laps.
+>
+> Implemented once, as `PIT_CEILING_MEDIAN_MULTIPLE` in `src/features/race/series.ts`.
+
+**RD-3 · Stint reconstruction** — Job: sequence. Form: stacked horizontal bar, one row per driver,
+`d3-shape.stack`. **This is the one kit form F3 needs that does not exist**; `BarChart` does not stack.
+2px surface gap between adjacent fills (§6.3) is what makes the stint boundaries legible without a
+stroke. **2011+, because stints are derived from pit stops** — and a 1996 race therefore shows lap
+charts with no stint layer, which is a designed state and not a gap.
+
+**RD-4 · Pace degradation** — Job: change over time, within a stint. Form: per-lap scatter plus a
+per-stint fitted trend (`ScatterChart`). **Available 1996+, not 2011+**: with no pit data there is still
+one implicit stint — the whole race — and a fit over it is the honest reduced answer rather than an
+absent section, so a 1996 race gets degradation without stint boundaries.
+
+**Three honesty rules, and they are the feature rather than decoration:**
+
+1. **The trend is dashed where the data is solid.** The points are what happened; a least-squares line
+   is a *claim* about them. Dash is the channel that survives a screenshot, a printout and greyscale —
+   the same reason §6.4's ladder spends dash rather than relying on colour. **A solid trend line through
+   a scatter is the most common way a chart launders a model into a fact.** The trend also renders
+   *before* the points, so the data sits on top of the model.
+2. **A fit that explains nothing is not drawn.** `fitLinear` returns `r2` and its own comment calls it
+   *"the honesty term"*: a four-lap stint will happily produce a confident-looking slope. So a trend is
+   drawn only at `r² ≥ TREND_R2_FLOOR` (**0.5** — the conventional weak-but-real threshold, and **a
+   judgement, not a measurement**, since there is no ground truth for tyre degradation here). **The r²
+   and the slope are in the table regardless**, so a reader can see that the line they are not being
+   shown would have explained 12% of the variation. A table stating the slope alone would launder the
+   same model the missing line is qualifying.
+3. **An inferred neutralisation is hatched, never filled, and named as inferred.** `REQUIREMENTS.md`
+   RD-4 and `DATABASE.md` §6.9 agree: **there is no safety-car flag anywhere in the data.** Hatch is
+   rung 4's channel and already means *"a different kind of thing"*, so it costs no new vocabulary; a
+   solid band would read as recorded fact. Consecutive flagged laps **merge into one band** — five
+   one-lap rects read as five incidents rather than one safety car.
+
+**The copy says "likely safety car or red flag" and never "safety car."** The heuristic cannot separate
+a safety car from a red flag, a virtual safety car, a wet restart or a lap behind a recovery vehicle;
+all of them mean the field was not racing, which is the property that disqualifies a lap from a pace
+metric, and none of them is in the data. The note states the **method** — laps ≥30% slower than the
+race's typical lap across the whole field — rather than presenting its output as a finding.
+
+**Excluded laps are counted, not silent.** Lap 1, every in-lap and every out-lap are dropped from the
+fits (§6.9), and the note says how many of how many — the same discipline the off-scale caret follows.
+
+> **The detection's accuracy is unverified by construction, not merely unmeasured.** There is no flag
+> to compare `SAFETY_CAR_RATIO` against, so no false-positive rate can be computed — not now, and not
+> after any amount of further work. The label is what carries that uncertainty, because nothing else
+> can. This distinction matters in the copy too: "inferred" is honest, "detected" would not be.
+
+##### Why the threshold is 1.3, and what it is a threshold *for* _(ruled 2026-08-07)_
+
+**Measured: across all 578 races with lap data, the per-race maximum ratio distributes p25 1.028 ·
+p50 1.270 · p75 1.600 · p95 4.987.** So **1.3 sits essentially at the median**, and it flags nine of ten
+modern races — modern races skew above the all-era median because red-flag stoppages are recorded as
+laps. A threshold at the 50th percentile is not detecting something unusual; it is splitting the
+distribution in half, and it cannot be defended as an outlier definition.
+
+**It is not an outlier definition, and reframing it is the resolution.** The purpose is not to detect a
+rare event. It is to identify **laps that cannot inform a pace conclusion**, and a lap 30% slower than
+the race's own typical lap is unfit for a degradation fit *regardless of why it was slow*. On that
+framing the threshold is calibrated to the phenomenon's frequency — a safety car, red flag, VSC or wet
+restart really does occur in roughly half of modern Grands Prix — rather than to a definition of
+unusualness, and it is **deliberately loose**: a short VSC that inflates laps by 35% is exactly the case
+a pace metric most needs excluded, and moving to p75 (1.600, flagging a quarter) would miss it.
+
+So: **1.3 stays, and the copy leads with the property rather than the cause.** *"30% or more slower than
+this race's typical lap"* is the finding; *"which usually means a likely safety car or red flag"* is the
+explanation offered for why such laps cluster — not a claim to have identified one. Had the copy led
+with the cause it would have been asserting a detection the data cannot support.
+
+**Recording which kind of threshold this is matters more than its value**, because the next person to
+look at nine-in-ten will otherwise reasonably conclude it is broken.
+
+**Queued, not yet specified:** RD-5 gap to leader (P1), RD-6 position-change events (P1), RD-9
+consistency (P1), RD-8 and RD-12 (P2). RD-11 weekend session times needs `session.timestamp` and
+`session.timezone` and is a list, not a chart.
 
 ---
 

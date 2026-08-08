@@ -50,6 +50,34 @@ export interface ChartFrameProps {
   patterns?: boolean;
   /** The state copy. Generated from `GET /api/meta`, never hardcoded — see §6.5.3. */
   stateCopy?: { title?: string; body: string; action?: ReactNode };
+  /**
+   * §6.3 — **the off-scale note, and it lives here rather than in the chart on purpose.**
+   *
+   * A clipped measure axis (a lap-time trace's `fastest × 1.5` ceiling) is only honest if two things
+   * are true: the reader can see **how many** readings are above the ceiling without hovering
+   * anything, and the exact values are one action away. The count is the note; the exact values are
+   * the table view — and the table toggle is **already** this component's, so the affordance that
+   * connects them has to be here too. A chart rendering its own note could state the count but could
+   * not offer the button, and "the table has the real numbers" would be true in the spec and
+   * invisible in the interface.
+   */
+  offScale?: {
+    count: number;
+    /** The ceiling, already formatted — e.g. `2:03.135`. The frame never formats a value. */
+    ceiling: string;
+  };
+  /**
+   * Override the plot area's height, in px. **The token is a floor, not the value.**
+   *
+   * For a horizontal bar chart whose category count exceeds what the token can label: §6.3 rotates a
+   * chart whose category axis does not fit, and rotating moves the problem to the *other* axis, where
+   * 32 rows in a 360px plot gave an 11.3px pitch against a 14px line-height. A leaderboard grows and
+   * its panel scrolls; it does not crush its own labels. Use `geometry.categoryPlotHeight`.
+   *
+   * §6.5.3 is not weakened: this is a function of the data the caller already has, so it is identical
+   * across loading, ready and empty for one dataset — which is the property that rule protects.
+   */
+  plotHeight?: number;
 }
 
 export function ChartFrame({
@@ -66,6 +94,8 @@ export function ChartFrame({
   patterns = false,
   onPatternsChange,
   stateCopy,
+  offScale,
+  plotHeight,
 }: ChartFrameProps) {
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const captionId = useId();
@@ -141,12 +171,37 @@ export function ChartFrame({
         </p>
       ))}
 
+      {/*
+       * §6.3's off-scale note. Rendered only in the chart view — in the table view every value is
+       * already on screen, so the note would be telling the reader about a ceiling that is not
+       * currently being applied to anything they can see.
+       */}
+      {offScale !== undefined && offScale.count > 0 && view === 'chart' && (
+        <p className="chart-note">
+          <span>
+            {offScale.count === 1
+              ? `1 lap is slower than ${offScale.ceiling} and is drawn at the top of the axis.`
+              : `${String(offScale.count)} laps are slower than ${offScale.ceiling} and are drawn at the top of the axis.`}
+          </span>{' '}
+          <button
+            type="button"
+            className="chart-note-action"
+            onClick={() => {
+              setView('table');
+            }}
+          >
+            Show exact times
+          </button>
+        </p>
+      )}
+
       {view === 'chart' ? (
         <div
           className="chart-plot"
           role="img"
           aria-label={ariaLabel}
           aria-describedby={caption === undefined ? undefined : captionId}
+          {...(plotHeight === undefined ? {} : { style: { height: `${String(plotHeight)}px` } })}
         >
           {showPlot && children}
           {state !== 'ready' && state !== 'loading' && stateCopy !== undefined && (

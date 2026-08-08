@@ -13,6 +13,23 @@ import { App } from '@/App';
  * `503` must produce the instructional "no database found" state, and **no response
  * detail may reach the screen** — no path, no stack frame, no SQLite code. Asserting
  * that mechanically is cheaper than trusting it.
+ *
+ * ---
+ *
+ * **This file mounts `<App />` 19 times, and that is not the flake. Do not "fix" it.**
+ * The count looks alarming because the route table is 13 of them, and it has twice been
+ * proposed as the cause of the suite's intermittent failure under parallel execution. It
+ * is not, and the discriminating measurement is cheap to repeat: set `asyncUtilTimeout`
+ * to `1` in `vitest.setup.ts` and run this file. **2 of the 17 tests fail — the two
+ * error-state tests — and the other 15, the entire route table included, pass**, because
+ * they resolve on `findBy*`'s initial synchronous pass and never enter the bounded wait
+ * at all. Mounts that contribute nothing to the binding budget cannot be removed to widen
+ * it.
+ *
+ * What actually bound was `@testing-library/dom`'s `asyncUtilTimeout`, defaulting to
+ * 1000 ms and never set here, while the configuration claimed 15 s. The reasoning and the
+ * numbers are in `vitest.setup.ts` §3; this note exists so the next reader finds them from
+ * the file that looks guilty rather than repeating the investigation.
  */
 
 function errorResponse(code: string, message: string, status: number): Response {
@@ -146,7 +163,14 @@ describe('the route table', () => {
     ['/', 'Settle the argument.'],
     ['/seasons', /season/i],
     ['/seasons/2024', /^2024 season/i],
-    ['/seasons/2024/races/3', 'Round 3'],
+    /*
+     * A regex for the same reason the two season rows are (F3, 2026-08-07): the race page's `h1` is
+     * the round *number* with the race name appended for screen readers, so its accessible name is
+     * data-dependent — and in this test's fixture the race query cannot resolve, so the masthead is
+     * in its own resolving state. What the route table asserts is that the path reaches the race
+     * page, and a level-1 heading naming a race or a round is that claim.
+     */
+    ['/seasons/2024/races/3', /race|round/i],
     ['/drivers', 'Drivers'],
     ['/drivers/max_verstappen', 'Driver'],
     ['/teams', 'Teams'],
