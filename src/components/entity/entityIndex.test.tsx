@@ -319,7 +319,7 @@ describe('sort — and the grouping that follows from it', () => {
 });
 
 describe('the other two indexes are the same surface', () => {
-  it('renders constructors with their own noun and links to a team profile', () => {
+  it('renders teams under the same heading the dock links with, and links to a profile', () => {
     render(
       <MemoryRouter>
         <TeamIndexPage
@@ -330,11 +330,13 @@ describe('the other two indexes are the same surface', () => {
         />
       </MemoryRouter>,
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Constructors' })).toBeTruthy();
+    // `Teams`, matching `navItems.ts`. A nav item and the page it lands on must agree — the route
+    // table in `RootLayout.test.tsx` caught this when the heading read `Constructors`.
+    expect(screen.getByRole('heading', { level: 1, name: 'Teams' })).toBeTruthy();
     expect(screen.getByRole('link', { name: /Ferrari/ }).getAttribute('href')).toBe(
       '/teams/ferrari',
     );
-    expect(screen.getByText('1 constructors')).toBeTruthy();
+    expect(screen.getByText('1 teams')).toBeTruthy();
   });
 
   it('calls a scheduled venue “not yet raced”, never “never raced”', () => {

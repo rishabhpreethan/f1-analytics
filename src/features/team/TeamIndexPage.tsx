@@ -12,7 +12,12 @@ import { DataUnavailableState } from '@/components/ui/DataUnavailableState';
 import { Info } from '@/components/ui/icons';
 
 /**
- * **`/teams`** — the constructor index. `DESIGN_SYSTEM.md` §6.6.4.
+ * **`/teams`** — the team index. `DESIGN_SYSTEM.md` §6.6.4.
+ *
+ * **Headed `Teams`, not `Constructors`, and the route table caught the difference.** The dock's own
+ * item reads `Teams`, and a navigation page whose heading disagrees with the link that reached it is
+ * exactly the seam this feature exists to close. The sport's own word stays where it belongs — on
+ * the entity itself, as the team profile's eyebrow (§6.6.2.1) — rather than on the directory.
  *
  * The one page of the three whose rows carry a colour: a team's identity *is* its own reference, so
  * `identityToken` resolves without a `teamRef` field — a brand colour for 12 of 214 and the
@@ -21,7 +26,7 @@ import { Info } from '@/components/ui/icons';
  *
  * **No lineage, and its absence is the data's.** `base_team` holds no rows (trap 5), so Minardi →
  * Toro Rosso → AlphaTauri → RB does not resolve and each identity is its own row. The index states
- * 214 constructors because the record holds 214, not because the sport had that many teams.
+ * 214 teams because the record holds 214 identities, not because the sport had 214 outfits.
  */
 
 export interface TeamIndexPageProps {
@@ -46,12 +51,12 @@ export function TeamIndexPage({ data, pending, error, onRetry }: TeamIndexPagePr
 
   return (
     <EntityIndex
-      title="Constructors"
+      title="Teams"
       eyebrow="The archive"
-      facts={items === null ? [] : indexFacts(items, 'constructors')}
+      facts={items === null ? [] : indexFacts(items, 'teams')}
       kind="team"
-      noun="constructors"
-      nounSingular="constructor"
+      noun="teams"
+      nounSingular="team"
       items={items}
       columns={TEAM_COLUMNS}
       sorts={TEAM_SORTS}
@@ -60,7 +65,7 @@ export function TeamIndexPage({ data, pending, error, onRetry }: TeamIndexPagePr
           <p className="index-notice">
             <Info size={16} />
             <span>
-              <b>{`${String(raceless)} of the ${String(items.length)} constructors in the record never started a Grand Prix.`}</b>{' '}
+              <b>{`${String(raceless)} of the ${String(items.length)} teams in the record never started a Grand Prix.`}</b>{' '}
               They entered and never made a grid. They are listed here and marked, rather than
               quietly left out.
             </span>
