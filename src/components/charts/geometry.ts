@@ -657,3 +657,25 @@ export function markerPath(shape: MarkerShape, size = MARKER_SIZE): string {
 export function fmtCoord(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
+
+/**
+ * The normalised layout of one row: cumulative `[start, end]` in `[0, 1]` per segment.
+ *
+ * Exported and pure because this is the part a test can decide without layout — jsdom measures
+ * nothing, so the arithmetic is where the correctness lives (`geometry.ts` follows the same rule).
+ * Returns `null` for a row that has no share to give, which is the branch §1.0 asks to be **named**
+ * rather than folded into a falsy check.
+ */
+export function normaliseShareRow(
+  segments: readonly { reference: string; value: number }[],
+): { reference: string; start: number; end: number }[] | null {
+  const total = segments.reduce((sum, segment) => sum + Math.max(0, segment.value), 0);
+  if (!(total > 0)) return null;
+
+  let cursor = 0;
+  return segments.map((segment) => {
+    const start = cursor;
+    cursor += Math.max(0, segment.value) / total;
+    return { reference: segment.reference, start, end: cursor };
+  });
+}

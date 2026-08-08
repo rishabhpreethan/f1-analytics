@@ -279,3 +279,80 @@ export function SpanTable({
     </table>
   );
 }
+
+/**
+ * §6.5.5's table for a share chart, and it carries **both** figures deliberately.
+ *
+ * The plot expresses the share and never the raw value; the raw value is what a reader wants when
+ * they ask "yes, but how many points?". Printing only the share would make the table a transcription
+ * of the picture rather than the discharge of it — and printing only the value would leave the
+ * chart's own encoding unreadable in the one place a screen-reader user can reach it.
+ *
+ * The share is computed here from the same rule `normaliseRow` uses, so the two cannot disagree
+ * about a zero-total row: both treat it as **no share**, rendered `—`, never `0%`.
+ */
+export interface ShareTableProps {
+  rows: readonly {
+    key: string;
+    label: string;
+    segments: readonly { reference: string; teamReference: string; label: string; value: number }[];
+  }[];
+  caption: string;
+  categoryLabel: string;
+  entityLabel: string;
+  valueLabel: string;
+  formatValue: (value: number) => string;
+  tokenFor: (segment: { teamReference: string }) => string;
+}
+
+export function ShareTable({
+  rows,
+  caption,
+  categoryLabel,
+  entityLabel,
+  valueLabel,
+  formatValue,
+  tokenFor,
+}: ShareTableProps) {
+  return (
+    <table className="chart-table">
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{categoryLabel}</th>
+          <th scope="col">{entityLabel}</th>
+          <th scope="col" data-numeric="true">
+            {valueLabel}
+          </th>
+          <th scope="col" data-numeric="true">
+            Share
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.flatMap((row) => {
+          const total = row.segments.reduce((sum, segment) => sum + Math.max(0, segment.value), 0);
+          return row.segments.map((segment, index) => (
+            <tr key={`${row.key}:${segment.reference}`}>
+              <th scope="row">{index === 0 ? row.label : ''}</th>
+              <td>
+                <span
+                  className="chart-table-swatch"
+                  aria-hidden="true"
+                  style={{ '--series': cssVar(tokenFor(segment)) } as React.CSSProperties}
+                />
+                {segment.label}
+              </td>
+              <td data-numeric="true">{formatValue(segment.value)}</td>
+              <td data-numeric="true">
+                {total > 0
+                  ? `${String(Math.round((Math.max(0, segment.value) / total) * 100))}%`
+                  : '—'}
+              </td>
+            </tr>
+          ));
+        })}
+      </tbody>
+    </table>
+  );
+}
