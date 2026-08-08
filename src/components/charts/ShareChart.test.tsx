@@ -272,3 +272,51 @@ describe('interaction', () => {
     expect(tooltip?.textContent).toContain('50%');
   });
 });
+
+/**
+ * **77 rows is not a hypothetical — it is Ferrari.** In a 360px plot that is a 4.0px band step, and
+ * the season labels in the gutter and the driver codes inside the segments both rendered as an
+ * illegible stack. jsdom performs no layout, so what is verifiable here is that the chart **asks**
+ * for a plot deep enough; that the figure it asks for is sufficient is `geometry.test.ts`'s
+ * `bandPlotHeight` property, computed against the real band scale.
+ */
+describe('a long history is grown, never crushed', () => {
+  const many = (count: number): ShareRow[] =>
+    Array.from({ length: count }, (_, i) => ({
+      key: String(1950 + i),
+      label: String(1950 + i),
+      segments: [
+        {
+          reference: `d${String(i)}`,
+          teamReference: 'ferrari',
+          label: `Driver ${String(i)}`,
+          shortLabel: 'LEC',
+          value: 10,
+        },
+      ],
+    }));
+
+  it('asks for at least a line of height per season across Ferrari’s 77', () => {
+    const { container } = renderShare({ rows: many(77) });
+    const plot = container.querySelector('.chart-plot') as HTMLElement;
+    expect(Number.parseFloat(plot.style.minHeight)).toBeGreaterThanOrEqual(76 * 16);
+  });
+
+  it('sets a floor and never a height, so the responsive token still governs a short history', () => {
+    const { container } = renderShare();
+    const plot = container.querySelector('.chart-plot') as HTMLElement;
+    expect(plot.style.height).toBe('');
+    expect(Number.parseFloat(plot.style.minHeight)).toBeLessThan(240);
+  });
+
+  it('asks for the same floor in every state, so nothing reflows as the query resolves', () => {
+    // §6.5.3 — the figure is a function of the data, so loading and ready must agree exactly.
+    const read = (state: 'loading' | 'ready') => {
+      const { container, unmount } = renderShare({ rows: many(77), state });
+      const value = (container.querySelector('.chart-plot') as HTMLElement).style.minHeight;
+      unmount();
+      return value;
+    };
+    expect(read('loading')).toBe(read('ready'));
+  });
+});

@@ -142,6 +142,40 @@ export function categoryPlotHeight(
   return Math.max(floorPx, Math.max(0, count - 1) * minGap);
 }
 
+/**
+ * **The height a band chart needs so its rows can be labelled**, chrome included and **measured from
+ * the data alone**. _(added 2026-08-08)_
+ *
+ * `categoryPlotHeight` answers the same question for the *plot area*; this wraps it for the three
+ * charts that actually lay rows out with a `scaleBand`, and it fixes two things the bar chart's
+ * inline version got wrong.
+ *
+ * **1. The margins were never counted.** A row's label sits at its band centre inside `innerHeight`,
+ * which is the plot height *minus* `top` and `bottom` — 49px on these charts, once the tick line, the
+ * axis gap and the axis title are added up. Sizing the whole plot to the rows' requirement therefore
+ * under-provisions the part the rows are actually in. With `paddingInner(0.28)` and
+ * `paddingOuter(0.14)` the band step is exactly `innerHeight / count` — the 0.28 the outer padding
+ * adds is the 0.28 the inner padding removes — so the requirement is exact, not an estimate.
+ *
+ * **2. It must not depend on the measured height, or it oscillates.** The bar chart grew its plot only
+ * `if (count > labelCapacity(measuredHeight))`, and growing satisfies that condition: at 32 rows the
+ * plot went to 496px, `labelCapacity(496)` is then 32, `32 > 32` is false, the override was withdrawn,
+ * the plot fell back to 360px — and the condition was true again. A measurement-driven feedback loop
+ * with nothing to damp it. **A function of the row count and the labels has no such fixed point**, and
+ * it is also what `ChartFrameProps.plotHeight` already required: identical across loading, ready and
+ * empty for one dataset (§6.5.3).
+ *
+ * Returned as a **floor**, not a height — `ChartFrame` applies it as `min-height`, so the responsive
+ * `--size-plot*` token still governs any chart whose rows fit inside it.
+ */
+export function bandPlotHeight(
+  count: number,
+  margin: PlotMargin,
+  minGap = DIRECT_LABEL_MIN_GAP,
+): number {
+  return margin.top + margin.bottom + categoryPlotHeight(count, 0, minGap);
+}
+
 export function prefersHorizontalBars(labels: readonly string[]): boolean {
   return (
     labels.length > CATEGORY_COUNT_LIMIT ||
@@ -189,6 +223,47 @@ export function withEndpoints(
    * own postcondition rather than inherit it. `d3.ticks` happens to return sorted values today, so
    * nothing depends on the caller staying that way. */
   return [min, ...kept, max].sort((a, b) => a - b);
+}
+
+/**
+ * **Two ticks may never carry the same label.** _(added 2026-08-08, after a shipped defect)_
+ *
+ * A measure axis encodes value in *position*, so two ticks reading the same value at two positions is
+ * not clutter — it is a false statement about the scale. It reached the browser on `/teams/ferrari`:
+ * the lineup chart's axis is seasons and its formatter is `String(Math.round(value))`, so while the
+ * payload was in flight the placeholder domain `[0, 1]` produced ticks at `0, 0.2, 0.4, 0.6, 0.8, 1`
+ * and six labels reading `0, 0, 0, 1, 1, 1`. `SpanChart` keyed its gridlines and its tick text **by
+ * that label**, so React saw four duplicate keys — `grid-0`, `grid-1`, `tick-0`, `tick-1` — and logged
+ * eight warnings per render (sixteen under `StrictMode`). The keys are now positional, but a key fix
+ * alone would have left the axis quietly drawing three ticks labelled `0`: the duplicate key was the
+ * *symptom that surfaced*, and the non-injective formatter is the defect.
+ *
+ * **Which tick of a duplicate run survives is the whole design of this function.** Labels off a
+ * monotonic scale through a monotonic formatter duplicate in *consecutive runs*, so: keep the first
+ * of each run — and let the **last run keep its last tick**, because that tick is the domain maximum.
+ * That is `withEndpoints`' precedent applied a second time — *"an interior tick is one of eleven
+ * equivalent references, an endpoint is the only one of its kind"*. Keeping the first of the final run
+ * instead would draw the `1` of a `[0, 1]` axis at 60% of its width, which is a worse lie than the
+ * duplicate it removes.
+ *
+ * A degenerate domain whose every tick formats identically therefore collapses to **one** tick, at the
+ * maximum. That is the honest reading: such an axis has exactly one distinguishable value on it.
+ */
+export function dedupeTickLabels<T extends { label: string }>(ticks: readonly T[]): T[] {
+  if (ticks.length < 2) return [...ticks];
+
+  const kept: T[] = [];
+  for (const tick of ticks) {
+    if (kept.at(-1)?.label === tick.label) continue;
+    kept.push(tick);
+  }
+
+  const last = ticks.at(-1);
+  const tail = kept.at(-1);
+  if (last !== undefined && tail !== undefined && tail.label === last.label) {
+    kept[kept.length - 1] = last;
+  }
+  return kept;
 }
 
 /**

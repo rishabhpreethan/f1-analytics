@@ -269,3 +269,32 @@ describe('the page', () => {
     expect(container.querySelector('.entity-masthead')).not.toBeNull();
   });
 });
+
+/**
+ * **The console is part of the delivered artefact.** `/teams/ferrari` shipped sixteen React errors,
+ * every one of them raised in the **loading** render — the state this page's own tests had never
+ * exercised, because they all supply a resolved team. The lineup chart's fallback `[0, 1]` domain met
+ * `String(Math.round(value))` and produced six ticks labelled `0, 0, 0, 1, 1, 1`, keyed by that label.
+ *
+ * Asserted as the property — *React raises no warning at all* — rather than as the four key names,
+ * because the next duplicate key will not be those four.
+ */
+describe('the loading render is silent', () => {
+  function consoleErrorsDuring(run: () => void): string[] {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      run();
+      return spy.mock.calls.map((call) => String(call[0]));
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it('raises no React warning while the payload is in flight', () => {
+    expect(consoleErrorsDuring(() => renderPage({ team: null, pending: true }))).toEqual([]);
+  });
+
+  it('raises none with the team resolved either', () => {
+    expect(consoleErrorsDuring(() => renderPage())).toEqual([]);
+  });
+});

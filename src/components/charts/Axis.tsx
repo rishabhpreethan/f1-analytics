@@ -1,6 +1,7 @@
 import {
   AXIS_GAP,
   AXIS_TITLE_LINE,
+  dedupeTickLabels,
   labelStride,
   monoTextWidth,
   TICK_LABEL_SIZE,
@@ -49,7 +50,26 @@ export interface MeasureAxisProps {
   labels?: boolean;
 }
 
-export function MeasureAxis({ plot, ticks, title, grid = true, labels = true }: MeasureAxisProps) {
+export function MeasureAxis({
+  plot,
+  ticks: given,
+  title,
+  grid = true,
+  labels = true,
+}: MeasureAxisProps) {
+  /*
+   * **A measure axis may not draw two ticks with the same label** — see `dedupeTickLabels`. It is
+   * enforced here rather than left to each caller because every caller formats its own ticks through
+   * a function of its own, and nothing constrains one to be injective: a lap-time axis over a
+   * four-hundredth-of-a-second domain formatted to one decimal is the same defect the span chart
+   * shipped, and the only reason it would not announce itself is that this axis is keyed by index.
+   *
+   * **Not applied to `CategoryAxis`.** There a label is a *name*, two categories may honestly share
+   * one, and dropping a band would delete a real reading. Here a label is a *value*, and the same
+   * value at two positions is a false statement about the scale.
+   */
+  const ticks = dedupeTickLabels(given);
+
   return (
     <g aria-hidden="true">
       {grid &&

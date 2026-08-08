@@ -1,9 +1,13 @@
+import { scaleBand, scaleLinear } from 'd3-scale';
 import { describe, expect, it } from 'vitest';
 import {
   AXIS_GAP,
   AXIS_TITLE_LINE,
+  bandPlotHeight,
   CATEGORY_COUNT_LIMIT,
   categoryPlotHeight,
+  dedupeTickLabels,
+  TICK_LABEL_LINE,
   clampTooltip,
   MARKER_RING,
   ISOLATION_THRESHOLD,
@@ -520,6 +524,154 @@ describe('categoryPlotHeight', () => {
   it('treats the token as a floor and never shrinks below it', () => {
     expect(categoryPlotHeight(1, 360)).toBe(360);
     expect(categoryPlotHeight(0, 360)).toBe(360);
+  });
+});
+
+/**
+ * **Two ticks may never carry the same label.** Shipped to the browser on `/teams/ferrari`: the
+ * lineup chart's formatter is `String(Math.round(value))`, and the `[0, 1]` domain it falls back to
+ * while its payload is in flight produced six ticks labelled `0, 0, 0, 1, 1, 1` — four duplicate React
+ * keys, sixteen console errors, and an axis making a false statement about its own scale.
+ *
+ * These assert the **property that could fail** — that no two surviving labels are equal, and that the
+ * survivor of a run is the one whose position is true — rather than the arithmetic of one case.
+ */
+describe('dedupeTickLabels', () => {
+  it('leaves an axis whose labels are already distinct exactly as it found it', () => {
+    const ticks = [1950, 1970, 1990, 2010, 2027].map((v) => ({ offset: v, label: String(v) }));
+    expect(dedupeTickLabels(ticks)).toEqual(ticks);
+  });
+
+  it('reproduces the shipped case: a [0, 1] axis rounded to integers keeps two ticks, not six', () => {
+    const measure = scaleLinear().domain([0, 1]).range([0, 800]);
+    const ticks = withEndpoints(measure.ticks(6), 0, 1, 0).map((value) => ({
+      offset: measure(value),
+      label: String(Math.round(value)),
+    }));
+    // What the browser was handed: 0, 0.2, 0.4, 0.6, 0.8, 1 → "0","0","0","1","1","1".
+    expect(ticks.map((t) => t.label)).toEqual(['0', '0', '0', '1', '1', '1']);
+
+    const kept = dedupeTickLabels(ticks);
+    expect(kept).toEqual([
+      { offset: 0, label: '0' },
+      { offset: 800, label: '1' },
+    ]);
+  });
+
+  it('gives the endpoint its run, never an interior tick — the label "1" sits at the axis end', () => {
+    /*
+     * The whole design of the function. Keeping the FIRST of every run would have put "1" at 60% of
+     * the axis, which is a worse lie than the duplicate it removes. `withEndpoints` sets the
+     * precedent: an interior tick is one of several equivalents, an endpoint is the only one of its
+     * kind.
+     */
+    const kept = dedupeTickLabels([
+      { offset: 0, label: '0' },
+      { offset: 480, label: '1' },
+      { offset: 640, label: '1' },
+      { offset: 800, label: '1' },
+    ]);
+    expect(kept.at(-1)).toEqual({ offset: 800, label: '1' });
+  });
+
+  it('never returns two equal labels, over every domain the span chart can be handed', () => {
+    // The placeholder domain, a single season, a full career, a race distance, a modern grid.
+    const domains: [number, number][] = [
+      [0, 1],
+      [1974, 1975],
+      [1950, 2027],
+      [1, 58],
+      [1, 22],
+      [0, 0.5],
+    ];
+    for (const [min, max] of domains) {
+      for (const count of [3, 4, 5, 6, 12]) {
+        const measure = scaleLinear().domain([min, max]).range([0, 800]);
+        const kept = dedupeTickLabels(
+          withEndpoints(measure.ticks(count), min, max, 0).map((value) => ({
+            offset: measure(value),
+            label: String(Math.round(value)),
+          })),
+        );
+        const labels = kept.map((t) => t.label);
+        expect(new Set(labels).size, `${String(min)}–${String(max)} at ${String(count)}`).toBe(
+          labels.length,
+        );
+      }
+    }
+  });
+
+  it('collapses a wholly indistinguishable axis to its single readable value', () => {
+    // Honest: such an axis has exactly one distinguishable reading on it, and it is at the maximum.
+    const kept = dedupeTickLabels([
+      { offset: 0, label: '1974' },
+      { offset: 400, label: '1974' },
+      { offset: 800, label: '1974' },
+    ]);
+    expect(kept).toEqual([{ offset: 800, label: '1974' }]);
+  });
+
+  it('passes a one-tick and a zero-tick axis straight through', () => {
+    expect(dedupeTickLabels([])).toEqual([]);
+    expect(dedupeTickLabels([{ offset: 0, label: '1' }])).toEqual([{ offset: 0, label: '1' }]);
+  });
+});
+
+/**
+ * **The row pitch a band chart needs.** Ferrari's lineup is 24 rows and its points split is 77, and
+ * both rendered their labels on top of each other in a 360px plot. The property asserted is the one
+ * that failed on screen — **band step ≥ the label's line height** — computed against the real
+ * `scaleBand`, at the real padding the charts use, rather than against a formula restated here.
+ */
+describe('bandPlotHeight', () => {
+  /* Exactly what `SpanChart`, `ShareChart` and a rotated `BarChart` build. */
+  const MARGIN = computeMargin({
+    measureLabels: ['1950'],
+    hasCategoryLabels: true,
+    hasCategoryTitle: true,
+  });
+
+  const step = (count: number, plotHeight: number) =>
+    scaleBand<string>()
+      .domain(Array.from({ length: count }, (_, i) => String(i)))
+      .range([0, Math.max(0, plotHeight - MARGIN.top - MARGIN.bottom)])
+      .paddingInner(0.28)
+      .paddingOuter(0.14)
+      .step();
+
+  it('is what a 360px plot could NOT do — the defect, stated as an assertion', () => {
+    // 24 driver codes in the lineup gutter, and 77 season labels in the split's.
+    expect(step(24, 360)).toBeLessThan(TICK_LABEL_LINE);
+    expect(step(77, 360)).toBeLessThan(TICK_LABEL_LINE);
+  });
+
+  it('gives every row at least a full line of height, from 1 row to 100', () => {
+    for (let count = 1; count <= 100; count += 1) {
+      const height = Math.max(360, bandPlotHeight(count, MARGIN));
+      expect(step(count, height), `${String(count)} rows`).toBeGreaterThanOrEqual(TICK_LABEL_LINE);
+    }
+  });
+
+  it('counts the axis chrome, which the plot height it replaces did not', () => {
+    // The rows live in `innerHeight`; `top + bottom` is 49px of tick line, gap and axis title here.
+    expect(MARGIN.top + MARGIN.bottom).toBeGreaterThan(0);
+    expect(bandPlotHeight(32, MARGIN)).toBe(MARGIN.top + MARGIN.bottom + 31 * DIRECT_LABEL_MIN_GAP);
+  });
+
+  it('has no fixed point — feeding the grown height back cannot withdraw the growth', () => {
+    /*
+     * The regression this replaces. `BarChart` grew only `if (count > labelCapacity(measured))`, and
+     * growing made that false — so the override was withdrawn, the plot fell back to the token, and
+     * the condition was true again. The first assertion documents the old oscillation; the second is
+     * why the new derivation cannot have one.
+     */
+    expect(labelCapacity(categoryPlotHeight(32, 360))).toBe(32); // 32 > 32 is false → withdrawn
+    const first = bandPlotHeight(32, MARGIN);
+    expect(bandPlotHeight(32, MARGIN)).toBe(first); // depends on no measurement at all
+  });
+
+  it('stays under the token for a chart whose rows fit, so the responsive height still governs', () => {
+    expect(bandPlotHeight(6, MARGIN)).toBeLessThan(240);
   });
 });
 

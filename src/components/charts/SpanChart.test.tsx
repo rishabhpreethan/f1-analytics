@@ -196,3 +196,107 @@ describe('the pinned domain', () => {
     expect(screen.getAllByText('58').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * **The axis, and the defect it shipped.** `/teams/ferrari` logged sixteen React console errors and
+ * drew its driver codes on top of one another. Both were this chart, in its **loading** state — the
+ * one state its own tests had never rendered.
+ *
+ * The two assertions are the two properties that failed, not the arithmetic of the case that failed
+ * them: **no two children share a key**, and **no two ticks share a label**. jsdom sees the first
+ * because React reports it through `console.error`; it can see the second because the labels are
+ * text nodes. It sees neither of the *positions* involved — that remains untested by construction.
+ */
+describe('the measure axis never lies about its own scale', () => {
+  /** Every duplicate-key warning React raised during the callback, by the key it named. */
+  function duplicateKeys(run: () => void): string[] {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      run();
+      return spy.mock.calls
+        .filter((call) => String(call[0]).includes('two children with the same key'))
+        .map((call) => String(call[1]));
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it('raises no duplicate key when the formatter is not injective over the ticks', () => {
+    /*
+     * The exact shipped case. With no rows and no pinned domain the chart falls back to `[0, 1]`,
+     * `d3` ticks it at 0, 0.2 … 1, and the team page's `String(Math.round(value))` collapses those
+     * to "0","0","0","1","1","1". Keyed by that label, React saw `grid-0`, `grid-1`, `tick-0` and
+     * `tick-1` twice each — eight warnings a render, sixteen under StrictMode.
+     */
+    const keys = duplicateKeys(() => {
+      /* Rendered directly rather than through `renderSpans`, because the helper pins a domain and
+       * an unpinned one is exactly the condition — this is the chart as the team page mounts it. */
+      render(
+        <SpanChart
+          rows={[]}
+          state="loading"
+          title="Driver lineup"
+          ariaLabel="The seasons each driver raced for this team."
+          measureTitle="Season"
+          formatMeasure={(value) => String(Math.round(value))}
+        />,
+      );
+    });
+    expect(keys).toEqual([]);
+  });
+
+  it('draws each tick label exactly once, which is the defect behind the duplicate key', () => {
+    // Keying by index alone would have silenced React and left the axis drawing three ticks
+    // labelled "0" and three labelled "1". The label collision is the actual fault.
+    const { container } = render(
+      <SpanChart
+        rows={[]}
+        state="loading"
+        title="Driver lineup"
+        ariaLabel="The seasons each driver raced for this team."
+        measureTitle="Season"
+        formatMeasure={(value) => String(Math.round(value))}
+      />,
+    );
+    const labels = [...container.querySelectorAll('text.chart-tick')].map((n) => n.textContent);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('keeps every year distinct on a real team’s axis, and keeps both endpoints', () => {
+    const { container } = renderSpans({
+      rows: [],
+      domain: [1950, 2027],
+      formatMeasure: (value) => String(Math.round(value)),
+    });
+    const labels = [...container.querySelectorAll('text.chart-tick')].map((n) => n.textContent);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels[0]).toBe('1950');
+    expect(labels.at(-1)).toBe('2027');
+  });
+
+  it('asks the frame for a plot tall enough to label every row it draws', () => {
+    /*
+     * Ferrari's lineup is 24 rows; in a 360px plot that is a 13.0px band step against a 14px line
+     * height, and the driver codes overlapped. jsdom performs no layout, so what is verifiable here
+     * is that the floor is **requested** — that it is sufficient is `geometry.test.ts`'s
+     * `bandPlotHeight` property, computed against the real band scale.
+     */
+    const rows: SpanRow[] = Array.from({ length: 24 }, (_, i) => ({
+      reference: `d${String(i)}`,
+      teamReference: 'ferrari',
+      label: `D${String(i)}`,
+      spans: [{ key: `d${String(i)}-1`, start: 1950 + i, end: 1951 + i }],
+    }));
+    const { container } = renderSpans({ rows, domain: [1950, 1975] });
+    const plot = container.querySelector('.chart-plot') as HTMLElement;
+    expect(Number.parseFloat(plot.style.minHeight)).toBeGreaterThanOrEqual(23 * 16);
+    // A floor, never a height: the responsive --size-plot token must still govern a chart that fits.
+    expect(plot.style.height).toBe('');
+  });
+
+  it('asks for no floor worth having when two rows fit the token comfortably', () => {
+    const { container } = renderSpans();
+    const plot = container.querySelector('.chart-plot') as HTMLElement;
+    expect(Number.parseFloat(plot.style.minHeight)).toBeLessThan(240);
+  });
+});

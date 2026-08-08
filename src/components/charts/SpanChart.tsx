@@ -5,7 +5,9 @@ import { CHART_REVEAL_ATTR, useChartMount } from '@/lib/motion/chart';
 import { ChartFrame } from './ChartFrame';
 import { SpanTable } from './ChartTable';
 import {
+  bandPlotHeight,
   computeMargin,
+  dedupeTickLabels,
   measureTickCount,
   mountKey,
   plotArea,
@@ -139,8 +141,19 @@ export function SpanChart({
    * finish of the race, and `d3.ticks` omits both. */
   const gapInDomain =
     plot.innerWidth > 0 ? ((measureLabels[0]?.length ?? 2) * 8 * (max - min)) / plot.innerWidth : 0;
-  const measureTicks = withEndpoints(measure.ticks(tickCount), min, max, gapInDomain).map(
-    (value) => ({ offset: measure(value), label: formatMeasure(value) }),
+  /*
+   * `dedupeTickLabels` is not defensive tidying — it is the fix for a defect that reached the browser.
+   * `formatMeasure` is the caller's and nothing constrains it to be injective: the team page's is
+   * `String(Math.round(value))`, and on the placeholder `[0, 1]` domain this chart falls back to while
+   * its payload is in flight, six ticks formatted to `0, 0, 0, 1, 1, 1`. Two ticks reading the same
+   * value at two positions is a false statement about a measure axis, and it was also producing four
+   * duplicate React keys. See the note on the function.
+   */
+  const measureTicks = dedupeTickLabels(
+    withEndpoints(measure.ticks(tickCount), min, max, gapInDomain).map((value) => ({
+      offset: measure(value),
+      label: formatMeasure(value),
+    })),
   );
 
   const { scope: motionScope } = useChartMount<HTMLDivElement>({
@@ -169,6 +182,13 @@ export function SpanChart({
       notes={notes}
       state={state}
       {...(stateCopy === undefined ? {} : { stateCopy })}
+      /*
+       * **Every row is labelled in the gutter, so every row must have room for a label.** Ferrari's
+       * lineup is 24 rows; in a 360px plot that is a 13.0px band step against a 14px line-height, and
+       * the driver codes rendered on top of each other. The chart grows and its section scrolls
+       * (§6.3), rather than crushing the labels that make it readable.
+       */
+      plotHeight={bandPlotHeight(rows.length, margin)}
       table={
         <SpanTable
           rows={rows}
@@ -204,9 +224,17 @@ export function SpanChart({
 
             {/* The measure axis runs along the bottom; the category side keeps no line (§6.3). */}
             <g aria-hidden="true">
-              {measureTicks.map((tick) => (
+              {/*
+               * **Keyed by index, as every other axis in this kit is** (`Axis.tsx`, `BarChart`).
+               * The label was never an identity here — nothing transitions a tick between renders,
+               * and the entrance is one clip wipe over the whole plot keyed on `mountKey`, not a
+               * per-tick tween — so there is no reconciliation benefit to trade against the label
+               * being a value the caller's formatter is free to repeat. Ticks are positionally
+               * stable and ascending, so the index *is* the identity.
+               */}
+              {measureTicks.map((tick, i) => (
                 <line
-                  key={`grid-${tick.label}`}
+                  key={`grid-${String(i)}`}
                   className="chart-grid-line"
                   x1={Math.round(plot.left + tick.offset) + 0.5}
                   x2={Math.round(plot.left + tick.offset) + 0.5}
@@ -221,9 +249,9 @@ export function SpanChart({
                 y1={Math.round(plot.top + plot.innerHeight) + 0.5}
                 y2={Math.round(plot.top + plot.innerHeight) + 0.5}
               />
-              {measureTicks.map((tick) => (
+              {measureTicks.map((tick, i) => (
                 <text
-                  key={`tick-${tick.label}`}
+                  key={`tick-${String(i)}`}
                   className="chart-tick"
                   x={Math.round(plot.left + tick.offset)}
                   y={plot.top + plot.innerHeight + 8}

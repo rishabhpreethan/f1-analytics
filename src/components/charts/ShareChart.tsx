@@ -4,7 +4,14 @@ import { assignEntityColours, cssVar, identityToken } from '@/lib/entityColor';
 import { CHART_REVEAL_ATTR, useChartMount } from '@/lib/motion/chart';
 import { ChartFrame } from './ChartFrame';
 import { ShareTable } from './ChartTable';
-import { computeMargin, mountKey, normaliseShareRow, plotArea, spanPath } from './geometry';
+import {
+  bandPlotHeight,
+  computeMargin,
+  mountKey,
+  normaliseShareRow,
+  plotArea,
+  spanPath,
+} from './geometry';
 import type { PlotState } from './types';
 import { useChartSize } from './useChartSize';
 
@@ -193,6 +200,14 @@ export function ShareChart({
       notes={notes}
       state={state}
       {...(stateCopy === undefined ? {} : { stateCopy })}
+      /*
+       * **One row per season, and Ferrari has 77 of them.** In a 360px plot that is a 4.0px band step:
+       * the season labels in the gutter and the driver codes inside the segments both rendered as an
+       * illegible stack, and the chart's whole reading — *which driver carried the team, season by
+       * season* — was unavailable. It grows to a scrolling timeline instead, which is the same answer
+       * §6.3 gives a category axis that does not fit.
+       */
+      plotHeight={bandPlotHeight(rows.length, margin)}
       table={
         <ShareTable
           rows={rows}
