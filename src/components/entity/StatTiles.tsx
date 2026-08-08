@@ -71,18 +71,30 @@ export function StatTiles({ tiles, notes = [], ariaLabel, pending = false }: Sta
               <dd className="stat-tile-figure" data-unavailable={unavailable}>
                 {pending ? (
                   <LoadingState announce={false} className="skeleton-stat-figure" />
-                ) : unavailable ? (
+                ) : (
                   <>
-                    <span aria-hidden="true">—</span>
-                    <span className="sr-only">Not available for this career</span>
+                    {unavailable ? (
+                      <>
+                        <span aria-hidden="true">—</span>
+                        <span className="sr-only">Not available for this career</span>
+                      </>
+                    ) : (
+                      tile.value
+                    )}
+                    {/*
+                     * ⚠ **The marker belongs to the note, not to the absence, and the first build
+                     * of this component tied it to the absence.** That collapsed §6.6.2.2's three
+                     * states back into two: a *partial* figure — 26 poles measured over 41 of 161
+                     * starts — rendered as a bare `26` with no indication it was undercounted,
+                     * which is the more dangerous of the two failures because the number looks
+                     * complete. Caught by the test, not by reading the code.
+                     */}
                     {marker !== null && (
                       <sup className="stat-tile-marker" aria-hidden="true">
                         {marker}
                       </sup>
                     )}
                   </>
-                ) : (
-                  tile.value
                 )}
               </dd>
             </div>
