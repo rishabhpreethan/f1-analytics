@@ -18,13 +18,18 @@ import { prepared } from './prepared';
  * idx_se_re` at **13–17 ms p50**. See ARCHITECTURE.md §10 #32 — the canonical views are
  * entered by `(year, round)` and there is no way to enter them by an entity.
  *
- * Ferrari is the archive's worst case and it is stated rather than smoothed: the whole
- * payload measures **~30 ms p50 / ~55 ms p95** end to end, against §8's aspirational
- * 50 ms p95 for a non-lap endpoint. The dominant cost is SQLite materialising 2,500 row
- * objects, not the plan. It was left as raw rows plus a pure builder rather than pushed
- * into `GROUP BY` aggregates because the counting rules here are exactly where traps 16
- * and 17 bite, and CI — which never has `data/f1.db` — can only exercise them in the
- * builder. A typical team measures 10–25 ms.
+ * Ferrari is the archive's worst case and the whole-payload figure is stated with its
+ * spread rather than smoothed to one number: **10–15 ms p50 on an idle machine**, against
+ * §8's aspirational 50 ms p95 for a non-lap endpoint. Repeated across runs of the same
+ * process while other work was running it reached **20–37 ms p50 and 26–65 ms p95** — so
+ * the honest claim is that the budget is met with headroom when the machine is free and
+ * that this measurement cannot distinguish a slow query from a busy CPU. `readDriver` and
+ * `readCircuit` track it: 5–13 ms and 6–9 ms idle.
+ *
+ * The dominant cost is SQLite materialising 2,500 row objects, not the plan. It was left
+ * as raw rows plus a pure builder rather than pushed into `GROUP BY` aggregates because
+ * the counting rules here are exactly where traps 16 and 17 bite, and CI — which never has
+ * `data/f1.db` — can only exercise them in the builder.
  *
  * ===================================================================== S-10, and its bound
  *
