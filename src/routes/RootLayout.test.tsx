@@ -172,11 +172,25 @@ describe('the route table', () => {
      */
     ['/seasons/2024/races/3', /race|round/i],
     ['/drivers', 'Drivers'],
-    ['/drivers/max_verstappen', 'Driver'],
+    /*
+     * The three entity profiles assert an **unnamed** level-1 heading (F4–F6, 2026-08-08), and the
+     * empty string is the assertion rather than a gap in it. They used to read `Driver`, `Team` and
+     * `Circuit` — the placeholders' literal headings — and the real surfaces put the entity's own
+     * name in the `h1`, which this fixture cannot supply: one mock answers every request with
+     * `/api/meta`, so each entity query fails its own schema and the masthead sits in its resolving
+     * state. `EntityMasthead` renders the `h1` regardless, with an `aria-hidden` skeleton inside it,
+     * so its accessible name is exactly `''`.
+     *
+     * That is still the claim this table makes — **the path resolves to the profile surface** — and
+     * it is the same accommodation the season and race rows already carry for a data-dependent
+     * heading. What it cannot show is the heading's *content*, which needs a payload and, for
+     * anything about how it looks, a browser.
+     */
+    ['/drivers/max_verstappen', ''],
     ['/teams', 'Teams'],
-    ['/teams/ferrari', 'Team'],
+    ['/teams/ferrari', ''],
     ['/circuits', 'Circuits'],
-    ['/circuits/spa', 'Circuit'],
+    ['/circuits/spa', ''],
     ['/compare', 'Compare'],
     ['/records', 'Records'],
     ['/not-a-real-route', 'No page at this address'],
