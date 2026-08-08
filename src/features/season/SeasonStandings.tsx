@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { Link } from 'react-router';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { StateCard } from '@/components/ui/StateCard';
 import { Trophy } from '@/components/ui/icons';
@@ -222,10 +223,18 @@ function DriverTable({ rows, year }: { rows: readonly DriverStandingRow[]; year:
               style={{ '--identity': cssVar(identityToken(row.colorRef)) } as CSSProperties}
             >
               <PositionCell position={row.position} adjustment={row.adjustment} kind="driver" />
+              {/*
+               * §1.0a — the driver page exists now, so the link is this surface's obligation. The
+               * name is the link and the position cell is not: a standings row's subject is the
+               * ranking, and making the whole row navigate to a driver would give the points cell
+               * a destination about somebody rather than about the number in it.
+               */}
               <td>
-                <span className="standings-name">
-                  {row.forename} {row.surname}
-                </span>
+                <Link className="entity-link" to={`/drivers/${row.driverRef}`}>
+                  <span className="standings-name">
+                    {row.forename} {row.surname}
+                  </span>
+                </Link>
                 {row.code !== null && <span className="standings-code">{row.code}</span>}
                 <TeamLine teams={row.teams} />
               </td>
@@ -297,7 +306,9 @@ function TeamTable({ rows, year }: { rows: readonly TeamStandingRow[]; year: num
             >
               <PositionCell position={row.position} adjustment={row.adjustment} kind="team" />
               <td>
-                <span className="standings-name">{row.name}</span>
+                <Link className="entity-link" to={`/teams/${row.teamRef}`}>
+                  <span className="standings-name">{row.name}</span>
+                </Link>
                 {row.nationality !== null && (
                   <span className="standings-team">{row.nationality}</span>
                 )}
@@ -397,11 +408,34 @@ function NumericCell({ value, prefix = '' }: { value: number | null; prefix?: st
  */
 function TeamLine({ teams }: { teams: DriverStandingRow['teams'] }) {
   const lineage = teamLineage(teams);
+  /*
+   * §1.0a again, and the reason the presenter's joined label is not used here: `teamLineage`
+   * returns **one string**, and a string cannot carry two destinations. A driver who changed team
+   * mid-season has two team pages, so the fold is re-expressed with the same rule — two shown in
+   * full, three or more collapsed to first and last with a count — and each name is its own link.
+   * The full list stays in the row's accessible text either way, so a collapse never loses a team.
+   */
+  const shown = teams.length <= 2 ? teams : [teams[0], teams[teams.length - 1]];
+
+  if (teams.length === 0) return <span className="standings-team">{lineage.label}</span>;
+
   return (
     <span className="standings-team">
-      {lineage.label}
+      {shown.map((team, index) =>
+        team === undefined ? null : (
+          <span key={team.ref}>
+            {index > 0 && <span aria-hidden="true"> → </span>}
+            <Link className="entity-link entity-link-quiet" to={`/teams/${team.ref}`}>
+              {team.name}
+            </Link>
+          </span>
+        ),
+      )}
       {lineage.count !== null && (
-        <span className="season-chip season-chip-inline">{lineage.count} teams</span>
+        <>
+          <span className="season-chip season-chip-inline">{lineage.count} teams</span>
+          <span className="sr-only">{`All teams: ${teams.map((team) => team.name).join(', ')}`}</span>
+        </>
       )}
     </span>
   );

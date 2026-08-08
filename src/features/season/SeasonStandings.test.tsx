@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -91,19 +92,25 @@ const TEAMS_2007: TeamStandingRow[] = [
   }),
 ];
 
+/**
+ * A router is part of the harness from F4 onwards: §1.0a made every driver and team name in this
+ * table a link to the page that owns it, and a `<Link>` outside a router throws.
+ */
 function renderStandings(over: Partial<Parameters<typeof SeasonStandings>[0]> = {}) {
   return render(
-    <SeasonStandings
-      year={1997}
-      drivers={DRIVERS_1997}
-      teams={TEAMS_2007}
-      driverNotices={[]}
-      teamNotices={[]}
-      asOfRound={17}
-      isComplete
-      pending={false}
-      {...over}
-    />,
+    <MemoryRouter>
+      <SeasonStandings
+        year={1997}
+        drivers={DRIVERS_1997}
+        teams={TEAMS_2007}
+        driverNotices={[]}
+        teamNotices={[]}
+        asOfRound={17}
+        isComplete
+        pending={false}
+        {...over}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -273,5 +280,50 @@ describe('the table’s own conventions', () => {
     for (const skeleton of skeletons) {
       expect(skeleton.closest('[data-motion="reveal-item"]')).toBeNull();
     }
+  });
+});
+
+/**
+ * **§1.0a — the seam, asserted.** The standings table named every driver and every team on the
+ * season hub as plain text; the pages that own them exist now, so the link is this surface's
+ * obligation.
+ */
+describe('§1.0a — every entity this table names is a link', () => {
+  it('links a driver’s name to their driver page', () => {
+    renderStandings();
+    const link = screen.getAllByRole('link', { name: /Villeneuve/ })[0];
+    expect(link?.getAttribute('href')).toBe('/drivers/villeneuve');
+  });
+
+  it('links a constructor’s name to its team page', () => {
+    renderStandings();
+    expect(screen.getAllByRole('link', { name: 'McLaren' })[0]?.getAttribute('href')).toBe(
+      '/teams/mclaren',
+    );
+  });
+
+  it('gives a two-team season TWO team links rather than one joined string', () => {
+    /*
+     * `teamLineage` returns one string and a string cannot carry two destinations. 318
+     * driver-seasons involve more than one team, so collapsing them to a single link would make
+     * one of the two teams unreachable from the row that names it.
+     */
+    renderStandings({
+      drivers: [
+        {
+          ...(DRIVERS_1997[0] as DriverStandingRow),
+          teams: [
+            { ref: 'sauber', name: 'Sauber', firstRound: 1, lastRound: 9, entries: 9 },
+            { ref: 'ferrari', name: 'Ferrari', firstRound: 10, lastRound: 17, entries: 8 },
+          ],
+        },
+      ],
+    });
+    expect(screen.getAllByRole('link', { name: 'Sauber' })[0]?.getAttribute('href')).toBe(
+      '/teams/sauber',
+    );
+    expect(screen.getAllByRole('link', { name: 'Ferrari' })[0]?.getAttribute('href')).toBe(
+      '/teams/ferrari',
+    );
   });
 });
