@@ -5,8 +5,12 @@ import { type Team, teamSchema } from '@schemas/team';
 import { type ApiRequestError, apiGet, isTerminalApiError } from '@/lib/api';
 
 /**
- * The only place the three entity endpoints are fetched. Components never fetch
+ * The only place the three entity **profile** endpoints are fetched. Components never fetch
  * (ARCHITECTURE.md §3); they receive props.
+ *
+ * The three **index** endpoints are `useEntityIndex.ts` beside this file — a separate module
+ * because they answer a different question: no parameter, so nothing to leave unresolved,
+ * nothing to 404, and no reference in the query key.
  *
  * ==================================================== one module for three, on purpose
  *
