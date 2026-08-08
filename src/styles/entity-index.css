@@ -325,10 +325,9 @@
     transition: background-color var(--dur-instant) var(--ease-enter);
   }
 
-  .index-list:last-child .index-row {
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
+  /* Only the very last row of the very last group loses its rule — every other row keeps one,
+   * including the last row before a group heading, where the heading's own top edge would
+   * otherwise be the only separator. */
   .index-group:last-child .index-list > li:last-child .index-row {
     border-bottom: none;
   }
