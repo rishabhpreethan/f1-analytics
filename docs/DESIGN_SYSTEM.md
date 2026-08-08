@@ -2142,6 +2142,30 @@ fits (§6.9), and the note says how many of how many — the same discipline the
 > after any amount of further work. The label is what carries that uncertainty, because nothing else
 > can. This distinction matters in the copy too: "inferred" is honest, "detected" would not be.
 
+##### Why the threshold is 1.3, and what it is a threshold *for* _(ruled 2026-08-07)_
+
+**Measured: across all 578 races with lap data, the per-race maximum ratio distributes p25 1.028 ·
+p50 1.270 · p75 1.600 · p95 4.987.** So **1.3 sits essentially at the median**, and it flags nine of ten
+modern races — modern races skew above the all-era median because red-flag stoppages are recorded as
+laps. A threshold at the 50th percentile is not detecting something unusual; it is splitting the
+distribution in half, and it cannot be defended as an outlier definition.
+
+**It is not an outlier definition, and reframing it is the resolution.** The purpose is not to detect a
+rare event. It is to identify **laps that cannot inform a pace conclusion**, and a lap 30% slower than
+the race's own typical lap is unfit for a degradation fit *regardless of why it was slow*. On that
+framing the threshold is calibrated to the phenomenon's frequency — a safety car, red flag, VSC or wet
+restart really does occur in roughly half of modern Grands Prix — rather than to a definition of
+unusualness, and it is **deliberately loose**: a short VSC that inflates laps by 35% is exactly the case
+a pace metric most needs excluded, and moving to p75 (1.600, flagging a quarter) would miss it.
+
+So: **1.3 stays, and the copy leads with the property rather than the cause.** *"30% or more slower than
+this race's typical lap"* is the finding; *"which usually means a likely safety car or red flag"* is the
+explanation offered for why such laps cluster — not a claim to have identified one. Had the copy led
+with the cause it would have been asserting a detection the data cannot support.
+
+**Recording which kind of threshold this is matters more than its value**, because the next person to
+look at nine-in-ten will otherwise reasonably conclude it is broken.
+
 **Queued, not yet specified:** RD-5 gap to leader (P1), RD-6 position-change events (P1), RD-9
 consistency (P1), RD-8 and RD-12 (P2). RD-11 weekend session times needs `session.timestamp` and
 `session.timezone` and is a list, not a chart.
