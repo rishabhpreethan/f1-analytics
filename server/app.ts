@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import { notFound, onError } from './errors';
 import { rateLimit } from './middleware/rateLimit';
+import { entityRoutes } from './routes/entities';
 import { metaRoutes } from './routes/meta';
 import { raceRoutes } from './routes/races';
 import { seasonRoutes } from './routes/seasons';
@@ -75,13 +76,16 @@ app.use('/api/*', rateLimit());
 
 // 4. Routes. Handlers validate, call one named query, and return.
 //
-//    Order is not load-bearing between these three: their patterns differ in segment
+//    Order is not load-bearing between these four: their patterns differ in segment
 //    count or in a static segment, so no request matches two. `routes/races.ts` mounts
 //    `/seasons/:year/races/:round`, which is four segments where `/seasons/:year` is two
-//    and `/seasons/:year/standings` is three.
+//    and `/seasons/:year/standings` is three; `routes/entities.ts` mounts three
+//    two-segment patterns whose first segment is a distinct literal (`drivers`, `teams`,
+//    `circuits`) and so can never collide with `/seasons/:year`.
 app.route('/api', metaRoutes);
 app.route('/api', seasonRoutes);
 app.route('/api', raceRoutes);
+app.route('/api', entityRoutes);
 
 app.notFound(notFound);
 app.onError(onError);

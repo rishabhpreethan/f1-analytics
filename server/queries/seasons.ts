@@ -15,6 +15,8 @@ import type {
   TeamStanding,
 } from '../schemas/season';
 import { DatabaseUnavailableError } from '../db';
+import { SEASON_CACHE_TTL_MS } from '../config';
+import { memoize } from '../cache/memo';
 import { prepared } from './prepared';
 
 /**
@@ -705,6 +707,30 @@ export function readSeasonList(): SeasonList {
       hasTeamStandings: toCounting(row.teamBestResults).counting !== 'none',
     })),
   };
+}
+
+/**
+ * `year → is every numbered round of that season complete`, memoised in-process.
+ *
+ * **The entity pages need this and cannot ask a season endpoint for it.** A driver's
+ * season row carries `isChampion`, which is `position = 1` in the final snapshot **of a
+ * finished season** — and the gate is live rather than defensive: the 2026 snapshot in
+ * this data ranks Antonelli first with 12 of 22 rounds unrun, and a team page would
+ * likewise hand Mercedes a tenth constructors' title.
+ *
+ * Memoised here rather than at a route, which is the one departure from
+ * ARCHITECTURE.md §6 convention 4's usual placement, because **three endpoints share it**
+ * (driver, team, and any later career surface) and a per-route memo would hold three
+ * copies of the same 77-entry map. The payload it derives from is the memo's own subject:
+ * global, tiny, and immutable between database refreshes — exactly convention 4's test.
+ * `invalidateMemo()` clears it for tests.
+ */
+export function readSeasonCompleteness(): ReadonlyMap<number, boolean> {
+  return memoize('season-completeness', SEASON_CACHE_TTL_MS, () => {
+    const map = new Map<number, boolean>();
+    for (const season of readSeasonList().seasons) map.set(season.year, season.isComplete);
+    return map;
+  });
 }
 
 /** False for a well-formed year the dataset does not hold — the 404 case. */

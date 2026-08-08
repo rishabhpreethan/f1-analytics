@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -73,15 +74,22 @@ const view = (
   isRetirement: r.outcome === 'accident' || r.outcome === 'mechanical',
 });
 
+/**
+ * A router is part of the harness from F4 onwards: §1.0a made every driver and team name in this
+ * table a link — RD-10 named 22 entities and linked to none of them — and a `<Link>` outside a
+ * router throws.
+ */
 function renderRows(rows: ClassificationRowView[]) {
   return render(
-    <RaceClassification
-      rows={rows}
-      year={2026}
-      raceName="Monaco Grand Prix"
-      notice={null}
-      pending={false}
-    />,
+    <MemoryRouter>
+      <RaceClassification
+        rows={rows}
+        year={2026}
+        raceName="Monaco Grand Prix"
+        notice={null}
+        pending={false}
+      />
+    </MemoryRouter>,
   );
 }
 
@@ -214,22 +222,74 @@ describe('trap 17 — the key is (driverRef, carNumber)', () => {
 describe('a round that has not been run', () => {
   it('says so rather than rendering an empty table', () => {
     render(
-      <RaceClassification
-        rows={[]}
-        year={2026}
-        raceName="Hungarian Grand Prix"
-        notice="This round has not been run yet."
-        pending={false}
-      />,
+      <MemoryRouter>
+        <RaceClassification
+          rows={[]}
+          year={2026}
+          raceName="Hungarian Grand Prix"
+          notice="This round has not been run yet."
+          pending={false}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByText('This round has not been run yet.')).toBeTruthy();
     expect(document.querySelector('table')).toBeNull();
   });
 
   it('holds its box while the query is in flight, and says busy once', () => {
-    render(<RaceClassification rows={[]} year={2026} raceName="—" notice={null} pending />);
+    render(
+      <MemoryRouter>
+        <RaceClassification rows={[]} year={2026} raceName="—" notice={null} pending />
+      </MemoryRouter>,
+    );
     const busy = screen.getByRole('status', { name: 'Classification' });
     expect(busy.getAttribute('aria-busy')).toBe('true');
     expect(within(busy).queryAllByRole('status')).toHaveLength(0);
+  });
+});
+
+/**
+ * **§1.0a — the seam, asserted.** These are the cheap tests the design system says would have
+ * caught the original defect: RD-10 rendered 22 driver names and 22 team names, and not one of
+ * them was a link, so the driver and team pages were reachable only by typing a URL.
+ *
+ * Both directions matter and both are checked elsewhere: the race page's masthead links **back**
+ * to the season and **out** to the circuit (`RaceMasthead`), and this table links out to every
+ * entity it names.
+ */
+describe('§1.0a — every entity this table names is a link', () => {
+  it('links the driver’s name to their driver page', () => {
+    renderRows([view(row(), { kind: 'total', text: '1:23:31.243' })]);
+    const link = screen.getByRole('link', { name: /Kimi Antonelli/ });
+    expect(link.getAttribute('href')).toBe('/drivers/antonelli');
+  });
+
+  it('links the team’s name to its team page', () => {
+    renderRows([view(row(), { kind: 'total', text: '1:23:31.243' })]);
+    expect(screen.getByRole('link', { name: 'Mercedes' }).getAttribute('href')).toBe(
+      '/teams/mercedes',
+    );
+  });
+
+  it('gives the driver and the team separate destinations rather than one row link', () => {
+    /*
+     * A whole-row link would give the points cell a destination about somebody rather than about
+     * the number in it — and it would make the team unreachable, because an anchor cannot contain
+     * another anchor.
+     */
+    renderRows([view(row(), { kind: 'total', text: '1:23:31.243' })]);
+    const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    expect(hrefs).toContain('/drivers/antonelli');
+    expect(hrefs).toContain('/teams/mercedes');
+  });
+
+  it('carries a visible affordance, not just an href', () => {
+    // §1.0a rule 3, and §7.3.0's lesson: *it was not broken, it was undiscoverable, and that is
+    // worse*. `entity-link` is the product's existing underlined inline-link treatment.
+    renderRows([view(row(), { kind: 'total', text: '1:23:31.243' })]);
+    expect(
+      screen.getByRole('link', { name: /Kimi Antonelli/ }).classList.contains('entity-link'),
+    ).toBe(true);
   });
 });

@@ -485,6 +485,18 @@
    * desynchronise the two. Pinned to `TOOLTIP_WIDTH` by `tokens.css.test.ts`. */
   --size-tooltip: 200px;
 
+  /* ---- the entity pages (§7.9, §7.10, §7.11). `px` throughout and deliberately so: the ribbon's
+   * cell pitch is compared against a measured container width in JS to decide whether the strip
+   * scrolls, and a `rem` cell would stop equalling the arithmetic the moment the root font moved —
+   * the same reason `--size-tooltip` and `--size-dock-indicator` are px. */
+  --size-ribbon: 72px; /* the ribbon's track height */
+  --size-ribbon-cell: 14px; /* one season, ≥768 */
+  --size-ribbon-cell-sm: 8px; /* one season, <768 */
+  --size-ribbon-gap: 3px; /* between cells, ≥768 */
+  --size-ribbon-gap-sm: 2px; /* between cells, <768 */
+  --size-portrait: 72px; /* `EntityPortrait`, ≥768 */
+  --size-portrait-sm: 56px; /* `EntityPortrait`, <768 */
+
   /* `--size-spotlight` (220) and `--size-card-lift` (2) are **removed**. G-8's pointer spotlight
    * is retired from the product and the capability card's 2px lift is superseded by G-25's
    * perspective tilt (§3.5.2, §4.6). Recorded here rather than silently deleted, because both

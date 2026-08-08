@@ -67,12 +67,20 @@ export interface ChartFrameProps {
     ceiling: string;
   };
   /**
-   * Override the plot area's height, in px. **The token is a floor, not the value.**
+   * The plot area's **minimum** height, in px. Use `geometry.bandPlotHeight`.
    *
-   * For a horizontal bar chart whose category count exceeds what the token can label: §6.3 rotates a
-   * chart whose category axis does not fit, and rotating moves the problem to the *other* axis, where
-   * 32 rows in a 360px plot gave an 11.3px pitch against a 14px line-height. A leaderboard grows and
-   * its panel scrolls; it does not crush its own labels. Use `geometry.categoryPlotHeight`.
+   * For any chart laying rows out with a band scale — the horizontal bar, the span, the share — whose
+   * row count exceeds what the height token can label. §6.3 rotates a chart whose category axis does
+   * not fit, and rotating moves the problem to the *other* axis, where 32 rows in a 360px plot gave an
+   * 11.3px pitch against a 14px line-height. A leaderboard grows and its panel scrolls; it does not
+   * crush its own labels.
+   *
+   * **Applied as `min-height`, and that is load-bearing rather than stylistic** _(corrected
+   * 2026-08-08)_. As an inline `height` it *replaced* the responsive `--size-plot*` token, so the
+   * caller had to decide the height in every case and could only do that by reading the measured one —
+   * which is a feedback loop, and it oscillated (see `geometry.bandPlotHeight`). As a floor, the token
+   * still governs every chart whose rows fit, the caller supplies a figure derived from its data
+   * alone, and the used height is `max(token, floor)` — which no re-measurement can change.
    *
    * §6.5.3 is not weakened: this is a function of the data the caller already has, so it is identical
    * across loading, ready and empty for one dataset — which is the property that rule protects.
@@ -201,7 +209,7 @@ export function ChartFrame({
           role="img"
           aria-label={ariaLabel}
           aria-describedby={caption === undefined ? undefined : captionId}
-          {...(plotHeight === undefined ? {} : { style: { height: `${String(plotHeight)}px` } })}
+          {...(plotHeight === undefined ? {} : { style: { minHeight: `${String(plotHeight)}px` } })}
         >
           {showPlot && children}
           {state !== 'ready' && state !== 'loading' && stateCopy !== undefined && (

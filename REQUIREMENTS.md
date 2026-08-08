@@ -137,7 +137,7 @@ Derived data windows:
 | Data | Usable from |
 |---|---|
 | Race results | **1950** |
-| Qualifying positions | **1994** — `QB` rows exist from 1950 but hold **zero entries before 1990** |
+| Qualifying positions | **1994**, and **holed until 2003** — see below |
 | Q1/Q2/Q3 segments | **2006** |
 | **Lap times** | **1996** |
 | **Pit stops** | **2011** |
@@ -154,6 +154,19 @@ Derived data windows:
 2. **`session.has_time_data` is not reliable.** It disagrees with reality in both directions:
    `R` is flagged 442 but 578 sessions actually have lap rows; `FP1` is flagged 116 but only 34 do.
    **Queries must test for the existence of `lap` rows**, not trust the flag.
+
+3. **The qualifying window is a hole, not a boundary — added 2026-08-08 in F4.** "Usable from
+   1994" is true of the first row and false of everything a career metric needs. Counted per
+   year, rounds holding **any** qualifying classification against rounds with a race:
+
+   | 1994 | 1995 | 1996 | 1997 | 1998 | 1999 | 2000 | 2001 | 2002 | 2003+ |
+   |---|---|---|---|---|---|---|---|---|---|
+   | 15/16 | 17/17 | 7/16 | 10/17 | 7/16 | 3/16 | 4/17 | **1/17** | 2/17 | complete |
+
+   Nothing before 1994 has one at all — 0 of 484 races in the 1950s–80s, 0 of the first four
+   1990s seasons. **Any pole or qualifying-delta figure must publish the number of races it
+   could have been measured on**, or Senna reads 0 poles from 161 races and Häkkinen reads
+   far fewer than the record shows. `docs/DATABASE.md` §7 trap 23 is the authority.
 
 **Requirement:** every feature below declares its coverage window. The UI must degrade gracefully
 outside it — disable the control and explain why, never render a blank chart.
@@ -397,9 +410,24 @@ Every computed metric must have one documented definition, applied consistently:
   changed repeatedly across eras.
 - **DNF** — `positionText` indicates retirement, or `status` is neither `Finished` nor a
   `+n Lap(s)` classification.
-- **Start** — appearing in race results, regardless of classification.
+- **Start** — a race in which the driver's entry was **not** `status IN (30, 40)`
+  (did-not-start / did-not-qualify, `docs/DATABASE.md` §3).
+  **Corrected 2026-08-08 in F4.** This previously read *"appearing in race results,
+  regardless of classification"*, which contradicted `DATABASE.md` §3's rule that those two
+  status codes are excluded from starts counts. DR-2's career totals made the conflict
+  load-bearing for the first time and it is resolved toward `DATABASE.md`: a driver who
+  withdrew did not start, and that is what the status codes exist to encode. Measured: it
+  moves **368 of 26,093** race entries, including one of Michael Schumacher's — his totals
+  read 307 starts from 308 races entered.
+  **A start is a race, not a classification row.** 83 (driver, race) pairs in the archive
+  hold two or three rows because a driver took over a second car mid-race
+  (`DATABASE.md` §7 trap 17), and counting rows would give Ascari two starts and a
+  retirement in the 1950 Italian Grand Prix he finished second in.
 - **Positions gained** — `grid - position`, excluding DNFs and pit-lane starts (`grid = 0`).
-- **Fastest lap count** — `FastestLap.rank == 1`. **2004+ only.**
+- **Fastest lap count** — `FastestLap.rank == 1`. **2004+ only** — and additionally present
+  on **1958–59 alone** among earlier seasons, with nothing between 1960 and 2003
+  (`DATABASE.md` §7 trap 24). A career total is therefore not comparable across the
+  boundary and must be published with the count of races it could have been measured on.
 - **Stint** — laps between pit stops (or race start/end). **2011+ only.**
 - **Clean lap** — excludes lap 1, in/out laps around a stop, and inferred SC laps. Required for
   any pace metric.

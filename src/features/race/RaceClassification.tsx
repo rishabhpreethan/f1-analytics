@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { cssVar, identityToken } from '@/lib/entityColor';
 import type { ClassificationRowView } from './selectors';
@@ -135,12 +136,27 @@ function ClassificationRow({ view }: { view: ClassificationRowView }) {
         {row.position !== null ? String(row.position).padStart(2, '0') : '—'}
       </th>
 
+      {/*
+       * ⚠ **§1.0a — RD-10 named 22 entities and linked to none of them**, which the design system
+       * listed as an outstanding seam the moment the driver and team pages existed. They exist now,
+       * so the link is this surface's obligation rather than theirs: *the calendar owes the race
+       * page its link; the race page does not owe the calendar its inbound traffic.*
+       *
+       * Two links in one cell rather than a linked row: the row already carries a result, a grid
+       * slot, laps and points, and a whole-row link to a driver would make the points cell
+       * navigate somewhere about the driver. The driver and the team are separate destinations and
+       * they read as separate destinations.
+       */}
       <td>
-        <span className="standings-name">
-          {row.forename} {row.surname}
-        </span>
+        <Link className="entity-link" to={`/drivers/${row.driverRef}`}>
+          <span className="standings-name">
+            {row.forename} {row.surname}
+          </span>
+        </Link>
         {row.code !== null && <span className="standings-code">{row.code}</span>}
-        <span className="standings-team">{row.teamName}</span>
+        <Link className="entity-link entity-link-quiet" to={`/teams/${row.teamRef}`}>
+          <span className="standings-team">{row.teamName}</span>
+        </Link>
       </td>
 
       {/*

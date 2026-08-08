@@ -6,9 +6,8 @@ import { CategoryAxis, MeasureAxis } from './Axis';
 import { ChartFrame } from './ChartFrame';
 import { BarTable } from './ChartTable';
 import {
-  categoryPlotHeight,
+  bandPlotHeight,
   computeMargin,
-  labelCapacity,
   measureTickCount,
   mountKey,
   plotArea,
@@ -105,15 +104,16 @@ export function BarChart({
 
   /*
    * §6.3, completed: a rotated chart whose **row** pitch cannot carry its labels grows instead of
-   * crushing them. `height` is the measured plot; `needed` is what the categories require. Passing it
-   * back through the frame is what makes the container grow, so `useChartSize` measures the grown box
-   * on the next frame and the two agree rather than the SVG being drawn against a stale height.
+   * crushing them.
+   *
+   * ⚠ **This used to read the measured height, and that oscillated** _(fixed 2026-08-08)_. It grew
+   * only `if (data.length > labelCapacity(measuredHeight))` — and growing satisfies the condition, so
+   * the override was withdrawn, the plot fell back to the token, and the condition was true again.
+   * `bandPlotHeight` is a function of the row count and the labels, so it has no fixed point to chase;
+   * `ChartFrame` applies it as a floor, which is what lets the responsive token still govern the
+   * charts that fit. The margins are now counted too — the rows live in `innerHeight`, not in `height`.
    */
-  const measuredHeight = height > 0 ? height : 0;
-  const needed =
-    horizontal && data.length > labelCapacity(measuredHeight)
-      ? categoryPlotHeight(data.length, measuredHeight)
-      : undefined;
+  const needed = horizontal ? bandPlotHeight(data.length, margin) : undefined;
 
   const plot = plotArea(width, height, margin);
 

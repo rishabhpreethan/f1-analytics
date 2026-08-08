@@ -279,6 +279,24 @@
     pointer-events: none;
   }
 
+  /*
+   * §6.6.3 — a share row whose raw total is zero. **Neutral, and it carries its own sentence**:
+   * absent is not zero (§1.0), and a season in which a team scored nothing is a fact about the
+   * season rather than a gap in the record. `--surface-sunken` on `--surface-sunken` would be
+   * invisible, so the band is `--border-subtle` — a filled shape at the plot's own separator weight,
+   * which reads as "an empty row" rather than as a series.
+   */
+  .chart-share-empty {
+    fill: var(--border-subtle);
+  }
+
+  .chart-share-empty-label {
+    fill: var(--ink-tertiary);
+    font-family: var(--font-text);
+    font-size: var(--text-2xs);
+    pointer-events: none;
+  }
+
   .chart-marks[data-dimmed='true'] .chart-span:not([data-active='true']) {
     opacity: 0.4;
     transition: opacity var(--dur-fast) var(--ease-enter);

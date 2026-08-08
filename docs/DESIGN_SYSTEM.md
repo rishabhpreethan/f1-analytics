@@ -1510,6 +1510,56 @@ label over ~12 characters, the bar chart is **horizontal**: categories run down 
 > rotated. Only running the arithmetic showed the collision was vertical. **A prediction about where a
 > defect is does not survive contact with the measurement of what it is.**
 
+> **The rule above was right and its implementation was wrong twice** _(2026-08-08, found on
+> `/teams/ferrari`)_. Both corrections are in the kit.
+>
+> **1. It applies to every band chart, not only to a rotated bar.** `SpanChart` and `ShareChart` lay
+> rows out with the same `scaleBand` and label every one of them, and neither derived its height from
+> its row count. Ferrari's lineup is **24 rows — a 13.0px band step against a 14px line-height** — and
+> its points split is **77 seasons at 4.0px**, so the driver codes and the season labels rendered as an
+> illegible stack. `geometry.bandPlotHeight(count, margin)` now serves all three, and it **counts the
+> axis chrome** the bar chart's version omitted: rows live in `innerHeight`, which is 49px less than
+> the plot height once the tick line, the axis gap and the axis title are taken out.
+>
+> **2. The floor is a `min-height`, not a `height`.** As an inline `height` the override *replaced* the
+> responsive `--size-plot*` token, so the caller had to supply a figure in every case and could only
+> get one by reading the measured height — **which is a feedback loop, and it oscillated**: the bar
+> chart grew only `if (count > labelCapacity(measured))`, growing made that false, the override was
+> withdrawn, the plot fell back to 360px, and the condition was true again. A figure derived from the
+> **row count and the labels alone** has no fixed point to chase, and it is what §6.5.3 asked for in the
+> first place — identical across loading, ready and empty for one dataset.
+
+**A measure axis may never draw two ticks with the same label** _(added 2026-08-08)_.
+
+A measure axis encodes value in **position**, so two ticks reading the same value at two positions is
+not clutter — it is a false statement about the scale, of the same class as a truncated bar axis.
+
+It shipped. The lineup chart's axis is seasons and its formatter is `String(Math.round(value))`, and
+the placeholder `[0, 1]` domain a chart falls back to **while its payload is in flight** gave ticks at
+`0, 0.2 … 1` and six labels reading `0, 0, 0, 1, 1, 1`. `SpanChart` keyed its gridlines and tick text
+**by that label**, so React logged four duplicate keys — `grid-0`, `grid-1`, `tick-0`, `tick-1` — eight
+warnings a render, **sixteen under `StrictMode`**.
+
+- **Every axis in the kit keys its ticks by index.** A tick has no identity worth preserving across a
+  render: nothing transitions one, and the entrance is a single clip wipe over the whole plot (G-28).
+  A label is a value the caller's formatter is free to repeat, and it is therefore never a key.
+- **`geometry.dedupeTickLabels` removes the duplicates themselves**, applied in `MeasureAxis` and in
+  `SpanChart`. Keying by index alone would have silenced React and left the axis still drawing three
+  ticks labelled `0`; the duplicate key was the symptom that surfaced, and the non-injective formatter
+  is the defect.
+- **The endpoint wins its run.** Labels off a monotonic scale duplicate in consecutive runs; the first
+  of each run survives, except the final run, which keeps its **last** tick. That is `withEndpoints`'
+  precedent applied a second time — keeping the first would draw the `1` of a `[0, 1]` axis at 60% of
+  its width, a worse lie than the duplicate it removed.
+- **Not applied to `CategoryAxis`.** There a label is a *name*, two categories may honestly share one,
+  and dropping a band would delete a real reading.
+
+> **The lesson, and it is the same one §1.0 keeps collecting: the loading state is a state.** Both
+> defects on that page were reachable only through renders no test had ever performed — the axis fault
+> needed the in-flight domain, the overlap needed a real entity's row count rather than a two-row
+> fixture. **A chart's fixtures must include the shape of the largest real caller**, not a legible
+> sample of it.
+
 **Zero, and where the axis starts.**
 
 - A **bar or area** measure axis **always includes zero**. Length is the encoding; truncating it lies.
@@ -1950,6 +2000,7 @@ scope is visible when the F1/F2 decision is made (⚑ Rishabh's call, §6):
 | Records leaderboard | magnitude + identity | horizontal bar, direct-labelled | `scaleBand` |
 | Head-to-head | polarity | single diverging bar, centred at 0 | `scaleBand` |
 | Season heat map | magnitude across two categories | cell grid, per-mark tooltip | `scaleBand` × 2 |
+| **Composition split** | part-to-whole within a category | **share bar** — one row per category, segments per entity, normalised to 1 | `scaleBand` + `scaleLinear`. **Built F5** as `ShareChart`, §6.6.3 |
 
 **Not in this list, and not to be added:** anything requiring tyre compounds, weather, sector times,
 telemetry or practice analysis. None of it exists in the data (`REQUIREMENTS.md` §6), and 423 FP1
@@ -2169,6 +2220,299 @@ look at nine-in-ten will otherwise reasonably conclude it is broken.
 **Queued, not yet specified:** RD-5 gap to leader (P1), RD-6 position-change events (P1), RD-9
 consistency (P1), RD-8 and RD-12 (P2). RD-11 weekend session times needs `session.timestamp` and
 `session.timezone` and is a list, not a chart.
+
+#### 6.6.2 F4 / F5 / F6 — the three entity pages, specified _(2026-08-08)_
+
+Driver (`/drivers/:driverRef`), team (`/teams/:teamRef`) and circuit (`/circuits/:circuitRef`) are
+specified **together and in one section**, because the single largest risk here is not any one page
+being wrong — it is three pages that look like three products. They share a masthead, a career
+strip, a stat-tile grid, a season table and a chart language, and every difference between them
+below is a difference the *data* forces.
+
+**Scope is P0 only.** DR-6…DR-9, CN-5…CN-7, CI-4…CI-6 are deferred and are **not** to be built as
+"while we're here" additions: each needs a query nobody has written and half of them need a coverage
+window this pass does not touch.
+
+##### 6.6.2.0 The one thing that makes these pages not a dashboard
+
+Every entity page opens with the same three-part masthead, and the third part is the moment:
+
+1. **The name at `--display-lg` / `--display-xl`**, with the identity swatch and the code-or-fallback
+   badge beside it.
+2. **A meta line** in `--text-sm`: nationality, dates, span — facts, in mono where they are figures.
+3. **The `CareerRibbon` (§7.9)** — one cell per season of the entity's whole existence, the cell's
+   fill height encoding that season's championship position. **A forty-year career as one 900px
+   strip.** It is the only element on any of these pages that is unique to it and it is deliberately
+   large, because §1.1's brief is that a system needs one thing that arrests you.
+
+The ribbon is *the same component* on all three pages with a different measure, which is precisely
+the coherence lever: a reader who learns it on Hamilton's page reads Ferrari's and Monza's for free.
+
+##### 6.6.2.1 The three mastheads, and what differs
+
+| | Driver | Team | Circuit |
+|---|---|---|---|
+| Eyebrow | `Driver` | `Constructor` | `Circuit` |
+| Headline | `{forename} {surname}` | `{name}` | `{name}` |
+| Badge | the **code** (`VER`) where one exists; otherwise **no badge at all** — see below | — | — |
+| Identity | 3px bar + swatch in the **most recent team's** colour | 3px bar + swatch in the team's own colour | none. A circuit has no identity colour and must not borrow one |
+| Meta | nationality · born `{date}` (`{age}`) · `{first}–{last}` · car number where one exists | nationality · `{first}–{last}` · `{n} seasons` | locality, country · `{lat}, {lon}` · `{alt} m` |
+| Third part | `CareerRibbon`, measure = drivers' championship position | `CareerRibbon`, measure = constructors' championship position | `CircuitLocator` (§7.11) **and** `CareerRibbon`, measure = *hosted / not hosted* |
+
+**The missing code is the common case and gets no placeholder.** `abbreviation` covers **107 of 881
+drivers** (queried). §6.5.4a already ruled that the fallback is the **surname** and never a
+three-letter abbreviation derived from it, because that would invent a convention the data does not
+carry. On a masthead the surname is *already* the headline, so the badge is simply **not rendered** —
+an empty or `—` badge would state that a code is missing, which is a fact about our source and not
+about the driver. Same rule for `permanent_car_number` (**63 of 881**) and `date_of_birth`
+(**865 of 881** — the sixteen without one are reserve and test entrants).
+
+**The meta line never shows a current age, and the reason is permanent rather than a gap.** There is
+**no date of death anywhere in the schema**, so a "current age" would confidently report Fangio at
+114. The payload therefore publishes `ageAtFirstRace` and `ageAtLastRace` — two figures derived from
+dates the data holds, correct forever and carrying no clock — and the masthead reads
+**`Born 1911-06-24 · debut at 38 · last race at 47`**. A living driver's age today is a presentation
+concern with a clock in it and stays out of the payload; `selectAgeYears(dob, on)` exists for a
+surface that genuinely wants one, and no surface in F4–F6 does.
+
+_(This replaces an earlier draft that said the age renders "only when the payload marks the driver
+as active". There is no such flag and there cannot be one — the dataset has no death column and no
+retirement column, so "active" would have had to be inferred from the last season, which is exactly
+the kind of inference §5.3 forbids presenting as fact.)_
+
+##### 6.6.2.2 Career totals — the exhaustive per-metric table, in §6.6.1's discipline
+
+The race page's RESULT column taught this: **a total that is silently zero is worse than a total that
+is absent**, because zero is a plausible-looking claim. `DR-2` asks for eight figures and they do
+**not** all share one coverage window. This table is exhaustive on the eight and is binding.
+
+> **⚠ Two rows of this table were wrong when it was written, and the engineer's measurements
+> corrected them the same day. Both are recorded rather than edited silently, because the version
+> that was wrong is the version a reader would reasonably have assumed.**
+>
+> **Poles.** This said *"`grid = 1` in the race result · 1950+ · never absent — **not** derived from
+> the qualifying session, which begins 1994; a pole is the grid slot, and the grid exists from
+> 1950."* That reasoning is clean and the data does not support it: measured, **9 races carry more
+> than one `grid = 1` row**, and 1952 R8 has two *different* cars there (Ascari's 12 and Moss's 32).
+> `grid` is a **starting slot after penalties**, not a qualifying result, and it is not reliably one
+> car. Poles therefore come from the **qualifying classification**, which exists from 1994 and is
+> **holed rather than merely bounded**: rounds with any qualifying classification run 15/16 in 1994
+> and 17/17 in 1995, then **7, 10, 7, 3, 4, 1 and 2** of ~16 for 1996–2002, then complete from 2003.
+> Senna reads 0 poles. That is the data.
+>
+> **Fastest laps.** This said **2004+**, quoting §5.1. §5.1 is right about the modern boundary and
+> silent about an island: the flag is present on **every race of 1958 and 1959** (20 races), on
+> **none** from 1960 to 2003, and on every race from 2004 bar one. So a career total for Clark or
+> Stewart reads 0 where the record says 28 and 15 — and it is **not** a shape any single window can
+> express, which is why the fix below is a denominator rather than a boundary year.
+
+| Figure | Derivation | Coverage | Rendering |
+|---|---|---|---|
+| **Starts** | races entered minus those where every entry was `didNotStart` / `didNotQualify` (`DATABASE.md` §3). **The `REQUIREMENTS.md` §5.1 / `DATABASE.md` §3 conflict was resolved in `DATABASE.md`'s favour** — a driver who withdrew did not start. It moves 368 rows, one of them Schumacher's | 1950+ | always a figure |
+| **Wins** | `position = 1` on the driver's best row for that race | 1950+ | always a figure |
+| **Podiums** | `position IN (1,2,3)` — §5.1 | 1950+ | always a figure |
+| **Points finishes** | `points > 0` for that event, **never "top 10"** — the points-paying range moved repeatedly (§5.1) | 1950+ | always a figure |
+| **Poles** | overall qualifying classification = P1. **Never `grid = 1`** — see above | 1994+, **holed** | the denominator rule below |
+| **Fastest laps** | `fastest_lap_rank = 1` | 1958–59 **and** 2004+ | the denominator rule below |
+| **DNFs** | `status IN (10, 11)` on the best row, **never `position IS NULL`** (trap 3) | 1950+ | always a figure |
+| **Championships** | a **count of titles read from `driver_championship` / `team_championship`**, `position = 1` in a **complete** season's final snapshot. **Never derived here, never from a points threshold, and the completeness gate is not a formality** — the 2026 snapshot currently ranks Antonelli first with 12 of 22 rounds unrun | 1950+ | always a figure |
+
+##### The denominator rule — three states, because two would be a lie
+
+A coverage-limited count has **three** states and a boundary year can only express two. The payload
+publishes the denominator beside every such figure (`racesWithQualifying`, `racesWithFastestLapData`),
+and the tile reads it:
+
+| Denominator | Tile | Why |
+|---|---|---|
+| `0` | **`—`** in `--ink-tertiary`, with a footnote marker | The figure cannot be computed at all. `0 poles` for Fangio is a **false statement**, not a low score |
+| `> 0` but `< starts` | **the figure**, with a footnote marker | The count is real and partial. Häkkinen's poles are undercounted and the footnote says by how much |
+| `= starts` | **the figure**, no marker | Complete. Nothing to explain |
+
+The footnote is one sentence per distinct denominator, in §6.5.3's three-part form: *"Qualifying
+results are recorded for 41 of this driver's 161 races, so the pole count covers only those. Race
+results, grids and championship positions are complete."* **Never a `caution` colour** (§3.4.3) and
+never a `title` attribute as the only carrier.
+
+**`entries` and `races` are both shown when they differ**, and they differ for 45 drivers. Trap 17:
+40 races between 1950 and 1964 classify one driver two or three times, because he took over a second
+car mid-race. 1950 R7 counted naively is one start, one podium **and one retirement in a race Ascari
+finished second**. The payload collapses to one row per race and publishes `entries` beside it so the
+discrepancy is visible; the masthead states `{starts} starts` and the totals grid adds
+`{entries} classifications` only when the two disagree.
+
+**Points is deliberately not one of the eight, and that is the most important row in this table.**
+A career points total is the defect `DATABASE.md` trap 4 and §6.2 both name: 24 point systems, and
+several eras counted only a driver's best N results, so the sum of a 1950s driver's race points is
+not their championship total and no arithmetic makes the two comparable. Where a reader wants
+magnitude across a career the honest figures are the counts above and the **rates** (§5.2); per-season
+points appear on the season table, where they are a fact about one season's own scoring system.
+
+**A tile whose value is outside its window renders `—` in `--ink-tertiary`, carries a superscript
+marker, and the section carries one sentence per distinct absent window.** Never a `0`, never a
+`caution` colour (§3.4.3), and never a tooltip as the only carrier.
+
+##### 6.6.2.3 The season table, and the 318 two-team seasons
+
+**Measured: 318 driver-seasons involve more than one team.** Rendering only the first would delete
+half of González's 1951 and every mid-season switch in the sport's history; rendering two rows would
+say the driver had two championship positions in one year, which is false.
+
+**One row per season. The team cell holds every team, in order, joined by `→`** — the exact
+treatment `SeasonStandings`' `TeamLine` already ships for the same data (`teamLineage`), so this is
+reuse, not a new pattern. Above three teams it collapses to `{first} → … → {last}` plus a
+`{n} teams` chip, and the full list is in the row's accessible name. **The identity bar on the row
+takes the team the driver scored the most points with that season** — the same non-arbitrary rule
+`SeasonCalendar` uses for a shared drive, and it is stated rather than left to row order.
+
+Columns, at every breakpoint: **Season · Team · Pos · Points · Wins · Starts**. `Best` is
+`standings-optional` and drops below 768px, exactly as the standings table does. The season is a
+**link to `/seasons/{year}`**; the team cell links to `/teams/{ref}`.
+
+##### 6.6.2.4 DR-4 + DR-5 — one chart, two measures, and the 1994 boundary is a control
+
+Two near-identical diverging bars would be the worst outcome here: *grid → finish* and
+*qualifying → finish* differ only by grid penalties, and side by side they read as a rendering
+mistake. **They are one chart with a two-segment control**, which makes the difference between them
+*visible by toggling* rather than by comparing two plots.
+
+1. **Job** — polarity, per season. Did this driver gain or lose places, and when in their career.
+2. **Form** — a **diverging horizontal bar**, one row per season, zero at the centre; gains extend
+   right, losses left. Horizontal because a career is 1–20 rows and reads top-down as a ledger,
+   because §6.3 rotates any category axis above seven, and because `categoryPlotHeight` already grows
+   the plot rather than crushing the labels.
+3. **Marks** — §6.3's 4px data-end on the far end only, square against the zero line. 2px surface gap
+   between rows from `paddingInner`.
+4. **Interaction** — per-mark tooltip. The two-segment control sits in the **filter row above the
+   plot**, never inside it.
+5. **Colour** — the team the driver drove most for that season, so a career changes colour when the
+   driver changed team, which is the reading an F1 fan wants. Zero-length rows keep their colour.
+6. **Accessibility** — every band labelled with its season, table view, and the disabled segment's
+   explanation is **text, not only a `title`**.
+
+**The pre-1994 state is the segment, not the plot.** `Qualifying → finish` is **disabled** for a
+driver whose career ended before 1994 and carries §7.4's exact sentence — *"Qualifying positions
+aren't available for 1985. Qualifying data begins in 1994."* — rendered beside the control, which is
+NV-8's "coverage-aware controls reuse the same sentences" made concrete. For a career that **straddles**
+1994 the segment is enabled and the plot shows the covered seasons only, with §6.5.3's partial note
+naming how many seasons are outside the window. **A blank plot is never the answer to a boundary.**
+
+**Positions gained excludes DNFs and pit-lane starts (`grid = 0`)** — §5.1, and the caption says so,
+because a mean that quietly included retirements would make every unreliable car look like a bad
+racer.
+
+##### 6.6.2.5 CN-4 — the intra-team points split, and why it needs a new form
+
+1. **Job** — **composition**. Which driver carried the team, season by season. Not magnitude
+   (a bar), not sequence (a span), not change (a line): part-to-whole.
+2. **Form** — the **`ShareChart`** (new, §6.6.3). One row per season, segments = that season's
+   drivers, each row normalised to **100% of that team's driver points in that season**.
+3. **Marks** — full band height, 2px `--surface-sunken` gap between segments, 4px radius on the row's
+   **outer** ends only (§6.6's span rule, same argument), in-segment label where it fits.
+4. **Interaction** — per-segment tooltip carrying the driver, the points and the share.
+5. **Colour** — **this is the teammate case, so §6.4a applies in full**: two drivers of one team take
+   the shade pair; three or more exhaust it and take the team's single plot colour with rung 4's
+   hatch alternating and every segment directly labelled. This is the documented exception to §6.6's
+   *"spans within a row are not differentiated by colour"* — that rule exists **because** the shade
+   pair is reserved for teammates, and here the segments *are* the teammates.
+6. **Accessibility** — legend of that season's drivers on hover/focus is not enough; the table view
+   carries driver, points and share per season, and every segment has an accessible name.
+
+**Normalising to a share is what makes this legal at all.** Raw points are comparable **within** one
+season and not across eras (§5.2, trap 4); a share is a ratio of two figures scored under one system,
+so a 1961 row and a 2026 row are comparable *as shares* while their points never are. The axis title
+says `Share of the team's driver points (%)` and the caption states the rule. **A `ShareChart` whose
+rows are not normalised is a defect**, and the component enforces it rather than trusting the caller.
+
+**A season in which the team scored zero points has no share**, and dividing renders `NaN` — which
+would collapse every segment silently (§1.0's exact failure mode). Such a row draws as a single
+full-width `--surface-sunken` band labelled `No points scored`, which is a fact rather than a gap.
+
+##### 6.6.2.6 CN-3 — the driver lineup, as a span chart
+
+The team's whole roster history: **one row per driver, spans across the seasons they drove**,
+`SpanChart` with the measure axis in **seasons** rather than laps. Ferrari 1950–2026 in one picture
+is the single most striking thing on the team page and it needs no new component.
+
+- **The row colour is the team's**, for every driver, because on a team page the team *is* the
+  identity and colouring drivers differently would imply an encoding that does not exist. Drivers are
+  separated by their row labels, which is rung 1 and always present.
+- **A driver with two separate spells gets two spans in one row** — Räikkönen at Ferrari, Alonso at
+  Renault. That is exactly what a span chart is for and it is why this is not a bar per driver.
+- **Rows sort by first season ascending, then by surname** — never by success, which would encode
+  rank in position.
+- **Above 24 drivers the plot grows** (`categoryPlotHeight`), and above 60 it is capped with an
+  explicit `Showing the {n} drivers with the most starts` note plus the full list in the table view.
+  Ferrari has raced far more than 24 drivers and a silently truncated roster would be a lie.
+
+##### 6.6.2.7 CI-1 — the map question, ruled
+
+**No embedded map, and this is a decision rather than an omission.** A tile map is a third-party
+network call on a request path, which `ARCHITECTURE.md` §7 (S-1, DL-2) forbids and the CSP does not
+whitelist; a vector basemap is a megabyte of geometry against a 250 KB budget; and a *track* outline
+does not exist in the data at all — drawing one would be fabrication.
+
+What ships instead is **`CircuitLocator` (§7.11)**: an SVG graticule in equirectangular projection
+with the equator, both tropics and both polar circles drawn and labelled, meridians every 30°, and
+the circuit marked with a crosshair and a pip. Beside it, the numbers: latitude and longitude in
+both decimal and DMS, and **altitude**, which is the one coordinate that changes how an F1 car
+behaves — Mexico City sits at **2,227 m** and Zandvoort at **−7 m** (queried; both extremes of the
+78 circuits in the record).
+
+It is honest — every mark is drawn from `latitude` / `longitude` / `altitude`, nothing is inferred,
+and no coastline is implied — and it is a better fit for this product than a map would be: it reads
+as an instrument, which is §1.1's whole brief.
+
+##### 6.6.2.8 CI-2 / CI-3 — the venue's record
+
+**CI-2 race history** is a table, not a chart: season · round · race · winner · pole · laps, newest
+first, every row a link to `/seasons/{year}/races/{round}`. It is the calendar row's anatomy rotated
+to a venue, and it reuses `standings-table`.
+
+**CI-3 most successful here** is a **horizontal `BarChart`** — magnitude with identity attached,
+which is the form's own job — with a two-segment `Drivers` / `Teams` control in the filter row.
+**Capped at the top 8 with ties shown in full**, and the note states the cap. Value is **wins at this
+circuit**; the caption states that a venue's race count varies from 1 to 70+ so a raw win count
+favours long-running venues' regulars, and the table view carries starts and wins together so the
+rate is checkable.
+
+##### 6.6.2.9 The seams this feature owes _(§1.0a)_
+
+Built as part of **this** feature, because §1.0a rule 1 says the link belongs to the surface that
+names the entity:
+
+| From | To | Status |
+|---|---|---|
+| `SeasonStandings` driver row → `/drivers/:ref` | driver page | **built** |
+| `SeasonStandings` team row → `/teams/:ref` | team page | **built** |
+| `RaceClassification` driver cell → `/drivers/:ref` | driver page | **built** — RD-10 named 22 entities and linked to none |
+| `RaceClassification` team cell → `/teams/:ref` | team page | **built** |
+| `RaceMasthead` circuit → `/circuits/:ref` | circuit page | **built** |
+| Driver season row → `/seasons/:year`, `/teams/:ref` | season hub, team page | **built** |
+| Team lineup row, team season row → `/drivers/:ref`, `/seasons/:year` | driver page, season hub | **built** |
+| Circuit history row → `/seasons/:year/races/:round` | race page | **built** |
+| `SeasonCalendar` winner name → `/drivers/:ref` | driver page | ⛔ **deliberately not built** — see below |
+
+**The calendar's winner is the principled exception (§1.0a rule 4).** The whole round row is already
+a `<Link>` to the race page — itself the fix for a shipped seam defect — and an anchor inside an
+anchor is invalid HTML and an established screen-reader failure. Restructuring the row so the round
+number alone is the link would trade a working primary affordance for a secondary one. The driver and
+team are reachable **one click further on**, from the race page's classification, which now links
+every entity it names. Recorded here so it is not rediscovered as a bug.
+
+#### 6.6.3 `ShareChart` — the fourth kit form _(added 2026-08-08)_
+
+| | |
+|---|---|
+| **Job** | composition — part-to-whole within a category |
+| **Beats** | a stacked `BarChart` (the kit has no stack, and `d3-shape.stack`'s cumulative round-trip is the error source §6.6 already rejected); a pie (angles are unreadable at 2 slices × 70 rows); a grouped bar (which encodes magnitude, so it answers a different question) |
+| **Primitives** | `scaleBand` for the rows, `scaleLinear` fixed to `[0, 1]` for the measure. **No `d3-shape`.** |
+| **Invariant it enforces** | every row's segments sum to 1. The component normalises from raw values itself and **a row whose raw total is 0 renders as a single labelled empty band**, never as `NaN` widths |
+| **Motion** | **G-27's axis-anchored growth is wrong here and G-28's clip wipe is right.** A segment starting at 62% must not grow from the axis — that animates its *start*, the same argument `SpanChart` makes. One clip-rect `scaleX 0→1`, `dur.chart`, `ease.none` |
+| **Colour** | the entity's plot token per segment, via `assignEntityColours` on the row's members — so the teammate shade pair applies without the caller doing anything |
+| **Table view** | category · entity · value · share, one row per segment |
+
+Added to §6.6's queue table as: **Composition split · part-to-whole · share bar · `scaleBand` + `scaleLinear`.**
 
 ---
 
@@ -2676,6 +3020,99 @@ glass — the obvious alternative — is a worse outcome than a clipped preferen
 height nobody uses. The pin is also the only *optional* control in the rail: every destination it
 could displace stays reachable, and the preference it toggles has a persisted default.
 
+### 7.9 `CareerRibbon` — a whole existence as one strip _(added 2026-08-08)_
+
+The signature element of the three entity pages (§6.6.2.0). One cell per season from an entity's
+first to its last, in year order, no gaps — a season the entity sat out is a cell in the **absent**
+state, because the hole in a career is part of the career.
+
+#### 7.9.1 Anatomy
+
+| Element | Spec |
+|---|---|
+| Cell | `--size-ribbon-cell` **14px** wide, `--size-ribbon` **72px** tall, `--radius-xs`, gap `--size-ribbon-gap` **3px**. Below 768px the cell is **8px** and the gap **2px** |
+| Fill | a bar **grown from the cell's foot**, height = `positionFill(position, fieldReference)`; token `--accent-mark` at 100% for a title, `--ink-primary` otherwise. The track behind it is `--surface-sunken` |
+| Title season | the cell is **fully filled** and carries a 2px `--accent-mark` cap rule at its head. A championship is the one thing on the strip that must be findable without counting |
+| Absent season | track only, no fill, plus a 1px `--border-subtle` baseline tick — visibly a cell that exists and holds nothing |
+| Unranked season | the entity raced and finished with no championship position (1950 has 59 of them). A **2px `--ink-tertiary` foot rule**, never a zero-height fill: absent and zero are different (§1.0) |
+| Year label | every 5th cell and both ends, `--text-2xs` `--font-mono` `--ink-tertiary`, below the strip. Never every cell — a 40-season career would collide at 14px |
+| Overflow | the strip scrolls **inside its own container** above 76 cells (`--size-ribbon-max`), which is the widest 1440px can hold; it never shrinks the cell below 8px |
+
+#### 7.9.2 The fill is a rank, and inverting it is the whole point
+
+`positionFill` maps **P1 → 1.0** and the deepest position in the entity's own history → **0.12**,
+linearly. Three properties, each a rule:
+
+1. **P1 is the tallest.** In F1 up means faster and 1 is the best value — §6.3 already inverts every
+   position axis in the product and a ribbon that grew with the number would read backwards to every
+   fan.
+2. **The reference is the entity's own worst season, not the field size.** A driver whose career ran
+   P1–P4 gets a strip that uses its full height; scaling to P26 would flatten a title fight into four
+   near-identical stubs. This is the same argument §6.3 records for the position axis's maximum, and
+   it is the same reversal — reached the same way, by looking at what it renders as.
+3. **A floor of 0.12, never 0.** A zero-height fill is indistinguishable from the absent state, which
+   is the §1.0 collapse this whole document keeps finding. The floor makes "raced, finished last" and
+   "did not race" different marks by construction.
+
+#### 7.9.3 Interaction, motion and accessibility
+
+| | |
+|---|---|
+| Hover / focus | the cell's fill steps to `--accent-mark`, `dur.instant`, CSS transition, plus a readout above the strip naming the season and its position. **The readout has a reserved line whether or not anything is hovered**, so nothing reflows |
+| Keyboard | the strip is **one tab stop**; `←` / `→` move the cursor cell, `Home` / `End` jump to the ends, matching §6.5.1's plot-area convention exactly. A cell is not individually focusable — 76 tab stops is a trap |
+| Mount | **G-27**, `scaleY 0→1` from `transformOrigin: "center bottom"`, `dur.chart`, `ease.mech`, `stagger.bar` through `staggerAmount` so a 76-cell strip stays inside its budget. This is a data mark growing from an axis and it takes the motion that exists for exactly that |
+| Reduced motion | **not created.** Every cell is at full height in the DOM from frame one (MR-2) |
+| Announcement | the strip carries one `aria-label` — *"Championship position by season, 2007 to 2026"* — and the full sequence is in the season table below it, which is the table view this element's chart cousins are required to have |
+
+**It is not a chart and must not grow into one.** No axis, no gridlines, no tooltip, no table toggle:
+its readings are exactly the season table's rows, one section below it. A ribbon that acquired a
+measure axis would be a bar chart drawn small, and the product already has one.
+
+### 7.10 `EntityPortrait` — the permanent placeholder _(added 2026-08-08, discharges §7.6)_
+
+881 drivers and 214 teams will never all have images, so the placeholder is the **shipping** form
+and the photograph is the enrichment (§7.6). It is designed as a component, not as a grey box.
+
+| | Driver | Team |
+|---|---|---|
+| Box | 72×72 at ≥768px, 56×56 below, `--radius-lg`, `1px --border-subtle` | same |
+| Ground | `--surface-sunken`, with a 3px full-height `--identity` bar on the leading edge | same |
+| Mark | the **code** where one exists, `--display-xs` `--font-display`; otherwise the **surname's first two letters**, capitalised | the team name's **initials**, up to 3 |
+| Ink | `--ink-primary`. **Never the identity colour** — §3.3a.5 rule 2: an identity colour is never applied to a numeral or a glyph that stands for a name |
+| Accessible | `aria-hidden`; the name beside it is the accessible content. A placeholder is decoration for a fact already stated |
+
+**Two initials from a surname is not the abbreviation trap.** §6.5.4a forbids *deriving a
+three-letter code*, because a code is a convention the sport owns and inventing one misrepresents
+the data. Two letters in a box is unmistakably a monogram — it does not look like `HAM` and cannot be
+mistaken for one.
+
+**When an asset arrives** (R1/R2, Rishabh's) the `<img>` replaces the mark and keeps the box, the
+radius and the identity bar, so nothing around it moves.
+
+### 7.11 `CircuitLocator` — coordinates, drawn _(added 2026-08-08)_
+
+The answer to CI-1's "map" that does not need a map (§6.6.2.7). One inline SVG, `viewBox="0 0 360 180"`,
+equirectangular — x = `longitude + 180`, y = `90 − latitude`, so the projection is the identity and
+there is nothing to get wrong.
+
+| Layer | Spec |
+|---|---|
+| Frame | 1px `--border-subtle` rect, `--surface-sunken` fill |
+| Meridians | every 30°, 1px `--border-subtle`, dashed `2 4`. The **prime meridian** is solid `--border-strong` |
+| Parallels | the equator solid `--border-strong`; the two tropics (±23.44°) and the two polar circles (±66.56°) dashed `2 4` in `--border-subtle`, each labelled at the left in `--text-2xs` `--ink-tertiary` |
+| Mark | a full-width and full-height 1px `--accent-mark` crosshair through the point, plus a 7px `--accent-mark` pip with a 2px `--surface-sunken` ring — §6.3's marker ring rule, so the pip survives on a gridline |
+| Readout | beside the SVG: `26.0325° N, 50.5106° E` and `26°01′57″ N, 50°30′38″ E` in `--font-mono`, plus `7 m above sea level` |
+| Accessible | `role="img"` with `aria-label="Bahrain International Circuit, Sakhir, Bahrain — 26.03 degrees north, 50.51 degrees east"`; the numbers are also present as text, so the graphic is redundant |
+| Motion | **none.** It is a static readout. `prefers-reduced-motion` has nothing to stop |
+
+**It draws no coastline and implies none.** The graticule is stated as a graticule by its own labels;
+a viewer reads latitude and longitude, not a country outline. Adding a landmass would need a
+topojson asset that costs more than the whole chart kit and would be the only decorative geometry in
+the product.
+
+**Altitude is a figure, never a mark on this graphic.** A third dimension on a two-dimensional
+projection is the dual-axis mistake in a different costume.
+
 ---
 
 ## 8. Accessibility — binding
@@ -2977,3 +3414,5 @@ admissible shade pair in light mode (§9.2.3 G-27d). Nothing in this entry weake
 | 2026-08-04 | **CR-005** (`PLAN.md` §5.5): the upstream-attribution constraint is removed from §7.3 as a forward obligation — both the release-blocker framing and the derived clause in the ban list. The §7.3 ban on refresh/update language is **retained on independent grounds** (`REQUIREMENTS.md` §2.2 — a currency surface must not assume today's calendar position). **No copy string changed**: the coverage phrasing survives on its own merits. No token, colour, typography, motion or component change → no §9 validation run | designer |
 | 2026-08-07 | **The entity colour layer, the chart language and chart motion — F1's three open colour/chart items closed.** (a) **New §3.3a: entity colour encoding.** The ramp is stated as **94% of the data**, not a fallback — 214 teams, 12 with a `primary_color`. Three roles are separated and named (`--team-<ref>` identity, `--*-plot`, `--*-plot-deep`/`-bright`); the ramp is **12 slots in two tiers of guarantee** with the collision-rate arithmetic (0.278 at N = 6 → 0.573 at N = 12); assignment is a stable hash of `team.reference`, never rank; **Haas and Cadillac get identity and no plotting colour** because their OkLCh chroma is 0.0056 / 0.0043 and a grey series is confusable with this product's achromatic chart furniture. §3.3 rules 4–6 move from "specified in F1" to specified. **CR-004's logo slot is designed and its block is stated**: `public/assets/teams/<reference>.svg`, monochrome-capable, **R2, Rishabh's, undelivered**, with the ladder differentiator as a sufficient interim rather than a placeholder box. (b) **`src/styles/entity.css` is generated, not authored** — `node scripts/validate-palette.mjs tokens`, with `scripts/entity-tokens.test.mjs` diffing the emitter against the file and `src/styles/entity.css.test.ts` asserting the 16 things a stylesheet can be wrong about while still looking fine. The ramp search is extracted into `selectRamp()` so the validator and the emitter cannot disagree. (c) **§6 rewritten.** The Recharts + visx premise is **superseded** (`ARCHITECTURE.md` §10 #28): **d3 primitives plus an in-repo kit**, with the five packages the kit needs and the four it must not use named, and every colour a `var()` so a theme switch needs no re-render. New: **§6.3** the chart furniture with tick-density rules as arithmetic, one axis line not two, and the inverted position axis; **§6.4** the collision ladder — four rungs, all non-colour, assigned by identity and never withdrawn; **§6.4a** the teammate treatment; **§6.5** the five plot-area states with real copy, small multiples as the scope→form rule, the table view's exact location, and the patterns/print affordance; **§6.6** the per-chart queue with each chart's primitives. Whether the kit lands in F1 or F2 is **⚑ flagged for Rishabh**. (d) **§4.6.2: G-27 … G-30**, replacing a one-line forward reference. Axis-anchored bar growth; a **single-tween left-to-right reveal via a `scaleX` transform on a `userSpaceOnUse` clip rect** — the previously specified `strokeDasharray` draw is **withdrawn**, because it reveals at constant arc speed and so reports gradient rather than time, needs `getTotalLength()` per path, and would need a second exception to §4.2; **G-29 makes "no motion on data update" a citable named entry**; **G-30 states that a readout snaps and never follows** — `m.pointer`'s 600ms catch-up is for decoration, and a lagging crosshair misreports which lap the reader is pointing at. (e) **§4.3 drift corrected against `src/lib/motion/tokens.ts`**: `stagger.bar`, the whole `dist` table and the whole `gesture` table existed in code and were missing from a section that claims to define the set once; the `stagger.cap`-as-`amount` mechanism is now stated; and **four references to `src/lib/motion.ts`, a path that has never existed**, are corrected. (f) **§9.2.3 records V-23 … V-28.** **No floor was moved.** The teammate split's 13.63 failure was fixed by rebuilding the construction — a **symmetric shade pair** at two admissible shades of one hue, replacing an anchor-plus-derivative that could not reach the floor from mid-band — reaching worst-case **normal ΔE 17.27 / CVD 14.18** against floors of 15 / 8. **The measurement that changed the design: Sauber's brand hue 143 sits inside the reserved green band and in light mode exactly ONE lightness in the whole plotting band clears ΔE 15 from `--timing-green-ink` (109 of 161 candidates blocked by it), so a two-shade split is impossible.** Colour is therefore **not** the teammate channel: marker, dash and direct label are mandatory for every team, and the shade pair is a redundant fourth channel. G-27e — that the pair is an entity property and not a per-theme one — was **found by a test, not by reasoning**: Sauber had a dark pair and no light one, which would have changed the *encoding* at sunset, and the dark pair is now deliberately discarded. `vite.config.ts` gains `entity.css` in `test.css.include`; without it vitest blanks the import **silently, even for `?raw`**, and 14 of 16 assertions passed against `''`. **Measured cost: render-blocking CSS 9.79 → 10.86 KB gzipped, 43.4% of the 25 KB budget** — the entity layer's 144 declarations cost **1.07 KB**. Initial JS unchanged at 160.25 / 250 KB; no dependency was added, because the layer is CSS and the emitter is a dev-time script. Suite 339 → **358 tests**, 3 consecutive green runs | designer |
 | 2026-08-07 | **F2 — the chart kit and `entityColor.ts` built.** (a) **§3.3a.3 closed**: `src/lib/entityColor.ts` exists, the hash is **FNV-1a 32-bit** over `team.reference`, and **the only field it needs from the data layer is `reference`** — whether a plotting variant exists is a property of our generated palette, not of the row, so no selector carries it and the two cannot disagree. Haas → ramp 3, Cadillac → ramp 7: the ΔE 3.8 pair that started §3.2 is separated by construction, asserted. (b) **§6.4 — two corrections, both changing what ships.** A pair now collides if it collides in **either** theme, because measuring in the theme in force would let a sunset withdraw a dash pattern — the thing §6.4a property 3 already forbids for the shade pair. And the detection is **precomputed** into `src/lib/entityColorData.ts` by a new `validate-palette.mjs entity-data` mode: the palette is a closed set of 64 tokens, so shipping CIEDE2000 plus two CVD models plus a `getComputedStyle` read into a chart component bought nothing and would have been **untestable**, since jsdom resolves no custom properties and every ladder assertion would have passed against `''`. **No colour crosses into the client**, asserted. (c) **§6.4 — the ladder fires chart-wide.** Escalation stays pairwise; application does not, because two of four series carrying a marker shape reads as an accident. Consequence stated: at ≤4 series rung 2 alone separates every pair, so rung 3 only ever fires for a **teammate** comparison. (d) **§6.4a — two teammate pairs on one chart.** Read literally, "circle and square in driver order" gives the second team's pair the same shape *and* dash as the first, leaving colour as the only separator. The rule is restated on **indices**: a team keeps the set of rung indices its members hold and redistributes them by `reference` ascending. (e) **§6.4 rung 3 — the dash rule was wrong.** "Dash lengths ≥ 2× stroke width" fails on its own `2 3` pattern; the binding property is the **period**, and `2 3` renders as a dotted line, the most distinguishable of the three. Values kept, rule fixed, test asserts the period. (f) **§6.3 — two additions**: markers are equal **area** across all four shapes (a square and a circle of the same width differ ~27% to the eye, which encodes magnitude on an identity channel), and 1px strokes sit on half-pixel coordinates or a "1px" gridline rasterises as a 2px smear. (g) **§6 — the kit is built** and its module inventory recorded: `geometry.ts` (pure, and where layout is *tested*, because jsdom performs none), `ladder.ts`, `Axis.tsx`, `ChartFrame.tsx` (**one measure axis, so a dual-axis chart is not expressible**), `ChartLegend`, `ChartTable`, `MarkerGlyph`, `LineChart`, `BarChart`, `useChartSize`; motion in `src/lib/motion/chart.ts`. Built against **fixture shapes, not an endpoint's**. (h) **§9.2.4 records the two build-time facts**: 663 of 2016 token pairs collide, **31 of 66** among the 2026 grid — about half of all real two-team comparisons reach the ladder — and **14 of 66** among the ramp base slots, which is exactly the 14 CVD pairs §3.3a.2 independently said tier B hands over. Tier A: 0 of 15. Hash distribution over the live 214 teams: **χ² 12.88 against 19.68 at 11 df**, consistent with uniform. **Measured cost: render-blocking CSS 10.86 → 12.09 KB gzipped, 48.4% of 25 KB** — the chart stylesheet costs 1.23 KB. **Initial JS unchanged at 160.27 / 250 KB, because no route imports the kit yet**; measured standalone with esbuild + Node zlib L9 it is **18.2 KB gzipped marginal** over the GSAP already in the bundle, d3 subset included. Suite: **106 tests added by this work** — entityColor 25, ladder 19, geometry 30, chart motion 8, the two charts 21, the emitter drift 3 — inside a suite that reads **629 passing across 44 files** with the season data layer landing in parallel. 3 consecutive green runs. **Untested by construction and named as such: everything about where a mark, axis, label or reveal actually lands** — jsdom has no layout, no `ResizeObserver` and no `getBBox` | designer |
+| 2026-08-08 | **F4 / F5 / F6 — the three entity pages, specified and built.** (a) **New §6.6.2**, and the three pages are specified in **one** section on purpose: the largest risk in shipping driver, team and circuit together is three pages that look like three products, so they share a masthead, a career strip, a stat grid, a season table and a chart language, and every difference between them is one the *data* forces. (b) **Two rows of §6.6.2.2 were wrong when written and the engineer's measurements corrected them the same day, recorded rather than edited silently.** **Poles** was derived from `grid = 1` on the clean-sounding reasoning that the grid exists from 1950 while qualifying begins in 1994 — measured, **9 races carry more than one `grid = 1` row** and 1952 R8 has two *different* cars there, so a grid slot is not a qualifying result and is not reliably one car; poles come from the qualifying classification, which is 1994+ and **holed** (15/16 rounds in 1994, then **7, 10, 7, 3, 4, 1, 2** of ~16 across 1996–2002, complete from 2003). **Fastest laps** said 2004+, quoting `REQUIREMENTS.md` §5.1; the flag is also on **every race of 1958 and 1959**, so no single window expresses it. The fix is structural rather than a corrected year: **a coverage-limited count is a denominator with three states** — denominator `0` renders **`—`** (`0 poles` for Fangio is a false statement, not a low score), a partial denominator renders the figure **with a footnote marker**, a complete one renders the figure alone. (c) **No current age anywhere, and it is permanent rather than a gap**: the schema has **no date of death**, so an age against the clock would report Fangio at 114. `ageAtFirstRace` / `ageAtLastRace` instead, both clock-free. (d) **DR-4 and DR-5 are ONE chart with a segmented control** (§6.6.2.4). Two near-identical diverging bars would read as a rendering mistake; toggling makes the difference between them the thing you see, and the **1994 boundary is the disabled segment** carrying §7.4's sentence as *text beside the control* — never a `title`, which is unreachable by touch, unreachable by keyboard in most browsers and invisible in a screenshot. (e) **§6.6.2.7 rules the map question: there is no map.** A tile map is a third-party call on a request path (§7 S-1/DL-2, and the CSP does not whitelist it), a vector basemap costs more than the application, and **a track outline does not exist in the data at all** — `circuit` holds a name, a locality, a country and three numbers. **New §7.11 `CircuitLocator`** draws those three numbers on an equirectangular graticule, so the projection is the identity map and nothing is claimed the coordinates do not say. (f) **New §7.9 `CareerRibbon`** — the signature element, one cell per season across an entity's whole span, fill height = championship position **inverted** so P1 is tallest (§6.3's position-axis rule applied to a strip). **Three cell kinds that must never collapse into two**: `ranked`, `unranked` (contested, no position — 1950 has 59) and `absent` (a career's gap years are part of the career). `RIBBON_FILL_FLOOR` **0.12** exists so "finished last" and "did not race" cannot become the same mark, which is §1.0's failure by construction. Same component on all three pages with a different measure, which is the coherence lever. (g) **New §7.10 `EntityPortrait`, discharging §7.6** — the placeholder is the shipping form, since `abbreviation` covers 107 of 881 drivers; a **monogram**, never a derived three-letter code (§6.5.4a). (h) **New §6.6.3 `ShareChart`, the kit's fourth form** — composition, for CN-4. It **normalises rows itself** (a caller free to pre-normalise is free to ship a row summing to 0.9 and nothing on screen would look wrong) and a **zero-total row renders as one labelled band** rather than `NaN` widths, which is §1.0's collapse again. (i) **§6.6.2.9 — the seams §1.0a owed are built**: `RaceClassification` links all 22 entities it names (recorded as outstanding since F3), `SeasonStandings` links drivers, constructors and **both** teams of a two-team season, `RaceMasthead` links the circuit it names on all 1,173 race pages. The **calendar's winner is a principled exception** — the row is already a `<Link>`, and an anchor inside an anchor is invalid. (j) **Two defects found by tests rather than by reading**: `StatTiles` tied the footnote marker to the *absence* rather than to the note, so a partial figure rendered as a bare complete-looking number; and a ribbon test asserted a one-season P12 career should fill its strip, where the code was right. **Measured cost: initial JS 197 → 209.15 KB / 250 (83.7%), render-blocking CSS ~14.5 → 15.61 KB / 25 (62.4%)** — both figures include the engineer's data layer landing in the same session. **Palette re-validated: PASS, unchanged** — no colour token moved; the six new tokens are `--size-ribbon*` and `--size-portrait*`. Suite **1298 → 1678 tests across 78 files, 3 consecutive green runs**. **Untested by construction and named as such: every dimension, position and composition on all three pages** — jsdom performs no layout, so the ribbon's 72px track, the locator's on-screen projection, the share chart's segment widths and the diverging bars' geometry are unverified | designer |
+| 2026-08-08 | **One defect on `/teams/ferrari`, and it was two.** (a) **Sixteen React `duplicate key` errors**, root cause reproduced rather than assumed: `SpanChart` keyed its gridlines and tick text by `tick.label`, and while the team payload is in flight the chart falls back to a `[0, 1]` domain which the team page's `String(Math.round(value))` formatter collapses to `0, 0, 0, 1, 1, 1` — eight warnings a render, sixteen under `StrictMode`. **The engineer's report attributed it to `ShareChart`; it is the sibling `SpanChart`, in its loading state.** Ticks are now keyed by index like every other axis in the kit, and **`geometry.dedupeTickLabels` removes the duplicate labels**, applied in `MeasureAxis` too — a key fix alone would have silenced React and left an axis drawing three ticks labelled `0`. `Axis.tsx` and `BarChart` were already index-keyed and so immune to the *key* collision; the duplicate *label* was latent in both. (b) **The overlapping driver codes are a separate layout defect**, and neither chart's fix touches the other: §6.3's growth rule was implemented only for a rotated `BarChart`, so `SpanChart` at Ferrari's 24 rows (**13.0px band step against a 14px line-height**) and `ShareChart` at its 77 seasons (**4.0px**) crushed every label. **New `geometry.bandPlotHeight`** serves all three and counts the 49px of axis chrome the bar chart's version omitted. (c) **`ChartFrameProps.plotHeight` is now applied as `min-height`**, which fixes a **latent oscillation** in `BarChart`: it grew only `if (count > labelCapacity(measured))`, growing satisfied that condition, the override was withdrawn and the plot fell back — a measurement-driven feedback loop with nothing to damp it. The figure is now a function of the row count and the labels alone. No token, colour, typography or motion change → **`validate:palette` re-run anyway: PASS, unchanged**. Suite **1678 → 1693 tests across 78 files**; the four new `SpanChart` assertions were **verified to fail against the pre-fix component** before being kept. **Untested by construction: that the grown plot renders legibly** — jsdom performs no layout, so the band-step property is asserted against the real `scaleBand` in `geometry.test.ts` and the on-screen result needs Rishabh's capture | designer |

@@ -10,9 +10,10 @@
 export { BarChart, type BarChartProps } from './BarChart';
 export { ChartFrame, type ChartFrameProps } from './ChartFrame';
 export { ChartLegend } from './ChartLegend';
-export { BarTable, ScatterTable, SeriesTable, SpanTable } from './ChartTable';
+export { BarTable, ScatterTable, SeriesTable, ShareTable, SpanTable } from './ChartTable';
 export { LineChart, type LineChartProps } from './LineChart';
 export { RankChart, type RankChartProps, type RankSeries } from './RankChart';
+export { ShareChart, type ShareChartProps, type ShareRow, type ShareSegment } from './ShareChart';
 export {
   ScatterChart,
   TREND_R2_FLOOR,

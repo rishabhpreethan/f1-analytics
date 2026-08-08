@@ -188,3 +188,44 @@ export function crossFadeMarks(layer: SVGElement): gsap.core.Tween {
     { opacity: 1, duration: dur.fast, ease: ease.enter, overwrite: 'auto' },
   );
 }
+
+/** The `data-motion` value the career ribbon grows. Written by the component, queried here. */
+export const RIBBON_CELL_ATTR = 'ribbon-cell';
+export const RIBBON_CELL = `[data-motion="${RIBBON_CELL_ATTR}"]`;
+
+/**
+ * **G-27 for `CareerRibbon`** (`DESIGN_SYSTEM.md` §7.9.3).
+ *
+ * The same motion as a bar chart's mount and deliberately so — a ribbon cell *is* a data mark
+ * growing from an axis — with one difference that is not cosmetic: the ribbon is **HTML, not SVG**,
+ * so the anchor is CSS `transformOrigin: "center bottom"` rather than `svgOrigin`. `svgOrigin` is
+ * silently ignored on an HTML element, which would leave every cell growing from its own centre —
+ * the "decorating a magnitude rather than reporting one" failure §4.6.2 names, and one that would
+ * look plausible enough to ship.
+ *
+ * Authored as `from` (MR-2): under reduced motion no tween exists and every cell is at full height
+ * in the DOM from frame one.
+ */
+export function useRibbonMount<T extends HTMLElement = HTMLDivElement>(
+  deps: React.DependencyList,
+): MotionHandle<T> {
+  return useMotion<T>({
+    deps,
+    animate: ({ q, tl }) => {
+      const cells = q(RIBBON_CELL);
+      if (cells.length === 0) return undefined;
+      tl.from(cells, {
+        scaleY: 0,
+        transformOrigin: 'center bottom',
+        duration: dur.chart,
+        ease: ease.mech,
+        stagger: {
+          each: stagger.bar.each,
+          from: stagger.bar.from,
+          amount: staggerAmount(cells.length, stagger.bar.each),
+        },
+      });
+      return undefined;
+    },
+  });
+}

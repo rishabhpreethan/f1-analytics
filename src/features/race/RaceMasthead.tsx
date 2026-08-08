@@ -70,9 +70,22 @@ export function RaceMasthead({ race, counts, raceLaps, pending }: RaceMastheadPr
 
         {race !== null && (
           <p className="race-meta t-sm text-ink-secondary mt-2">
+            {/*
+             * §1.0a — the circuit page exists now, so this masthead owes it the link. The venue is
+             * named here on every one of 1,173 race pages, which makes this the single highest-
+             * traffic route into F6.
+             *
+             * **The whole `circuit` object is nullable and its `ref` is not** — `race.ts` reaches
+             * `circuit` through a `LEFT JOIN`, so a round either has a circuit with an address or
+             * has no circuit at all. A first draft here guarded `circuit.ref === null` as well;
+             * that branch could never fire and is removed rather than kept as insurance, because a
+             * dead branch documents a case the schema says does not exist.
+             */}
             {race.circuit !== null && (
               <>
-                <span>{race.circuit.name}</span>
+                <Link className="entity-link" to={`/circuits/${race.circuit.ref}`}>
+                  {race.circuit.name}
+                </Link>
                 {race.circuit.locality !== null && <span>{race.circuit.locality}</span>}
               </>
             )}
