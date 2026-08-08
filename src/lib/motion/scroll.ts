@@ -186,6 +186,52 @@ export function useAxisAnchoredBars<T extends HTMLElement = HTMLElement>(): Moti
 }
 
 /**
+ * **G-23 — list / grid reveal on mount.** `opacity 0→1, y 8→0` at `dur.base` / `ease.enter`,
+ * staggered `stagger.row` and capped through `staggerAmount`.
+ *
+ * **No `ScrollTrigger`, deliberately**, which is why it reads differently from its two neighbours
+ * in this file. G-15 is a *scroll* reveal for a section below the fold; this is a mount reveal for
+ * a list that is on screen at first paint, and §4.6.1 rule 2 is explicit that giving such a section
+ * a scroll trigger makes the trigger load-bearing for the content being visible at all.
+ *
+ * **The cap is what makes 881 rows affordable.** `stagger.row` at 24ms across 881 items would take
+ * 21 seconds; `staggerAmount` distributes a total of 12 × 24ms across however many targets there
+ * are, so a full driver index costs exactly what a twelve-row list costs.
+ *
+ * **It must not re-run on a filter or a sort change.** The caller passes `deps` that identify the
+ * *dataset*, never the query — re-staggering 881 rows on the fifth keystroke is G-29's defect in a
+ * list instead of a chart. `revertOnUpdate` would additionally leave the previous run's inline
+ * opacity on rows that are being replaced.
+ *
+ * Authored `from` (MR-2): a list whose tween is never created is simply visible.
+ */
+export function useListReveal<T extends HTMLElement = HTMLElement>(
+  deps: React.DependencyList,
+): MotionHandle<T> {
+  return useMotion<T>({
+    deps,
+    animate: ({ q, tl }) => {
+      const rows = q('[data-motion="index-row"]');
+      if (rows.length === 0) return undefined;
+
+      tl.from(rows, {
+        opacity: 0,
+        y: dist.step,
+        duration: dur.base,
+        ease: ease.enter,
+        stagger: {
+          each: stagger.row.each,
+          from: stagger.row.from,
+          amount: staggerAmount(rows.length, stagger.row.each),
+        },
+      });
+
+      return undefined;
+    },
+  });
+}
+
+/**
  * The `stagger.cap` rule, expressed the way GSAP wants it. `amount` distributes a *total* delay
  * across the targets, so capping the total at `cap × each` gives items past the cap a shrinking
  * share rather than a growing queue — which is what keeps a long list inside the budget.

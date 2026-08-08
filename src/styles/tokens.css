@@ -497,6 +497,19 @@
   --size-portrait: 72px; /* `EntityPortrait`, ≥768 */
   --size-portrait-sm: 56px; /* `EntityPortrait`, <768 */
 
+  /* ---- the entity indexes (§6.6.4, §7.12, §7.13). px for the same reason as the block above:
+   * these are named dimensions rather than spacing, and `--size-index-row*` in particular is fed
+   * to `contain-intrinsic-size`, where the figure is a *placeholder for a measured height* — a
+   * `rem` there would stop matching the row it stands in for the moment the root font moved, and
+   * the symptom would be a scrollbar that jumps as rows are painted. */
+  --size-index-field: 56px; /* the search field, ≥768 */
+  --size-index-field-sm: 48px; /* the search field, <768 */
+  --size-index-figure: 68px; /* one right-aligned figure column, ≥768 */
+  --size-index-row: 64px; /* a row's height, ≥768 — `contain-intrinsic-size` */
+  --size-index-row-sm: 108px; /* a row's height, <768: two lines plus the rail */
+  --size-span-rail: 20px; /* the rail's own box (§7.12) */
+  --size-span-tick: 8px; /* the bracket's end ticks */
+
   /* `--size-spotlight` (220) and `--size-card-lift` (2) are **removed**. G-8's pointer spotlight
    * is retired from the product and the capability card's 2px lift is superseded by G-25's
    * perspective tilt (§3.5.2, §4.6). Recorded here rather than silently deleted, because both

@@ -25,6 +25,10 @@
  * `season.css` because it reuses that file's panel, eyebrow, chip and table classes verbatim: the
  * three entity pages are the same surface as the season hub, not a second one. */
 @import './entity-page.css';
+/* The three entity indexes (`/drivers`, `/teams`, `/circuits`). After `entity-page.css` because it
+ * reuses that file's `.entity-name` and `.portrait` and `season.css`'s panel, eyebrow and chip: an
+ * index is the front door to a profile, not a second surface. */
+@import './entity-index.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so

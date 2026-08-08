@@ -2514,6 +2514,225 @@ every entity it names. Recorded here so it is not rediscovered as a bug.
 
 Added to §6.6's queue table as: **Composition split · part-to-whole · share bar · `scaleBand` + `scaleLinear`.**
 
+#### 6.6.4 The three entity indexes — `/drivers`, `/teams`, `/circuits` _(specified 2026-08-08)_
+
+**Why this exists at all, stated first because it is a shipped defect and not a new feature.** F4–F6
+built the three entity *profiles* and routed them at `/drivers/:ref`, `/teams/:ref` and
+`/circuits/:ref`. Nothing was built at the bare paths, so the dock's "Drivers" item — the primary
+navigation, on every screen — led to an F0 `RoutePlaceholder`. §6.6.2.9 audited the seams *between*
+surfaces and found none missing; it never asked whether the surfaces had a **front door**. That is
+§1.0a's failure in a new place, and the rule earns a fourth clause: **a link in the primary nav is a
+seam too, and the surface it points at is in scope the moment the nav item ships.**
+
+**Volumes, queried:** **881** drivers, **214** teams, **78** circuits. The season hub's calendar is 22
+rows; this is forty times that. So the whole design question is density, and this product has one
+answer to density already — *be honest about it and give the reader a real control*, never truncate
+silently and never dump the lot unstyled.
+
+##### 6.6.4.0 One surface, three pages — and the device that makes it not a data table
+
+The three pages are **one component** parameterised by three column sets, for exactly the reason
+§6.6.2 gives for the profiles: the risk is not that one page is wrong, it is that three pages look
+like three products.
+
+**The signature element is the `SpanRail` (§7.12): every row plots its entity's first and last season
+against the same fixed 1950 → 2026 baseline.** Scrolling the list is scrolling the sport's history —
+the 1950s cluster left, the current grid clusters right, and Monza's rail runs the entire width. It is
+the `CareerRibbon`'s idea compressed to a row: *a whole existence, as one strip*. A reader who learned
+the ribbon on Hamilton's page reads this for free, and unlike a rank column it is comparable **across
+rows without reading a single digit**.
+
+**It is a bracket, never a fill, and that is a correctness decision.** A career has gaps — Räikkönen
+raced 2001–2009 and 2012–2021 — and a solid bar from first to last would state that he raced in 2010.
+The rail is drawn as **two end ticks joined by a rule**, which reads as *from … to* and cannot be read
+as *throughout*. Separated by **form**, exactly as §3.3a.5 separates an identity swatch from a timing
+colour.
+
+> **Correction, made after the payload landed.** This paragraph originally continued: *"the season
+> **count** sits in its own column beside it, so a span of 21 years against 19 seasons is visible as
+> a discrepancy rather than absorbed."* **There is no `seasonsEntered` on the directory payload** and
+> there should not be — `server/schemas/directory.ts` rules that these endpoints are a directory and
+> not a dashboard. The bracket still holds on its own, because its whole property is that it does not
+> *claim* the years between; but the index cannot show the count-versus-span discrepancy the profile
+> page shows, and saying it could would have been the spec describing something that does not exist.
+
+##### 6.6.4.1 Layout
+
+| Zone | Spec |
+|---|---|
+| **Masthead** | `.season-eyebrow` + accent rule (`The archive`), `h1` at `--display-lg` / `--display-xl` ≥1024 — the same `.entity-name` type as a profile page, so the two read as one product. Meta line at `--text-sm`: `881 in the record · 1950–2026 · 22 racing in 2026`, figures in mono. Every figure is **counted from the payload**, never hardcoded — and worded so it does not repeat the console's live count 40px below it |
+| **Console** (§7.13) | `position: sticky; top: var(--size-header)`, `z-index: var(--z-content)` — glass (§5.2b) so the atmosphere still moves behind it. Holds the search field, the sort segments and the live count. It is sticky because on an 881-row list the control has to still be there when you are 400 rows down |
+| **Panel** | `.season-panel` verbatim — 1px `--border-subtle`, `--radius-lg`, `--surface-raised` |
+| **Column header** | one `aria-hidden` strip at `--text-2xs` uppercase `--ink-tertiary`, matching `.standings-table thead th`. Hidden below 768 |
+| **Rows** | `<ul>` of `<li><Link class="index-row">`. **The whole row is the link** — this page's entire job is navigation |
+
+**Row grid.** Four discrete layouts, switched at §5.3's breakpoints; no `clamp`, no fluid columns.
+
+| Breakpoint | Columns |
+|---|---|
+| `< 768` | two lines: `mark · name+subtitle · chevron`, then the rail full-width on line 2 with the figures as a mono meta line beneath the name |
+| `≥ 768` | `mark · name+subtitle · rail (140px) · 2 figures · chevron` |
+| `≥ 1024` | `mark · name+subtitle · rail (180px) · 3 figures · chevron` |
+| `≥ 1280` | `mark · name+subtitle · rail (220px) · 4 figures · chevron` |
+
+Figures drop **from the right**, in a fixed priority order per page, so the column that survives every
+width is the one the page is most about (drivers: races; teams: seasons; circuits: grands prix).
+
+**The three headings are `Drivers`, `Teams` and `Circuits` — the dock's own labels, verbatim.** The
+team index was written as `Constructors`, which is the sport's word and is the team *profile's*
+eyebrow (§6.6.2.1); the route table caught it. A navigation page whose heading disagrees with the nav
+item that reached it is the same class of seam this whole feature exists to close, and on a directory
+the nav wins. The sport's word stays on the entity, not on the list of them.
+
+**The circuit list has no mark column and no identity bar**, and that is §6.6.2.1's existing ruling
+applied consistently: *a circuit has no identity colour and must not borrow one*. The name block takes
+the mark column's grid space for the whole list — a per-list decision, not a per-row hole.
+
+##### 6.6.4.2 The control, and why the sort changes the **grouping**
+
+Search alone is the wrong answer for 881 rows: it serves a reader who already knows a name and
+abandons the one who is browsing. The sort control therefore does two things at once — it orders the
+list **and it decides what the group headers are**:
+
+| Sort | Order | Groups |
+|---|---|---|
+| `A–Z` | surname, then forename (drivers); name (teams, circuits) | **initial letter** — 26 headers, each with its own count |
+| `Debut` / `First held` | earliest season ascending | **decade** — `1950s`, `1960s`, … The shape of the sport's history, and the same device `SeasonPicker` uses for 77 years |
+| a metric (`Races`, `Grands Prix`) | descending | **none** — a numeric ranking has no natural bucket, and inventing one would be a bucket the data does not have |
+
+**Absence sorts last in both directions, and that is the rule this control most easily gets wrong.**
+JavaScript's `null < 1` is `true`, so a naive descending sort by races opens the driver index with the
+63 people who never raced, presented as the most raced. `compareNullable` in `indexModel.ts` puts
+`null` last whichever way the comparator points, and `indexModel.test.ts` asserts it — absence is not
+a low score (§1.0). Every comparator additionally falls back to the sort key, because 765 of 881
+drivers tie on most metrics and an unbroken tie leaves their order to the engine.
+
+> **Correction, made after the payload landed.** The row above originally listed `Wins` and `Seasons`
+> as metric sorts. **The directory payload carries neither**, deliberately: it is a directory and not
+> a dashboard, and aggregating 881 careers to answer *which page do I want* is the profile's job. The
+> sorts that ship are `A–Z`, `Debut` and `Races` — and `Races` is a real ranking, not a consolation.
+
+**Under a metric sort the sorted column is promoted to `--ink-primary` at weight 600 and the others
+stay `--ink-tertiary`.** That is the whole indication of what you are sorted by — quieter than a
+caret, and it points at the data rather than at the control.
+
+**The sort is a real `<fieldset>` of `<input type="radio">`** with visually-hidden inputs and styled
+`<label>`s, not `role="radio"` buttons. Arrow-key roving, `:checked`, form semantics and the
+accessible group name all come from the platform, and the alternative is thirty lines of keyboard code
+that has to be right (§8).
+
+**Search matches a diacritic-folded haystack, all tokens, substring.** `hakkinen` finds *Häkkinen*,
+`lewis ham` finds *Lewis Hamilton*, `ver` finds every Ver-. It matches **name, code, nationality,
+country, locality and the reference slug** — which is what lets nationality act as a filter without a
+second control. **Order is never re-ranked by match quality**: a list that reshuffles on the fifth
+keystroke is harder to use than one that only shrinks.
+
+##### 6.6.4.3 Zero-race entities — the state this feature exists to get right
+
+Queried, not assumed: **63 of 881 drivers have no race entry**, and they are two different things.
+
+| | Count | What it is |
+|---|---|---|
+| No session entry of any kind | **47** | Historic entrants the record names and holds nothing for — Bernie Ecclestone (1958), Alberto Crespo, Ted Whiteaway. `firstSeason` is `null` |
+| Practice-only | **16** | 2025–26 Friday practice runners: Paul Aron, Ryo Hirakawa, Jak Crawford, Colton Herta. Real F1 sessions, no race start |
+
+**9 of 214 teams** are in the same position. **All 78 circuits have hosted a round**, but **Madring
+(Madrid) has hosted no completed race** — its first is scheduled for 2026, which is *not yet raced*
+rather than missing (`SeasonCalendar`'s rule).
+
+Four channels carry it, because one would not:
+
+1. A `.season-chip` reading **`Never raced`** beside the name (**`Not yet raced`** for Madring).
+2. **The season columns render `—` in `--ink-tertiary`; the races column renders its measured `0`.**
+   Both halves matter and they are not the same rule. `firstSeason` is null *exactly* when `races` is
+   0, so printing `0` for a debut year would state a season that never happened — §6.6.2.2's
+   stat-tile rule. But `0` races is what the query counted, and replacing a measurement with a dash
+   would be the same collapse pointing the other way (§1.0).
+3. The `SpanRail` draws **the baseline and no bracket**, so the row is visibly a row with nothing to
+   plot rather than a row that failed to render.
+4. The portrait's leading rule drops from `--border-strong` to `--border-subtle`. **The name does
+   not dim** — dimming a person because our record holds nothing for them is the wrong statement.
+5. A panel notice, once, above the list — never repeated per row.
+
+**Copy, verbatim** — every figure in it is counted from the payload:
+
+> **63 of the 881 drivers in the record never started a Grand Prix.** Some entered a Grand Prix and
+> never qualified; others appear only in a Friday practice session. They are listed here and marked,
+> rather than quietly left out.
+
+_(An earlier draft named the split as "sixteen … the other forty-seven". The payload carries no field
+that distinguishes the two groups per row, so those two numbers would have been hardcoded prose
+sitting beside a computed total — the exact drift this document keeps recording. The wording above is
+true of the set without claiming a count the page cannot derive; the field that would restore the
+precision is requested in §6.6.4.7.)_
+
+##### 6.6.4.4 States
+
+| State | Treatment |
+|---|---|
+| **Loading** | 12 skeleton rows at the real geometry, inside the panel, `aria-busy` on the list once. **Not animated in** (§4.6.1 rule 1) |
+| **Empty search** | inside the panel: `No driver matches “xyz”.` + `Search matches a name, a code, a nationality or the reference in the URL.` + a `Clear search` button. **Never a blank panel** |
+| **Empty payload** | `The record holds no drivers.` — unreachable on this data, and stated rather than silent |
+| **Error** | `ErrorState` with retry, exactly as the profile pages use |
+| **`DATABASE_UNAVAILABLE`** | `DataUnavailableState`, page-level, masthead suppressed |
+| **Partial** | not reachable: an index row is identity plus counts, and neither has a coverage window |
+
+##### 6.6.4.5 Motion
+
+| Trigger | Spec | Reduced |
+|---|---|---|
+| List mount | **G-23**, `stagger.row` through `staggerAmount()` so 881 rows cost the same 12-row budget as 12 | opacity only, no stagger |
+| Filter / sort change | **nothing animates.** G-29's rule, applied to a list: re-staggering 881 rows on the fifth keystroke is the same defect as a chart re-animating while it is read | — |
+| Row hover / focus | `--surface-sunken` wash at `dur.instant`; chevron `opacity 0→1` + `translateX(3px)` at `dur.fast` — the product's standing "go here", identical to `.round-arrow` | transform suppressed, wash kept |
+| Search focus | the field's 2px `--accent-mark` underline `scaleX 0→1` from `left center`, `dur.fast`, `ease.enter` — **G-10's vocabulary**, reused rather than reinvented | `transition: none`; the underline is at full width the moment the field is focused |
+| Sort change | none | — |
+
+##### 6.6.4.6 Density — `content-visibility`, and its one honest cost
+
+`.index-row` carries `content-visibility: auto` with `contain-intrinsic-size: auto <row-height>`, so
+the browser skips layout and paint for off-screen rows. **No virtualisation library, no bundle cost,
+no scroll handler** — the same "let the compositor do it" position §7.7 takes on the background.
+Baseline since Firefox 125 and Safari 18; older engines simply render every row, which is correct,
+only slower.
+
+**The cost, stated because it is real: Safari does not reveal `content-visibility: auto` content to
+find-in-page.** ⌘F will miss an off-screen row there. It is accepted because this page ships a search
+field that is better than ⌘F — it is diacritic-folded, it matches nationality and code, and it is
+where the reader's attention already is. Recorded so it is not rediscovered as a bug.
+
+##### 6.6.4.7 The payload boundary — what shipped, and the two things the design gave up
+
+Design does not build queries or schemas (§2). `server/schemas/directory.ts` is the authority; this
+section records what it delivers and, more usefully, **the two design decisions it overruled**. Both
+are recorded rather than quietly absorbed, because in each case the version that was designed is the
+version a reader would reasonably expect to find.
+
+**What every row carries.** `ref`; the name; `nationality` + `countryCode`; `races`; `firstSeason`
+and `lastSeason` — **race-derived, so they equal the profile's `career.firstSeason`**, which is what
+stops two surfaces disagreeing about a debut year. Drivers add `code` (107 of 881). Circuits carry
+`locality`, `country`, `roundsHeld`, `racesWithResults`, `firstYear`, `lastYear`.
+
+**All 881, 214 and 78 rows are served, including the ones that never raced** — the ruling the design
+asked for, reached independently and for a better reason than the design's: *excluding is not
+reversible by the client and including is*, so the editorial decision stays where a human can change
+it.
+
+| Overruled | The design wanted | What shipped, and why it is right |
+|---|---|---|
+| **No `wins`, no `championships`** | metric sorts on wins and titles; a **champion's** bracket in `--accent-mark` on the rail | The endpoints are a directory, not a dashboard: putting career aggregates here means aggregating 881 careers to answer *which page do I want*. **The rail's accent now marks an entity still going in the archive's latest season** — which is what a browsing reader actually wants, needs no field at all (it is `lastSeason === max(lastSeason)`), and is **redundantly encoded**, because that bracket is also the one reaching the right end of the domain (§3.4.2) |
+| **No `teamRef`** | a 3px identity bar on every driver row, per §6.6.2.1 | A driver's colour is their team's, and no brand colour crosses an API boundary in this product. **Team rows keep their colour** — a team's reference *is* its identity, so `identityToken(ref)` resolves with no extra field. **The driver index is therefore monochrome**, which is consistent with §1.1 (the chrome carries no hue) but does cost that page its only chromatic element. ⚑ **Open for the engineer:** one `teamRef` — the driver's most recent team — would restore it, and it is the only field this surface still wants |
+
+**Still open, and unchanged:** a discriminator for §6.6.4.3's two raceless groups — *appeared in a
+session, never a race* versus *no session entry at all*. A `sessionEntries` count is the least
+bespoke. Without it the notice is still true and the rows are still marked; only the per-row precision
+is waiting.
+
+**Sorting and searching are client-side, and that is the schema's own ruling rather than a
+convenience.** SQLite compares text with BINARY collation, which files `Räikkönen` after `Ryan`. This
+surface goes further than a locale-aware compare: `normalise()` folds diacritics *before* comparing,
+which the letter grouping needs anyway — `Räikkönen` has to file under **R**, and a collator that
+orders him correctly still cannot tell the group header what letter he is.
+
 ---
 
 ## 7. Components
@@ -3113,6 +3332,47 @@ the product.
 **Altitude is a figure, never a mark on this graphic.** A third dimension on a two-dimensional
 projection is the dual-axis mistake in a different costume.
 
+### 7.12 `SpanRail` — a career against the whole archive, in one row _(added 2026-08-08)_
+
+The index pages' signature element (§6.6.4.0) and the `CareerRibbon`'s little sibling: where the
+ribbon gives one cell per season and needs 900px, the rail gives **one bracket against a fixed
+1950 → 2026 baseline** and fits in a table column.
+
+| Part | Spec |
+|---|---|
+| **Baseline** | 1px `--border-subtle`, full column width, **always drawn** — including for an entity with nothing to plot. It is the archive's extent, and it is what makes two rows comparable |
+| **Bracket** | a `--size-rule` (2px) rule in `--ink-tertiary` from `first` to `last`, with a 2×8px end tick at each end. A single-season entity is one tick, `min-width` 2px, so it never vanishes |
+| **Current** | an entity still going in the archive's latest season takes **`--accent-mark`** — 19.91:1 light / 17.06:1 dark, the loudest mark a monochrome system has. It is what gives 881 quiet rows a focal rhythm, and it lands on the right-hand edge, where the eye already is. **Never colour-alone**: that bracket is also the one reaching the end of the rail, and the row's accessible name states the last season in words. _(This row read **Champion** until the payload landed; there is no `championships` field and there should not be — §6.6.4.7.)_ |
+| **Nothing to plot** | the baseline alone. No bracket, no zero-width mark, no `0` |
+| **Scale** | `left: (first − 1950) / (2026 − 1950)`, `width: (last − first) / span`, in **percent of the column** — the column is the only geometry, so a `%` here is not the `%`-vs-px trap, and `spanRailGeometry()` is unit-tested including the single-season, out-of-range and inverted cases |
+| **Bounds** | the domain comes from the payload (`min(firstSeason)`, `max(lastSeason)`), never a literal. A 2027 season appearing in the data must move the rail, not overflow it |
+| **Motion** | **none of its own.** It arrives inside its row's G-23 reveal and does nothing else. A rail that drew itself would re-draw on every keystroke |
+| **Accessible** | `aria-hidden`. Its content is in the row's `aria-label` as `1991 to 2007`, which is better than any graphic reading |
+
+**It is not a chart and must not grow one.** No axis, no ticks, no tooltip — the years are in the row.
+This is the same boundary §7.9 draws around `CareerRibbon`, and for the same reason: the product has a
+`SpanChart` for when a span genuinely needs an axis, and it renders an SVG per chart, which at 881 rows
+would be 881 SVGs.
+
+### 7.13 `IndexConsole` — search, sort and the count _(added 2026-08-08)_
+
+The instrument at the top of every index page (§6.6.4.2). Sticky under the header, glass, one row of
+controls at ≥768 and two stacked below it.
+
+| Part | Spec |
+|---|---|
+| **Field** | `--surface-sunken`, 1px `--border-control`, `--radius-md`, height **56px** ≥768 / **48px** below. Value and placeholder at `--text-lg` (18/26, Inter 500) ≥768, `--text-md` (16) below — **16 is the floor**, because iOS zooms a focused input under it |
+| **Underline** | a 2px `--accent-mark` bar on the field's bottom edge, `transformOrigin: left center`, `scaleX 0 → 1` on `:focus-within` over `dur.fast` / `ease.enter`. G-10's gesture, on a field instead of a link |
+| **Icon** | Lucide `search` at 20px, `--ink-tertiary`, `--accent-ink` on `:focus-within`. `aria-hidden` — the field has a real label |
+| **Clear** | a 28px icon button carrying Lucide `x`, rendered **only when the field is non-empty**, `aria-label="Clear search"`. Returns focus to the field. `Esc` in the field does the same thing and keeps focus — but only when there is something to clear, so `Esc` still reaches anything above it on an empty field |
+| **Not "Clear search" twice** | the empty-search state's button reads **`Show all drivers`**, never `Clear search`. Two controls sharing one accessible name inside one region is ambiguous to a screen reader and to anyone driving by voice |
+| **Sort** | `<fieldset>` + visually-hidden radios + `<label class="index-sort-option">`. Checked = `--accent-wash` + `--accent-border` + `--accent-wash-ink`, exactly `.season-entity-chip[aria-pressed]` |
+| **Count** | `--font-mono`, `--text-sm`. `881 drivers` at rest, `12 of 881` while filtering. It is the field's `aria-describedby` **and** an `aria-live="polite"` region, so a screen-reader user hears the result count change without leaving the input |
+| **Reduced motion** | the underline transition is removed; it is at full width whenever the field is focused. Everything else is a colour change already |
+
+**The label is visually hidden, not a placeholder.** A placeholder is not a label; it disappears
+exactly when a reader needs it most, and this field is the page's primary control.
+
 ---
 
 ## 8. Accessibility — binding
@@ -3416,3 +3676,4 @@ admissible shade pair in light mode (§9.2.3 G-27d). Nothing in this entry weake
 | 2026-08-07 | **F2 — the chart kit and `entityColor.ts` built.** (a) **§3.3a.3 closed**: `src/lib/entityColor.ts` exists, the hash is **FNV-1a 32-bit** over `team.reference`, and **the only field it needs from the data layer is `reference`** — whether a plotting variant exists is a property of our generated palette, not of the row, so no selector carries it and the two cannot disagree. Haas → ramp 3, Cadillac → ramp 7: the ΔE 3.8 pair that started §3.2 is separated by construction, asserted. (b) **§6.4 — two corrections, both changing what ships.** A pair now collides if it collides in **either** theme, because measuring in the theme in force would let a sunset withdraw a dash pattern — the thing §6.4a property 3 already forbids for the shade pair. And the detection is **precomputed** into `src/lib/entityColorData.ts` by a new `validate-palette.mjs entity-data` mode: the palette is a closed set of 64 tokens, so shipping CIEDE2000 plus two CVD models plus a `getComputedStyle` read into a chart component bought nothing and would have been **untestable**, since jsdom resolves no custom properties and every ladder assertion would have passed against `''`. **No colour crosses into the client**, asserted. (c) **§6.4 — the ladder fires chart-wide.** Escalation stays pairwise; application does not, because two of four series carrying a marker shape reads as an accident. Consequence stated: at ≤4 series rung 2 alone separates every pair, so rung 3 only ever fires for a **teammate** comparison. (d) **§6.4a — two teammate pairs on one chart.** Read literally, "circle and square in driver order" gives the second team's pair the same shape *and* dash as the first, leaving colour as the only separator. The rule is restated on **indices**: a team keeps the set of rung indices its members hold and redistributes them by `reference` ascending. (e) **§6.4 rung 3 — the dash rule was wrong.** "Dash lengths ≥ 2× stroke width" fails on its own `2 3` pattern; the binding property is the **period**, and `2 3` renders as a dotted line, the most distinguishable of the three. Values kept, rule fixed, test asserts the period. (f) **§6.3 — two additions**: markers are equal **area** across all four shapes (a square and a circle of the same width differ ~27% to the eye, which encodes magnitude on an identity channel), and 1px strokes sit on half-pixel coordinates or a "1px" gridline rasterises as a 2px smear. (g) **§6 — the kit is built** and its module inventory recorded: `geometry.ts` (pure, and where layout is *tested*, because jsdom performs none), `ladder.ts`, `Axis.tsx`, `ChartFrame.tsx` (**one measure axis, so a dual-axis chart is not expressible**), `ChartLegend`, `ChartTable`, `MarkerGlyph`, `LineChart`, `BarChart`, `useChartSize`; motion in `src/lib/motion/chart.ts`. Built against **fixture shapes, not an endpoint's**. (h) **§9.2.4 records the two build-time facts**: 663 of 2016 token pairs collide, **31 of 66** among the 2026 grid — about half of all real two-team comparisons reach the ladder — and **14 of 66** among the ramp base slots, which is exactly the 14 CVD pairs §3.3a.2 independently said tier B hands over. Tier A: 0 of 15. Hash distribution over the live 214 teams: **χ² 12.88 against 19.68 at 11 df**, consistent with uniform. **Measured cost: render-blocking CSS 10.86 → 12.09 KB gzipped, 48.4% of 25 KB** — the chart stylesheet costs 1.23 KB. **Initial JS unchanged at 160.27 / 250 KB, because no route imports the kit yet**; measured standalone with esbuild + Node zlib L9 it is **18.2 KB gzipped marginal** over the GSAP already in the bundle, d3 subset included. Suite: **106 tests added by this work** — entityColor 25, ladder 19, geometry 30, chart motion 8, the two charts 21, the emitter drift 3 — inside a suite that reads **629 passing across 44 files** with the season data layer landing in parallel. 3 consecutive green runs. **Untested by construction and named as such: everything about where a mark, axis, label or reveal actually lands** — jsdom has no layout, no `ResizeObserver` and no `getBBox` | designer |
 | 2026-08-08 | **F4 / F5 / F6 — the three entity pages, specified and built.** (a) **New §6.6.2**, and the three pages are specified in **one** section on purpose: the largest risk in shipping driver, team and circuit together is three pages that look like three products, so they share a masthead, a career strip, a stat grid, a season table and a chart language, and every difference between them is one the *data* forces. (b) **Two rows of §6.6.2.2 were wrong when written and the engineer's measurements corrected them the same day, recorded rather than edited silently.** **Poles** was derived from `grid = 1` on the clean-sounding reasoning that the grid exists from 1950 while qualifying begins in 1994 — measured, **9 races carry more than one `grid = 1` row** and 1952 R8 has two *different* cars there, so a grid slot is not a qualifying result and is not reliably one car; poles come from the qualifying classification, which is 1994+ and **holed** (15/16 rounds in 1994, then **7, 10, 7, 3, 4, 1, 2** of ~16 across 1996–2002, complete from 2003). **Fastest laps** said 2004+, quoting `REQUIREMENTS.md` §5.1; the flag is also on **every race of 1958 and 1959**, so no single window expresses it. The fix is structural rather than a corrected year: **a coverage-limited count is a denominator with three states** — denominator `0` renders **`—`** (`0 poles` for Fangio is a false statement, not a low score), a partial denominator renders the figure **with a footnote marker**, a complete one renders the figure alone. (c) **No current age anywhere, and it is permanent rather than a gap**: the schema has **no date of death**, so an age against the clock would report Fangio at 114. `ageAtFirstRace` / `ageAtLastRace` instead, both clock-free. (d) **DR-4 and DR-5 are ONE chart with a segmented control** (§6.6.2.4). Two near-identical diverging bars would read as a rendering mistake; toggling makes the difference between them the thing you see, and the **1994 boundary is the disabled segment** carrying §7.4's sentence as *text beside the control* — never a `title`, which is unreachable by touch, unreachable by keyboard in most browsers and invisible in a screenshot. (e) **§6.6.2.7 rules the map question: there is no map.** A tile map is a third-party call on a request path (§7 S-1/DL-2, and the CSP does not whitelist it), a vector basemap costs more than the application, and **a track outline does not exist in the data at all** — `circuit` holds a name, a locality, a country and three numbers. **New §7.11 `CircuitLocator`** draws those three numbers on an equirectangular graticule, so the projection is the identity map and nothing is claimed the coordinates do not say. (f) **New §7.9 `CareerRibbon`** — the signature element, one cell per season across an entity's whole span, fill height = championship position **inverted** so P1 is tallest (§6.3's position-axis rule applied to a strip). **Three cell kinds that must never collapse into two**: `ranked`, `unranked` (contested, no position — 1950 has 59) and `absent` (a career's gap years are part of the career). `RIBBON_FILL_FLOOR` **0.12** exists so "finished last" and "did not race" cannot become the same mark, which is §1.0's failure by construction. Same component on all three pages with a different measure, which is the coherence lever. (g) **New §7.10 `EntityPortrait`, discharging §7.6** — the placeholder is the shipping form, since `abbreviation` covers 107 of 881 drivers; a **monogram**, never a derived three-letter code (§6.5.4a). (h) **New §6.6.3 `ShareChart`, the kit's fourth form** — composition, for CN-4. It **normalises rows itself** (a caller free to pre-normalise is free to ship a row summing to 0.9 and nothing on screen would look wrong) and a **zero-total row renders as one labelled band** rather than `NaN` widths, which is §1.0's collapse again. (i) **§6.6.2.9 — the seams §1.0a owed are built**: `RaceClassification` links all 22 entities it names (recorded as outstanding since F3), `SeasonStandings` links drivers, constructors and **both** teams of a two-team season, `RaceMasthead` links the circuit it names on all 1,173 race pages. The **calendar's winner is a principled exception** — the row is already a `<Link>`, and an anchor inside an anchor is invalid. (j) **Two defects found by tests rather than by reading**: `StatTiles` tied the footnote marker to the *absence* rather than to the note, so a partial figure rendered as a bare complete-looking number; and a ribbon test asserted a one-season P12 career should fill its strip, where the code was right. **Measured cost: initial JS 197 → 209.15 KB / 250 (83.7%), render-blocking CSS ~14.5 → 15.61 KB / 25 (62.4%)** — both figures include the engineer's data layer landing in the same session. **Palette re-validated: PASS, unchanged** — no colour token moved; the six new tokens are `--size-ribbon*` and `--size-portrait*`. Suite **1298 → 1678 tests across 78 files, 3 consecutive green runs**. **Untested by construction and named as such: every dimension, position and composition on all three pages** — jsdom performs no layout, so the ribbon's 72px track, the locator's on-screen projection, the share chart's segment widths and the diverging bars' geometry are unverified | designer |
 | 2026-08-08 | **One defect on `/teams/ferrari`, and it was two.** (a) **Sixteen React `duplicate key` errors**, root cause reproduced rather than assumed: `SpanChart` keyed its gridlines and tick text by `tick.label`, and while the team payload is in flight the chart falls back to a `[0, 1]` domain which the team page's `String(Math.round(value))` formatter collapses to `0, 0, 0, 1, 1, 1` — eight warnings a render, sixteen under `StrictMode`. **The engineer's report attributed it to `ShareChart`; it is the sibling `SpanChart`, in its loading state.** Ticks are now keyed by index like every other axis in the kit, and **`geometry.dedupeTickLabels` removes the duplicate labels**, applied in `MeasureAxis` too — a key fix alone would have silenced React and left an axis drawing three ticks labelled `0`. `Axis.tsx` and `BarChart` were already index-keyed and so immune to the *key* collision; the duplicate *label* was latent in both. (b) **The overlapping driver codes are a separate layout defect**, and neither chart's fix touches the other: §6.3's growth rule was implemented only for a rotated `BarChart`, so `SpanChart` at Ferrari's 24 rows (**13.0px band step against a 14px line-height**) and `ShareChart` at its 77 seasons (**4.0px**) crushed every label. **New `geometry.bandPlotHeight`** serves all three and counts the 49px of axis chrome the bar chart's version omitted. (c) **`ChartFrameProps.plotHeight` is now applied as `min-height`**, which fixes a **latent oscillation** in `BarChart`: it grew only `if (count > labelCapacity(measured))`, growing satisfied that condition, the override was withdrawn and the plot fell back — a measurement-driven feedback loop with nothing to damp it. The figure is now a function of the row count and the labels alone. No token, colour, typography or motion change → **`validate:palette` re-run anyway: PASS, unchanged**. Suite **1678 → 1693 tests across 78 files**; the four new `SpanChart` assertions were **verified to fail against the pre-fix component** before being kept. **Untested by construction: that the grown plot renders legibly** — jsdom performs no layout, so the band-step property is asserted against the real `scaleBand` in `geometry.test.ts` and the on-screen result needs Rishabh's capture | designer |
+| 2026-08-08 | **The three entity indexes — `/drivers`, `/teams`, `/circuits`, specified and built.** (a) **New §6.6.4.** The three profile pages had no front door: F4–F6 routed them at a slug and left the bare paths on an F0 `RoutePlaceholder`, so the dock's own "Drivers" item — the primary navigation, on every screen — led nowhere. §6.6.2.9 audited the seams *between* surfaces and never asked whether a surface had an **entrance**, so §1.0a earns a fourth clause: **a link in the primary nav is a seam too**. One component behind all three, for §6.6.2's reason. (b) **New §7.12 `SpanRail`** — the signature, and the answer to 881 rows. Every row plots its entity against the same fixed 1950→2026 baseline, so scrolling the list is scrolling the sport's history. **A bracket, never a fill**: a career has gaps — Räikkönen raced 2001–2009 and 2012–2021 — and a solid bar would state that he raced in 2010, so it is two end ticks joined by a rule, which reads *from … to* and cannot be read as *throughout*. Separated by **form**, the same device §3.3a.5 uses for an identity swatch beside a timing colour. `spanRailGeometry` returns **`null`, never `{0,0}`**, when there is nothing to plot — a zero-width bracket at the origin is indistinguishable from a 1950 debut, which is §1.0's collapse. (c) **New §7.13 `IndexConsole`.** Sticky, glass, `--z-content` and **never `--z-header`** (§5.2a — the dock's fault 4 on a different element). The sort is a real `<fieldset>` of radios, clipped rather than `display: none`, so arrow-key roving and `:checked` come from the platform instead of from thirty lines of keyboard code. (d) **The sort decides the grouping**, which is what makes 881 rows browsable rather than merely searchable: letters under `A–Z`, decades under `Debut`, none under a metric — and the sorted column is promoted to `--ink-primary` 600, which is the whole indication of what you are sorted by. **Absence sorts last in both directions**: `null < 1` is `true` in JavaScript, so a naive descending sort by races opens the driver index with the 63 people who never raced, presented as the most raced. (e) **§6.6.4.3, the state this feature exists to get right.** Queried: **63 of 881 drivers, 9 of 214 teams and 1 of 78 circuits** never contested a race. Four channels carry it — a chip, an empty rail, a demoted portrait rule and one panel notice — and the figure rule is **two rules, not one**: the season columns read `—` because `firstSeason` is null *exactly* when `races` is 0 and printing `0` would state a season that never happened, while the races column reads its **measured `0`**, because replacing a measurement with a dash is the same collapse pointing the other way. Madring reads **`Not yet raced`**, never `Never raced` — a venue joining the calendar is not a gap (`SeasonCalendar`'s rule). (f) **§6.6.4.6 — density is `content-visibility: auto` + `contain-intrinsic-size`, no virtualisation library and no scroll handler**, the same "let the compositor do it" position §7.7 takes on the background. Its one honest cost is recorded rather than discovered later: **Safari does not reveal skipped content to find-in-page**, accepted because this page ships a search that is better than ⌘F. (g) **Four spec rows were wrong when written and the payload corrected them the same day, recorded rather than edited silently.** `server/schemas/directory.ts` rules that these endpoints are a **directory and not a dashboard**, so there is no `wins`, no `championships`, no `seasonsEntered` and no `teamRef`: the **champion** marker on the rail became a **current** marker (an entity still going in the latest season — available for free as `lastSeason === max(lastSeason)`, and **redundantly encoded**, because that bracket is also the one reaching the end of the rail), the wins and titles sorts are gone, the count-versus-span column is gone, and **the driver index carries no identity colour** — team rows keep theirs, since a team's reference *is* its identity. One `teamRef` is ⚑ open with the engineer, as is a discriminator for §6.6.4.3's two raceless groups. (h) **One regression, caught by a test rather than by reading**: the team index was headed `Constructors` — the sport's word, and the team profile's eyebrow — while the dock's item reads `Teams`. `RootLayout.test.tsx`'s route table failed on it. **On a directory the nav wins**, and the sport's word stays on the entity. **No colour token moved → `validate:palette` re-run anyway: PASS, unchanged.** Six new `--size-index-*` / `--size-span-*` tokens; one new Lucide glyph (`search`, geometry copied verbatim). **Measured cost: initial JS 209.15 → 214.59 KB / 250 (85.8%, first WARN band), render-blocking CSS 15.61 → 16.98 KB / 25 (67.9%)** — both figures include the engineer's directory schemas, queries, routes and hooks landing in the same session. Suite **1693 → 1878 tests across 85 files, 3 consecutive green runs**; 84 of the new tests are this work's. **Untested by construction and named as such: every position, size and composition on all three pages** — jsdom performs no layout, so where the rail's bracket lands, whether the console sticks under the header, whether `content-visibility` skips anything, how 881 rows scroll, and what an identity bar resolves to are all unverified and need Rishabh's capture | designer |
