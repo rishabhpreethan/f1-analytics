@@ -2217,12 +2217,18 @@ an empty or `—` badge would state that a code is missing, which is a fact abou
 about the driver. Same rule for `permanent_car_number` (**63 of 881**) and `date_of_birth`
 (**865 of 881** — the sixteen without one are reserve and test entrants).
 
-**Age is computed and labelled as computed.** `{age}` renders only when the driver has a `date_of_birth`
-**and** the payload marks them as active; for a driver whose career ended the meta line reads
-`born 1911-06-24` with no age, because an age for a person whose status we do not know is a claim the
-data cannot support. The database carries no date of death, so this is not a coverage gap that can
-be closed later — it is a **permanent** property of the source and is recorded here rather than
-rediscovered.
+**The meta line never shows a current age, and the reason is permanent rather than a gap.** There is
+**no date of death anywhere in the schema**, so a "current age" would confidently report Fangio at
+114. The payload therefore publishes `ageAtFirstRace` and `ageAtLastRace` — two figures derived from
+dates the data holds, correct forever and carrying no clock — and the masthead reads
+**`Born 1911-06-24 · debut at 38 · last race at 47`**. A living driver's age today is a presentation
+concern with a clock in it and stays out of the payload; `selectAgeYears(dob, on)` exists for a
+surface that genuinely wants one, and no surface in F4–F6 does.
+
+_(This replaces an earlier draft that said the age renders "only when the payload marks the driver
+as active". There is no such flag and there cannot be one — the dataset has no death column and no
+retirement column, so "active" would have had to be inferred from the last season, which is exactly
+the kind of inference §5.3 forbids presenting as fact.)_
 
 ##### 6.6.2.2 Career totals — the exhaustive per-metric table, in §6.6.1's discipline
 
@@ -2230,16 +2236,60 @@ The race page's RESULT column taught this: **a total that is silently zero is wo
 is absent**, because zero is a plausible-looking claim. `DR-2` asks for eight figures and they do
 **not** all share one coverage window. This table is exhaustive on the eight and is binding.
 
-| Figure | Derivation | Window | What renders outside the window |
+> **⚠ Two rows of this table were wrong when it was written, and the engineer's measurements
+> corrected them the same day. Both are recorded rather than edited silently, because the version
+> that was wrong is the version a reader would reasonably have assumed.**
+>
+> **Poles.** This said *"`grid = 1` in the race result · 1950+ · never absent — **not** derived from
+> the qualifying session, which begins 1994; a pole is the grid slot, and the grid exists from
+> 1950."* That reasoning is clean and the data does not support it: measured, **9 races carry more
+> than one `grid = 1` row**, and 1952 R8 has two *different* cars there (Ascari's 12 and Moss's 32).
+> `grid` is a **starting slot after penalties**, not a qualifying result, and it is not reliably one
+> car. Poles therefore come from the **qualifying classification**, which exists from 1994 and is
+> **holed rather than merely bounded**: rounds with any qualifying classification run 15/16 in 1994
+> and 17/17 in 1995, then **7, 10, 7, 3, 4, 1 and 2** of ~16 for 1996–2002, then complete from 2003.
+> Senna reads 0 poles. That is the data.
+>
+> **Fastest laps.** This said **2004+**, quoting §5.1. §5.1 is right about the modern boundary and
+> silent about an island: the flag is present on **every race of 1958 and 1959** (20 races), on
+> **none** from 1960 to 2003, and on every race from 2004 bar one. So a career total for Clark or
+> Stewart reads 0 where the record says 28 and 15 — and it is **not** a shape any single window can
+> express, which is why the fix below is a denominator rather than a boundary year.
+
+| Figure | Derivation | Coverage | Rendering |
 |---|---|---|---|
-| **Starts** | race entries, excluding `status IN (30, 40)` — §5.1 "appearing in race results" | 1950+ | never absent |
-| **Wins** | `position = 1` | 1950+ | never absent |
-| **Podiums** | `position IN (1,2,3)` — §5.1 | 1950+ | never absent |
-| **Points finishes** | `points > 0` for that event, **never "top 10"** — the points-paying range moved repeatedly (§5.1) | 1950+ | never absent |
-| **Poles** | `grid = 1` in the race result | 1950+ | never absent. **Not** derived from the qualifying session, which begins 1994 — a pole is the grid slot, and the grid exists from 1950 |
-| **Fastest laps** | `fastest_lap_rank = 1` — §5.1 | **2004+** | the tile renders **`—`**, not `0`, with a footnote marker; the section note reads the §6.5.3 three-part sentence |
-| **DNFs** | `status` decoded per `DATABASE.md` §3, **never `position IS NULL`** (trap 3) | 1950+ | never absent |
-| **Championships** | a **count of titles read from the payload** (`driver_championship` / `team_championship` final position = 1). **Never derived here, and never from a points threshold** | 1950+ | never absent |
+| **Starts** | races entered minus those where every entry was `didNotStart` / `didNotQualify` (`DATABASE.md` §3). **The `REQUIREMENTS.md` §5.1 / `DATABASE.md` §3 conflict was resolved in `DATABASE.md`'s favour** — a driver who withdrew did not start. It moves 368 rows, one of them Schumacher's | 1950+ | always a figure |
+| **Wins** | `position = 1` on the driver's best row for that race | 1950+ | always a figure |
+| **Podiums** | `position IN (1,2,3)` — §5.1 | 1950+ | always a figure |
+| **Points finishes** | `points > 0` for that event, **never "top 10"** — the points-paying range moved repeatedly (§5.1) | 1950+ | always a figure |
+| **Poles** | overall qualifying classification = P1. **Never `grid = 1`** — see above | 1994+, **holed** | the denominator rule below |
+| **Fastest laps** | `fastest_lap_rank = 1` | 1958–59 **and** 2004+ | the denominator rule below |
+| **DNFs** | `status IN (10, 11)` on the best row, **never `position IS NULL`** (trap 3) | 1950+ | always a figure |
+| **Championships** | a **count of titles read from `driver_championship` / `team_championship`**, `position = 1` in a **complete** season's final snapshot. **Never derived here, never from a points threshold, and the completeness gate is not a formality** — the 2026 snapshot currently ranks Antonelli first with 12 of 22 rounds unrun | 1950+ | always a figure |
+
+##### The denominator rule — three states, because two would be a lie
+
+A coverage-limited count has **three** states and a boundary year can only express two. The payload
+publishes the denominator beside every such figure (`racesWithQualifying`, `racesWithFastestLapData`),
+and the tile reads it:
+
+| Denominator | Tile | Why |
+|---|---|---|
+| `0` | **`—`** in `--ink-tertiary`, with a footnote marker | The figure cannot be computed at all. `0 poles` for Fangio is a **false statement**, not a low score |
+| `> 0` but `< starts` | **the figure**, with a footnote marker | The count is real and partial. Häkkinen's poles are undercounted and the footnote says by how much |
+| `= starts` | **the figure**, no marker | Complete. Nothing to explain |
+
+The footnote is one sentence per distinct denominator, in §6.5.3's three-part form: *"Qualifying
+results are recorded for 41 of this driver's 161 races, so the pole count covers only those. Race
+results, grids and championship positions are complete."* **Never a `caution` colour** (§3.4.3) and
+never a `title` attribute as the only carrier.
+
+**`entries` and `races` are both shown when they differ**, and they differ for 45 drivers. Trap 17:
+40 races between 1950 and 1964 classify one driver two or three times, because he took over a second
+car mid-race. 1950 R7 counted naively is one start, one podium **and one retirement in a race Ascari
+finished second**. The payload collapses to one row per race and publishes `entries` beside it so the
+discrepancy is visible; the masthead states `{starts} starts` and the totals grid adds
+`{entries} classifications` only when the two disagree.
 
 **Points is deliberately not one of the eight, and that is the most important row in this table.**
 A career points total is the defect `DATABASE.md` trap 4 and §6.2 both name: 24 point systems, and
