@@ -1,0 +1,570 @@
+/*
+ * THE ENTITY PAGES — `/drivers/:ref`, `/teams/:ref`, `/circuits/:ref`.
+ *
+ * `DESIGN_SYSTEM.md` §6.6.2, §7.9, §7.10, §7.11. Its own file for the reason `season.css` and
+ * `charts.css` have theirs: this is a surface **language**, not a component — a masthead, a career
+ * ribbon, a stat grid, a season table and a locator, sharing one anatomy across three page types.
+ *
+ * **The single rule this file exists to hold:** the three pages must not look like three products.
+ * Every heading, eyebrow, panel, table and identity bar here is either literally `season.css`'s
+ * class or built from the same tokens, so a reader crossing from the season hub to a driver page
+ * meets one surface. Where a rule below duplicates `season.css`, it is because the element is new
+ * and its *treatment* is not — never because a second convention was wanted.
+ *
+ * Named `entity-page.css` rather than `entity.css`: **`entity.css` is generated** by
+ * `scripts/validate-palette.mjs tokens` and must never be hand-edited.
+ */
+
+@layer components {
+  /* ============================================================ the page and its masthead */
+
+  /* The page shell reuses `.season`'s rhythm exactly — same section gap, same page padding — so a
+   * reader crossing between surfaces meets one product. */
+  .entity-page {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 12);
+    padding-block: calc(var(--spacing) * 8) calc(var(--spacing) * 16);
+  }
+
+  @media (min-width: 48rem) {
+    .entity-page {
+      padding-block: calc(var(--spacing) * 12) calc(var(--spacing) * 16);
+    }
+  }
+
+  .entity-masthead {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .entity-headline {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 4);
+  }
+
+  .entity-name-group {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 3);
+    min-width: 0;
+  }
+
+  /*
+   * §2.3 — `--display-lg` at 44 below 1024, `--display-xl` at 60 above it. **Two exact steps
+   * switched at a breakpoint, never `clamp()`**: a fluid size is by definition off the scale, and
+   * §2.3 forbids it for type.
+   */
+  .entity-name {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-lg);
+    font-stretch: 82%;
+    font-weight: 700;
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
+  }
+
+  @media (min-width: 64rem) {
+    .entity-name {
+      font-size: var(--text-display-xl);
+      letter-spacing: var(--text-display-xl--letter-spacing);
+      line-height: var(--text-display-xl--line-height);
+    }
+  }
+
+  /*
+   * The driver's code. **Not inside the `h1`** — `VER` announced mid-heading reads as three
+   * letters in a sentence — and rendered only when the driver actually has one (107 of 881).
+   */
+  .entity-code {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding-inline: calc(var(--spacing) * 1.5);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-sm);
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    letter-spacing: 0.08em;
+  }
+
+  /* The meta line: facts separated by a middot, exactly as `.race-meta` does it. */
+  .entity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 3);
+    margin: 0;
+  }
+
+  .entity-meta > span + span::before {
+    content: '·';
+    margin-inline-end: calc(var(--spacing) * 3);
+    color: var(--ink-tertiary);
+  }
+
+  /* ============================================================ §7.10 the portrait */
+
+  .portrait {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: var(--size-portrait-sm);
+    height: var(--size-portrait-sm);
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-sunken);
+  }
+
+  @media (min-width: 48rem) {
+    .portrait {
+      width: var(--size-portrait);
+      height: var(--size-portrait);
+    }
+  }
+
+  /* The 3px identity bar — the only place the entity's colour appears in this component, and it is
+   * beside a name, which is the one role §3.3a.1 permits a brand colour. */
+  .portrait::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 3px;
+    background: var(--identity, var(--border-strong));
+  }
+
+  /*
+   * **`--ink-primary`, never the identity colour** (§3.3a.5 rule 2: an identity colour is never
+   * applied to a glyph that stands for a name). Six of eleven brand colours fall below 3:1 on a
+   * light surface, so a coloured monogram would be illegible for half the grid.
+   */
+  .portrait-mark {
+    padding-inline-start: 3px;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-xs);
+    font-stretch: 82%;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  /* ============================================================ §7.9 the career ribbon */
+
+  .ribbon {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  /*
+   * §7.9.3 — **the readout's line is reserved whether or not a cell is active**, so nothing below
+   * the strip moves as the pointer crosses it. `min-height` on the line box rather than a fixed
+   * height, so a wrapped detail on a narrow viewport still fits.
+   */
+  .ribbon-readout {
+    display: flex;
+    align-items: baseline;
+    gap: calc(var(--spacing) * 3);
+    min-height: calc(var(--text-sm--line-height));
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .ribbon-readout b {
+    color: var(--ink-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  .ribbon-readout-detail {
+    color: var(--ink-tertiary);
+  }
+
+  .ribbon-track,
+  .ribbon-years {
+    display: flex;
+    gap: var(--size-ribbon-gap-sm);
+    /* The strip scrolls **inside its own container** rather than shrinking its cell below the 8px
+     * floor — §5.3's rule for a wide table, applied to a wide strip. */
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  @media (min-width: 48rem) {
+    .ribbon-track,
+    .ribbon-years {
+      gap: var(--size-ribbon-gap);
+    }
+  }
+
+  .ribbon-track {
+    align-items: flex-end;
+    height: var(--size-ribbon);
+    padding: 0;
+  }
+
+  .ribbon-track:focus-visible {
+    outline: var(--size-rule) solid var(--ink-primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--surface-raised);
+  }
+
+  .ribbon-cell {
+    position: relative;
+    display: block;
+    flex: none;
+    width: var(--size-ribbon-cell-sm);
+    height: 100%;
+    border-radius: var(--radius-xs);
+    /* The track behind the fill. Every cell has one, including an absent season — which is what
+     * makes a gap in a career visible as a gap rather than as a shorter strip. */
+    background: var(--surface-sunken);
+  }
+
+  @media (min-width: 48rem) {
+    .ribbon-cell {
+      width: var(--size-ribbon-cell);
+    }
+  }
+
+  .ribbon-fill {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: calc(var(--ribbon-fill, 0) * 100%);
+    border-radius: var(--radius-xs);
+    background: var(--ink-primary);
+    transition: background-color var(--dur-instant) var(--ease-enter);
+  }
+
+  /*
+   * §7.9.1 — a title season is **fully filled and capped**. A championship is the one thing on the
+   * strip that must be findable without counting, and the cap is `--accent-mark`: the pole of the
+   * neutral scale, 19.91:1 light and 17.06:1 dark (§3.6.3), which is the loudest mark available in
+   * a monochrome system.
+   */
+  .ribbon-cell[data-champion='true'] .ribbon-fill {
+    background: var(--accent-mark);
+  }
+
+  .ribbon-cell[data-champion='true']::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: var(--size-rule);
+    border-radius: var(--radius-xs);
+    background: var(--accent-mark);
+  }
+
+  /*
+   * `unranked` — the entity raced and finished the season with no championship position. A **2px
+   * foot rule**, never a zero-height fill: absent and zero are different things (§1.0), and a
+   * zero-height fill would make this cell identical to `absent`.
+   */
+  .ribbon-cell[data-kind='unranked']::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: var(--size-rule);
+    border-radius: var(--radius-xs);
+    background: var(--ink-tertiary);
+  }
+
+  /* `absent` — a 1px baseline tick. Visibly a cell that exists and holds nothing. */
+  .ribbon-cell[data-kind='absent']::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  .ribbon-cell[data-active='true'] .ribbon-fill {
+    background: var(--accent-mark);
+  }
+
+  .ribbon-cell[data-active='true'] {
+    outline: 1px solid var(--border-control);
+    outline-offset: 1px;
+  }
+
+  .ribbon-years {
+    height: var(--text-2xs--line-height);
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    /* The label row must not scroll independently of the strip, or the two stop agreeing about
+     * which cell a year belongs to. It scrolls with it, which is why it carries the same gap and
+     * the same cell width. */
+    overflow-x: hidden;
+  }
+
+  .ribbon-year {
+    flex: none;
+    width: var(--size-ribbon-cell-sm);
+    /* A four-digit mono year is far wider than a cell, so it is allowed to overhang its own box
+     * and is centred on the cell it belongs to. Only every fifth one is rendered (§7.9.1), so
+     * nothing collides. */
+    overflow: visible;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 48rem) {
+    .ribbon-year {
+      width: var(--size-ribbon-cell);
+    }
+  }
+
+  .ribbon-track-skeleton .ribbon-cell {
+    height: 60%;
+  }
+
+  .skeleton-entity-name {
+    width: 9ch;
+    height: var(--text-display-lg--line-height);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ============================================================ §6.6.2.2 the stat grid */
+
+  .stat-tiles-block {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 4);
+  }
+
+  .stat-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(var(--spacing) * 4);
+    margin: 0;
+  }
+
+  @media (min-width: 48rem) {
+    .stat-tiles {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: calc(var(--spacing) * 6);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .stat-tiles {
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+  }
+
+  .stat-tile {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    min-width: 0;
+  }
+
+  .stat-tile-figure {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-display-md);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-display-md--line-height);
+  }
+
+  /*
+   * §6.6.2.2 — **an out-of-window figure is `—` in `--ink-tertiary`, never `0` and never a status
+   * colour.** A coverage boundary is a property of the sport's history, not a fault (§3.4.3).
+   */
+  .stat-tile-figure[data-unavailable='true'] {
+    color: var(--ink-tertiary);
+  }
+
+  .stat-tile-marker {
+    margin-inline-start: 2px;
+    color: var(--ink-tertiary);
+    font-family: var(--font-text);
+    font-size: var(--text-2xs);
+  }
+
+  .stat-notes {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .stat-notes .season-note {
+    align-items: baseline;
+  }
+
+  /* ============================================================ §7.11 the circuit locator */
+
+  .locator {
+    display: grid;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  @media (min-width: 64rem) {
+    .locator {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+      align-items: center;
+    }
+  }
+
+  .locator-map {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+  }
+
+  .locator-frame {
+    fill: var(--surface-sunken);
+    stroke: var(--border-subtle);
+    stroke-width: 1;
+  }
+
+  /* Recessive furniture, exactly as §6.3 asks of a chart: the graticule is structure, the pip is
+   * the subject. */
+  .locator-graticule {
+    stroke: var(--border-subtle);
+    stroke-dasharray: 2 4;
+    stroke-width: 1;
+  }
+
+  .locator-prime {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+  }
+
+  .locator-label {
+    fill: var(--ink-tertiary);
+    font-family: var(--font-text);
+    font-size: 6px;
+    letter-spacing: 0.04em;
+  }
+
+  .locator-cross {
+    stroke: var(--accent-mark);
+    stroke-width: 1;
+  }
+
+  /* §6.3's 1.5px surface ring, so the pip survives sitting exactly on a gridline. */
+  .locator-pip {
+    fill: var(--accent-mark);
+    stroke: var(--surface-sunken);
+    stroke-width: 1.5;
+  }
+
+  .locator-readout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 6);
+    margin: 0;
+  }
+
+  @media (min-width: 64rem) {
+    .locator-readout {
+      flex-direction: column;
+      gap: calc(var(--spacing) * 4);
+    }
+  }
+
+  .locator-readout > div {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+  }
+
+  .locator-readout dt {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  .locator-readout dd {
+    margin: 0;
+    color: var(--ink-primary);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .locator-readout .locator-dms {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  /* ============================================================ tables and links */
+
+  /*
+   * §1.0a — every entity a row names is a link, and a link needs a **visible** affordance:
+   * *"it was not broken, it was undiscoverable, and that is worse"*. This is the product's existing
+   * inline-link treatment (§3.5.2), applied inside a table so a whole column does not become a
+   * field of underlines: the rest state is `--ink-primary` with a 1px underline at 0.14em, and
+   * hover promotes the ink rather than adding a second gesture.
+   */
+  .entity-link {
+    color: var(--ink-primary);
+    text-decoration: underline;
+    text-decoration-color: var(--border-control);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.14em;
+    transition: color var(--dur-instant) var(--ease-enter);
+  }
+
+  .entity-link:hover,
+  .entity-link:focus-visible {
+    color: var(--accent-ink);
+    text-decoration-color: var(--accent-mark);
+    text-decoration-thickness: var(--size-rule);
+  }
+
+  /* A secondary link in the same cell — a team under a driver's name. Quieter by ink, not by
+   * removing the affordance. */
+  .entity-link-quiet {
+    color: var(--ink-tertiary);
+  }
+
+  .entity-link-quiet:hover,
+  .entity-link-quiet:focus-visible {
+    color: var(--accent-ink);
+  }
+
+  /* The section that holds a chart plus its own control row, reusing the season panel exactly. */
+  .entity-chart-panel {
+    padding: calc(var(--spacing) * 4);
+  }
+
+  @media (min-width: 48rem) {
+    .entity-chart-panel {
+      padding: calc(var(--spacing) * 6);
+    }
+  }
+
+  /*
+   * A disabled segment's explanation. NV-8 — a coverage-aware control reuses §7.4's exact sentence,
+   * and it is **text beside the control**, never only a `title`: a `title` is unreachable by touch,
+   * unreachable by keyboard in most browsers, and invisible in a screenshot.
+   */
+  .entity-control-note {
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+}

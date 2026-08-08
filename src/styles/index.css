@@ -20,6 +20,11 @@
  * language — masthead, dial, calendar rows, standings tables, progression panel — sharing one
  * anatomy, and that anatomy is defined once rather than per component. */
 @import './season.css';
+/* The entity pages (F4/F5/F6) — driver, team and circuit. Named `entity-page.css` and NOT
+ * `entity.css`, which is generated above and must never be hand-edited. It comes after
+ * `season.css` because it reuses that file's panel, eyebrow, chip and table classes verbatim: the
+ * three entity pages are the same surface as the season hub, not a second one. */
+@import './entity-page.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so
