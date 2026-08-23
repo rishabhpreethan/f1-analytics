@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 import { notFound, onError } from './errors';
 import { rateLimit } from './middleware/rateLimit';
+import { compareRoutes } from './routes/compare';
 import { entityRoutes } from './routes/entities';
 import { metaRoutes } from './routes/meta';
 import { raceRoutes } from './routes/races';
@@ -81,11 +82,14 @@ app.use('/api/*', rateLimit());
 //    `/seasons/:year/races/:round`, which is four segments where `/seasons/:year` is two
 //    and `/seasons/:year/standings` is three; `routes/entities.ts` mounts three
 //    two-segment patterns whose first segment is a distinct literal (`drivers`, `teams`,
-//    `circuits`) and so can never collide with `/seasons/:year`.
+//    `circuits`) and so can never collide with `/seasons/:year`. `routes/compare.ts` adds
+//    `/compare` and `/compare/season/:year`, both behind a literal first segment no other
+//    router claims.
 app.route('/api', metaRoutes);
 app.route('/api', seasonRoutes);
 app.route('/api', raceRoutes);
 app.route('/api', entityRoutes);
+app.route('/api', compareRoutes);
 
 app.notFound(notFound);
 app.onError(onError);
