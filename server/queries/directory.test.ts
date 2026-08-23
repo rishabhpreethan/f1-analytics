@@ -47,6 +47,7 @@ const driverRow = (overrides: Partial<DriverIndexRow> = {}): DriverIndexRow => (
   podiums: 106,
   firstSeason: 2001,
   lastSeason: 2026,
+  colorTeamRef: 'renault',
   ...overrides,
 });
 
@@ -69,6 +70,7 @@ describe('buildDriverIndexItem', () => {
       bestChampionshipPosition: 1,
       firstSeason: 2001,
       lastSeason: 2026,
+      colorTeamRef: 'renault',
     });
   });
 
@@ -600,6 +602,7 @@ describe.skipIf(!hasDatabase)('directory queries against the live database', () 
       'bestChampionshipPosition',
       'championships',
       'code',
+      'colorTeamRef',
       'countryCode',
       'firstSeason',
       'forename',

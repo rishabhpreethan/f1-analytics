@@ -237,6 +237,21 @@ export const driverListItemSchema = z.strictObject({
    * completed-season test, and never against a hard-coded year.
    */
   lastSeason: seasonYearSchema.nullable(),
+  /**
+   * **The team whose colour represents this driver: most starts, ties to the most recent.**
+   * Null exactly when `races` is 0.
+   *
+   * A reference, never a hex — `src/lib/entityColor.ts` turns it into a token name and no colour
+   * crosses this boundary (`DESIGN_SYSTEM.md` §3.3a.3). Added in F7 for `/compare`'s picker, which
+   * has to make a bay recognisable *before* it is filled and so cannot ask the comparison endpoint
+   * for a driver who is not in the comparison yet.
+   *
+   * The tiebreak is recency rather than the alphabet, and it is load-bearing on a split career:
+   * Hamilton's 246 races in silver should not lose to Ferrari's 34 because `ferrari < mercedes`.
+   * A driver whose every entry was a non-start has no *start* to count, so the fallback is the team
+   * of their first race — an entry with no start is still an entry by a team.
+   */
+  colorTeamRef: entityRefSchema.nullable(),
 });
 
 export const driverListSchema = z.strictObject({

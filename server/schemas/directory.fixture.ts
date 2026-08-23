@@ -41,6 +41,7 @@ export const driverListFixture: DriverList = {
       bestChampionshipPosition: 1,
       firstSeason: 2001,
       lastSeason: 2026,
+      colorTeamRef: 'renault',
     },
     {
       // Entered a Grand Prix in 1958, never qualified. 47 drivers are this case.
@@ -58,6 +59,7 @@ export const driverListFixture: DriverList = {
       bestChampionshipPosition: null,
       firstSeason: null,
       lastSeason: null,
+      colorTeamRef: null,
     },
     {
       // FP1 only, 2026. 16 drivers are this case, and any of them may start a race.
@@ -75,6 +77,7 @@ export const driverListFixture: DriverList = {
       bestChampionshipPosition: null,
       firstSeason: null,
       lastSeason: null,
+      colorTeamRef: null,
     },
     {
       ref: 'perez',
@@ -91,6 +94,7 @@ export const driverListFixture: DriverList = {
       bestChampionshipPosition: 2,
       firstSeason: 2011,
       lastSeason: 2026,
+      colorTeamRef: 'force_india',
     },
     {
       ref: 'raikkonen',
@@ -107,6 +111,7 @@ export const driverListFixture: DriverList = {
       bestChampionshipPosition: 1,
       firstSeason: 2001,
       lastSeason: 2021,
+      colorTeamRef: 'ferrari',
     },
     {
       ref: 'ryan',
@@ -123,6 +128,7 @@ export const driverListFixture: DriverList = {
       bestChampionshipPosition: null,
       firstSeason: 1961,
       lastSeason: 1961,
+      colorTeamRef: 'lotus-climax',
     },
   ],
 };

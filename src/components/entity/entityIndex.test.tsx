@@ -67,6 +67,7 @@ const driver = (
   bestChampionshipPosition: null,
   firstSeason: 1990,
   lastSeason: 2000,
+  colorTeamRef: null,
   ...over,
 });
 
