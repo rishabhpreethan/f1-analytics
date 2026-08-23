@@ -232,7 +232,7 @@ export function useListReveal<T extends HTMLElement = HTMLElement>(
 }
 
 /**
- * **G-30 — the population board's two marks** (`DESIGN_SYSTEM.md` §6.6.5.1, §4.6 G-30).
+ * **G-31 — the population board's two marks** (`DESIGN_SYSTEM.md` §6.6.5.1, §4.6 G-31).
  *
  * Both grow from their own axis, which is §6.1's rule and the only honest direction for either:
  *

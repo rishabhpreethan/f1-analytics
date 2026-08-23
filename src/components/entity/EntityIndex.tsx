@@ -60,7 +60,7 @@ import {
  * 2. **The accessible name is one sentence, not eight fragments.** A per-cell `sr-only` label
  *    would be four extra nodes on every one of 881 rows. `ariaLabel` is built by the presenter
  *    from the same values the cells show.
- * 3. **Nothing animates on a filter, a sort or a lens change.** G-23 and G-30 fire once per
+ * 3. **Nothing animates on a filter, a sort or a lens change.** G-23 and G-31 fire once per
  *    dataset; re-staggering 881 rows on the fifth keystroke is G-29's defect moved to a list.
  * 4. **The board's counts are of the whole payload, never of the current view** — the same rule
  *    the rail's domain follows. A ladder that rescaled as you filtered would make the same

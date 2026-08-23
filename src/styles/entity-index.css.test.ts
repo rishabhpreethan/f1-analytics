@@ -315,7 +315,7 @@ describe('the population board — §6.6.5.1', () => {
 
   /**
    * §6.1 — a magnitude mark grows off its own axis. The decade column is anchored at the bottom of
-   * its track, which is where G-30's `scaleY` origin also is; anchor it at the top and the tween
+   * its track, which is where G-31's `scaleY` origin also is; anchor it at the top and the tween
    * would grow it downwards out of the baseline.
    */
   it('anchors the decade column to the baseline, not to the top of its track', () => {
@@ -427,7 +427,7 @@ describe('reduced motion is genuinely stopped', () => {
   });
 
   it('stops every board transition, so a hovered bar changes state instantly', () => {
-    // G-30 itself never exists under reduce — `useMotion` builds no tween — but these are CSS
+    // G-31 itself never exists under reduce — `useMotion` builds no tween — but these are CSS
     // transitions on hover and pressed, which the hook has no say over.
     for (const selector of ['.tier-bar', '.era-bar', '.tier-label', '.era-value']) {
       expect(reduce).toContain(selector);

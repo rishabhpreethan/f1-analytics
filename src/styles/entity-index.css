@@ -1045,7 +1045,7 @@
   }
 
   /*
-   * Anchored to the **bottom** — the baseline of a magnitude chart is where zero is, and G-30
+   * Anchored to the **bottom** — the baseline of a magnitude chart is where zero is, and G-31
    * grows it from there. `min-height` for the same reason the ladder's bar has `min-width`.
    */
   .era-bar {
