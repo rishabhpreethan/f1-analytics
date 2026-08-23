@@ -1667,6 +1667,16 @@ was no finish. Rung 4's hatch (§6.4) carries it, stepped up from `--border-subt
 `--border-strong` because on `--surface-raised` the hatch is the only thing separating the segment
 from the panel — 1.24:1 against 1.90:1, gated at 1.2 (V-38 G-38d).
 
+> ⚠ **`color-mix()` is new to this product — this is its first use — and the build emits a
+> fallback that collapses the ramp.** Lightning CSS cannot statically resolve a `var()` inside
+> `color-mix()`, so it precedes each rule with `fill: var(--series)`. On any browser in the target
+> set the second rule wins and the ramp is correct; **below the target, steps 1–3 all paint at full
+> strength and only the hatched fourth remains distinct.** That is a graceful degradation rather
+> than a break — the row still sums to the driver's starts, the legend still names the order, and
+> the table still carries every figure — but it is a real difference and it is recorded here rather
+> than discovered. `color-mix` has been available in every evergreen browser since mid-2023, which
+> is inside the range Tailwind v4 already targets, so nothing in the supported set sees it.
+
 #### Why this is not the shade pair returning
 
 §6.4a deleted the two-shade teammate pair on the same day this ramp was added, and both spend
