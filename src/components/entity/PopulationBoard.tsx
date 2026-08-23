@@ -220,11 +220,16 @@ function EraBars({
           }}
           style={{ '--era-extent': `${String(era.extent * 100)}%` } as CSSProperties}
         >
-          <span className="era-value t-mono" aria-hidden="true">
-            {era.count}
-          </span>
+          {/*
+           * The value lives **inside** the track, because it is positioned against the bar's top
+           * edge (`bottom: var(--era-extent)`) and the track is the element that establishes the
+           * containing block for that percentage. Outside it, the label would resolve against
+           * whatever happened to be positioned further up the tree — which is the quiet version of
+           * this bug, not a loud one.
+           */}
           <span className="era-track" aria-hidden="true">
             <span className="era-bar" data-motion="era-bar" />
+            <span className="era-value t-mono">{era.count}</span>
           </span>
           <span className="era-label" aria-hidden="true">
             {era.label}
@@ -259,7 +264,6 @@ function EraSkeleton() {
     <div className="era-bars" aria-busy="true" aria-label="Loading">
       {Array.from({ length: 8 }, (_, column) => (
         <div className="era-col" key={column} data-skeleton="true">
-          <span className="era-value" />
           <span className="era-track" />
           <span className="era-label" />
         </div>

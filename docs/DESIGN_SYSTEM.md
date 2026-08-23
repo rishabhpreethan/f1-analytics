@@ -2824,8 +2824,9 @@ stacked below.
    strongest mark on the page, not the faintest. Never colour-alone — every bar prints its count.
 
 **The decade columns (right, drivers and teams).** Eight `<button aria-pressed>` columns, `1fr`
-each, 4px gap. Value above at `--text-xs` mono; a track at **84px / 104px ≥768 as a *floor*, growing
-to fill the column**, `--surface-raised`;
+each, 4px gap. A track at **84px / 104px ≥768 as a *floor*, growing to fill the column**,
+`--surface-raised`; the value in `--text-xs` mono **inside** the track, absolutely positioned at
+`bottom: var(--era-extent)` so it rides its own bar;
 the bar anchored at `bottom: 0` with `min-height: 3px` and `--radius-xs` on the **top two corners
 only**, because a bar rounded at the bottom lifts off the axis it grows from. Label below at
 `--text-2xs` uppercase (`50s`, `60s`, …).
@@ -2847,6 +2848,12 @@ only**, because a bar rounded at the bottom lifts off the axis it grows from. La
   percentage height against it, and a percentage against an `auto`-height ancestor is the one corner
   of flexbox engines have historically disagreed on. Deleting that `height` as redundant would leave
   the bars correct in one browser and missing in another.
+- ⚠ **The value rides its bar, and that requirement is a consequence of the growth above.** At
+  104px the figure could sit in the flow at the top of its column and still read as that bar's
+  label; at ~360px the 2020s figure would float roughly 300px above the mark it names, which is a
+  direct label that has stopped being direct. It is therefore anchored to the bar's top edge inside
+  the track, which also means **the track must not clip** — a full-height column would otherwise
+  lose its number — and `.era-col` reserves one line of top padding for the tallest case.
 - **A decade the archive has not finished is hatched *and* captioned.** A 135° repeating gradient in
   `--surface-raised` over the bar, plus *"The last column covers a decade the record has not
   finished."* Texture, not colour (§6.3), because the 2020s column being short is a calendar fact and

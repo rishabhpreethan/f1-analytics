@@ -361,6 +361,20 @@ describe('the population board — §6.6.5.1', () => {
   });
 
   /**
+   * ⚠ **Growing the track created this and the fix ships with it.** At 104px the value could sit in
+   * the flow above its column and still read as that bar's label. At the ~360px the filled column
+   * gives it, the 2020s figure would float roughly 300px above the mark it names. It is therefore
+   * anchored at `bottom: var(--era-extent)` — the bar's own top edge — which also means the track
+   * **must not clip**, or a full-height column would lose its number entirely.
+   */
+  it('rides each decade’s value on its own bar, and lets it out of the track', () => {
+    const value = bodies(CSS, '.era-value')[0] ?? '';
+    expect(value).toMatch(/position:\s*absolute/);
+    expect(value).toMatch(/bottom:\s*var\(--era-extent,\s*0%\)/);
+    expect(bodies(CSS, '.era-track')[0] ?? '').not.toMatch(/overflow:\s*hidden/);
+  });
+
+  /**
    * The unfinished decade is hatched as well as short. Texture rather than colour, per §6.3's
    * CVD-and-print rule, and the caption says the same thing in words — three channels for a fact
    * that would otherwise read as "the sport shrank again this year".
