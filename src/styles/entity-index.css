@@ -1183,6 +1183,49 @@
    */
   .atlas-map .locator-frame {
     fill: var(--surface-raised);
+    /*
+     * **Stroke suppressed here and restated by `.atlas-neatline` at the end of the drawing.**
+     * The coastline reaches x = 0, x = 360 and y = 180 — Eurasia runs off both edges at
+     * Chukotka and Antarctica now fills to the pole — and anything painted after the frame
+     * paints *over* its border. A frame drawn first would ship with its left, right and bottom
+     * edges eaten by land. A neatline drawn last is also what an atlas does, so this is the
+     * convention rather than a workaround.
+     */
+    stroke: none;
+  }
+
+  /*
+   * The coastline. Natural Earth 1:110m, Visvalingam–Whyatt at 1 square degree, 0.1° grid, in
+   * the atlas's own coordinate space — §6.6.5.3 for the cost and the three rejected shapes.
+   *
+   * ⚠ **No `fill-rule` is set, and setting one is a defect.** SVG's default is `nonzero`, the
+   * Caspian is the single hole in the dataset, and it winds against its outer ring — so
+   * `nonzero` punches it out. `evenodd` would work here *by accident* and break on a source
+   * bump that added a second hole with matching winding. Verified by computing the winding
+   * number at (51°E, 42°N) rather than by looking: it is 0.
+   *
+   * `vector-effect: non-scaling-stroke` because the map is `width: 100%` and the viewBox is
+   * 360 units wide, so a user-space stroke would be 1.44 px at the 517 px board column and
+   * 0.95 px on a phone. A coastline is a hairline at every size or it is furry at one of them.
+   */
+  .atlas-land {
+    fill: var(--map-land);
+    stroke: var(--map-coast);
+    stroke-width: 1;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /*
+   * The neatline — the frame's border, restated over everything except nothing. It is also what
+   * hides the four artificial edges the generator introduces at the viewBox boundary: the clip
+   * of Eurasia at both antimeridian edges, and Antarctica's pole line along y = 180. Those are
+   * not coastline and must not be stroked where a reader would take them for one.
+   */
+  .atlas-neatline {
+    fill: none;
+    stroke: var(--border-subtle);
+    stroke-width: 1;
   }
 
   /*

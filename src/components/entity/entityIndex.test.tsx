@@ -22,6 +22,7 @@ vi.hoisted(() => {
 });
 
 import type { CircuitListItem, DriverListItem, TeamListItem } from '@schemas/directory';
+import { WORLD_LAND_PATH } from '@/components/entity/worldLand';
 import { CircuitIndexPage } from '@/features/circuit/CircuitIndexPage';
 import { DriverIndexPage } from '@/features/driver/DriverIndexPage';
 import { TeamIndexPage } from '@/features/team/TeamIndexPage';
@@ -840,6 +841,86 @@ describe('circuits are the same surface, with a map instead of a decade chart', 
     const atlas = screen.getByRole('img', { name: /Formula 1 venues/ });
     expect(within(atlas).queryAllByRole('link')).toHaveLength(0);
     expect(within(atlas).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  /* ------------------------------------------------------------ the coastline, §7.15 */
+
+  it('draws the generated coastline verbatim, with no transform and no wrapper', () => {
+    renderCircuits(CIRCUITS);
+    const land = screen
+      .getByRole('img', { name: /Formula 1 venues/ })
+      .querySelector('path.atlas-land');
+    expect(land).toBeTruthy();
+    /*
+     * Verbatim, character for character. `WORLD_LAND_PATH` is already in this viewBox's
+     * coordinate space, so any wrapping, scaling or re-serialising of it is a coordinate bug of
+     * exactly CR-007's kind — the pointer spotlight written in `%` instead of px, drawn outside
+     * its element, invisible to jsdom. The subpath order is asserted by the same equality: the
+     * Caspian is a hole and it must stay behind the ring it belongs to.
+     */
+    expect(land?.getAttribute('d')).toBe(WORLD_LAND_PATH);
+    expect(land?.getAttribute('transform')).toBeNull();
+    expect(land?.parentElement?.tagName.toLowerCase()).toBe('svg');
+  });
+
+  /**
+   * ⚠ **No `fill-rule` in the markup either.** The CSS test asserts the stylesheet does not set
+   * one; this asserts the attribute is absent too, because a presentation attribute would beat
+   * nothing at all and lose to the stylesheet, which is precisely the sort of half-working
+   * override that survives review.
+   */
+  it('leaves the fill-rule at the SVG default, so the Caspian punches out', () => {
+    renderCircuits(CIRCUITS);
+    const svg = screen.getByRole('img', { name: /Formula 1 venues/ });
+    for (const node of svg.querySelectorAll('*')) {
+      expect(node.getAttribute('fill-rule')).toBeNull();
+    }
+  });
+
+  /**
+   * ⚠ **Paint order is this component's correctness, and SVG has no z-index.**
+   *
+   * Plate → coastline → graticule → pips → neatline. Land after the plate or it is invisible;
+   * land *before* the pips or seventy-eight venues are buried under the continents they sit on;
+   * the neatline after everything or the border is eaten, because land now reaches x = 0,
+   * x = 360 and y = 180. Every one of those is a silent failure in jsdom — the element exists,
+   * the attributes are right, and the picture is wrong — so document order is asserted directly.
+   */
+  it('paints plate, then land, then graticule, then pips, then the neatline', () => {
+    renderCircuits(CIRCUITS);
+    const svg = screen.getByRole('img', { name: /Formula 1 venues/ });
+    const children = [...svg.children];
+    const at = (selector: string) => children.findIndex((node) => node.matches(selector));
+    const last = (selector: string) =>
+      children.length - 1 - [...children].reverse().findIndex((node) => node.matches(selector));
+
+    const frame = at('.locator-frame');
+    const land = at('.atlas-land');
+    const graticule = at('.locator-graticule, .locator-prime');
+    const firstPip = at('.atlas-pip');
+    const neatline = at('.atlas-neatline');
+
+    expect(frame).toBeGreaterThanOrEqual(0);
+    expect(land).toBeGreaterThan(frame);
+    expect(graticule).toBeGreaterThan(land);
+    expect(firstPip).toBeGreaterThan(land);
+    expect(neatline).toBe(children.length - 1);
+    expect(neatline).toBeGreaterThan(last('.atlas-pip'));
+  });
+
+  /**
+   * A retired pip must still be painted before a current one — the pre-existing rule, restated
+   * here because the coastline was inserted into the middle of that sequence and an insertion is
+   * exactly when an ordering gets shuffled.
+   */
+  it('still paints every retired pip before every current one', () => {
+    renderCircuits(CIRCUITS);
+    const pips = [
+      ...screen.getByRole('img', { name: /Formula 1 venues/ }).querySelectorAll('.atlas-pip'),
+    ].map((node) => node.getAttribute('data-current'));
+    expect(pips).toContain('false');
+    expect(pips).toContain('true');
+    expect(pips.lastIndexOf('false')).toBeLessThan(pips.indexOf('true'));
   });
 
   it('has no decade chart at all — that column is the map', () => {

@@ -223,6 +223,20 @@
   --ink-tertiary: #6a6d74;
   --ink-inverse: #ffffff;
 
+  /* ---------------------------------------------------------------- the map — §7.15
+   * Two tokens, and **no new colour**: both are values the neutral ramp already ships
+   * (`--accent-wash` and `--border-strong` in this theme). They exist under their own names
+   * because a landmass is not an accent wash, and a map that changed shade because the
+   * selected-state tint was retuned would be a coupling nobody would look for. Gated by
+   * §9.2.4 **V-37**.
+   *
+   * Direction, and it is the same in both themes: **land steps one place toward the ink from
+   * the plate it sits on.** The `.atlas-pip` surface ring is `--surface-raised` — the plate's
+   * own colour — so `--map-land` must differ from it or 78 overlapping marks lose the one
+   * thing that separates them. */
+  --map-land: #e4e7ed;
+  --map-coast: #b9bcc3;
+
   --status-info-ink: #034f89;
   --status-info-wash: #e1eefc;
   --status-good-ink: #0a7554;
@@ -533,6 +547,12 @@
   --ink-secondary: #b3b6ba;
   --ink-tertiary: #86898f;
   --ink-inverse: #0e0f13;
+
+  /* The map — §7.15, §9.2.4 V-37. Same rule as light and the same two ramp values
+   * (`--accent-wash`, `--border-strong`): land steps one place toward the ink from its plate,
+   * which here means *lighter* rather than darker. Nothing about the encoding inverts. */
+  --map-land: #2c2f35;
+  --map-coast: #4f535a;
 
   --status-info-ink: #2e9cfd;
   --status-info-wash: #142f4b;

@@ -457,6 +457,77 @@ describe('the circuit atlas — §6.6.5.3', () => {
       );
     }
   });
+
+  /* -------------------------------------------------------------- the coastline, §7.15 */
+
+  it('paints the landmass in its own two tokens, not in a borrowed one', () => {
+    const land = bodies(CSS, '.atlas-land')[0] ?? '';
+    expect(land).toMatch(/fill:\s*var\(--map-land\)/);
+    expect(land).toMatch(/stroke:\s*var\(--map-coast\)/);
+  });
+
+  /**
+   * ⚠ **The single highest-consequence assertion in this file.**
+   *
+   * `WORLD_LAND_PATH` carries exactly one hole — the Caspian — and it winds *against* its outer
+   * ring, so SVG's default `fill-rule: nonzero` punches it out. `evenodd` produces the same
+   * picture here **by accident**, and would silently start filling lakes in on any source bump
+   * that added a hole winding the other way. Nothing about a filled Caspian looks like a bug:
+   * it looks like a cartographic choice, which is why it needs an assertion rather than an eye.
+   */
+  it('never sets a fill-rule anywhere on the map', () => {
+    expect(bodies(CSS, '.atlas-land')[0] ?? '').not.toMatch(/fill-rule/);
+    expect(bodies(CSS, '.atlas-map')[0] ?? '').not.toMatch(/fill-rule/);
+    expect(bodies(CSS, '.locator-map')[0] ?? '').not.toMatch(/fill-rule/);
+  });
+
+  /**
+   * The map is `width: 100%` over a 360-unit viewBox — 1.44 px per unit in the 517 px board
+   * column and 0.95 on a phone. A user-space stroke is therefore a different weight at every
+   * breakpoint; `non-scaling-stroke` is what makes a coastline a hairline at all of them.
+   */
+  it('holds the coastline to a hairline at every width', () => {
+    const land = bodies(CSS, '.atlas-land')[0] ?? '';
+    expect(land).toMatch(/vector-effect:\s*non-scaling-stroke/);
+    expect(land).toMatch(/stroke-width:\s*1/);
+  });
+
+  /**
+   * ⚠ **The border is drawn twice over, and deleting either half breaks it.**
+   *
+   * Land reaches x = 0, x = 360 and y = 180 — Eurasia runs off both edges at Chukotka and
+   * Antarctica fills to the pole — and SVG has no z-index, so anything after the plate paints
+   * over the plate's stroke. The frame therefore carries the fill and `.atlas-neatline`, drawn
+   * last, carries the border. A tidy-up that restored `stroke` to the frame and dropped the
+   * neatline would ship a map with three sides of its border eaten by continents, and no test
+   * anywhere else would notice.
+   */
+  it('moves the frame’s border to a neatline drawn after the land', () => {
+    expect(bodies(CSS, '.atlas-map .locator-frame')[0] ?? '').toMatch(/stroke:\s*none/);
+    const neatline = bodies(CSS, '.atlas-neatline')[0] ?? '';
+    expect(neatline).toMatch(/fill:\s*none/);
+    expect(neatline).toMatch(/stroke:\s*var\(--border-subtle\)/);
+  });
+
+  /**
+   * The pip's surface ring is `--surface-raised`. If `--map-land` ever equalled it, every pip on
+   * land would lose the ring that separates it from its neighbour, and the European cluster —
+   * twenty-odd venues inside four degrees — would go back to being one blob. Asserted in both
+   * themes because a token only has to collide in one of them to break that theme.
+   */
+  it('keeps the land distinct from the surface every pip is ringed in', () => {
+    const light = TOKENS.slice(0, TOKENS.indexOf("[data-theme='dark']"));
+    const dark = TOKENS.slice(TOKENS.indexOf("[data-theme='dark']"));
+    for (const [theme, scope] of [
+      ['light', light],
+      ['dark', dark],
+    ] as const) {
+      const land = /--map-land:\s*(#[0-9a-f]{6})/.exec(scope)?.[1];
+      const raised = /--surface-raised:\s*(#[0-9a-f]{6})/.exec(scope)?.[1];
+      expect(land, `--map-land missing in ${theme}`).toBeTruthy();
+      expect(land).not.toBe(raised);
+    }
+  });
 });
 
 describe('reduced motion is genuinely stopped', () => {

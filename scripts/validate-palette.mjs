@@ -2415,6 +2415,108 @@ if (mode === 'entity-data') {
 if (mode === 'tokens') {
   console.log(emitTokens());
 }
+/* ================================================================ V-37  THE MAP PLATE
+ *
+ * `CircuitAtlas` (§7.15) paints a landmass behind 78 pips, which is a new painted surface and
+ * therefore a new set of contrast obligations. Two new tokens, `--map-land` and `--map-coast`,
+ * both taken from values the neutral ramp already ships — so nothing here can fail on hue, and
+ * everything here can fail on *stacking*: a mark on land, a hairline between land and water, a
+ * ring that has to separate two overlapping pips while sitting on the land they are both on.
+ *
+ * Three of these are gates and three are recorded. The recorded ones matter as much: the
+ * graticule being **absorbed** by the land is a design decision (§7.15, "the grid reads over
+ * water"), and a decision stated as a number is the only kind that survives someone later
+ * looking at the screen and calling it a bug.
+ */
+const MAP = {
+  light: { land: '#E4E7ED', coast: '#B9BCC3' },
+  dark: { land: '#2C2F35', coast: '#4F535A' },
+};
+
+function map() {
+  let failures = 0;
+  const report = (label, ratio, floor) => {
+    const v = verdict(ratio, floor);
+    if (v === 'FAIL') failures += 1;
+    console.log(`  ${v}  ${n(ratio).padStart(6)}:1  (floor ${floor.toFixed(2)})  ${label}`);
+  };
+  const record = (label, ratio) =>
+    console.log(`  ----  ${n(ratio).padStart(6)}:1  (recorded)   ${label}`);
+
+  console.log('\n================================================================');
+  console.log('  V-37  THE MAP PLATE — a landmass behind 78 marks (§7.15)');
+  console.log('================================================================');
+
+  for (const theme of ['light', 'dark']) {
+    const S = SURF[theme];
+    const F = FURNITURE[theme];
+    const M = MAP[theme];
+    console.log(`\n--- ${theme} ---   plate ${S.raised}   land ${M.land}   coast ${M.coast}`);
+
+    /* Gated: the shape has to be seen at all. Same floor as V-18's `accent-wash` field. */
+    report(
+      `land ${M.land} vs the map plate ${S.raised} (visible landmass)`,
+      contrast(M.land, S.raised),
+      1.06,
+    );
+
+    /*
+     * Gated, and this is the one that decides whether 78 pips read as 78 pips. Every
+     * `.atlas-pip` carries a ring in `--surface-raised` — the water's colour — whose job is to
+     * separate two overlapping marks. On water the ring is invisible and unnecessary; on land it
+     * is the only thing between adjacent pips, so land and plate must not converge.
+     */
+    report(`the pip's surface ring ${S.raised} against land`, contrast(S.raised, M.land), 1.06);
+
+    /* Gated at the §6.3 mark floor: both pip classes sit almost entirely on land. */
+    report(
+      `current pip accent-mark ${F['accent-mark']} on land`,
+      contrast(F['accent-mark'], M.land),
+      3.0,
+    );
+    report(
+      `retired pip ink-tertiary ${F['ink-tertiary']} on land`,
+      contrast(F['ink-tertiary'], M.land),
+      3.0,
+    );
+
+    /* Gated: the coastline is the map's only hard edge and must read on both sides of itself. */
+    report(`coast ${M.coast} on water ${S.raised}`, contrast(M.coast, S.raised), 1.2);
+    report(`coast ${M.coast} on land ${M.land}`, contrast(M.coast, M.land), 1.2);
+
+    /*
+     * Recorded, deliberately. The prime meridian and the equator are `--border-strong` and stay
+     * continuous across land and water — they are what tells a reader which way is up. The
+     * dashed subdivisions are `--border-subtle` and are *absorbed* by the land, which is the
+     * intended reading rather than a miss: the grid describes the empty part of the map, and its
+     * two anchors carry across the whole of it. If the second figure ever rose to meet the
+     * first, the map would gain a full grid over the continents and lose that hierarchy.
+     */
+    record(
+      `prime meridian / equator border-strong ${F['border-strong']} on land (continuous)`,
+      contrast(F['border-strong'], M.land),
+    );
+    record(
+      `graticule border-subtle ${F['border-subtle']} on land (absorbed, by design)`,
+      contrast(F['border-subtle'], M.land),
+    );
+    record(
+      `neatline border-subtle ${F['border-subtle']} vs the sunken board ${S.sunken} outside it`,
+      contrast(F['border-subtle'], S.sunken),
+    );
+
+    /*
+     * Recorded: the land is a *neutral*, and it has to stay one. A map tinted even slightly
+     * would read as a data encoding on a board where every other fill is one.
+     */
+    record(`land OkLCh chroma (must read as neutral, ramp entries floor at 0.05)`, oklch(M.land).C);
+  }
+
+  console.log(`\n  ${failures === 0 ? 'V-37 PASS' : `V-37 FAIL — ${String(failures)} check(s)`}`);
+  return failures;
+}
+if (mode === 'map' || mode === 'all') map();
+
 if (mode === 'calibrate' || mode === 'all') calibration();
 if (mode === 'mono' || mode === 'all') mono();
 if (mode === 'catramp' || mode === 'all') catramp();

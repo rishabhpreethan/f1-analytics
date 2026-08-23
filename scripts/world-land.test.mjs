@@ -215,12 +215,55 @@ describe('the path string is well formed and in the atlas coordinate space', () 
      * And it actually spans the box, rather than sitting in one corner — a projection that had
      * lost its `+ 180` would still satisfy the bounds above for every eastern longitude.
      * Natural Earth land touches the antimeridian at both ends, so x really does reach 0 and
-     * 360; y does not, because no land sits at either pole in this dataset (northernmost
-     * ~83.6°N, southernmost ~85.6°S as clipped by `world-atlas`).
+     * 360. `maxY` is exactly 180 — the south pole — because the generator closes Antarctica
+     * over it: `world-atlas` clips the dataset at 85.6°S, which is a storage limit and not a
+     * shore, and everything between there and the pole is continent. `minY` does not reach 0;
+     * the northernmost land in this dataset is ~83.6°N.
      */
     expect(minX).toBe(0);
     expect(maxX).toBe(360);
+    expect(minY).toBeGreaterThan(0);
     expect(minY).toBeLessThan(20);
-    expect(maxY).toBeGreaterThan(160);
+    expect(maxY).toBe(180);
+  });
+
+  /**
+   * ⚠ **The invariant whose absence shipped three wrong pictures, and none of them was visible
+   * in a path string.**
+   *
+   * Two islands that straddle the antimeridian — Fiji and Wrangel — carry seam vertices Natural
+   * Earth writes at longitude −180 while their bodies sit at +178.7…+180. Projected without
+   * unwrapping, each became a quad **spanning the whole 360-unit map**: a hairline of land
+   * across the Pacific, the Atlantic and the Indian Ocean at lat −16.5 and lat 71, with a
+   * measured nonzero winding number of 1 at (−140°, −16.5°), which is open ocean. Afro-Eurasia
+   * carried a third such edge at y = 25, invisible while the path was only filled because a
+   * horizontal edge crosses no scanline — and a full-width scar the moment §7.15 stroked it.
+   *
+   * Found by rasterising the constant offline. Caught here from now on: on a 1:110m coastline
+   * the longest legitimate segment is a few degrees, so a non-horizontal edge spanning half the
+   * map is a seam, a wrap or a polar chord, never a shore.
+   */
+  it('has no edge that sweeps across the map — the antimeridian guard', () => {
+    let worst = 0;
+    let where = null;
+    for (const points of subpaths) {
+      for (let i = 0; i < points.length; i += 1) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        // Horizontal edges are exempt: they bound no fill and, at y = 0 or y = 180, the
+        // neatline covers the stroke. Antarctica's pole line is one, and is a full 360 wide.
+        if (a[1] === b[1]) continue;
+        const span = Math.abs(Number(a[0]) - Number(b[0]));
+        if (span > worst) {
+          worst = span;
+          where = `(${a[0]}, ${a[1]}) -> (${b[0]}, ${b[1]})`;
+        }
+      }
+    }
+    expect(
+      worst,
+      `longest non-horizontal edge is ${String(worst)} units, ${String(where)} — that is an ` +
+        'antimeridian seam, not a coastline, and it draws a straight line across open ocean',
+    ).toBeLessThanOrEqual(180);
   });
 });

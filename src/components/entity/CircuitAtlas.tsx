@@ -1,5 +1,7 @@
 import type { CircuitListItem } from '@schemas/directory';
 
+import { WORLD_LAND_PATH } from './worldLand';
+
 /**
  * **`CircuitAtlas`** — 78 venues on one graticule. `DESIGN_SYSTEM.md` §6.6.5.3, §7.11.
  *
@@ -12,11 +14,21 @@ import type { CircuitListItem } from '@schemas/directory';
  *
  * ---
  *
- * **Still no coastline, and still no track outline.** The projection is the identity map —
- * `x = longitude + 180`, `y = 90 − latitude` — so there is no projection arithmetic to get wrong.
- * A landmass would need a topojson asset costing more than the whole chart kit, and the `circuit`
- * table holds a name, a locality, a country and three numbers, so a track shape would be
- * fabrication. §7.11 already ruled both and this inherits the ruling rather than relitigating it.
+ * **The coastline lands here, and still no track outline.** §7.11 ruled both out together and
+ * only one of the two rulings survived a number: the landmass was rejected as *"a topojson asset
+ * costing more than the whole chart kit"*, which measured out at **5.95 KB gzipped in-bundle**
+ * and was approved. A track shape was rejected because the `circuit` table holds a name, a
+ * locality, a country and three numbers — that is fabrication, and no measurement changes it.
+ *
+ * **Paint order is the whole of this component's correctness, and SVG has no z-index.**
+ * Frame plate → coastline → graticule → retired pips → current pips → neatline. Land after the
+ * plate and *before* the pips, so a venue is never buried under the continent it is on; the
+ * neatline last, because land now reaches x = 0, x = 360 and y = 180 and would otherwise eat
+ * three sides of the border.
+ *
+ * ⚠ **No `fill-rule`, no wrapper `<g>`, no transform, and the subpaths are never reordered.**
+ * `WORLD_LAND_PATH` is already in this viewBox's coordinate space, and its one hole — the
+ * Caspian — winds against its outer ring, so SVG's default `nonzero` punches it out.
  *
  * **`role="img"` with one accessible name, and not 78 links.** This is `SeasonDial`'s decision on a
  * bigger mark: seventy-eight tab stops between the console and the list would make the map a
@@ -96,6 +108,14 @@ export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
       >
         <rect className="locator-frame" x="0.5" y="0.5" width="359" height="179" />
 
+        {/*
+         * The coastline, drawn straight in with no transform because the generator emitted it in
+         * this viewBox's own space. `aria-hidden` is redundant under `role="img"` and is written
+         * anyway: the summary sentence is the whole accessible reading of this figure, and a
+         * 12.9 KB path is the single most likely thing to acquire an accidental name later.
+         */}
+        <path className="atlas-land" d={WORLD_LAND_PATH} aria-hidden="true" />
+
         {MERIDIANS.map((lon) => (
           <line
             key={`m${String(lon)}`}
@@ -146,6 +166,14 @@ export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
             r={3.2}
           />
         ))}
+
+        {/*
+         * The neatline. Same geometry as the plate, stroke only, painted after everything —
+         * see `.atlas-neatline` for why the plate's own stroke is suppressed to make room for
+         * it. It is drawn after the pips too, which is deliberate: a pip on the edge of the map
+         * is clipped by the frame rather than hanging over it.
+         */}
+        <rect className="atlas-neatline" x="0.5" y="0.5" width="359" height="179" />
       </svg>
 
       {/*
