@@ -1,0 +1,1082 @@
+/*
+ * THE COMPARISON WORKSPACE — `/compare`. `DESIGN_SYSTEM.md` §6.6.6.
+ *
+ * Its own file for `entity-index.css`'s reason: this is a surface **language** — a tray of bays, a
+ * verdict band, a relationship matrix, a balance bar, a staircase and a rate rail — and defining it
+ * once is what stops the six reading as six products.
+ *
+ * **Everything already in the system is reused literally.** The eyebrow is `.season-eyebrow` with
+ * `index.css`'s `.accent-rule`. The notes are `.season-note`. The panel border, radius and
+ * elevation are `.season-panel`'s values. Where a rule below looks like a duplicate it is because
+ * the element is new and its *treatment* is not.
+ *
+ * ─────────────────────────────────────────────────────────────────────── the one geometric idea
+ *
+ * **`--axis-inset` is the page's spine.** The chain's track, the era strip's columns and every
+ * career band are laid out on the *same* 1950–2026 domain, and they can only line up if they share
+ * one left edge and one width. That edge is `--axis-inset` — the width of the year gutter — and it
+ * is declared once on `.compare` and inherited. A component that hard-coded its own gutter is the
+ * defect that put a chart axis 130px out of line in CR-007; one inherited custom property makes it
+ * unexpressible.
+ */
+
+@layer components {
+  .compare {
+    /* The year gutter to the left of every axis-aligned track. One value, inherited by all of
+     * them, so the chain's 1957 and the era strip's 1957 are the same x. */
+    --axis-inset: 64px;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 12);
+    padding-block: calc(var(--spacing) * 8) calc(var(--spacing) * 16);
+  }
+
+  @media (min-width: 64rem) {
+    .compare {
+      --axis-inset: 88px;
+      gap: calc(var(--spacing) * 16);
+      padding-block: calc(var(--spacing) * 12) calc(var(--spacing) * 16);
+    }
+  }
+
+  /* ============================================================== the masthead */
+
+  .compare-masthead {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .compare-title {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-lg);
+    font-stretch: var(--font-stretch-display);
+    font-weight: 700;
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
+  }
+
+  @media (min-width: 64rem) {
+    .compare-title {
+      font-size: var(--text-display-xl);
+      letter-spacing: var(--text-display-xl--letter-spacing);
+      line-height: var(--text-display-xl--line-height);
+    }
+  }
+
+  .compare-lead {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-md);
+    line-height: var(--text-md--line-height);
+  }
+
+  /* ============================================================== the tray */
+
+  /*
+   * Four bays, always four. The cap is drawn rather than implied, because it is a measured property
+   * of the palette (§3.2 rule 3) and a tray that grew as you added would hide it until you hit it.
+   */
+  .tray-bays {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: calc(var(--spacing) * 3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 48rem) {
+    .tray-bays {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .tray-bays {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .tray-bay {
+    position: relative;
+    display: flex;
+    min-height: 180px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    box-shadow: var(--elev-1-shadow);
+    overflow: hidden;
+  }
+
+  /*
+   * §3.3a.4's first permitted identity form: a 3px full-bleed bar on the leading edge, beside a
+   * name in ink. **Never the card's background** — 6 of 11 brand colours fall below 3:1 against a
+   * light surface (§9.2 V-8), so a tinted card would be unreadable for half the grid.
+   */
+  .tray-identity {
+    flex: none;
+    width: 3px;
+    background-color: var(--identity);
+  }
+
+  .tray-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    padding: calc(var(--spacing) * 4);
+    min-width: 0;
+  }
+
+  .tray-forename {
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .tray-surname {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-sm);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-sm--font-weight);
+    line-height: var(--text-display-sm--line-height);
+    overflow-wrap: anywhere;
+  }
+
+  @media (min-width: 64rem) {
+    .tray-surname {
+      font-size: var(--text-display-md);
+      letter-spacing: var(--text-display-md--letter-spacing);
+      line-height: var(--text-display-md--line-height);
+    }
+  }
+
+  .tray-span {
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-xs--line-height);
+  }
+
+  .tray-dot {
+    padding-inline: calc(var(--spacing) * 1);
+  }
+
+  .tray-metric {
+    display: flex;
+    align-items: baseline;
+    gap: calc(var(--spacing) * 2);
+    margin: calc(var(--spacing) * 3) 0 0;
+  }
+
+  .tray-metric-figure {
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-display-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-display-xs--line-height);
+  }
+
+  .tray-metric-label {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+  }
+
+  .tray-key {
+    margin-top: auto;
+    padding-top: calc(var(--spacing) * 3);
+  }
+
+  .tray-remove {
+    position: absolute;
+    top: calc(var(--spacing) * 2);
+    right: calc(var(--spacing) * 2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-md);
+    color: var(--ink-tertiary);
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      color var(--dur-instant) var(--ease-enter);
+  }
+
+  .tray-remove:hover {
+    background-color: var(--accent-wash);
+    color: var(--accent-ink);
+  }
+
+  .tray-bay[data-empty='true'] {
+    border-style: dashed;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .tray-add {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 4);
+    text-align: left;
+    transition: background-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .tray-add:hover {
+    background-color: var(--accent-wash);
+  }
+
+  .tray-add-plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-md);
+    color: var(--ink-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    line-height: 1;
+  }
+
+  .tray-add-label,
+  .tray-empty-copy {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    margin: 0;
+    padding: calc(var(--spacing) * 4);
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  .tray-add-label {
+    padding: 0;
+  }
+
+  .tray-empty-copy span {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  /* ============================================================== the verdict */
+
+  .relation {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .relation-verdict {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 6);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-sunken);
+  }
+
+  /*
+   * The largest type on the page after the title, and the page's actual thesis. `--display-md` at
+   * base and `--display-lg` at ≥1024 — two exact steps switched at a breakpoint, never `clamp()`
+   * (§2.3).
+   */
+  .relation-headline {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-md);
+    font-stretch: var(--font-stretch-display);
+    font-weight: 700;
+    letter-spacing: var(--text-display-md--letter-spacing);
+    line-height: var(--text-display-md--line-height);
+  }
+
+  @media (min-width: 64rem) {
+    .relation-headline {
+      font-size: var(--text-display-lg);
+      letter-spacing: var(--text-display-lg--letter-spacing);
+      line-height: var(--text-display-lg--line-height);
+    }
+  }
+
+  .relation-lead {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-md);
+    line-height: var(--text-md--line-height);
+  }
+
+  .relation-matrix-title {
+    margin: 0 0 calc(var(--spacing) * 3);
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .relation-matrix {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: calc(var(--spacing) * 1);
+  }
+
+  .relation-matrix th {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: var(--text-xs--line-height);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .relation-matrix th[scope='row'] {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    padding-right: calc(var(--spacing) * 3);
+    color: var(--ink-primary);
+  }
+
+  .relation-swatch {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-xs);
+    background-color: var(--identity);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  /*
+   * §3.5.1a: a pressed state is never carried by fill alone. Three channels — wash, border, and
+   * the label stepping to `--accent-wash-ink` at 600.
+   */
+  .relation-cell {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+    width: 100%;
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-raised);
+    text-align: left;
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      border-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .relation-cell:hover {
+    background-color: var(--accent-wash);
+  }
+
+  .relation-cell[aria-pressed='true'] {
+    border-color: var(--accent-border);
+    background-color: var(--accent-wash);
+  }
+
+  .relation-cell[aria-pressed='true'] .relation-cell-tier {
+    color: var(--accent-wash-ink);
+    font-weight: 600;
+  }
+
+  .relation-cell-tier {
+    color: var(--ink-secondary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .relation-cell-figure {
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-sm--line-height);
+  }
+
+  /* ============================================================== the balance bar */
+
+  .ledgers {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  @media (min-width: 64rem) {
+    .ledgers {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .balance {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-raised);
+    box-shadow: var(--elev-1-shadow);
+  }
+
+  .balance[data-size='micro'] {
+    padding: 0;
+    border: 0;
+    background-color: transparent;
+    box-shadow: none;
+  }
+
+  .balance-title {
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .balance-heads {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .balance-head {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    min-width: 0;
+  }
+
+  .balance-name {
+    color: var(--ink-primary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: var(--text-sm--line-height);
+  }
+
+  .balance-count {
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-display-xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-display-xs--line-height);
+  }
+
+  .balance-track {
+    position: relative;
+    display: flex;
+    height: 14px;
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-sunken);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+    overflow: hidden;
+  }
+
+  /*
+   * A 2px surface gap between the two fills — §3.3 rule 2's requirement, and the thing that keeps
+   * two shades of one team colour readable as two marks rather than one gradient.
+   */
+  .balance-fill[data-side='a'] {
+    width: var(--balance-a-share);
+    background-color: var(--balance-a);
+    border-right: 2px solid var(--surface-raised);
+  }
+
+  .balance-fill[data-side='b'] {
+    width: var(--balance-b-share);
+    margin-left: auto;
+    background-color: var(--balance-b);
+    border-left: 2px solid var(--surface-raised);
+  }
+
+  .balance-tied {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--border-subtle) 0,
+      var(--border-subtle) 2px,
+      transparent 2px,
+      transparent 5px
+    );
+  }
+
+  /*
+   * The 50% reference. **Never remove it**: without a drawn even mark the reader has no reference
+   * to judge the split against, and 39–27 reads as a rout instead of the 59% it is. It is
+   * `--border-strong`, the axis-line token, because that is what it is.
+   */
+  .balance-even {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background-color: var(--border-strong);
+  }
+
+  .balance-caption,
+  .balance-empty {
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .balance-empty {
+    padding: calc(var(--spacing) * 3);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+    color: var(--ink-secondary);
+  }
+
+  /* ============================================================== the chain */
+
+  .chain {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .chain-header {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .chain-heading {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-sm);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-sm--font-weight);
+    line-height: var(--text-display-sm--line-height);
+  }
+
+  @media (min-width: 64rem) {
+    .chain-heading {
+      font-size: var(--text-display-md);
+      font-weight: 700;
+      letter-spacing: var(--text-display-md--letter-spacing);
+      line-height: var(--text-display-md--line-height);
+    }
+  }
+
+  .chain-lead {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+
+  .chain-rows {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: calc(var(--spacing) * 4) 0 0;
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-sunken);
+    list-style: none;
+  }
+
+  /*
+   * One row per link. The grid is [year gutter | axis track | readout], and the track's width is
+   * the page's shared domain — every capsule on every row and every column in the era strip below
+   * measures against the same box, which is what makes a vertical read across the page valid.
+   */
+  .chain-row {
+    display: grid;
+    grid-template-columns: var(--axis-inset) 1fr;
+    grid-template-areas:
+      'years track'
+      'readout readout';
+    align-items: center;
+    gap: 0 calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 4);
+  }
+
+  @media (min-width: 64rem) {
+    .chain-row {
+      grid-template-columns: var(--axis-inset) minmax(0, 1fr) 300px;
+      grid-template-areas: 'years track readout';
+      gap: 0 calc(var(--spacing) * 4);
+    }
+  }
+
+  .chain-years {
+    grid-area: years;
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-2xs--line-height);
+  }
+
+  .chain-track {
+    position: relative;
+    grid-area: track;
+    height: 34px;
+  }
+
+  /*
+   * The capsule: the seasons the pair were actually teammates. `min-width` is 3px so a
+   * single-season pairing — one of 77ths of the domain, about 4px at 1024 — is never a mark the
+   * reader cannot see. `PopulationBoard` uses the same floor for the same reason (§7.14).
+   */
+  .chain-link {
+    position: absolute;
+    top: 50%;
+    left: var(--link-offset);
+    width: var(--link-length);
+    min-width: 3px;
+    height: 10px;
+    margin-top: -5px;
+    border-radius: var(--radius-sm);
+    background-color: var(--accent-mark);
+  }
+
+  /*
+   * A pairing that produced no race both drivers finished. **Texture, not colour** (§6.3): the
+   * capsule is still there and still at its true extent — the pairing happened — but it is hatched
+   * to say the head-to-head inside it is empty. 2,378 of 4,637 pairings are in this state.
+   */
+  .chain-link[data-evidence='none'] {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--border-strong) 0,
+      var(--border-strong) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  }
+
+  /* The vertical handoff from the row above, landing on this row's centre. */
+  .chain-drop {
+    position: absolute;
+    top: -50%;
+    left: var(--drop-x);
+    width: 1px;
+    height: 100%;
+    background-color: var(--border-strong);
+  }
+
+  /*
+   * The horizontal run to the next capsule — **the years the shared driver raced with neither
+   * teammate on the chain**. Dashed, because it is inferred rather than measured: §6.3's crosshair
+   * idiom (`--border-strong`, dashed `2 3`) applied to a mark instead of to furniture.
+   */
+  .chain-run {
+    position: absolute;
+    top: 50%;
+    left: var(--run-start);
+    width: var(--run-length);
+    height: 1px;
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--border-strong) 0,
+      var(--border-strong) 2px,
+      transparent 2px,
+      transparent 5px
+    );
+  }
+
+  .chain-readout {
+    display: flex;
+    grid-area: readout;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 0.5);
+    padding-bottom: calc(var(--spacing) * 2);
+  }
+
+  @media (min-width: 64rem) {
+    .chain-readout {
+      padding-bottom: 0;
+    }
+  }
+
+  .chain-pair {
+    display: flex;
+    align-items: baseline;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .chain-driver {
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+  }
+
+  /* The one who finished ahead more often, in the primary ink at 600. Weight, not colour (§3.6.1
+   * device 3) — the series colours are spoken for and a third hue here would compete with them. */
+  .chain-driver[data-lead='true'] {
+    color: var(--ink-primary);
+    font-weight: 600;
+  }
+
+  .chain-score {
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-sm--line-height);
+  }
+
+  .chain-where,
+  .chain-evidence,
+  .chain-pivot {
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .chain-pivot {
+    font-style: italic;
+  }
+
+  .chain-axis,
+  .era-axis {
+    position: relative;
+    height: 18px;
+    margin-left: var(--axis-inset);
+  }
+
+  .chain-axis {
+    margin-inline: calc(var(--axis-inset) + var(--spacing) * 4 + var(--spacing) * 2)
+      calc(var(--spacing) * 4);
+  }
+
+  .chain-tick {
+    position: absolute;
+    left: var(--tick-x);
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-2xs--line-height);
+    transform: translateX(-50%);
+  }
+
+  .chain-notes {
+    max-width: 68ch;
+  }
+
+  /* ============================================================== the rate rails */
+
+  .rails,
+  .era {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  .rails-header,
+  .era-header {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .rails-heading,
+  .era-heading {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-sm);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-sm--font-weight);
+    line-height: var(--text-display-sm--line-height);
+  }
+
+  .era-lead {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+
+  .rails-list {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 8);
+    margin: 0;
+    padding: calc(var(--spacing) * 6) calc(var(--spacing) * 4);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-sunken);
+    list-style: none;
+  }
+
+  .rail {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .rail-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  .rail-name {
+    color: var(--ink-primary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: var(--text-sm--line-height);
+  }
+
+  .rail-ceiling {
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-2xs--line-height);
+  }
+
+  .rail-track {
+    position: relative;
+    height: 8px;
+    margin-block: calc(var(--spacing) * 8) calc(var(--spacing) * 3);
+    border-radius: var(--radius-xs);
+    background-color: var(--surface-raised);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  .rail-mark {
+    position: absolute;
+    top: 50%;
+    left: var(--mark-x);
+    transform: translate(-50%, -50%);
+  }
+
+  .rail-glyph {
+    display: block;
+  }
+
+  /*
+   * The direct label. Mandatory at ≤4 series (§6.4 rung 1), which is why this chart needs no
+   * legend and no tooltip: every mark is already named and every value is already printed.
+   */
+  .rail-value {
+    position: absolute;
+    bottom: calc(100% + var(--spacing) * 2);
+    left: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+
+  .rail-value-figure {
+    color: var(--ink-primary);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-sm--line-height);
+  }
+
+  .rail-value-who {
+    color: var(--ink-secondary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .rail-value-of {
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-2xs--line-height);
+  }
+
+  .rail-denominator {
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  /* ============================================================== the era strip */
+
+  .era-plot {
+    padding: calc(var(--spacing) * 6) calc(var(--spacing) * 4);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-sunken);
+  }
+
+  .era-columns {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 88px;
+    margin-left: var(--axis-inset);
+  }
+
+  .era-column {
+    flex: 1 1 auto;
+    height: var(--column-extent);
+    min-height: 2px;
+    border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+    background-color: var(--border-subtle);
+  }
+
+  .era-bands {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+    margin: calc(var(--spacing) * 4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .era-band {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+  }
+
+  .era-band-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: calc(var(--spacing) * 2);
+    margin-left: var(--axis-inset);
+    color: var(--ink-primary);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    line-height: var(--text-xs--line-height);
+  }
+
+  .era-band-track {
+    position: relative;
+    display: block;
+    height: 10px;
+    margin-left: var(--axis-inset);
+  }
+
+  /*
+   * A bracket, never a fill — `SpanRail`'s rule (§7.12). A career has gaps, and a solid bar from
+   * first season to last would state that Räikkönen raced in 2010. Two end ticks joined by a rule
+   * read as *from … to* and cannot be read as *throughout*.
+   */
+  .era-band-bracket {
+    position: absolute;
+    top: 50%;
+    left: var(--band-offset);
+    width: var(--band-length);
+    min-width: 2px;
+    height: 1px;
+    background-color: var(--series);
+  }
+
+  .era-band-bracket::before,
+  .era-band-bracket::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: 9px;
+    background-color: var(--series);
+  }
+
+  .era-band-bracket::before {
+    left: 0;
+  }
+
+  .era-band-bracket::after {
+    right: 0;
+  }
+
+  .era-band-detail {
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    line-height: var(--text-2xs--line-height);
+  }
+
+  /* ============================================================== the empty state */
+
+  .compare-empty {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 8);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-sunken);
+  }
+
+  .compare-empty-title {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-sm);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-sm--font-weight);
+    line-height: var(--text-display-sm--line-height);
+  }
+
+  .compare-empty-copy {
+    max-width: 68ch;
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+  }
+
+  /* ============================================================== reduced motion
+   *
+   * The hook side of this surface is already `matchMedia`-gated (§4.4) — under `reduce` no tween
+   * for G-32 is ever created. **These transitions are the half the hook has no say over**, because
+   * they are CSS, and the same audit `entity-index.css` records: a colour step is not what `reduce`
+   * is protecting against, but a `transition` on it still schedules work on every hover. The state
+   * changes below all arrive instantly, which is exactly what G-7's reduced column asks for.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .tray-remove,
+    .tray-add,
+    .relation-cell {
+      transition: none;
+    }
+  }
+}

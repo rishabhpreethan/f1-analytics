@@ -1,0 +1,207 @@
+import { describe, expect, it } from 'vitest';
+import COMPARE_CSS from './compare.css?raw';
+import TOKENS_CSS from './tokens.css?raw';
+
+/**
+ * The invariants of the comparison workspace's stylesheet (`DESIGN_SYSTEM.md` §6.6.6).
+ *
+ * **jsdom performs no layout and no compositing**, so nothing here can assert that the staircase's
+ * connectors meet their capsules or that the era strip lines up with the chain above it. What it
+ * *can* assert is every rule whose violation renders something wrong while throwing no error and
+ * logging nothing: a token that does not exist and so resolves to the empty string, two tracks that
+ * disagree about their left edge, a data-mark floor that was deleted as redundant, a 50% reference
+ * that was tidied away. With no visual gate in this project (CR-006) a source assertion is the only
+ * thing that catches those before Rishabh does.
+ */
+
+const CODE = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+const CSS = CODE(COMPARE_CSS);
+const TOKENS = CODE(TOKENS_CSS);
+
+/** Every rule body for a selector, brace-balanced — a `[^}]*` regex would read a nested at-rule. */
+function bodies(css: string, selector: string): string[] {
+  const found: string[] = [];
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const needle = new RegExp(`(^|[},{])\\s*${escaped}\\s*\\{`, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = needle.exec(css)) !== null) {
+    const open = css.indexOf('{', match.index);
+    if (open === -1) continue;
+    let depth = 0;
+    for (let i = open; i < css.length; i += 1) {
+      if (css[i] === '{') depth += 1;
+      else if (css[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          found.push(css.slice(open + 1, i));
+          break;
+        }
+      }
+    }
+  }
+  return found;
+}
+
+const body = (selector: string) => bodies(CSS, selector).join('\n');
+
+describe('the input', () => {
+  /**
+   * **Vitest replaces every CSS import with `''` by default, even for an explicit `?raw`.** A
+   * stylesheet is only readable here if its name matches `test.css.include` in `vite.config.ts`,
+   * and removing an entry there does not fail loudly — every assertion below would simply pass
+   * against an empty string. This is the first test in the file for that reason.
+   */
+  it('is actually the stylesheet', () => {
+    expect(CSS.length).toBeGreaterThan(1000);
+    expect(TOKENS.length).toBeGreaterThan(1000);
+  });
+});
+
+describe('the shared axis — the one geometric idea on the page', () => {
+  it('declares the year gutter once, on the page root', () => {
+    expect(body('.compare')).toMatch(/--axis-inset:\s*64px/);
+    expect(CSS).toMatch(/--axis-inset:\s*88px/);
+  });
+
+  /**
+   * The chain's track, the era strip's columns and every career band must start at the same x, or
+   * a reader who drops their eye from a 1957 pairing to the 1957 column is reading two different
+   * axes. This is the CR-007 defect class — a chart axis 130px out of line — and one inherited
+   * custom property is what makes it unexpressible.
+   */
+  it('lays every axis-aligned track against that one gutter and never a literal', () => {
+    expect(body('.chain-row')).toMatch(/grid-template-columns:\s*var\(--axis-inset\)/);
+    expect(body('.era-columns')).toMatch(/margin-left:\s*var\(--axis-inset\)/);
+    expect(body('.era-band-track')).toMatch(/margin-left:\s*var\(--axis-inset\)/);
+    expect(body('.era-band-label')).toMatch(/margin-left:\s*var\(--axis-inset\)/);
+    expect(body('.chain-axis')).toMatch(/var\(--axis-inset\)/);
+  });
+});
+
+describe('the marks', () => {
+  /**
+   * A one-season pairing is 1/77th of the domain — about 4px at 1024 and under 3px on a phone.
+   * Without the floor it is a mark the reader cannot see, which is indistinguishable from a mark
+   * that failed to render. `PopulationBoard` carries the same floor for the same reason (§7.14).
+   */
+  it('floors a capsule at 3px so a single-season pairing is visible', () => {
+    expect(body('.chain-link')).toMatch(/min-width:\s*3px/);
+  });
+
+  it('anchors the capsule to the axis, not to the row — left and width, never a transform', () => {
+    const chainLink = body('.chain-link');
+    expect(chainLink).toMatch(/left:\s*var\(--link-offset\)/);
+    expect(chainLink).toMatch(/width:\s*var\(--link-length\)/);
+  });
+
+  /**
+   * 2,378 of the archive's 4,637 round-level teammate pairings produced no race both drivers
+   * finished. That link still happened, so its capsule keeps its true extent — but the head-to-head
+   * inside it is empty, and the channel that says so is **texture, not colour** (§6.3): a colour
+   * would be read as a category and there is no category here.
+   */
+  it('marks an unrated pairing with texture and keeps its extent', () => {
+    const empty = body(".chain-link[data-evidence='none']");
+    expect(empty).toMatch(/repeating-linear-gradient/);
+    expect(empty).toMatch(/background-color:\s*transparent/);
+    expect(empty).not.toMatch(/width:/);
+  });
+
+  /**
+   * The run between two capsules is **inference** — the years the pivot driver raced with neither
+   * teammate — and the capsule is measurement. They must not look alike. §6.3's crosshair idiom.
+   */
+  it('draws the connector run dashed and the capsule solid', () => {
+    expect(body('.chain-run')).toMatch(/repeating-linear-gradient/);
+    expect(body('.chain-link')).toMatch(/background-color:\s*var\(--accent-mark\)/);
+  });
+
+  /**
+   * `SpanRail`'s rule (§7.12): a career has gaps, and a solid bar from first season to last would
+   * state that the driver raced in every year between. Two end ticks joined by a rule read as
+   * *from … to* and cannot be read as *throughout*.
+   */
+  it('draws a career as a bracket, never as a fill', () => {
+    expect(body('.era-band-bracket')).toMatch(/height:\s*1px/);
+    expect(bodies(CSS, '.era-band-bracket::before').length).toBeGreaterThan(0);
+    expect(bodies(CSS, '.era-band-bracket::after').length).toBeGreaterThan(0);
+  });
+});
+
+describe('the balance bar', () => {
+  /**
+   * **Never remove this.** Without a drawn 50% the reader has no reference to judge the split
+   * against and 39–27 reads as a rout instead of the 59% it is. It is `--border-strong` because it
+   * is this chart's one axis line (§6.3).
+   */
+  it('draws the even mark, in the axis-line token, at exactly half', () => {
+    const even = body('.balance-even');
+    expect(even).toMatch(/left:\s*50%/);
+    expect(even).toMatch(/background-color:\s*var\(--border-strong\)/);
+  });
+
+  /** §3.3 rule 2: a 2px surface gap between adjacent fills, so two shades of one team read as two
+   * marks rather than as one gradient. This is the teammate case, which is the common one here. */
+  it('keeps a 2px surface gap between the two fills', () => {
+    expect(body(".balance-fill[data-side='a']")).toMatch(
+      /border-right:\s*2px solid var\(--surface-raised\)/,
+    );
+    expect(body(".balance-fill[data-side='b']")).toMatch(
+      /border-left:\s*2px solid var\(--surface-raised\)/,
+    );
+  });
+});
+
+describe('colour and tokens', () => {
+  it('holds no literal colour — every colour is a token, so a theme switch needs no re-render', () => {
+    expect(CSS).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(CSS).not.toMatch(/\brgba?\(/);
+    expect(CSS).not.toMatch(/\bhsla?\(/);
+  });
+
+  /**
+   * An unknown custom property resolves to the empty string and paints **nothing** — no error, no
+   * warning, an invisible mark. Every `var()` this file consumes must therefore exist, either in
+   * `tokens.css` or as one this file or its components set themselves.
+   */
+  it('consumes no custom property that does not exist', () => {
+    const local = new Set([
+      '--axis-inset',
+      '--identity',
+      '--series',
+      '--link-offset',
+      '--link-length',
+      '--drop-x',
+      '--run-start',
+      '--run-length',
+      '--tick-x',
+      '--mark-x',
+      '--band-offset',
+      '--band-length',
+      '--column-extent',
+      '--balance-a',
+      '--balance-b',
+      '--balance-a-share',
+      '--balance-b-share',
+      '--spacing',
+    ]);
+    const used = new Set([...CSS.matchAll(/var\((--[a-z0-9-]+)/g)].map((match) => match[1] ?? ''));
+    const missing = [...used].filter((name) => !local.has(name) && !TOKENS.includes(`${name}:`));
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('reduced motion', () => {
+  /**
+   * G-32 is `matchMedia`-gated in the hook, so under `reduce` no tween exists. **The hook has no
+   * say over a CSS `transition`**, which is the half `entity-index.css` had to remove separately —
+   * so it is removed here too, and the state changes arrive instantly, which is what G-7's reduced
+   * column asks for.
+   */
+  it('removes the CSS transitions the hook cannot reach', () => {
+    const reduce = CSS.slice(CSS.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduce).toMatch(/\.tray-remove/);
+    expect(reduce).toMatch(/\.relation-cell/);
+    expect(reduce).toMatch(/transition:\s*none/);
+  });
+});
