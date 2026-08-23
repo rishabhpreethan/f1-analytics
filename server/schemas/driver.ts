@@ -323,6 +323,11 @@ export const driverRaceSchema = z.strictObject({
    * position, the car started from the pit lane (`grid = 0` — 267 race entries), or the
    * grid is unknown. A 0 here means the car finished exactly where it started, and
    * nothing else.
+   *
+   * ⚠ **The first condition is `is_classified = 0`, not `position IS NULL`** (trap 27).
+   * `position` is non-NULL on all 26,093 race rows and holds the *retirement order* on the
+   * 9,683 unclassified ones — minimum 5, so it never looks wrong. Until 2026-08-23 this
+   * field carried `grid - retirement order` for every race a driver failed to finish.
    */
   positionsGained: z.number().int().nullable(),
 });
@@ -334,25 +339,59 @@ export const driverRaceSchema = z.strictObject({
  *
  * A mean over "the races where the metric applies" is only honest if the reader can see
  * how many races that was and why the others left. `excluded` is not diagnostics — it is
- * the caption: 61 of Senna's 161 races ended in a retirement, so a mean position change
- * computed over the remaining 100 is a different claim from one over 161.
+ * the caption: **53 of Senna's 161 races ended without a classified finish**, so a mean
+ * position change computed over the remaining 108 is a different claim from one over 161.
+ *
+ * ⚠ **That sentence was false in the code until 2026-08-23** — the mean *was* over 161,
+ * and `excluded.unclassified` read 0 for every driver in the archive, because the
+ * exclusion was tested with `position === null` on a column that is never null (trap 27).
+ * Senna's figure moved from **−4.99** to **−0.30** when it was fixed. Nothing about the
+ * shape changed; the shape was right and the arithmetic behind it was not.
+ *
+ * **Shared with `GET /api/compare`'s career lens**, which publishes this object per
+ * selected driver from the same builder — `buildGridVsFinish` in `queries/drivers.ts`,
+ * whose parameter is the narrow `GridVsFinishRace` rather than a `DriverRace` precisely so
+ * two endpoints can feed it. `queries/compare.test.ts` asserts the two agree on four
+ * careers, exactly as it already does for `totals`.
  */
 export const gridVsFinishSchema = z.strictObject({
+  /** Races the metric applies to: a grid slot and a **classified** finish. */
   racesCounted: z.number().int().nonnegative(),
-  /** Mean of `positionsGained` over the counted races. Null when none qualify. */
+  /**
+   * Mean of `positionsGained` over the counted races. Null when there are none — which is
+   * not rare: **155 of the 818 drivers with a race** were never classified in one they
+   * started from a grid slot, so any surface drawing this needs an empty state.
+   */
   meanPositionsGained: z.number().nullable(),
   /** The single best gain and worst loss, as signed place counts. */
   bestGain: z.number().int().nullable(),
   worstLoss: z.number().int().nullable(),
+  /**
+   * The same races split by sign, so `gained + lost + held === racesCounted`.
+   *
+   * **Published beside the mean because the two can disagree**, and the disagreement is the
+   * honest part: Fangio gained places in 14 races and lost them in 9, and his mean is
+   * **−0.05** — a handful of large losses against many small gains. Clark is the other case
+   * in the archive at 20 or more counted races (18 / 16 / 16 with a mean of −0.14). A bar
+   * drawn on the mean alone puts both of them on the wrong side of zero for a reader who
+   * would have counted races.
+   */
   gained: z.number().int().nonnegative(),
   lost: z.number().int().nonnegative(),
   held: z.number().int().nonnegative(),
   excluded: z.strictObject({
-    /** Ended without a classified finishing position — the largest group. */
+    /**
+     * `is_classified = 0` — the largest group, and the one the retirement tail lives in.
+     * 32 of Verstappen's 243 races, 53 of Senna's 161.
+     */
     unclassified: z.number().int().nonnegative(),
-    /** `grid = 0`, a pit-lane start (trap 9). */
+    /** `grid = 0`, a pit-lane start (trap 9). 267 race entries in the archive. */
     pitLaneStarts: z.number().int().nonnegative(),
-    /** `grid` is NULL. Zero on the present data; the case exists so it cannot be silent. */
+    /**
+     * Classified, not a pit-lane start, and still unmeasurable — `grid` is NULL. **Zero on
+     * the present data**, where `grid` is non-NULL on all 26,093 race rows; the case exists
+     * so a refresh that introduces one cannot fold it silently into a neighbour.
+     */
     unknownGrid: z.number().int().nonnegative(),
   }),
 });
@@ -365,8 +404,13 @@ export const gridVsFinishSchema = z.strictObject({
  * actually started from **after penalties**, and the qualifying classification is what
  * the driver earned. On a weekend with a grid drop the two differ, and the difference is
  * the point of having both.
+ *
+ * ⚠ `meanDelta` carried trap 27's defect too and was corrected with it on 2026-08-23: the
+ * unclassified guard was `position === null`, so the mean was measured against a
+ * retirement order on every race the driver did not finish.
  */
 export const qualifyingVsRaceSchema = z.strictObject({
+  /** Races with a qualifying classification **and** a classified finish. */
   racesCounted: z.number().int().nonnegative(),
   meanDelta: z.number().nullable(),
   /** Races where the driver has a qualifying classification, whatever the race outcome. */
