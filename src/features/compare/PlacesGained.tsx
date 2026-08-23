@@ -56,8 +56,20 @@ export interface PlacesGainedProps {
   channels: SeriesChannels[];
 }
 
-const signed = (value: number) =>
-  `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(2)}`;
+/**
+ * The mean, signed.
+ *
+ * ⚠ **A non-zero mean never prints as `0.00`.** The same family as the zero-bar defect and found
+ * looking for it: a mean is `k / n`, so one place gained over 358 races is `+0.0028`, which
+ * `toFixed(2)` renders as `+0.00` — a figure claiming exactly level beside a 3px bar claiming
+ * movement. `<0.01` keeps the sign, states the size honestly and cannot be mistaken for the true
+ * zero, which prints bare and draws no bar at all.
+ */
+const signed = (value: number) => {
+  if (value === 0) return '0.00';
+  const size = Math.abs(value) < 0.005 ? '<0.01' : Math.abs(value).toFixed(2);
+  return `${value > 0 ? '+' : '−'}${size}`;
+};
 
 export function PlacesGained({ entities, channels }: PlacesGainedProps) {
   const { rows, scale } = placesGained(entities);

@@ -20,7 +20,7 @@ vi.hoisted(() => {
 });
 
 import { ShareChart, type ShareRow } from './ShareChart';
-import { normaliseShareRow } from './geometry';
+import { normaliseShareRow, spanPath } from './geometry';
 
 /**
  * **The share chart, and what jsdom can decide about it.**
@@ -476,5 +476,129 @@ describe('§6.3a — the outcome ramp', () => {
     renderMix();
     expect(screen.getByText('24')).toBeTruthy();
     expect(screen.getByText('47%')).toBeTruthy(); // 24 of 51
+  });
+});
+
+describe('a zero draws nothing — measured on the live page, 2026-08-23', () => {
+  /**
+   * Jos Verstappen has 0 wins and the win segment rendered a 1px mark: the fill path is degenerate
+   * and paints nothing, but the hit rect floors its width at 1 for pointer safety, so the row
+   * carried a 1px hover target popping *"Won — 0 races — 0%"*. On a chart whose premise is *no
+   * axis, read the proportions*, a mark for a category the driver never entered is the one thing
+   * that cannot ship — the reader has nothing to check it against. It reaches 702 of 818 drivers
+   * on the win band alone.
+   */
+  const ZERO_WIN: ShareRow[] = [
+    {
+      key: 'jos',
+      label: 'Verstappen',
+      segments: [
+        { reference: 'win', teamReference: 'arrows', label: 'Won', value: 0, tone: 'win' },
+        { reference: 'podium', teamReference: 'arrows', label: 'Podium', value: 2, tone: 'podium' },
+        {
+          reference: 'classified',
+          teamReference: 'arrows',
+          label: 'Finished',
+          value: 60,
+          tone: 'classified',
+        },
+        {
+          reference: 'unclassified',
+          teamReference: 'arrows',
+          label: 'Not classified',
+          value: 44,
+          tone: 'unclassified',
+        },
+      ],
+    },
+  ];
+
+  const renderZero = () => renderShare({ rows: ZERO_WIN });
+
+  it('renders no mark for the zero segment', () => {
+    const { container } = renderZero();
+    const tones = [...container.querySelectorAll('.chart-marks .chart-span')].map((mark) =>
+      mark.getAttribute('data-tone'),
+    );
+    expect(tones).toEqual(['podium', 'classified', 'unclassified']);
+  });
+
+  it('renders no hit target for it either — the 1px that was actually measured', () => {
+    /*
+     * The sharper half of the defect. A transparent 1px rect is invisible in a screenshot and is
+     * still a hover affordance asserting a category, and a tooltip reading "Won — 0" is a stronger
+     * claim than any painted pixel.
+     */
+    const { container } = renderZero();
+    expect(container.querySelectorAll('.chart-marks .chart-hit')).toHaveLength(3);
+  });
+
+  it('makes the rounded end belong to the first segment that IS drawn', () => {
+    /*
+     * The defect the filter would otherwise have introduced: with the leading flag still keyed on
+     * index 0, a row whose first segment is zero would have a square left edge and a round right
+     * one — visible instantly, and invisible to every test here, because `useChartSize` reports 0
+     * in jsdom and every segment collapses to zero width where `spanPath` drops the arcs anyway.
+     *
+     * So what is asserted is that the flag is **load-bearing** — the two paths genuinely differ —
+     * and that the podium segment is the one now holding the leading position. That the component
+     * passes `firstDrawn` rather than `0` is named as unverified in §6.6.6.14.
+     */
+    const rounded = spanPath(0, 0, 40, 12, 4, { leading: true, trailing: true });
+    const square = spanPath(0, 0, 40, 12, 4, { leading: false, trailing: true });
+    expect(rounded).not.toBe(square);
+    expect(rounded.match(/A /g)).toHaveLength(4);
+    expect(square.match(/A /g)).toHaveLength(2);
+
+    const { container } = renderZero();
+    expect(container.querySelector('.chart-marks .chart-span')?.getAttribute('data-tone')).toBe(
+      'podium',
+    );
+  });
+
+  it('keeps the zero in the table, where it is text and cannot be misread', () => {
+    /*
+     * Suppressed as a *mark*, never as a *fact*. "Won — 0 — 0%" in a table row is unambiguous;
+     * the same claim as a 1px band is not, which is the whole distinction.
+     */
+    renderZero();
+    const won = screen.getAllByRole('row').find((row) => row.textContent?.includes('Won'));
+    expect(won?.textContent).toContain('0%');
+  });
+
+  it('still draws a small non-zero segment rather than flooring it to a visible minimum', () => {
+    /*
+     * The other half of the rule, and the reason this chart has no `min-width` while the rate board
+     * does: on a shared track length IS the encoding, so a floor would overstate a small share at
+     * the expense of the neighbour it is measured against. One race in four hundred is allowed to
+     * be almost nothing — the table carries the figure.
+     */
+    const tiny = [
+      {
+        key: 'x',
+        label: 'X',
+        segments: [
+          {
+            reference: 'win',
+            teamReference: 'arrows',
+            label: 'Won',
+            value: 1,
+            tone: 'win' as const,
+          },
+          {
+            reference: 'classified',
+            teamReference: 'arrows',
+            label: 'Finished',
+            value: 399,
+            tone: 'classified' as const,
+          },
+        ],
+      },
+    ];
+    const { container } = renderShare({ rows: tiny });
+    const tones = [...container.querySelectorAll('.chart-marks .chart-span')].map((mark) =>
+      mark.getAttribute('data-tone'),
+    );
+    expect(tones).toEqual(['win', 'classified']);
   });
 });

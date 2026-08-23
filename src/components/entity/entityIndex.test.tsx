@@ -425,6 +425,40 @@ describe('the ladder and the decades are controls, not decoration', () => {
   });
 });
 
+describe('a rung of zero draws no bar (2026-08-23)', () => {
+  /**
+   * The same finding as §6.6.6.14's zero segment, in the surface that set the precedent for the
+   * floor. `min-width: 3px` keeps a rung of 3 visible against a rung of 571 — that is what it is
+   * for — and on a count of 0 it paints a mark for a group with no members. The row already knew:
+   * it is `disabled`, because a rung that filters to nothing is not a control. The bar was the last
+   * part still claiming otherwise.
+   *
+   * jsdom computes no width, so what is asserted is the element's existence, which is the half a
+   * DOM test can reach and the half the fix changed.
+   */
+  it('renders no bar on a stratum nobody is in, and keeps the count', () => {
+    const noChampions = DRIVERS.map((driver) => ({ ...driver, championships: 0 }));
+    renderDrivers(noChampions);
+    const champions = screen.getByRole('button', { name: /^Champions:/ });
+    expect(champions.querySelectorAll('.tier-bar')).toHaveLength(0);
+    expect(champions.getAttribute('disabled')).not.toBeNull();
+    expect(champions.textContent).toContain('0');
+  });
+
+  it('still renders a bar on every stratum that has members', () => {
+    renderDrivers();
+    const ladder = screen.getByRole('group', { name: 'How far they got' });
+    const rungs = within(ladder).getAllByRole('button');
+    for (const rung of rungs) {
+      const count = Number(/: (\d+) /.exec(rung.getAttribute('aria-label') ?? '')?.[1] ?? '0');
+      expect(
+        rung.querySelectorAll('.tier-bar'),
+        rung.getAttribute('aria-label') ?? '',
+      ).toHaveLength(count > 0 ? 1 : 0);
+    }
+  });
+});
+
 describe('the drivers who never started — kept in the record, out of the browse', () => {
   it('leaves them out of the default list', () => {
     renderDrivers();

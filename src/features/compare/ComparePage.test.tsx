@@ -659,3 +659,84 @@ describe('the finishing strip (§6.6.6.14 D)', () => {
     expect(table?.textContent).toContain('NC');
   });
 });
+
+describe('a zero draws no mark, on every board that has a minimum width', () => {
+  /**
+   * Measured on the live page 2026-08-23: Jos Verstappen's 0 wins rendered a 1px win segment on the
+   * result mix. The same floor existed on the rate board, where a rate of exactly 0 is not null and
+   * so still drew `min-width: 3px`. The rule that came out of it is general — **a floor is right
+   * for a small non-zero value and wrong for a true zero, and they are different cases** — so it is
+   * asserted here for every mark on this page at once.
+   */
+  const zeroWinner = {
+    ...COMPARE_FIXTURE,
+    entities: COMPARE_FIXTURE.entities.map((entity, index) =>
+      index === 0
+        ? {
+            ...entity,
+            totals: { ...entity.totals, wins: 0 },
+            gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 0 },
+          }
+        : entity,
+    ),
+  };
+
+  const renderZero = () =>
+    render(
+      <ComparePage available={COMPARE_DIRECTORY} data={zeroWinner} seasons={SEASON_LENS_FIXTURE} />,
+    );
+
+  it('drops the win segment from the result mix and nothing else', () => {
+    const { container } = renderZero();
+    const firstRow = [...container.querySelectorAll('.chart-marks .chart-span')]
+      .slice(0, 3)
+      .map((mark) => mark.getAttribute('data-tone'));
+    expect(firstRow).toEqual(['podium', 'classified', 'unclassified']);
+  });
+
+  it('drops the win-rate bar but keeps the printed 0%', () => {
+    /*
+     * `null` and `0` stay different states and both are said in the figure column: `null` is "he
+     * never started, so there is no rate", `0` is "there is a rate and it is zero". Only the mark
+     * goes, because a mark is the thing the reader cannot check against an axis.
+     */
+    const { container } = renderZero();
+    const rows = [...container.querySelectorAll('.rate-measure')];
+    const winRate = rows[0];
+    expect(winRate?.textContent).toContain('Win rate');
+    const bars = winRate?.querySelectorAll('.rate-bar') ?? [];
+    expect(bars).toHaveLength(COMPARE_FIXTURE.entities.length - 1);
+    expect(winRate?.textContent).toContain('0%');
+  });
+
+  it('draws no diverging bar for a mean of exactly zero, which it never did', () => {
+    // The one of the three that was already right: `direction: 'held'` covers `mean === 0`, so the
+    // 3px floor was unreachable there. Asserted so it stays unreachable.
+    const { container } = renderZero();
+    expect(container.querySelectorAll('.gain-bar')).toHaveLength(
+      COMPARE_FIXTURE.entities.length - 1,
+    );
+  });
+});
+
+describe('the figure beside a bar never contradicts the bar', () => {
+  it('prints a tiny non-zero mean as <0.01 rather than as 0.00', () => {
+    /*
+     * Found while fixing the zero-bar defect, and the same family: a mean is `k / n`, so one place
+     * gained over 358 races is `+0.0028` and `toFixed(2)` renders `+0.00` — a figure claiming
+     * exactly level beside a 3px bar claiming movement. A true zero prints bare and draws nothing,
+     * so the two states cannot be confused.
+     */
+    const tiny = {
+      ...COMPARE_FIXTURE,
+      entities: COMPARE_FIXTURE.entities.map((entity, index) =>
+        index === 0
+          ? { ...entity, gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 1 / 358 } }
+          : entity,
+      ),
+    };
+    render(<ComparePage available={COMPARE_DIRECTORY} data={tiny} seasons={SEASON_LENS_FIXTURE} />);
+    expect(screen.getByText('+<0.01')).toBeTruthy();
+    expect(screen.queryByText('+0.00')).toBeNull();
+  });
+});

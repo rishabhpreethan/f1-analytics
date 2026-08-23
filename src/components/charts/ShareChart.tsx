@@ -420,15 +420,60 @@ export function ShareChart({
                   );
                 }
 
-                return row.segments.map((segment, index) => {
-                  const share = shares[index];
-                  const colour = colours[index];
+                /*
+                 * ⚠ **A segment worth zero is not drawn at all — no fill, no hatch, no label and
+                 * no hit target** _(2026-08-23, measured on the live page)_.
+                 *
+                 * Jos Verstappen has 0 wins, and the win segment was rendering a **1px** mark: the
+                 * fill path is degenerate and paints nothing, but the hit rect floors its width at
+                 * 1 for pointer safety, so the row carried a 1px hover target that popped
+                 * *"Won — 0 races — 0%"*. On a chart whose whole premise is *no axis, read the
+                 * proportions*, a mark for a category the driver never entered is the one thing
+                 * that cannot ship: the reader has no axis to check it against. It reaches **702
+                 * of 818 drivers** on the win band alone.
+                 *
+                 * Filtered here rather than by the caller, for the same reason the label rule is:
+                 * a caller passing a zero is not doing anything unreasonable, and *"a zero draws
+                 * nothing"* belongs to the encoding.
+                 */
+                const drawable = row.segments
+                  .map((segment, index) => ({
+                    segment,
+                    index,
+                    share: shares[index],
+                    colour: colours[index],
+                  }))
+                  .filter(
+                    (entry) =>
+                      entry.share !== undefined &&
+                      entry.colour !== undefined &&
+                      entry.share.end > entry.share.start,
+                  );
+
+                /*
+                 * **The rounded ends belong to the first and last DRAWN segment, not to index 0
+                 * and index n−1.** Skipping a zero-width leader without this leaves the row's own
+                 * left edge square while its right edge is round — a defect the filter would
+                 * otherwise have introduced, and one only a screenshot could find.
+                 */
+                const firstDrawn = drawable[0]?.index;
+                const lastDrawn = drawable.at(-1)?.index;
+
+                return drawable.map(({ segment, index, share, colour }) => {
                   if (share === undefined || colour === undefined) return null;
 
                   const x = plot.left + measure(share.start);
                   /* The 2px gap comes off the trailing edge, so it is the plot surface showing
                    * through between adjacent fills rather than a drawn line (§6.3). */
                   const raw = measure(share.end) - measure(share.start);
+                  /*
+                   * **No minimum width here, and that is deliberate** — unlike the rate board's
+                   * `min-width: 3px`. On a shared track *length is the encoding* (the same reason
+                   * the axis is fixed to `[0, 1]`), so a floor would overstate a small share at
+                   * the expense of the neighbour it is measured against. A bar that stands alone
+                   * with its figure printed beside it can afford a floor; a segment sharing a
+                   * track with three others cannot.
+                   */
                   const segWidth = Math.max(0, raw - 2);
                   const key = `${row.key}:${segment.reference}`;
 
@@ -439,8 +484,8 @@ export function ShareChart({
                         data-active={activeKey === key}
                         data-tone={outcomeMode ? segment.tone : undefined}
                         d={spanPath(x, y, segWidth, band.bandwidth(), 4, {
-                          leading: index === 0,
-                          trailing: index === row.segments.length - 1,
+                          leading: index === firstDrawn,
+                          trailing: index === lastDrawn,
                         })}
                         style={{ '--series': cssVar(colour.plot) } as CSSProperties}
                       />
@@ -460,8 +505,8 @@ export function ShareChart({
                       {(outcomeMode ? segment.tone === 'unclassified' : colour.seat % 2 === 1) && (
                         <path
                           d={spanPath(x, y, segWidth, band.bandwidth(), 4, {
-                            leading: index === 0,
-                            trailing: index === row.segments.length - 1,
+                            leading: index === firstDrawn,
+                            trailing: index === lastDrawn,
                           })}
                           fill={`url(#${hatchId})`}
                         />
