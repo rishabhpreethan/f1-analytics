@@ -3678,7 +3678,12 @@ jsdom performs no layout and no compositing, and CR-006 removed the visual gate.
 invisible to `scrollWidth`, and visible in the first second to a human. **Add "the container's own
 margins and padding" to what a surface names as unverified**, not just what is inside it.
 
-##### 6.6.6.12 Proposed and not built — with the figures that would justify each
+##### 6.6.6.12 ~~Proposed and not built~~ — **all four were built on 2026-08-23, see §6.6.6.14**
+
+_Kept as written, because the figures it proposed were partly wrong and the corrections are the
+useful part: the result mix's denominator was a raw count (trap 17) and Fangio's places-gained
+figure was measured against retirement order. §6.6.6.14 carries both._
+
 
 Offered in the brief, weighed, and deliberately left out of this change so that the picker and the
 lens could be built properly. Each is cheap and each has its number already:
@@ -3868,6 +3873,29 @@ the model, `--x` and `--y` are readable off the element and every position is as
 text at all, so the table is the only place a finishing position appears as a number. `NC` for a
 start with no classification, an em dash for a round not started: the same three states, in the same
 order.
+
+###### What the four charts do not verify
+
+jsdom performs no layout and no compositing, and there is no visual gate (CR-006). Named explicitly,
+because none of it should be reported as working:
+
+- **Every position, size and gap in all four.** Percentages and band scales are asserted; where they
+  land on a screen is not.
+- **Whether the four outcome tones read as four steps of one colour** at a 10px band height, and
+  whether the hatch on the fourth is legible at that size. The colours themselves are gated
+  numerically by V-38; how they *look* against each other in a real row is not.
+- **Whether the result mix's row labels crowd the plot at 390px**, where the gutter is sized from
+  the longest surname.
+- **Whether four career arcs of very different lengths read as four arcs**, and whether `RankChart`'s
+  both-end labels collide when two careers end at the same placing.
+- **Whether a 3px minimum diverging bar is visible**, whether the zero line reads as an axis rather
+  than as a divider, and whether the split column wraps or overflows at 768.
+- **Whether 22 dots at 8px are distinguishable on one strip row at 390px**, whether the podium rule
+  reads as a rule rather than as a mark, and whether the out-lane reads as being *below* the axis
+  rather than as its last row.
+- **The container's own margins and padding** — §6.6.6.11's addition, and the four new sections
+  inherit `.compare`'s flex column, which no test can measure.
+- **G-33 as a picture.** Its tween object is asserted; its appearance is not.
 
 ##### 6.6.6.13 Four defects found on the live page, and what each one teaches _(2026-08-23)_
 
@@ -5133,3 +5161,4 @@ sides, and 60/30 sits between them with margin at each end.
 | 2026-08-23 | **§7.16 `EntityPicker`** — the search-and-add control `/compare` shipped without. `/drivers`' field reused class for class and `indexModel.ts`'s `normalise` imported literally; ARIA 1.2 combobox, results in flow so nothing needs a z-index, cap drawn at four, 818 drivers rather than 881. The pending bay is specified with it | designer |
 | 2026-08-23 | **§6.6.6.10–12 the season lens** — one season, round by round, on `/compare` rather than a second route. Records why points are legitimately comparable within a season and never across; the shadow as a **seat** rather than a person, with the four consequences drawn; the two charts through §6.1's six steps; six designed states with their copy; and §6.6.6.11, five behaviours no test in this project can reach. §6.6.6.12 records the four charts proposed and not built, each with the figures that would justify it | designer |
 | 2026-08-23 | **Four live-page defects fixed and generalised, §6.6.6.13.** (1) `/compare` measured **left gutter 96px, right gutter 0** — three branches carried the container as a literal and the fourth carried none; the width, centring and inline padding now live once in `.compare`, asserted in `compare.css.test.ts`, because **jsdom computes no box and no DOM test can measure a gutter**. §6.6.6.11's untested list is corrected: it named five things about motion and legibility and nothing about the page's own box. (2) `ComparePage` takes `selected` / `onSelect`, so the picker writes to `?e=` — with `placeholderData: keepPreviousData`, without which changing the selection unmounts the page and loses the picker, the pending bay and the chosen lens. (3) §6.6.6.1 gains a fourth headline, **"Same season, never the same race"**, for a `contemporary` pair who shared no race — Senna R1–3 of 1994, Coulthard R5–13; the matrix tier now comes from `verdict()` so a cell cannot disagree with the band. (4) The route's link-correction card moves into a `notice` slot under the masthead, so an `h2` no longer precedes the `h1` | designer |
+| 2026-08-23 | **The four simple charts, built — new §6.6.6.14, new §6.3a, new §9.2.8 and §9.2.9.** Rishabh: *"comparison which can be represented using simple charts that anyone can read and understand."* **(a) The budget was reclaimed before it was spent.** §9.2.7 had measured the retired shade-pair tokens at **0.61 KB gzipped**; §9.2.8 deleted them — 84 declarations, `shadePair()`, `SHADE_PAIR_TEAMS`, 42 of 64 `PLOT_TOKENS` with every `COLLISION_MASKS` entry regenerated (**87 of 231 pairs collide**, against 663 of 2016), and V-27 plus G-27a–e from the validator, replaced by a tombstone because *a validator that stops printing a number reads exactly like one whose check passed*. **20.77 → 20.16 KB**, the projected delta exactly. **(b) New §6.3a, the outcome ramp** — four ordinal steps inside ONE entity's colour, which is the opposite job to the shade pair deleted the same day: that spent lightness on *identity*, this spends it on an *order* inside a row that is already one entity. **New gate V-38** over all 22 plotting tokens × 2 themes chose the two mix ratios by measurement: **55/22 failed** at 1.16:1 against the plot surface and **62/38 failed** at ΔE 7.85 between steps 2 and 3; **60/30** clears both (13.17 / 10.11 / 10.24 against a floor of 8, and 1.27:1). Two residuals are **reported, not buried**: CVD bottoms out at ΔE 3.65, mitigated structurally by the drawn 2px gap, the fixed order, the legend and the table; and **no text may ever be drawn on a tone**, because neither ink clears 4.5:1 across all 44 fills. That second figure is a **correction to a claim already in the tree** — `charts.css` says `--ink-inverse` clears 4.5:1 against every plotting token and McLaren light is **3.40:1**, so `.chart-span-label` is below the text floor on the team page today; recorded and left open rather than fixed blind. **(c) Four charts.** *Result mix* — 100% stacked, and the only cross-era instrument here needing no normalisation argument, because the denominator is the driver's own starts; ⚠ §6.6.6.12's figures were raw and are corrected, Fangio **24/11/6/10 of 51** not 24/11/9/14 of 58 (**trap 17**), and the fourth band is *not classified*, not *retired* — Hamilton 34 against 32. *Career-relative arc* — x is the season of a career, so the axis is its own normaliser; every year emits a point and a missing one emits `null`, because `defined` joins straight through an absent entry and would draw a line across a sabbatical. *Places gained* — a diverging bar where §6.6.6.3 argued against one, because that was a head-to-head split and this is a signed quantity with a real zero; a null mean is a state and never a zero bar (155 of 818 drivers). *Finishing strip* — three states per round, not two, and a retirement is drawn **below** the axis because it is not a position. **(d) `types.ts` now imports `GridVsFinish` from `@schemas/entity`** instead of restating it, takes `championshipPositionIsFinal`, and `Ledger.tied`'s comment is corrected — it claimed grid-only ties and the schema measured **85** same-team race ties, all 1950s shared drives. **(e) New G-33**, and G-27's anchor is generalised: *axis-anchored* means zero on a diverging bar, resolved per target. **Measured cost: render-blocking CSS 20.77 → 20.72 KB / 25 (82.9%) — the four charts and the tone ramp cost 0.56 KB and the reclaim paid for all of it; initial JS 162.35 → 162.42 KB / 250 (65.0%).** Suite **2464 tests across 104 files, 3 consecutive green runs** — a figure that also contains the engineer's parallel work on the same branch, so it is not all this change's. **Untested by construction and listed in full in §6.6.6.14**: every position, whether four tones read as four steps, whether 22 dots resolve at 390px, and G-33 as a picture | designer |
