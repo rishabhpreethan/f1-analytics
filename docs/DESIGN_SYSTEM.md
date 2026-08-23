@@ -3740,6 +3740,37 @@ standing disclaimer.
 **Motion** is G-28's clip wipe, unchanged and not re-specified: the segments do not grow from the
 axis, because a segment that starts at 62% must not animate its own start.
 
+###### B — The career-relative arc
+
+*Job*: change over time. *Form*: `RankChart` — §6.5.4a's one permitted many-series line, and the
+right one because the measure is a **placing**: inverted, P1 at the top, labels at both ends.
+*Marks*: 2px line, no markers at this density. *Interaction*: one crosshair, one tooltip, every
+series. *Colour*: last, per §6.4a. *Accessibility*: both-end direct labels, a table view, and an
+axis that states each rank.
+
+**x is the season of a career, not the calendar year.** 1 is the debut season, whenever it happened,
+so Fangio's 1950 and Verstappen's 2015 are the same column. **The axis is itself the normaliser** —
+which makes this the only cross-era device on the page that costs a reader nothing to understand.
+No index, no rate, no denominator; just a different thing along the bottom.
+
+**Why a placing and not a count.** A win count per season is a season-length measure before it is a
+driver measure (8.4 rounds against 21.9), and a rate over an eight-round year is too noisy to draw
+as a line. A placing means roughly the same thing in every season: first is champion.
+
+**Roughly — and the honesty caption says so, with a queried figure.** A championship has ranked
+between **16 and 29 drivers** across the 77 seasons (16 in 1965, 1996 and 2000; 29 in 1989), so a
+fifth place is not a fixed fraction of the field. It limits the chart rather than explaining it,
+which is the test §6.6.6.14 opens with.
+
+⚠ **Every year of the span emits a point, and a year with no season emits `null`.** `d3-shape`'s
+`defined` breaks at a null and joins straight through a *missing* array entry, so omitting a
+sabbatical would draw one unbroken line across it and state that the driver raced. Asserted.
+
+⚠ **A break has two causes and the chart cannot tell them apart** — a season not raced, and a season
+raced without a championship ranking (`championshipPosition: null` means unranked, never last). The
+model returns the two sets separately and the notes name which is which, per driver, with the years
+in them.
+
 ##### 6.6.6.13 Four defects found on the live page, and what each one teaches _(2026-08-23)_
 
 Rishabh ran `/compare` against the endpoints. Two were blocking; all four are fixed. They are

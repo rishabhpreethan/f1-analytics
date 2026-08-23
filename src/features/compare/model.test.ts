@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COMPARE_FIXTURE } from './fixture';
 import {
   archiveDomain,
+  careerArc,
   balanceFractions,
   chainGeometry,
   chainPivots,
@@ -423,5 +424,119 @@ describe('the result mix (§6.6.6.14)', () => {
       },
     ]);
     expect(row?.parts.map((part) => part.value)).toEqual([2, 6, 0, 5]);
+  });
+});
+
+describe('the career-relative arc (§6.6.6.14 B)', () => {
+  const arc = () => careerArc(COMPARE_FIXTURE.entities);
+  const seriesFor = (ref: string) => arc().series.find((entry) => entry.reference === ref);
+
+  it('starts every driver at x = 1, whatever year his debut was', () => {
+    /*
+     * The whole chart. Fangio debuts in 1950 and Verstappen in 2015, and they occupy the same
+     * column — the axis IS the normalisation, which is why this one needs no caveat about what is
+     * being held constant.
+     */
+    for (const entry of arc().series) {
+      expect(entry.points[0]?.x, entry.label).toBe(1);
+    }
+  });
+
+  it('runs each line exactly as long as the career, not as long as the longest', () => {
+    const fangio = COMPARE_FIXTURE.entities.find((e) => e.identity.ref === 'fangio');
+    const span = (fangio?.lastSeason ?? 0) - (fangio?.firstSeason ?? 0) + 1;
+    expect(seriesFor('fangio')?.points).toHaveLength(span);
+  });
+
+  it('emits a null point for a year inside the career with no season — never omits it', () => {
+    /*
+     * ⚠ The defect this exists to prevent. `d3-shape`'s `defined` breaks a line at a null and joins
+     * straight through a **missing** array entry, so omitting a sabbatical would draw one unbroken
+     * line across it and state that the driver raced. The point has to be present and null.
+     */
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const sabbatical = {
+      ...entity,
+      seasons: [
+        {
+          year: 2001,
+          teamRefs: [],
+          starts: 17,
+          wins: 0,
+          podiums: 0,
+          dnfs: 2,
+          championshipPosition: 10,
+        },
+        {
+          year: 2004,
+          teamRefs: [],
+          starts: 18,
+          wins: 1,
+          podiums: 3,
+          dnfs: 1,
+          championshipPosition: 7,
+        },
+      ],
+    };
+    const { series, absences } = careerArc([sabbatical]);
+    expect(series[0]?.points).toEqual([
+      { x: 1, y: 10 },
+      { x: 2, y: null },
+      { x: 3, y: null },
+      { x: 4, y: 7 },
+    ]);
+    expect(absences[0]?.years).toEqual([2002, 2003]);
+  });
+
+  it('separates "did not race" from "raced but was not ranked" — one gap, two facts', () => {
+    /*
+     * The chart draws both as a break and cannot tell them apart, so the model returns them apart
+     * and the copy names which is which. `championshipPosition: null` means unranked, never last.
+     */
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const { absences, unranked } = careerArc([
+      {
+        ...entity,
+        seasons: [
+          {
+            year: 1958,
+            teamRefs: [],
+            starts: 2,
+            wins: 0,
+            podiums: 0,
+            dnfs: 2,
+            championshipPosition: null,
+          },
+          {
+            year: 1959,
+            teamRefs: [],
+            starts: 8,
+            wins: 0,
+            podiums: 1,
+            dnfs: 3,
+            championshipPosition: 9,
+          },
+        ],
+      },
+    ]);
+    expect(absences).toEqual([]);
+    expect(unranked[0]?.years).toEqual([1958]);
+  });
+
+  it('carries the driver code as the short label and never invents one', () => {
+    // `driver.code` is null for 774 of 881 drivers; `RankChart` falls back to the full label, and a
+    // surname sliced to three letters would be a fabricated abbreviation.
+    for (const entry of arc().series) {
+      const entity = COMPARE_FIXTURE.entities.find((e) => e.identity.ref === entry.reference);
+      expect(entry.shortLabel).toBe(entity?.identity.code ?? null);
+    }
+  });
+
+  it('skips a driver with no seasons rather than drawing an empty line at the axis', () => {
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    expect(careerArc([{ ...entity, seasons: [] }]).series).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import { useId, useMemo, useState, type ReactNode } from 'react';
 import { assignLadder, COMPARISON_CAP } from '@/components/charts/ladder';
 import { assignEntityColours } from '@/lib/entityColor';
 import { BalanceBar } from './CompareLedger';
+import { CareerArc } from './CareerArc';
 import { CompareTray, type TrayBay } from './CompareTray';
 import { EraStrip } from './EraStrip';
 import { LineageChain } from './LineageChain';
@@ -406,6 +407,8 @@ export function ComparePage({
              * the era strip that says why the figures had to be rates at all.
              */}
             <ResultMix entities={entities} />
+
+            <CareerArc entities={entities} />
 
             <RateRailBoard channels={ladder.series} entities={entities} />
 

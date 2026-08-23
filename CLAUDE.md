@@ -114,7 +114,7 @@ deliberate security posture (`ARCHITECTURE.md` §7), not an omission.
 
 ## 5. Data traps that cause silent, shipped bugs
 
-Full list: `docs/DATABASE.md` §7 — **25 traps as of 2026-08-23, and the count grows as the data teaches us things. Read §7 for the current list, never a number quoted elsewhere.** The ones that bite hardest:
+Full list: `docs/DATABASE.md` §7 — **27 traps as of 2026-08-23, and the count grows as the data teaches us things. Read §7 for the current list, never a number quoted elsewhere.** The ones that bite hardest:
 
 | Trap | Rule |
 |---|---|

@@ -513,3 +513,85 @@ export function resultMix(entities: readonly CompareEntity[]): ResultMixRow[] {
     };
   });
 }
+
+/* -------------------------------------------------------------------- the career-relative arc */
+
+/** One driver's championship placings, on an axis that starts at his own debut. */
+export interface CareerArcSeries {
+  reference: string;
+  teamReference: string;
+  label: string;
+  /** `driver.code`, which is null for 774 of 881 drivers. Never derived from a surname. */
+  shortLabel: string | null;
+  points: { x: number; y: number | null }[];
+}
+
+/** A break in a line, and which of the two things caused it. */
+export interface CareerArcGap {
+  ref: string;
+  surname: string;
+  years: number[];
+}
+
+export interface CareerArc {
+  series: CareerArcSeries[];
+  /** Years inside a career with no entry at all — a sabbatical, or a year out of the sport. */
+  absences: CareerArcGap[];
+  /** Years entered but not ranked in the championship. A different fact, and the same gap. */
+  unranked: CareerArcGap[];
+}
+
+/**
+ * **The career-relative arc.** `DESIGN_SYSTEM.md` §6.6.6.14 B.
+ *
+ * x is **the season of a career**, not the calendar year: 1 is the debut season, whenever it
+ * happened. That single substitution is what lets Fangio's eight seasons and Hamilton's twenty
+ * share one chart honestly — **the axis is itself the normaliser**, so unlike almost everything
+ * else on this page it needs no caveat about what is being held constant.
+ *
+ * ⚠ **Every year of the span emits a point, including the ones with no season.** A missing year
+ * must be a `null` reading and not an absent one: `d3-shape`'s `defined` breaks a line at a null
+ * and joins straight through a gap in the array, so omitting Räikkönen's 2010 and 2011 would draw
+ * one continuous line from 2009 to 2012 and state that he raced through a sabbatical.
+ *
+ * **A break has two causes and they are not the same fact**, so both are returned separately for
+ * the surface to name: a year he did not race, and a year he raced without being ranked. The chart
+ * cannot distinguish them — a gap is a gap — so the copy does, per driver, with the years in it.
+ */
+export function careerArc(entities: readonly CompareEntity[]): CareerArc {
+  const series: CareerArcSeries[] = [];
+  const absences: CareerArcGap[] = [];
+  const unranked: CareerArcGap[] = [];
+
+  for (const entity of entities) {
+    if (entity.seasons.length === 0) continue;
+    const byYear = new Map(entity.seasons.map((season) => [season.year, season]));
+    const years = [...byYear.keys()].sort((a, b) => a - b);
+    const first = years[0] ?? entity.firstSeason;
+    const last = years.at(-1) ?? entity.lastSeason;
+
+    const points: { x: number; y: number | null }[] = [];
+    const missing: number[] = [];
+    const placeless: number[] = [];
+    for (let year = first; year <= last; year += 1) {
+      const season = byYear.get(year);
+      if (season === undefined) missing.push(year);
+      else if (season.championshipPosition === null) placeless.push(year);
+      points.push({ x: year - first + 1, y: season?.championshipPosition ?? null });
+    }
+
+    series.push({
+      reference: entity.identity.ref,
+      teamReference: entity.colorTeamRef,
+      label: entity.identity.surname,
+      shortLabel: entity.identity.code,
+      points,
+    });
+    const surname = entity.identity.surname;
+    if (missing.length > 0) absences.push({ ref: entity.identity.ref, surname, years: missing });
+    if (placeless.length > 0)
+      unranked.push({ ref: entity.identity.ref, surname, years: placeless });
+  }
+
+  return { series, absences, unranked };
+}

@@ -538,3 +538,25 @@ describe('the result mix (§6.6.6.14)', () => {
     expect(container.querySelectorAll('.chart-span-label')).toHaveLength(0);
   });
 });
+
+describe('the career-relative arc (§6.6.6.14 B)', () => {
+  it('is on the career lens, with the axis stated as a career and not a calendar', () => {
+    render_();
+    expect(screen.getByText('Season by season of a career')).toBeTruthy();
+    expect(screen.getByText(/season 1 is his debut season, whenever it happened/)).toBeTruthy();
+  });
+
+  it('draws one line per selected driver', () => {
+    const { container } = render_();
+    expect(container.querySelectorAll('.chart-rank-line')).toHaveLength(
+      COMPARE_FIXTURE.entities.length,
+    );
+  });
+
+  it('states the field-size limit rather than implying a placing is a fixed fraction', () => {
+    // An honesty caption, and the figure is queried: 77 seasons, 16 ranked at the fewest (1965,
+    // 1996, 2000) and 29 at the most (1989).
+    render_();
+    expect(screen.getByText(/ranked between 16 and 29 drivers/)).toBeTruthy();
+  });
+});
