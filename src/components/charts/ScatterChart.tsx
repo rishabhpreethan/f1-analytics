@@ -135,18 +135,14 @@ export function ScatterChart({
   const titleId = useId();
   const { ref, width, height } = useChartSize<HTMLDivElement>();
   const [active, setActive] = useState<string | null>(null);
-  const [sticky, setSticky] = useState<LadderState>({
-    marker: false,
-    dash: false,
-    texture: false,
-  });
+  const [sticky, setSticky] = useState<LadderState>({ marker: false, texture: false });
 
   const coloured = assignEntityColours(
     groups.map((g) => ({ reference: g.reference, teamReference: g.teamReference })),
   );
   const ladder = assignLadder(coloured, { sticky, patterns: false });
-  if (ladder.state.marker !== sticky.marker || ladder.state.dash !== sticky.dash) {
-    setSticky({ marker: ladder.state.marker, dash: ladder.state.dash, texture: false });
+  if (ladder.state.marker !== sticky.marker) {
+    setSticky({ marker: ladder.state.marker, texture: false });
   }
   const channels = new Map(ladder.series.map((entry) => [entry.reference, entry]));
 

@@ -139,75 +139,98 @@ describe('§3.3a.1 — the two grey teams keep an identity colour and plot from 
   });
 });
 
-describe('§6.4a — the teammate treatment, and the team that proves colour cannot do it', () => {
-  it('splits two drivers of one team into a symmetric pair, lower reference takes deep', () => {
+describe('§6.4a — colour is the car, the dash is the seat (ruled 2026-08-23)', () => {
+  it('gives two drivers of one team the SAME colour, and separate seats', () => {
+    /*
+     * The reversal. Until 2026-08-23 this returned a two-shade split; it now returns one colour
+     * twice, because "same colour" is the claim a team-mate comparison actually rests on — same
+     * machinery — and the seat is the dash's job (`ladder.ts`).
+     */
     const [alonso, stroll] = assignEntityColours([
       entity('alonso', 'aston_martin'),
       entity('stroll', 'aston_martin'),
     ]);
-    expect(alonso?.plot).toBe('--team-aston_martin-plot-deep');
-    expect(stroll?.plot).toBe('--team-aston_martin-plot-bright');
-    expect(alonso?.teammate).toBe(true);
-    expect(stroll?.teammate).toBe(true);
+    expect(alonso?.plot).toBe(plotToken('aston_martin'));
+    expect(stroll?.plot).toBe(plotToken('aston_martin'));
+    expect(alonso?.seat).toBe(0);
+    expect(stroll?.seat).toBe(1);
+    expect(alonso?.teammate && stroll?.teammate).toBe(true);
   });
 
-  it('orders by reference, not by the order the caller passed them in', () => {
+  it('orders seats by reference, not by the order the caller passed them in', () => {
     const [stroll, alonso] = assignEntityColours([
       entity('stroll', 'aston_martin'),
       entity('alonso', 'aston_martin'),
     ]);
-    expect(alonso?.plot).toBe('--team-aston_martin-plot-deep');
-    expect(stroll?.plot).toBe('--team-aston_martin-plot-bright');
+    expect(alonso?.seat).toBe(0);
+    expect(stroll?.seat).toBe(1);
   });
 
-  it('gives neither driver the team’s own plot colour — the split is symmetric', () => {
+  it('seats every principal before any shadow, whatever the references sort to', () => {
     /*
-     * §6.4a property 1. Painting one driver in the team's colour and the other in a derivative
-     * implies a number-one / number-two hierarchy the data does not support, and measurably could
-     * not reach the ΔE floor from a mid-band anchor.
+     * `alonso` < `stroll` alphabetically, so reference order alone would hand seat 0 — the solid
+     * line — to the driver the reader did NOT choose. Role is the first key for exactly that
+     * reason: a shadow is by definition "the other seat".
      */
+    const [stroll, alonso] = assignEntityColours([
+      { reference: 'stroll', teamReference: 'aston_martin', role: 'principal' },
+      { reference: 'alonso', teamReference: 'aston_martin', role: 'shadow' },
+    ]);
+    expect(stroll?.seat).toBe(0);
+    expect(alonso?.seat).toBe(1);
+    expect(stroll?.role).toBe('principal');
+    expect(alonso?.role).toBe('shadow');
+  });
+
+  it('gives every driver of the car the team’s own plot colour, including the first', () => {
     const pair = assignEntityColours([entity('a', FERRARI), entity('b', FERRARI)]);
-    for (const member of pair) expect(member.plot).not.toBe(plotToken(FERRARI));
+    for (const member of pair) expect(member.plot).toBe(plotToken(FERRARI));
   });
 
-  it('separates the two shades — a pair the reader cannot tell apart would be worse than none', () => {
-    const pair = shadePair(FERRARI);
-    expect(pair).not.toBeNull();
-    if (pair !== null) expect(collides(pair.deep, pair.bright)).toBe(false);
-  });
-
-  it('has NO pair for Sauber, in either theme, and says so as colourExhausted', () => {
+  it('treats Sauber exactly like every other car — the team that used to be the exception', () => {
     /*
-     * The finding this suite exists to protect. Sauber's brand hue is 143 — inside the reserved
-     * green timing band — and in light mode exactly one lightness in the plotting band clears ΔE 15
-     * from `--timing-green-ink`. A dark-mode pair exists and is withheld, because an encoding that
-     * changed with the theme would have to be unlearned at sunset (§6.4a property 3).
+     * Sauber's brand hue is 143, inside the reserved green timing band, and in light mode exactly
+     * one lightness in the plotting band clears ΔE 15 from `--timing-green-ink`. That made a
+     * two-shade split impossible and forced §6.4a to be written around a single team's misfortune.
+     * Under the seat rule there is nothing to work around: one colour, two seats.
      */
-    expect(shadePair(SAUBER)).toBeNull();
     const pair = assignEntityColours([entity('a', SAUBER), entity('b', SAUBER)]);
     expect(pair.map((member) => member.plot)).toEqual(['--team-sauber-plot', '--team-sauber-plot']);
-    expect(pair.every((member) => member.teammate && member.colourExhausted)).toBe(true);
+    expect(pair.map((member) => member.seat)).toEqual([0, 1]);
+    expect(pair.some((member) => member.colourExhausted)).toBe(false);
   });
 
-  it('exhausts colour outright at three drivers of one team — a designed state', () => {
-    // A mid-season replacement driver. §6.4a property 4: one hue supplies at most two shades, and
-    // light mode sets the cap, so rungs 1–3 carry the whole distinction beyond two.
+  it('seats three drivers of one team, which two shades never could', () => {
+    // A mid-season replacement. The shade pair reported colour exhausted here; the dash ladder is
+    // four deep, so a third seat is an ordinary case rather than a designed failure.
     const trio = assignEntityColours([
       entity('a', FERRARI),
       entity('b', FERRARI),
       entity('c', FERRARI),
     ]);
     expect(trio.every((member) => member.plot === plotToken(FERRARI))).toBe(true);
-    expect(trio.every((member) => member.colourExhausted)).toBe(true);
+    expect(trio.map((member) => member.seat)).toEqual([0, 1, 2]);
+    expect(trio.some((member) => member.colourExhausted)).toBe(false);
   });
 
-  it('gives a colourless team a shade pair too — the ramp is gated on it in both themes', () => {
-    const pair = shadePair(BRM);
+  it('reports exhaustion past four seats — 1957 Maserati entered thirteen cars in one race', () => {
+    const many = ['a', 'b', 'c', 'd', 'e'].map((ref) => entity(ref, FERRARI));
+    expect(assignEntityColours(many).every((member) => member.colourExhausted)).toBe(true);
+  });
+
+  it('keeps the retired shade pair generating valid, separated tokens', () => {
+    /*
+     * `shadePair` is called by nothing since 2026-08-23 and the `--*-plot-deep` / `-bright` tokens
+     * are retired from use rather than deleted — deleting them means regenerating the emitter and
+     * unpicking §9.2.3's V-27 / G-27a–e record, which is a separate change. Until then the tokens
+     * still have to be well-formed, or a later reviver would find a broken channel.
+     */
+    const pair = shadePair(FERRARI);
     expect(pair).not.toBeNull();
-    if (pair !== null) {
-      expect(pair.deep).toBe(`--ramp-${String(rampSlot(BRM))}-plot-deep`);
-      expect(collides(pair.deep, pair.bright)).toBe(false);
-    }
+    if (pair !== null) expect(collides(pair.deep, pair.bright)).toBe(false);
+    const ramp = shadePair(BRM);
+    expect(ramp?.deep).toBe(`--ramp-${String(rampSlot(BRM))}-plot-deep`);
+    expect(shadePair(SAUBER)).toBeNull();
   });
 });
 
@@ -221,16 +244,23 @@ describe('§6.2 — a filter that changes the series count must not repaint the 
     );
   });
 
-  it('re-shades only the team whose teammate arrived — the one permitted repaint', () => {
+  it('repaints NOTHING when a team-mate arrives — the last permitted repaint is gone', () => {
+    /*
+     * §6.2 used to carry one named exception: adding a team-mate re-shaded that team's pair. The
+     * seat rule removes it. Adding a second Ferrari changes the first Ferrari's `seat`, and not
+     * one token anywhere on the chart.
+     */
     const solo = assignEntityColours([entity('a', FERRARI), entity('c', BRM)]);
     const withMate = assignEntityColours([
       entity('a', FERRARI),
       entity('c', BRM),
       entity('b', FERRARI),
     ]);
-    expect(solo[0]?.plot).toBe(plotToken(FERRARI));
-    expect(withMate[0]?.plot).toBe('--team-ferrari-plot-deep');
-    expect(withMate[1]?.plot).toBe(solo[1]?.plot); // the unrelated survivor does not move
+    expect(withMate.slice(0, 2).map((member) => member.plot)).toEqual(
+      solo.map((member) => member.plot),
+    );
+    expect(withMate[0]?.seat).toBe(0);
+    expect(withMate[2]?.seat).toBe(1);
   });
 
   it('preserves input order, because the ladder assigns rungs in that order', () => {

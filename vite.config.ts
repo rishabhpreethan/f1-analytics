@@ -151,6 +151,12 @@ export default defineConfig({
      * stylesheet whose name does not happen to contain one of these substrings gets `''` and every
      * assertion on it passes vacuously, which is why each of these tests opens by checking its own
      * input is non-empty.
+     *
+     * `charts.css` added 2026-08-23 with §6.4a's seat encoding. It is the kit's whole visual
+     * language and had **no source test at all** until now, which is how it came to carry the one
+     * rule that decides whether a principal and the seat beside it read as a pair: a shadow line
+     * draws at three-quarters of the mark stroke. jsdom applies no CSS, so the component test can
+     * only assert the `data-role` attribute — the declaration itself is assertable nowhere else.
      */
     css: {
       include: [
@@ -160,6 +166,7 @@ export default defineConfig({
         /index\.css/,
         /entity\.css/,
         /compare\.css/,
+        /charts\.css/,
       ],
     },
   },

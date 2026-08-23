@@ -357,8 +357,8 @@ describe('§6.2 / §3.3a.3 — no component holds a colour', () => {
   });
 });
 
-describe('§6.4a — a teammate comparison arrives with marker and dash already on', () => {
-  it('splits the pair by shade AND gives it two shapes and two dash patterns', () => {
+describe('§6.4a — one car is one colour and one shape; the dash is the seat', () => {
+  it('paints both team-mates in the car’s colour and separates them on the dash alone', () => {
     const teammates: SeriesInput[] = [
       {
         reference: 'russell',
@@ -377,12 +377,90 @@ describe('§6.4a — a teammate comparison arrives with marker and dash already 
       <LineChart series={teammates} title="Points" ariaLabel="Teammates by round" />,
     );
     const html = container.innerHTML;
-    expect(html).toContain('var(--team-mercedes-plot-deep)');
-    expect(html).toContain('var(--team-mercedes-plot-bright)');
-    const dashes = [...container.querySelectorAll('path.chart-line')].map((p) =>
-      p.getAttribute('stroke-dasharray'),
+    // One car, one colour — and no shade token anywhere (§6.4a, 2026-08-23).
+    expect(html).toContain('var(--team-mercedes-plot)');
+    expect(html).not.toContain('-plot-deep');
+    expect(html).not.toContain('-plot-bright');
+
+    const marks = [...container.querySelectorAll('g.chart-marks path.chart-line')];
+    expect(marks).toHaveLength(2);
+    // Two seats, two dashes.
+    expect(new Set(marks.map((p) => p.getAttribute('stroke-dasharray')))).toEqual(
+      new Set([null, '6 3']),
     );
-    expect(new Set(dashes).size).toBe(2);
+    // One car, ONE marker shape — this is what makes a pair read as a pair rather than as two
+    // unrelated lines that happen to share a colour.
+    const markers = [...container.querySelectorAll('g.chart-marks path.chart-marker')];
+    expect(new Set(markers.map((p) => p.getAttribute('d'))).size).toBe(1);
+  });
+
+  it('marks the other seat as a shadow, so the stylesheet can draw it lighter', () => {
+    const { container } = render(
+      <LineChart
+        series={[
+          {
+            reference: 'max_verstappen',
+            teamReference: 'red_bull',
+            label: 'Verstappen',
+            points: [{ x: 1, y: 25 }],
+          },
+          {
+            reference: 'hadjar',
+            teamReference: 'red_bull',
+            label: 'The other Red Bull',
+            role: 'shadow',
+            points: [{ x: 1, y: 8 }],
+          },
+        ]}
+        title="Points"
+        ariaLabel="Points by round"
+      />,
+    );
+    const roles = [...container.querySelectorAll('g.chart-marks path.chart-line')].map((p) =>
+      p.getAttribute('data-role'),
+    );
+    expect(roles).toEqual(['principal', 'shadow']);
+    /*
+     * ⚠ The *visual* consequence — a 1.5px stroke against 2px — is a CSS rule jsdom never applies.
+     * `charts.css.test.ts` asserts the rule's source; that it reads as a foreground and a
+     * background on screen is untested by construction.
+     */
+  });
+
+  it('direct-labels the principals and leaves the shadows to the legend (§6.5.2, §6.4a)', () => {
+    /*
+     * Eight series is the season lens at full stretch. "Direct labels at ≤ 4" cannot mean eight
+     * names stacked in a gutter sized for four, and it cannot mean none — so it means the four the
+     * reader chose. A shadow is named in the legend, the tooltip and the table view.
+     */
+    const cars = ['ferrari', 'mercedes', 'williams', 'alpine'];
+    const { container } = render(
+      <LineChart
+        series={cars.flatMap((team) => [
+          {
+            reference: `${team}-1`,
+            teamReference: team,
+            label: `${team} first`,
+            points: [{ x: 1, y: 10 }],
+          },
+          {
+            reference: `${team}-2`,
+            teamReference: team,
+            label: `${team} second`,
+            role: 'shadow' as const,
+            points: [{ x: 1, y: 5 }],
+          },
+        ])}
+        title="Points"
+        ariaLabel="Points by round"
+      />,
+    );
+    const labels = [...container.querySelectorAll('text.chart-direct-label')].map(
+      (node) => node.textContent,
+    );
+    expect(labels).toEqual(cars.map((team) => `${team} first`));
+    // …and every one of the eight is still in the legend, which is where the shadows are named.
+    expect(container.querySelectorAll('li.chart-legend-item')).toHaveLength(8);
   });
 });
 

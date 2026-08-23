@@ -120,18 +120,15 @@ export function RankChart({
   const { ref, width, height } = useChartSize<HTMLDivElement>();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [sticky, setSticky] = useState<LadderState>({
-    marker: false,
-    dash: false,
-    texture: false,
-  });
+  const [sticky, setSticky] = useState<LadderState>({ marker: false, texture: false });
 
   const labelX = formatXLong ?? formatX;
   const selectedSet = new Set(selected.slice(0, COMPARISON_CAP));
 
   /*
    * Two colour paths, and the split is the point. The **selection** goes through
-   * `assignEntityColours` + `assignLadder`, so two teammates get the shade pair and every member gets
+   * `assignEntityColours` + `assignLadder`, so two team-mates share the car's colour and differ by the
+   * seat dash (§6.4a), and every member gets
    * a dash rung. The **field** takes `plotToken` directly: it is context, and giving 22 series ladder
    * rungs would spend every channel on lines nobody is reading yet.
    */
@@ -140,8 +137,8 @@ export function RankChart({
     chosen.map((s) => ({ reference: s.reference, teamReference: s.teamReference })),
   );
   const ladder = assignLadder(coloured, { sticky, patterns: false });
-  if (ladder.state.marker !== sticky.marker || ladder.state.dash !== sticky.dash) {
-    setSticky({ marker: ladder.state.marker, dash: ladder.state.dash, texture: false });
+  if (ladder.state.marker !== sticky.marker) {
+    setSticky({ marker: ladder.state.marker, texture: false });
   }
   const channelsFor = new Map(ladder.series.map((entry) => [entry.reference, entry]));
 
@@ -385,6 +382,8 @@ export function RankChart({
             dash: 'solid' as const,
             texture: false,
             teammate: false,
+            role: 'principal' as const,
+            seat: 0,
             colourExhausted: false,
           }))}
           caption={ariaLabel}

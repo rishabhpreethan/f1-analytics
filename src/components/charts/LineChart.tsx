@@ -154,18 +154,18 @@ export function LineChart({
    * during render is the documented pattern for this: React re-runs the component before painting,
    * so nothing flashes.
    */
-  const [sticky, setSticky] = useState<LadderState>({
-    marker: false,
-    dash: false,
-    texture: false,
-  });
+  const [sticky, setSticky] = useState<LadderState>({ marker: false, texture: false });
 
   const coloured = assignEntityColours(
-    series.map((s) => ({ reference: s.reference, teamReference: s.teamReference })),
+    series.map((s) => ({
+      reference: s.reference,
+      teamReference: s.teamReference,
+      role: s.role ?? 'principal',
+    })),
   );
   const ladder = assignLadder(coloured, { sticky, patterns });
-  if (ladder.state.marker !== sticky.marker || ladder.state.dash !== sticky.dash) {
-    setSticky({ marker: ladder.state.marker, dash: ladder.state.dash, texture: false });
+  if (ladder.state.marker !== sticky.marker) {
+    setSticky({ marker: ladder.state.marker, texture: false });
   }
   const resolved: ResolvedSeries[] = ladder.series.map((channels, i) => ({
     ...channels,
@@ -222,7 +222,9 @@ export function LineChart({
 
   const directLabelWidth = Math.max(
     0,
-    ...resolved.map((s) => monoTextWidth(s.label, TICK_LABEL_SIZE)),
+    ...resolved
+      .filter((s) => s.role !== 'shadow')
+      .map((s) => monoTextWidth(s.label, TICK_LABEL_SIZE)),
   );
 
   const margin = computeMargin({
@@ -230,7 +232,8 @@ export function LineChart({
     hasCategoryLabels: true,
     hasMeasureTitle: yTitle !== undefined,
     hasCategoryTitle: xTitle !== undefined,
-    directLabelWidth: resolved.length <= 4 ? directLabelWidth : 0,
+    directLabelWidth:
+      resolved.filter((s) => s.role !== 'shadow').length <= 4 ? directLabelWidth : 0,
   });
   const plot = plotArea(width, height, margin);
 
@@ -289,8 +292,18 @@ export function LineChart({
     .x((p) => xScale(p.x))
     .y((p) => yScale(p.y ?? 0));
 
-  /* §6.5.2 — direct labels at the end of each line, de-collided to a 16px minimum gap. */
-  const anchors = resolved.map((s) => {
+  /*
+   * §6.5.2 — direct labels at the end of each line, de-collided to a 16px minimum gap.
+   *
+   * **Principals only** (§6.4a, 2026-08-23). The rule is "direct labels at ≤ 4 series", and the
+   * season lens draws eight — four principals each carrying the other seat in its car. Labelling
+   * all eight would put four names in a gutter sized for four and de-collide them into a stack
+   * nobody can read; labelling none would drop the rung the ladder counts as always satisfied.
+   * A shadow is named in the legend, in the tooltip and in the table view instead, which is where
+   * a reader asks *who* is in the other seat rather than *which line is whose*.
+   */
+  const labelled = resolved.filter((s) => s.role !== 'shadow');
+  const anchors = labelled.map((s) => {
     const last = [...s.points].reverse().find((p) => p.y !== null);
     return last === undefined ? plot.innerHeight : yScale(last.y ?? 0);
   });
@@ -460,6 +473,11 @@ export function LineChart({
                   <path
                     key={s.reference}
                     className="chart-line"
+                    /* §6.4a — the other seat draws at three-quarters of the mark stroke, so a
+                     * principal and its shadow read as one pair with a foreground rather than as
+                     * two equal lines. Weight, never opacity: opacity would move the mark's
+                     * contrast against the surface, and §6.3 gates that. */
+                    data-role={s.role}
                     d={path(s.points) ?? undefined}
                     strokeDasharray={DASH_ARRAY[s.dash]}
                     style={{ '--series': cssVar(s.plot) } as React.CSSProperties}
@@ -508,11 +526,11 @@ export function LineChart({
             </g>
 
             {/* §6.5.2 — direct labels, outside the clip so they are never wiped by G-28. */}
-            {resolved.length <= 4 && (
+            {labelled.length <= 4 && (
               <g
                 transform={`translate(${String(plot.left + plot.innerWidth)} ${String(plot.top)})`}
               >
-                {resolved.map((s, i) => {
+                {labelled.map((s, i) => {
                   const placement = labelPlacements[i];
                   if (placement === undefined) return null;
                   return (

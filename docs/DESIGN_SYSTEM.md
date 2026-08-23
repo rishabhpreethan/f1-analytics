@@ -387,10 +387,13 @@ unchanged in character: **6 of 11 fall below 3:1 in light mode, all 11 pass in d
    perceptual distance and automatically assign a differentiator to any colliding pair. **Specified
    in §3.3a and §6.4; the ladder is in §6.4.** The distance metric and CVD models are fixed by §9.1.
 5. **Teammate comparison always collides** — identical team colour — and is simultaneously the most
-   valuable comparison in the product. **Resolved in §6.4a, and the resolution is not primarily a
-   colour one:** for at least one team on the current grid, colour provably cannot separate two
-   teammates at all (§9.2.3 G-27d), so marker shape, dash and direct label are mandatory for every
-   teammate pair and the shade pair is a redundant fourth channel.
+   valuable comparison in the product. **Resolved in §6.4a, and the resolution is not a colour one
+   at all** _(reversed 2026-08-23)_: two drivers of one team now take **the same colour, on
+   purpose**, because one colour is the claim the comparison rests on — same machinery — and the
+   **dash carries the seat**. The shade pair that used to split them is withdrawn. For at least one
+   team on the current grid colour provably could not separate two team-mates anyway (§9.2.3
+   G-27d), so the pair was a channel that worked for ten teams out of eleven and capped at two
+   drivers; the dash works for every team and goes four deep.
 6. **Per-theme chart-safe variants.** Brand colours failing the lightness band need a derived
    plotting variant per theme (a darkened Mercedes for light mode, etc.). Brand colour for identity;
    derived variant for plotting. **Derived, validated and shipped** — `--team-<ref>-plot` in
@@ -1677,9 +1680,9 @@ used by either member. Every rung is a **non-colour** channel; that is the whole
 | Rung | Channel | Applied as |
 |---|---|---|
 | **1** | **Direct label** | always present at ≤ 4 series, so rung 1 is free and already satisfied — a colliding pair is *never* unlabelled |
-| **2** | **Marker shape** | circle → square → triangle → diamond, in that fixed order, ≥ 8px, 1.5px `--surface-sunken` ring |
-| **3** | **Dash pattern** | solid → `6 3` → `2 3` → `9 3 2 3`, in that fixed order. **The period — dash + gap — is ≥ 2× the stroke width**, so the pattern survives at 2px |
-| **4** | **Texture** | 45° hatch for area and bar fills, at `--border-subtle` over the entity colour. Also the print and CVD-preference rung — see §6.5.6 |
+| **2** | **Marker shape** | circle → square → triangle → diamond, in that fixed order, ≥ 8px, 1.5px `--surface-sunken` ring. **One shape per car**, not per series (§6.4a) |
+| **3** | **Texture** | 45° hatch for area and bar fills, at `--border-subtle` over the entity colour. Also the print and CVD-preference rung — see §6.5.6 |
+| ~~**Dash**~~ | ~~pattern~~ | **Left the ladder 2026-08-23.** A dash now *means* the other seat in this car (§6.4a) and a collision may never assign one. The patterns and the period rule below still stand — they are the seat's vocabulary now |
 
 > **Correction, 2026-08-07.** Rung 3 previously said *"dash lengths are ≥ 2× stroke width"*, which
 > its own `2 3` pattern fails: a 2px dash at a 2px stroke is 1×. The property that actually makes a
@@ -1705,69 +1708,101 @@ legend then has to explain a distinction that applies to half its rows. §6.5.6'
 already sets the precedent that a rung is a property of the chart. So when a rung fires, every
 series takes its value from that rung's fixed order.
 
-One consequence, stated so it is not mistaken for a bug: **at ≤ 4 series, rung 2 alone separates
-every pair**, because four distinct shapes is four distinct series. Rung 3 therefore only ever fires
-because a **teammate** comparison is present — where §6.4a makes marker *and* dash mandatory rather
-than escalated.
+One consequence, stated so it is not mistaken for a bug: **at ≤ 4 cars, rung 2 alone separates every
+pair**, because four distinct shapes is four distinct cars. Nothing escalates past it in practice,
+and **the cap is counted in cars rather than in series** — eight series across four cars is four
+shapes and two dashes, which the ladder separates completely, so `exceedsCap` stays false. Counting
+series would have pushed the season lens to small multiples for a chart the ladder handles.
 
-#### 6.4a The teammate treatment — colour is not the channel
+#### 6.4a The seat, not the shade — a dash means "the other driver in this car" _(reversed 2026-08-23)_
 
-Two drivers of one team is the most valuable comparison in the sport and the only truly like-for-like
-one. It is also the case where colour is **weakest**, and the measurement is unambiguous:
+> **This section was rewritten on Rishabh's ruling and it reverses what came before.** Until
+> 2026-08-23 two drivers of one team were split into a **shade pair** — two admissible plotting
+> shades of the team's own hue — with marker and dash layered on top. That is withdrawn. The
+> reasoning that replaced it is his and it is better than the argument it displaces:
+>
+> > **Same colour = same machinery. A dash = a different driver in it.**
+>
+> And the second half: team-mates are *precisely* where two brand colours are least
+> distinguishable, so one channel now solves both problems at once.
 
-> **Sauber's brand hue is 143 — inside the reserved green timing band. In light mode, exactly ONE
-> lightness in the whole plotting band clears ΔE 15 from `--timing-green-ink`: 109 of 161 candidates
-> are blocked by the green ink and 51 by contrast. A two-shade split is impossible.** (§9.2.3 G-27d.)
+**The rule, in four lines:**
 
-So the treatment is **mandatory and non-colour first**, and it is identical for every team — including
-the nine whose colour *would* have worked. Presenting one team differently because its hue is unlucky
-would make the reader learn two conventions:
+| Channel | Carries | Assignment |
+|---|---|---|
+| **Colour** | **the car** | `plotToken(team)`. Every driver of one team takes the identical token. No shade, no derivative, no split |
+| **Marker shape** | **the car** | one shape per car, by the car's position in the stable entity order: circle → square → triangle → diamond |
+| **Dash** | **the seat inside that car** | seat 0 solid, seat 1 `6 3`, seat 2 `2 3`, seat 3 `9 3 2 3` |
+| **Direct label** | the driver | mandatory, at ≤ 4 **principals** |
 
-| Channel | Rule |
-|---|---|
-| **Marker shape** | **Mandatory.** The team's two drivers take marker rungs 2's first two shapes — circle and square — in driver order |
-| **Dash pattern** | **Mandatory.** Solid and `6 3`, in driver order |
-| **Direct label** | **Mandatory.** Always available: a teammate comparison is ≤ 4 entities |
-| **Shade pair** | **When available.** `--*-plot-deep` and `--*-plot-bright` — two admissible plotting shades of the team's own hue and chroma, ≥ ΔE 15 normal and ≥ 8 CVD apart in both themes |
+**Seat order is principals first — each by `driver.reference` ascending — then shadows, likewise.**
+Role leads because a shadow is by definition *the other seat*: an alphabetical order alone would
+hand `alonso` the solid line and `stroll` the dash even when Stroll is the driver the reader chose,
+which inverts the sentence the encoding makes. `reference` breaks the tie because it is the only
+driver identifier with 100% coverage (`permanent_car_number` covers 63 of 881, `abbreviation`
+107 of 881, queried) and because §6.4 rule 1 needs the assignment stable across renders.
 
-**Driver order is `driver.reference` ascending** among the selected drivers of that team; the lower
-takes `deep`. `reference` is used because it is the only identifier with **100% coverage** —
-`permanent_car_number` covers 63 of 881 drivers and `abbreviation` 107 of 881 (queried).
+**The marker is per car, not per series, and that is the load-bearing part.** It is what makes eight
+series read as **four pairs**: a principal and the seat beside it share a colour *and* a shape and
+differ only in the dash and the stroke weight. Index it per series instead and the season lens
+becomes eight unrelated lines that happen to pair up by colour. `ladder.test.ts` asserts one shape
+per car and four distinct `shape/dash` combinations across two pairs.
 
-**Two teammate pairs on one chart** _(added on building it, 2026-08-07)_. Read literally, "circle
-and square, in driver order" hands the second team's pair the **same** shape *and* the same dash as
-the first team's, leaving colour as the only thing separating series 1 from series 3 — the exact
-failure this section exists to prevent. The rule is therefore stated on indices rather than on
-shapes: **a team's group keeps the set of rung indices its members hold in the stable order, and
-redistributes them inside the group by `reference` ascending.** With one pair — the case this
-section is written about, and the overwhelmingly common one — that is identical to circle-and-square
-in driver order. With two pairs, all four series stay distinct on both channels.
+**The other seat draws at three-quarters of the mark stroke** — 1.5px against 2px — so a pair has a
+foreground. **Weight, never opacity**: an opacity drop moves the mark's measured contrast against
+the surface and §6.3's plotting band is gated at 3:1, which six of the eleven brand colours would
+fall under in light mode at 0.6 (§9.2 V-8). At 1.5px the `6 3` period is still 6× the stroke, so the
+dash resolves. `charts.css.test.ts` asserts the rule spends `stroke-width` and contains no
+`opacity`.
 
-**Four properties of the shade pair, each measured:**
+**A fill has no dash, so in a share chart the seat is carried by texture.** Rung 4's 45° hatch, on
+every odd seat, keyed on `seat` and not on the segment's position so a row mixing two teams hatches
+the second seat of *each* car. That is strictly stronger than what it replaces: the shade pair was
+withheld from Sauber entirely and capped at two, where the hatch works for every team and alternates
+for as many seats as a row has.
 
-1. **It is symmetric — neither driver "gets the team colour".** Both take a shade; the true brand
-   colour stays on the identity swatch beside each name. An earlier draft anchored one driver on the
-   team's plotting variant and derived the other from it, which failed twice over: measurably, because
-   a mid-band anchor cannot reach the floor (Williams light reached 14.70 against a span ceiling of
-   27.07), and editorially, because painting one driver in the true colour and the other in a
-   derivative implies a number-one/number-two hierarchy the data does not support.
-2. **The split spends lightness and nothing else.** Hue and chroma are held, so the pair reads as one
-   colour family in two shades. Lightness is the one channel every dichromat keeps in full, which is
-   why the worst measured CVD figure across all 22 entities is **14.18** — nearly twice the floor.
-3. **It is a property of the entity, not of the theme.** Available in both themes or withheld from
-   both. Sauber has an admissible pair in dark mode and it is **deliberately discarded**: an encoding
-   that changed with the theme would make a reader who had learned "two lines of one colour are one
-   team" unlearn it at sunset.
-4. **The ladder caps at two shades, and light mode sets the cap.** One hue supplies at most 2 mutually
-   separated shades in light mode (3 in dark, unusable per property 3), because light's band has its
-   usable top cut by the 3:1-against-white requirement. **Beyond two drivers of one team in one plot,
-   colour is exhausted outright** and rungs 1–3 carry the whole distinction. This happens for real —
-   a mid-season replacement driver — and it is a designed state, not an edge case.
+**Considered and rejected: a hollow marker for the odd seat.** It would be a fourth, redundant
+channel at the mark level, and it is cheap — but the marker's 1.5px `--surface-sunken` ring is what
+keeps two overlapping marks readable (§6.3), and a hollow marker has only one stroke to spend. Since
+CR-006 there is no visual gate here, so trading a measured rule for an unverifiable improvement is
+the wrong direction. Revisit only with a capture.
 
-**Cross-era normalisation is made visible, never applied silently.** When a teammate comparison spans
-a regulation change or a scoring change, the chart carries a `--status-info` note above the plot
-naming what was normalised and what was not. A silently indexed axis is the same class of defect as a
-dual axis: it makes an incomparable comparison look fine.
+**Five things the reversal buys, each of them a defect the pair had:**
+
+1. **It goes four deep instead of two.** One hue supplied at most two mutually separated shades in
+   light mode, so a third driver of one team — a mid-season replacement — **exhausted colour
+   outright**. The dash ladder seats four. `colourExhausted` now fires at five, and five is real:
+   **1957's Maserati fielded thirteen cars in one Grand Prix** (queried).
+2. **Sauber stops being an exception.** Its brand hue is 143, inside the reserved green timing band,
+   and in light mode exactly **one** lightness in the whole plotting band clears ΔE 15 from
+   `--timing-green-ink` — 109 of 161 candidates blocked by the green ink, 51 by contrast (§9.2.3
+   G-27d). §6.4a used to be written around one team's misfortune. Now nothing about Sauber differs.
+3. **§6.2's last permitted repaint is gone.** Adding a team-mate used to re-shade that team's pair.
+   It now changes a `seat` index and not one token anywhere on the chart. `entityColor.test.ts`
+   asserts that adding a second Ferrari leaves the first Ferrari's token identical.
+4. **The dash stops lying.** As a collision rung it could dash two drivers of two *different* teams,
+   teaching a reader that a dash meant nothing in particular. It is now reserved in the same sense
+   purple/green/yellow are reserved in colour: **a dash always means the other seat**, and a
+   collision can never assign one.
+5. **One colour is the claim.** A team-mate comparison is valuable because the machinery is held
+   constant. Two shades quietly denied that; one colour states it.
+
+**The collision ladder is therefore three rungs, not four** (§6.4): direct label, marker shape,
+texture. Dash left it.
+
+**The shade-pair tokens are retired from use, not yet deleted.** `--*-plot-deep` / `-bright` are
+still generated into `src/styles/entity.css` (88 declarations), still listed in `PLOT_TOKENS`, and
+still gated by §9.2.3's V-27 and G-27a–e. `shadePair()` survives and is called by nothing; a test
+asserts the tokens it names remain well-formed and separated. **Deleting them is a queued
+follow-up** and it is not free: it means gutting V-27 and G-27a–e from a 2,795-line validator,
+regenerating `entityColorData.ts` (the collision masks are indexed over `PLOT_TOKENS`, so dropping
+32 of the 64 tokens re-indexes every mask) and rewriting `entity.css.test.ts`. The prize is CSS
+budget, which is the binding budget at 81.3% — **the measured saving is 0.61 KB gzipped, recorded in §9.2.7.**
+
+**Cross-era normalisation is made visible, never applied silently.** When a team-mate comparison
+spans a regulation change or a scoring change, the chart carries a `--status-info` note above the
+plot naming what was normalised and what was not. A silently indexed axis is the same class of
+defect as a dual axis: it makes an incomparable comparison look fine.
 
 ### 6.5 States, interaction and the table view
 
@@ -4401,6 +4436,30 @@ land is the design (§7.15), and a decision written as a number is the only kind
 later looking at the screen and calling it a bug.
 
 ---
+
+#### 9.2.7 M-1 — what the retired shade-pair tokens cost, measured 2026-08-23
+
+Not a palette run — a **budget** measurement, recorded here because §6.4a's follow-up depends on the
+figure and because reasoning about gzip is exactly the thing §9 exists to stop.
+
+**Method.** Delete every `--*-plot-deep` and `--*-plot-bright` declaration from
+`src/styles/entity.css` (**84 declarations**, both themes, brand teams and ramp slots), run
+`npm run build:unchecked && npm run check:budget`, restore. One variable, same build, same gzip
+encoder — `check:budget` is the single authority on a gzipped size (`vite.config.ts`).
+
+| Render-blocking CSS | Figure | % of the 25 KB budget |
+|---|---|---|
+| With the shade-pair tokens (shipped) | **20.35 KB** | 81.4% |
+| Without them | **19.74 KB** | 79.0% |
+| **Saving** | **0.61 KB** | **2.4 points** |
+
+**What that buys and what it costs.** 0.61 KB is 13% of the 4.65 KB of headroom that remained when
+CSS became the binding budget. It is worth having and it is **not worth taking in the same change as
+the encoding reversal**: the tokens are indexed into `COLLISION_MASKS` by their position in
+`PLOT_TOKENS`, so dropping 32 of the 64 re-indexes every mask in `entityColorData.ts`, and V-27 plus
+G-27a–e in a 2,795-line validator exist only to gate them. Queued as its own change, with this
+figure as its justification.
+
 
 ## 10. Theming mechanics
 

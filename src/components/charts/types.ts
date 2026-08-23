@@ -7,7 +7,7 @@
  * components never query, and shaping lives in pure, unit-testable selectors owned by the engineer).
  */
 
-import type { EntityColour } from '@/lib/entityColor';
+import type { EntityColour, SeriesRole } from '@/lib/entityColor';
 
 /**
  * One reading. `y === null` means **no datum at this x**, which is not the same as zero and must
@@ -28,6 +28,13 @@ export interface SeriesInput {
   /** The display name, for the direct label, the legend and the table header. Never abbreviated. */
   label: string;
   points: readonly SeriesPoint[];
+  /**
+   * §6.4a. **`'shadow'` is the other seat in a principal's car** — a series the surface added
+   * rather than one the reader chose. It never consumes a comparison slot, it takes the car's
+   * colour and marker shape and is separated by the seat dash, and it draws at three-quarters of
+   * the mark stroke so a pair reads principal-forward. Defaults to `'principal'`.
+   */
+  role?: SeriesRole;
 }
 
 /** One categorical bar. */
