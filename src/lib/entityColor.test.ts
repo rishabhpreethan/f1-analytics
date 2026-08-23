@@ -7,7 +7,6 @@ import {
   identityToken,
   plotToken,
   rampSlot,
-  shadePair,
   type ChartEntity,
   type PlotToken,
 } from './entityColor';
@@ -49,8 +48,6 @@ describe('§3.3a.3 — the contract is a token NAME, and nothing here is a colou
       plotToken(FERRARI),
       plotToken(BRM),
       plotToken(HAAS),
-      JSON.stringify(shadePair(FERRARI)),
-      JSON.stringify(shadePair(BRM)),
       JSON.stringify(assignEntityColours([entity('a', FERRARI), entity('b', FERRARI)])),
     ].join(' ');
     expect(surface).not.toMatch(HEX);
@@ -218,19 +215,17 @@ describe('§6.4a — colour is the car, the dash is the seat (ruled 2026-08-23)'
     expect(assignEntityColours(many).every((member) => member.colourExhausted)).toBe(true);
   });
 
-  it('keeps the retired shade pair generating valid, separated tokens', () => {
+  it('offers no shade-pair entry point at all — the palette has 22 tokens, not 64', () => {
     /*
-     * `shadePair` is called by nothing since 2026-08-23 and the `--*-plot-deep` / `-bright` tokens
-     * are retired from use rather than deleted — deleting them means regenerating the emitter and
-     * unpicking §9.2.3's V-27 / G-27a–e record, which is a separate change. Until then the tokens
-     * still have to be well-formed, or a later reviver would find a broken channel.
+     * `shadePair()` and its 84 declarations were deleted on 2026-08-23 (§9.2.8) for a measured
+     * 0.61 KB of the render-blocking CSS budget. Asserted as a property of the token universe
+     * rather than as `typeof shadePair === 'undefined'`, which typecheck already refuses to
+     * compile: what a later change can actually do is regenerate the emitter from an older
+     * revision and put the tokens back, and then `PLOT_TOKENS` grows and every COLLISION_MASKS
+     * index shifts under `collides()`.
      */
-    const pair = shadePair(FERRARI);
-    expect(pair).not.toBeNull();
-    if (pair !== null) expect(collides(pair.deep, pair.bright)).toBe(false);
-    const ramp = shadePair(BRM);
-    expect(ramp?.deep).toBe(`--ramp-${String(rampSlot(BRM))}-plot-deep`);
-    expect(shadePair(SAUBER)).toBeNull();
+    expect(PLOT_TOKENS.filter((name) => /-plot-(deep|bright)$/.test(name))).toEqual([]);
+    expect(PLOT_TOKENS).toHaveLength(22);
   });
 });
 
@@ -301,14 +296,19 @@ describe('§6.4 — collision lookup', () => {
   });
 
   it('does find collisions somewhere — a table of all-false would pass every test above', () => {
-    // 663 of 2016 pairs collide (§9.2.4). A masks array of zeros is the failure this catches.
+    /*
+     * 87 of the 231 pairs collide, regenerated 2026-08-23 when the shade pair was deleted (§9.2.8);
+     * it read 663 of 2016 while the palette carried 64 tokens (§9.2.4). A masks array of zeros is
+     * the failure this catches — every "these two are separated" assertion above passes vacuously
+     * against one.
+     */
     let found = 0;
     for (let i = 0; i < PLOT_TOKENS.length; i += 1) {
       for (let j = i + 1; j < PLOT_TOKENS.length; j += 1) {
         if (collides(PLOT_TOKENS[i] as PlotToken, PLOT_TOKENS[j] as PlotToken)) found += 1;
       }
     }
-    expect(found).toBe(663);
+    expect(found).toBe(87);
   });
 
   it('assumes the worst for a token it does not know', () => {

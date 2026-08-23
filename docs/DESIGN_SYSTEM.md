@@ -1790,14 +1790,17 @@ the wrong direction. Revisit only with a capture.
 **The collision ladder is therefore three rungs, not four** (§6.4): direct label, marker shape,
 texture. Dash left it.
 
-**The shade-pair tokens are retired from use, not yet deleted.** `--*-plot-deep` / `-bright` are
-still generated into `src/styles/entity.css` (88 declarations), still listed in `PLOT_TOKENS`, and
-still gated by §9.2.3's V-27 and G-27a–e. `shadePair()` survives and is called by nothing; a test
-asserts the tokens it names remain well-formed and separated. **Deleting them is a queued
-follow-up** and it is not free: it means gutting V-27 and G-27a–e from a 2,795-line validator,
-regenerating `entityColorData.ts` (the collision masks are indexed over `PLOT_TOKENS`, so dropping
-32 of the 64 tokens re-indexes every mask) and rewriting `entity.css.test.ts`. The prize is CSS
-budget, which is the binding budget at 81.3% — **the measured saving is 0.61 KB gzipped, recorded in §9.2.7.**
+**The shade-pair tokens are ~~retired from use, not yet deleted~~ DELETED — 2026-08-23, §9.2.8.**
+The follow-up this paragraph queued has been taken, and the figure §9.2.7 projected held exactly:
+render-blocking CSS **20.77 → 20.16 KB**, a **0.61 KB** saving and 2.4 points of a 25 KB budget,
+spent on the four comparison charts in §6.6.6.14. What went with it: 84 declarations from
+`src/styles/entity.css`, `shadePair()` from `entityColor.ts`, `SHADE_PAIR_TEAMS` from
+`entityColorData.ts`, and V-27 plus G-27a–e from the validator. **`PLOT_TOKENS` went from 64 entries
+to 22**, so every `COLLISION_MASKS` index moved — the two are emitted by the same function in the
+same pass and can only move together, which is the property that made a 32-token deletion safe.
+`entity.css.test.ts` now asserts the **absence**, because reappearance is what a later change can
+actually cause: an emitter regenerated from an older revision puts them back, the stylesheet still
+parses, and the budget silently loses the 2.4 points again.
 
 **Cross-era normalisation is made visible, never applied silently.** When a team-mate comparison
 spans a regulation change or a scoring change, the chart carries a `--status-info` note above the
@@ -4739,6 +4742,40 @@ the encoding reversal**: the tokens are indexed into `COLLISION_MASKS` by their 
 `PLOT_TOKENS`, so dropping 32 of the 64 re-indexes every mask in `entityColorData.ts`, and V-27 plus
 G-27a–e in a 2,795-line validator exist only to gate them. Queued as its own change, with this
 figure as its justification.
+
+✅ **Taken 2026-08-23 — see §9.2.8. The projection was exact.**
+
+#### 9.2.8 M-2 — the deletion, executed 2026-08-23
+
+The same method as §9.2.7, run for real rather than as a probe: the declarations are gone from the
+tree, not stubbed out for a measurement.
+
+| Render-blocking CSS | Figure | % of the 25 KB budget |
+|---|---|---|
+| Before (`main` at `34a4c9f`) | **20.77 KB** | 83.1% |
+| After the deletion | **20.16 KB** | 80.7% |
+| **Reclaimed** | **0.61 KB** | **2.4 points** |
+
+**§9.2.7's probe measured 20.35 → 19.74 and this run measured 20.77 → 20.16.** Both baselines are
+correct: the probe ran before the F7 season lens and picker landed, which added 0.42 KB of
+`compare.css` between them. **The saving is the invariant, not the baseline** — which is the reason
+§9.2.7 recorded a delta and not just a target figure.
+
+**What was deleted, in one change:** 84 declarations across both theme blocks of
+`src/styles/entity.css`; `shadePair()` and `HAS_SHADE_PAIR` from `src/lib/entityColor.ts`;
+`SHADE_PAIR_TEAMS` and 42 of the 64 `PLOT_TOKENS` from `src/lib/entityColorData.ts`, with all 22
+remaining `COLLISION_MASKS` regenerated (**87 of 231 pairs collide**, against 663 of 2016 before —
+a *rate* of 37.7% against 32.9%, and the rise is not a regression: what remains is exactly the set
+of colours the product actually assigns, and better than a third of its pairs still need the ladder.
+The old denominator was inflated by pairs no two entities could ever have been given); and
+`plottableShades`,
+`shadePair`, `pairBothThemes`, `shadePairIgnoringTiming`, V-27 and G-27a–e from
+`scripts/validate-palette.mjs`, which is 226 lines lighter and still exits 0 with no FAIL.
+
+**`validate:palette` prints a V-27 tombstone rather than skipping the number.** A validator that
+silently stops reporting a check reads identically to one whose check passed. The tombstone names
+what was measured, where the figures live (§9.2.3 V-27, G-27d's Sauber attribution) and why the
+gate is gone rather than failing.
 
 
 ## 10. Theming mechanics

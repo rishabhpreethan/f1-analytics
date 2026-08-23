@@ -6,9 +6,8 @@ import INDEX_CSS from './index.css?raw';
  * `entity.css` is **generated** (`DESIGN_SYSTEM.md` §3.3a), and that is the whole reason this file
  * exists. It asserts properties of the *result* that the emitter could get wrong without any of them
  * being visible in a screenshot: a dark-block token that does not exist (so `var()` silently serves
- * the light value), a `deep`/`bright` pair whose lightness ordering is inverted (so every consumer's
- * semantics flip while nothing looks broken), a series colour that has drifted grey, or the whole
- * layer never being imported.
+ * the light value), a series colour that has drifted grey, a retired shade-pair token creeping back
+ * into the budget, or the whole layer never being imported.
  *
  * **The byte-identical drift check is in `scripts/entity-tokens.test.mjs`, not here**, because it
  * needs `node:child_process` and `src/**` is compiled by `tsconfig.app.json`, which deliberately
@@ -194,9 +193,7 @@ describe('identity is separate from plotting (§3.3, §3.3a)', () => {
      */
     for (const theme of THEMES) {
       for (const team of ACHROMATIC_BRANDS) {
-        for (const role of ['plot', 'plot-deep', 'plot-bright']) {
-          expect(tokens(theme).has(`--team-${team}-${role}`), `--team-${team}-${role}`).toBe(false);
-        }
+        expect(tokens(theme).has(`--team-${team}-plot`), `--team-${team}-plot`).toBe(false);
       }
     }
   });
@@ -207,11 +204,7 @@ describe('the fallback ramp covers all 12 slots (§3.3a — 202 of 214 teams nee
     for (const theme of THEMES) {
       const declared = tokens(theme);
       for (let slot = 1; slot <= RAMP_SLOTS; slot += 1) {
-        for (const role of ['plot', 'plot-deep', 'plot-bright']) {
-          expect(declared.has(`--ramp-${slot}-${role}`), `--ramp-${slot}-${role} in ${theme}`).toBe(
-            true,
-          );
-        }
+        expect(declared.has(`--ramp-${slot}-plot`), `--ramp-${slot}-plot in ${theme}`).toBe(true);
       }
     }
   });
@@ -247,90 +240,35 @@ describe('every plotting colour is usable as a mark', () => {
   });
 });
 
-describe('the teammate shade pair (§6.4a)', () => {
-  const entities = () => [
-    ...BRANDED.filter((team) => !ACHROMATIC_BRANDS.includes(team as never)).map(
-      (team) => `--team-${team}`,
-    ),
-    ...Array.from({ length: RAMP_SLOTS }, (_, i) => `--ramp-${i + 1}`),
-  ];
-
-  it('is present as a pair or absent as a pair, never as a half', () => {
-    /*
-     * A half-pair is the failure mode with no visual signature: the chart asks for
-     * `-plot-bright`, gets nothing, and both teammates render in the same colour — which is
-     * exactly the state §6.4a's marker and dash channels are meant to be *redundant* with, not
-     * the state they are meant to rescue silently.
-     */
+describe('the teammate shade pair is GONE, and must stay gone (§6.4a, §9.2.8)', () => {
+  /*
+   * 84 `--*-plot-deep` / `-bright` declarations were deleted on 2026-08-23. §6.4a had already
+   * withdrawn them from use — colour identifies the car, the dash identifies the seat — and the
+   * deletion reclaimed a measured 0.61 KB gzipped of a 25 KB render-blocking CSS budget (§9.2.7).
+   *
+   * This asserts the *absence*, because absence is what a later change can destroy. Regenerating
+   * from an older emitter, or "completing the palette for symmetry", puts them back silently: the
+   * stylesheet still parses, every other test here still passes, and the budget quietly loses 2.4
+   * points to tokens no component can name.
+   */
+  it('declares no shade-pair token in either theme', () => {
     for (const theme of THEMES) {
-      const declared = tokens(theme);
-      for (const entity of entities()) {
-        expect(
-          declared.has(`${entity}-plot-deep`),
-          `${entity}-plot-deep / -bright disagree in ${theme}`,
-        ).toBe(declared.has(`${entity}-plot-bright`));
-      }
+      const shades = [...tokens(theme).keys()].filter(
+        (name) => name.endsWith('-plot-deep') || name.endsWith('-plot-bright'),
+      );
+      expect(shades, `${theme} still declares ${shades.length} shade-pair token(s)`).toEqual([]);
     }
   });
 
-  it('orders deep below bright in OkLab lightness, which is what the names promise', () => {
+  it('leaves exactly one plotting token per plotting entity — 22, not 64', () => {
     /*
-     * The pair's separation is built on lightness because it is the one channel every dichromat
-     * keeps in full. If the emitter ever returned them the other way round, every consumer's
-     * semantics invert and nothing looks broken — a driver simply swaps shade.
+     * The count, not just the suffix, because it is the figure `PLOT_TOKENS` and every
+     * `COLLISION_MASKS` index are built from. 10 branded plotting teams (12 brands less the two
+     * achromatic ones) plus the 12 ramp slots.
      */
     for (const theme of THEMES) {
-      const declared = tokens(theme);
-      for (const entity of entities()) {
-        const deep = declared.get(`${entity}-plot-deep`);
-        const bright = declared.get(`${entity}-plot-bright`);
-        if (deep === undefined || bright === undefined) continue;
-        expect(oklab(deep).L, `${entity} in ${theme}: ${deep} vs ${bright}`).toBeLessThan(
-          oklab(bright).L,
-        );
-      }
-    }
-  });
-
-  it('never pairs a shade with itself', () => {
-    for (const theme of THEMES) {
-      const declared = tokens(theme);
-      for (const entity of entities()) {
-        const deep = declared.get(`${entity}-plot-deep`);
-        const bright = declared.get(`${entity}-plot-bright`);
-        if (deep === undefined || bright === undefined) continue;
-        expect(deep, `${entity} in ${theme}`).not.toBe(bright);
-      }
-    }
-  });
-
-  it('holds the entity hue across the pair, so two teammates read as one team', () => {
-    /*
-     * Not asserted as a ΔE — that is the validator's job. Asserted as *hue*, because the design
-     * claim §6.4a makes is specifically that the split spends lightness and nothing else. A pair
-     * that had drifted in hue would still separate, and would have stopped meaning "same team".
-     */
-    const hue = (hex: string) => {
-      const [r, g, b] = linearRgb(hex);
-      const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-      const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-      const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-      const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
-      const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
-      return ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360;
-    };
-    for (const theme of THEMES) {
-      const declared = tokens(theme);
-      for (const entity of entities()) {
-        const deep = declared.get(`${entity}-plot-deep`);
-        const bright = declared.get(`${entity}-plot-bright`);
-        if (deep === undefined || bright === undefined) continue;
-        const gap = Math.abs(hue(deep) - hue(bright)) % 360;
-        expect(
-          Math.min(gap, 360 - gap),
-          `${entity} in ${theme}: ${deep} -> ${bright} moved hue`,
-        ).toBeLessThan(6);
-      }
+      const plotting = [...tokens(theme).keys()].filter((name) => name.endsWith('-plot'));
+      expect(plotting, theme).toHaveLength(BRANDED.length - ACHROMATIC_BRANDS.length + RAMP_SLOTS);
     }
   });
 });
