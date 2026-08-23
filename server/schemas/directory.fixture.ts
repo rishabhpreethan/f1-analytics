@@ -10,8 +10,18 @@ import type { CircuitList, DriverList, TeamList } from './directory';
  *
  * **Every row is a real one a reader can check, and the awkward cases are deliberate.**
  * Ecclestone and Life are the never-raced case the module ruling is about; Madring is the
- * scheduled-but-unrun venue; Räikkönen and Pérez are the two names SQLite's BINARY
- * collation misplaces, which is what the client-side collator is tested against.
+ * scheduled-but-unrun venue and the Nürburgring the retired one; Räikkönen and Pérez are
+ * the two names SQLite's BINARY collation misplaces, which is what the client-side
+ * collator is tested against.
+ *
+ * The achievement fields are covered across their whole range on purpose, so a surface
+ * built against this fixture meets every state it will meet in production: a champion
+ * (Alonso 2, Räikkönen 1), a **runner-up who never won a title** (Pérez, best P2, which is
+ * the state `championships` alone cannot express), a driver who raced once and never
+ * placed (Ryan, `bestChampionshipPosition: null`), and two who never raced at all.
+ *
+ * Every number here was read from `data/f1.db` on 2026-08-23 and matches the profile
+ * endpoint for the same entity. They are not round numbers and must not be "tidied".
  */
 
 export const driverListFixture: DriverList = {
@@ -24,6 +34,11 @@ export const driverListFixture: DriverList = {
       nationality: 'Spanish',
       countryCode: 'ESP',
       races: 438,
+      starts: 435,
+      wins: 32,
+      podiums: 106,
+      championships: 2,
+      bestChampionshipPosition: 1,
       firstSeason: 2001,
       lastSeason: 2026,
     },
@@ -36,6 +51,11 @@ export const driverListFixture: DriverList = {
       nationality: 'British',
       countryCode: 'GBR',
       races: 0,
+      starts: 0,
+      wins: 0,
+      podiums: 0,
+      championships: 0,
+      bestChampionshipPosition: null,
       firstSeason: null,
       lastSeason: null,
     },
@@ -48,6 +68,11 @@ export const driverListFixture: DriverList = {
       nationality: null,
       countryCode: 'USA',
       races: 0,
+      starts: 0,
+      wins: 0,
+      podiums: 0,
+      championships: 0,
+      bestChampionshipPosition: null,
       firstSeason: null,
       lastSeason: null,
     },
@@ -59,6 +84,11 @@ export const driverListFixture: DriverList = {
       nationality: 'Mexican',
       countryCode: 'MEX',
       races: 293,
+      starts: 291,
+      wins: 6,
+      podiums: 39,
+      championships: 0,
+      bestChampionshipPosition: 2,
       firstSeason: 2011,
       lastSeason: 2026,
     },
@@ -70,6 +100,11 @@ export const driverListFixture: DriverList = {
       nationality: 'Finnish',
       countryCode: 'FIN',
       races: 352,
+      starts: 351,
+      wins: 21,
+      podiums: 103,
+      championships: 1,
+      bestChampionshipPosition: 1,
       firstSeason: 2001,
       lastSeason: 2021,
     },
@@ -81,6 +116,11 @@ export const driverListFixture: DriverList = {
       nationality: 'Canadian',
       countryCode: 'CAN',
       races: 1,
+      starts: 1,
+      wins: 0,
+      podiums: 0,
+      championships: 0,
+      bestChampionshipPosition: null,
       firstSeason: 1961,
       lastSeason: 1961,
     },
@@ -95,6 +135,10 @@ export const teamListFixture: TeamList = {
       nationality: 'Italian',
       countryCode: 'ITA',
       races: 1134,
+      wins: 250,
+      podiums: 845,
+      championships: 16,
+      bestChampionshipPosition: 1,
       firstSeason: 1950,
       lastSeason: 2026,
     },
@@ -105,6 +149,10 @@ export const teamListFixture: TeamList = {
       nationality: 'Italian',
       countryCode: 'ITA',
       races: 0,
+      wins: 0,
+      podiums: 0,
+      championships: 0,
+      bestChampionshipPosition: null,
       firstSeason: null,
       lastSeason: null,
     },
@@ -114,6 +162,10 @@ export const teamListFixture: TeamList = {
       nationality: 'British',
       countryCode: 'GBR',
       races: 962,
+      wins: 199,
+      podiums: 546,
+      championships: 10,
+      bestChampionshipPosition: 1,
       firstSeason: 1968,
       lastSeason: 2026,
     },
@@ -128,11 +180,14 @@ export const circuitListFixture: CircuitList = {
       locality: 'Monza',
       country: 'Italy',
       countryCode: 'ITA',
+      latitude: 45.6156,
+      longitude: 9.28111,
       // 76 numbered rounds, 75 with results — the 76th is 2026's and has not been run.
       roundsHeld: 76,
       racesWithResults: 75,
       firstYear: 1950,
       lastYear: 2025,
+      lastScheduledYear: 2026,
     },
     {
       // Scheduled for 2026 R14 and never yet raced. Trap 13, not a gap.
@@ -141,10 +196,13 @@ export const circuitListFixture: CircuitList = {
       locality: 'Madrid',
       country: 'Spain',
       countryCode: 'ESP',
+      latitude: 40.46528,
+      longitude: -3.61528,
       roundsHeld: 1,
       racesWithResults: 0,
       firstYear: null,
       lastYear: null,
+      lastScheduledYear: 2026,
     },
     {
       ref: 'silverstone',
@@ -152,10 +210,30 @@ export const circuitListFixture: CircuitList = {
       locality: 'Silverstone',
       country: 'UK',
       countryCode: 'GBR',
+      latitude: 52.0786,
+      longitude: -1.01694,
       roundsHeld: 61,
       racesWithResults: 61,
       firstYear: 1950,
       lastYear: 2026,
+      lastScheduledYear: 2026,
+    },
+    {
+      // Retired: 41 rounds, the last of them run in 2020. 53 of 78 circuits are this case,
+      // and `lastScheduledYear` is the only field that separates them from the 25 current
+      // ones — `lastYear` cannot, because Madring's is null.
+      ref: 'nurburgring',
+      name: 'Nürburgring',
+      locality: 'Nürburg',
+      country: 'Germany',
+      countryCode: 'DEU',
+      latitude: 50.3356,
+      longitude: 6.9475,
+      roundsHeld: 41,
+      racesWithResults: 41,
+      firstYear: 1951,
+      lastYear: 2020,
+      lastScheduledYear: 2020,
     },
   ],
 };

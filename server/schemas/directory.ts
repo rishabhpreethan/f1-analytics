@@ -15,10 +15,21 @@ import { entityRefSchema } from './season';
  *
  * ===================================================== what these are, and what they are not
  *
- * A **directory**: enough to render a browsable, sortable, filterable list that links to a
- * profile. Deliberately *not* a dashboard — no wins, no podiums, no championships. Those
- * are the profile's, and putting them here would mean 881 careers aggregated to answer
- * "which page do I want".
+ * A **directory that can be ranked, stratified and grouped** — enough to render a browsable
+ * list that tells a reader something before they click, and links to a profile for the rest.
+ *
+ * **This is a deliberate reversal.** The first version of this module argued the opposite:
+ * "deliberately *not* a dashboard — no wins, no podiums, no championships". That produced
+ * a payload with nothing in it to sort by except a name and a race count, so the only page
+ * the data permitted was a search box, and the search box was rejected on sight
+ * (2026-08-23). The principle was defensible and the result was not: a directory with no
+ * achievement in it cannot be designed, only listed. **Do not re-narrow this payload
+ * without a page design that works on what is left.**
+ *
+ * What it is still not: a profile. There is no per-season array, no per-race row and no
+ * nested object anywhere — every added field is one integer, so 881 rows cost 22.6 KB
+ * gzipped rather than a megabyte. **The rule for anything further is: a scalar, or not at
+ * all.**
  *
  * **Every field name and definition matches the profile payload it corresponds to**, so a
  * number does not change when the reader clicks through:
@@ -26,13 +37,56 @@ import { entityRefSchema } from './season';
  * | index | profile | definition |
  * |---|---|---|
  * | `driver.races` | `driver.totals.races` | distinct races entered |
+ * | `driver.starts` | `driver.totals.starts` | of those, the ones that began |
+ * | `driver.wins` / `podiums` | `driver.totals.wins` / `podiums` | races finished 1st / top-three |
+ * | `driver.championships` | `driver.totals.championships` | titles — P1 in the **final** standing of a **complete** season |
  * | `driver.firstSeason` / `lastSeason` | `driver.career.firstSeason` / `lastSeason` | first/last season with a race entry |
- * | `team.races` | `team.totals.races` | distinct Grands Prix entered |
+ * | `team.races` / `wins` / `podiums` / `championships` | `team.totals.*` | the same four |
  * | `circuit.roundsHeld` / `racesWithResults` / `firstYear` / `lastYear` | the same four, top level on `circuit` | see `schemas/circuit.ts` |
+ * | `circuit.latitude` / `longitude` | `circuit.circuit.latitude` / `longitude` | as recorded |
  *
- * Verified against the live database at build time: Alonso 438 races 2001–2026, Schumacher
- * 308, Monza `roundsHeld` 76 / `racesWithResults` 75, all matching the profile endpoints.
+ * `bestChampionshipPosition` (both entities) and `lastScheduledYear` (circuits) are the
+ * only fields with **no** profile counterpart. Both are derivable from the profile —
+ * `min(position)` over complete seasons, and `max(year)` over numbered rounds — and
+ * `queries/directory.test.ts` asserts them against the profile's own arrays rather than
+ * against a copy of this SQL.
+ *
+ * Verified against the live database: Alonso 438 races / 435 starts / 32 wins / 106 podiums
+ * / 2 titles, Schumacher 308 / 307 / 91 / 155 / 7, Ferrari 250 wins and 16 constructors'
+ * titles, Monza `roundsHeld` 76 / `racesWithResults` 75, all matching the profile endpoints.
  * `queries/directory.test.ts` asserts the equality rather than trusting this table.
+ *
+ * ============================================ a title is not "led the championship once"
+ *
+ * **`championships` is the trap this project has already shipped once.** The naive query —
+ * `SELECT count(DISTINCT driver_id) FROM driver_championship WHERE position = 1` — returns
+ * **66** drivers, because `driver_championship` holds a **per-round snapshot** and 66
+ * drivers have led a championship at some point in a season. The answer is **35**.
+ *
+ * Two independent gates produce that, and both are structural rather than remembered:
+ *
+ * 1. The SQL joins `last_snapshot`, so only the **final** round's standing of each season
+ *    can enter the fold at all. A mid-season lead is not in the result set.
+ * 2. `foldChampionshipStandings` takes the season-completeness map as a **required
+ *    argument**, so a season still being run cannot yield a title. Without it the 2026
+ *    data — 10 of 22 rounds — would hand Antonelli a championship and Mercedes a ninth
+ *    constructors' title. It is the same gate `queries/drivers.ts` and `queries/teams.ts`
+ *    apply for `isChampion`, reading the same memoised map, which is why the index and the
+ *    profile cannot disagree.
+ *
+ * ==================================================== what is deliberately **not** here
+ *
+ * - **Points.** 24 scoring systems and several best-N-results eras: a career total is not
+ *   a comparable number (trap 4). Nothing on this payload sums points.
+ * - **Poles.** Measured before rejecting: qualifying classifications exist for **3 of
+ *   Senna's 161 races** and 192 of Schumacher's 308, and Clark and Fangio have none at all.
+ *   A `poles` column would print 3 next to Senna's name on a page whose whole purpose is
+ *   ranking. The profile can carry the figure because it carries `racesWithQualifying`
+ *   beside it and the prose to explain the window; a list row cannot.
+ * - **Fastest laps.** Present for 1958–59 and 2004+, absent for the 44 seasons between
+ *   (trap 18). Same argument.
+ * - **Brand colour.** As everywhere: `ref` is what `src/lib/entityColor.ts` needs, and 202
+ *   of 214 teams have none (trap 6).
  *
  * ======================================== the index lists the whole archive — the ruling
  *
@@ -66,6 +120,13 @@ import { entityRefSchema } from './season';
  * can tell an entered-only entity from a racing one **before** the click, without a second
  * request.
  *
+ * **`races === 0` is sufficient to separate them and is the field to use.** It is one
+ * comparison, it needs nothing from `/api/meta`, and `queries/directory.test.ts` asserts
+ * the count it selects (63 drivers, 9 teams) on every run, so a database refresh that
+ * changes the population fails a test rather than changing a page quietly. A UI that
+ * defaults them out of the main browse and keeps them reachable is the intended use; no
+ * second request is needed for either half.
+ *
  * ===================================================================== ordering, and why
  *
  * The rows arrive in a documented, deterministic order — drivers by surname then forename
@@ -89,6 +150,13 @@ import { entityRefSchema } from './season';
  * 2026 is in progress with 10 of 22 rounds run, and a driver racing in it must read as
  * active rather than as a career that ends mid-year. `selectEntityActivity` in
  * `src/features/entity/selectors.ts` is the one implementation.
+ *
+ * **So there is no `isCurrent` boolean on any of these rows, and that is the answer to
+ * "who is on the current grid" rather than an omission.** It resolves to 22 drivers and 11
+ * teams on the present data. Publishing the boolean as well would mean a row that can
+ * disagree with `/api/meta` after a refresh, and it would be a *different* answer per
+ * entity kind while the rule is one rule. The circuit equivalent is `lastScheduledYear`
+ * against the same year, because a venue's round can be scheduled and unrun.
  *
  * ============================================== no brand colour crosses this boundary
  *
@@ -123,6 +191,43 @@ export const driverListItemSchema = z.strictObject({
    * header for what those 63 are.
    */
   races: z.number().int().nonnegative(),
+  /**
+   * Of those races, the ones that **began** — `totals.starts` on the profile, so a race
+   * classified `didNotStart` (status 30) or `didNotQualify` (status 40) is excluded.
+   *
+   * Never greater than `races`, and different from it for **241 drivers** (Alonso 438/435,
+   * Schumacher 308/307). The pair exists because both are real career figures and a page
+   * that labels `races` as "starts" would be wrong for all 241.
+   */
+  starts: z.number().int().nonnegative(),
+  /** Races won — `totals.wins`. **116 of 881 drivers are non-zero**; 702 who raced are 0. */
+  wins: z.number().int().nonnegative(),
+  /** Races finished in the top three — `totals.podiums`. Never less than `wins`. */
+  podiums: z.number().int().nonnegative(),
+  /**
+   * Drivers' titles — `totals.championships`. **35 drivers are non-zero.**
+   *
+   * P1 in the **final** standing of a **complete** season, both halves load-bearing: see
+   * the module header for the 66-vs-35 trap this guards.
+   */
+  championships: z.number().int().nonnegative(),
+  /**
+   * Career-best drivers' championship position, over complete seasons only.
+   *
+   * **Null for 498 of 881** — the 63 who never raced, plus 435 who raced and never held a
+   * classified position in a final standing (no points under a system that ranked only
+   * scorers). Null therefore means "never placed", not "unknown", and it is the honest
+   * bottom of the ladder rather than a large number.
+   *
+   * It exists because `wins` and `championships` are zero for the overwhelming majority —
+   * 702 of the 818 who raced never won a race — so without it most of the list is flat.
+   * Non-null for **383**: 35 at 1, 36 best 2–3, 103 best 4–10, 161 best 11–20, 48 at 21+.
+   *
+   * Both fields come from the same filtered rows, so `bestChampionshipPosition === 1` and
+   * `championships > 0` are equivalent **by construction** — asserted on all 881 rows
+   * rather than left as an intention. Neither reads a title from an in-progress season.
+   */
+  bestChampionshipPosition: z.number().int().positive().nullable(),
   /** First season with a race entry. Null **exactly** when `races` is 0. */
   firstSeason: seasonYearSchema.nullable(),
   /**
@@ -154,6 +259,37 @@ export const teamListItemSchema = z.strictObject({
   countryCode: z.string().min(1).max(8).nullable(),
   /** Distinct Grands Prix entered — `totals.races` on the profile. **0 for 9 teams.** */
   races: z.number().int().nonnegative(),
+  /**
+   * Grands Prix won — `totals.wins`. **47 of 214 teams are non-zero.**
+   *
+   * Distinct **races**, not winning cars: three races in the archive hold two P1 rows
+   * (trap 16), so a row count would give Alfa Romeo two wins for the 1951 French Grand Prix.
+   */
+  wins: z.number().int().nonnegative(),
+  /**
+   * Podium **places** — `totals.podiums`, and deliberately not the same shape as the
+   * driver field. A 1–2 finish is two podiums for the team and one for each driver, so this
+   * counts distinct `(race, position)` slots: Ferrari 845 from 1,134 races.
+   */
+  podiums: z.number().int().nonnegative(),
+  /**
+   * Constructors' titles — `totals.championships`. **17 teams are non-zero**: Ferrari 16,
+   * McLaren 10, Williams 9, Mercedes 8, Red Bull 6.
+   *
+   * **0 is correct for a team that dominated before 1958** — Alfa Romeo won the first two
+   * drivers' titles and has 0 here, because the constructors' championship did not exist
+   * yet. `bestChampionshipPosition` is null for exactly those teams, which is the signal to
+   * render "no constructors' championship" rather than "never won one".
+   */
+  championships: z.number().int().nonnegative(),
+  /**
+   * Career-best constructors' championship position, over complete seasons only.
+   *
+   * **Non-null for 95 of 214.** Null covers the 9 that never started, every team whose
+   * whole life predates 1958, and every team that never held a classified position in a
+   * final constructors' standing.
+   */
+  bestChampionshipPosition: z.number().int().positive().nullable(),
   /** Null **exactly** when `races` is 0. */
   firstSeason: seasonYearSchema.nullable(),
   lastSeason: seasonYearSchema.nullable(),
@@ -184,6 +320,16 @@ export const circuitListItemSchema = z.strictObject({
   locality: z.string().min(1).nullable(),
   country: z.string().min(1).nullable(),
   countryCode: z.string().min(1).max(8).nullable(),
+  /**
+   * As recorded on the circuit, identical to `circuit.latitude` / `longitude` on the
+   * profile. Populated on all 78 today and nullable anyway, matching `circuitSchema`.
+   *
+   * Published because a circuit index is a **map**, and a map is the one design a list of
+   * 78 venues actually wants. They are decimal degrees, WGS 84, and are the venue's
+   * location — not a track outline, which this dataset does not hold.
+   */
+  latitude: z.number().min(-90).max(90).nullable(),
+  longitude: z.number().min(-180).max(180).nullable(),
   /** Numbered rounds scheduled at this venue, **including any not yet run**. */
   roundsHeld: z.number().int().nonnegative(),
   /** Of those, how many hold classification rows. */
@@ -191,6 +337,20 @@ export const circuitListItemSchema = z.strictObject({
   /** First year with results. Null **exactly** when `racesWithResults` is 0. */
   firstYear: seasonYearSchema.nullable(),
   lastYear: seasonYearSchema.nullable(),
+  /**
+   * The last year this venue holds a **numbered round**, run or not. Null exactly when
+   * `roundsHeld` is 0 (no circuit today).
+   *
+   * **This is the field that answers "is it still on the calendar", and `lastYear` is
+   * not.** Compare it against `/api/meta`'s `latestSeason.year`: 25 circuits reach 2025 or
+   * later, 22 of them are on the 2026 calendar, and 53 are retired. Madring reads
+   * `lastScheduledYear` 2026 with `lastYear` null — a venue joining the calendar, which
+   * `lastYear` alone would file under "never raced" (trap 13). Monza reads 2026 and 2025:
+   * still current, this year's round not yet run.
+   *
+   * Never less than `lastYear`, asserted on all 78 rows.
+   */
+  lastScheduledYear: seasonYearSchema.nullable(),
 });
 
 export const circuitListSchema = z.strictObject({

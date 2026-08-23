@@ -463,6 +463,37 @@ WHERE dc.year = ?
 ORDER BY dc.position;
 ```
 
+### 6.6a Career titles, for every entity at once
+
+The index endpoints need "how many championships has each driver won" across the whole archive.
+**Do not write `WHERE position = 1` against these tables** — that is trap 25, and it answers a
+different question (who has ever *led* a championship: 66 drivers, not 35).
+
+Take every season's final snapshot, return the placings, and apply the completeness gate **in
+application code**, because whether a season is finished is not in this table:
+
+```sql
+WITH last_snapshot AS (
+  SELECT year, max(round_number * 1000 + session_number) AS k
+  FROM driver_championship
+  GROUP BY year                 -- per year, unlike §6.6, which fixes one season
+)
+SELECT d.reference AS ref, dc.year, dc.position
+FROM driver_championship dc
+JOIN last_snapshot ls
+  ON ls.year = dc.year AND (dc.round_number * 1000 + dc.session_number) = ls.k
+JOIN driver d ON d.id = dc.driver_id
+WHERE dc.position IS NOT NULL;  -- 1,664 rows of 3,128; a null placing is neither a title
+                                -- nor a career best
+```
+
+`team_championship` takes the identical shape and returns 712 rows. Then, per reference:
+`championships` is the count of rows with `position = 1` **whose year is a complete season**, and
+`bestChampionshipPosition` is `min(position)` over the same filtered rows. Dropping the
+completeness filter is not a rounding error — it awards the current season's leader a title.
+
+Verified: 35 drivers and 17 teams, matching `totals.championships` on every profile endpoint.
+
 ### 6.7 Stints from pit stops
 
 ```sql
@@ -553,11 +584,12 @@ lap time inflates beyond a threshold, and **label them inferred** — never as f
 
 ## 7. Traps — read before writing any query
 
-**There are 24.** `CLAUDE.md` and `.claude/agents/*.md` still say "the 14 traps"; this table is the
+**There are 25.** `CLAUDE.md` and `.claude/agents/*.md` still say "the 14 traps"; this table is the
 authority. Trap 16 was found in F2 by querying rather than by reading, **traps 17–21 were found
 in F3**, the first feature to touch `lap` and `pit_stop` in anger, **trap 22 was found by a
-shipped display defect**, and **traps 23–24 were found in F4**, the first feature to ask a
-career-length question — every one of them by running a query rather than by reading this
+shipped display defect**, **traps 23–24 were found in F4**, the first feature to ask a
+career-length question, and **trap 25 was found in F7**, the first to count titles across the
+whole archive at once — every one of them by running a query rather than by reading this
 document. The count in those other files is stale — flagged rather than edited, because they are not
 this document's to change.
 
@@ -587,6 +619,7 @@ this document's to change.
 | 22 | **`session_entry.detail` changes wording mid-archive, and stops stating the lap deficit in 2023** | §3 says *"use `detail` for display"* and that stands — but **`detail` is not a stable vocabulary across eras**, so a surface that renders it verbatim renders two different things either side of a boundary that belongs to the dataset rather than to the sport. Measured on `status = 1` (classified, down laps) in race sessions: `detail` reads **`+N Laps` on 7,279 rows, every one of them 2022 or earlier**, and the bare word **`Lapped` on 363 rows, every one of them 2023–2026** — a clean split at 2023 with no overlap in either direction. A further 172 rows read `Not classified`, all 2009 or earlier. **The 363 are almost exactly the 364 lapped finishers that carry a `time_ms`**, which is what made this a defect rather than a curiosity: the modern rows are both the ones with a usable time *and* the ones whose `detail` no longer states the deficit, so code that fell back to `detail` for a lap-down car produced `+1 Lap` on 1988 and the word `Lapped` on eleven consecutive rows of 2026 R1. **If a deficit must be shown for those rows it has to be derived**, and the derivation is `max(laps_completed) − laps_completed`: verified against the `lap` table on the 363, where the winner's `laps_completed` equals their `max(lap.number)` on **363 of 363** and the deficit agrees both ways on **362 of 363** (the exception is 2026 R9 Sainz, `laps_completed = 51` against 52 lap rows — trap 21's unreliability, reaching one row). **Prefer the recorded wording over the derivation wherever `detail` states a figure**: the two disagree on **23 of the 7,279** rows that state one, and `laps_completed` is the unreliable half. Do not extend the derivation to a row with `is_classified = 0` — a deficit relative to the winner is a claim about a car that holds a position, and 171 of the 172 `Not classified` rows are unclassified. **And never render `detail` verbatim when it is silent on the figure**, which is the trap's sharpest edge: for `status = 1` the shapes are a closed set of three against two `is_classified` values, and one of the six pairs — `detail = 'Lapped'` with `is_classified = 0`, **2 rows, 2026 R1 Stroll and 2026 R7 Albon** — has no figure and no classified position, so a fallback to `detail` prints the **`status` category's own name** where a magnitude belongs. Those two are genuinely unclassified (43 of 58 laps = 74.1% and 55 of 66 = 83.3%, both under the sport's 90% threshold), so **`is_classified` is the field to trust where it disagrees with `status = 1`'s "classified, down laps"**, and the display for that state is the data's own older wording, `Not classified` — used verbatim on 171 rows from 1950 to 2004. The six pairs and their counts are pinned in `server/queries/race.test.ts`, so a refresh introducing a fourth shape fails a test instead of reaching a screen. |
 | 23 | **The qualifying window is a hole, not a boundary** | §4 says qualifying positions are usable from **1994**, which is true of the first row and false of everything a career metric needs. Counted per year — rounds holding **any** qualifying classification (`QB`, `QA`, `Q1`–`Q3` with a non-NULL position) against rounds with a race: **1994 15/16 · 1995 17/17 · 1996 7/16 · 1997 10/17 · 1998 7/16 · 1999 3/16 · 2000 4/17 · 2001 1/17 · 2002 2/17 · 2003 onward complete.** Before 1994 there are none at all: 0 of the 484 races in the 1950s–80s and 0 across 1990–1993, so §4's note that `QB` sessions "hold zero entries before 1990" understates it by four seasons — the earliest `QB` **entry** is 1994. Consequences that bite: **a career pole count is not comparable across the boundary** — Senna reads 0 poles from 161 races and Häkkinen far fewer than the record — so any pole or qualifying-delta figure must publish the number of races it could have been measured on beside it (`server/schemas/driver.ts`, `racesWithQualifying`). **And `grid = 1` is not a substitute**: it is populated on all 1,173 races, which makes it tempting, but it is the slot the car started from after penalties and it is not even reliably one car — **9 races carry more than one `grid = 1` row**, and 1952 R8 has two *different* cars there (Ascari's 12 and Moss's 32). Publishing it as "poles" would give a complete-looking column that is wrong where nobody could check it. **The 2006+ segments need one more rule**: `Q1`, `Q2` and `Q3` each rank *everyone who took part in that segment*, so a driver's overall qualifying position is the one from the **highest segment they reached** — Verstappen is 3rd in 2024 R1's Q1 and on pole. Reading Q1 for everybody is a different, meaningless number. |
 | 24 | **`fastest_lap_rank` is an island, not a window** | §5.1 of `REQUIREMENTS.md` says fastest laps are "2004+ only" and that is right about the modern boundary and silent about the rest. Counted by year, race sessions carrying an entry with `fastest_lap_rank = 1`: **1958 11/11 and 1959 9/9**, then **zero for every season from 1960 to 2003**, then complete from **2004** onward bar one race in the 2020s. So a career total spanning the gap is not a measurement of anything — Clark reads 0 against a record of 28 — and the figure must travel with the count of the driver's races that carry the flag at all (`server/schemas/driver.ts`, `racesWithFastestLapData`). This is a **different** defect from trap 18, which is about the flag disagreeing with the `lap` table *where both exist*; the `lap` table is the better authority for one session and is unusable for a 438-race career, because answering it there means aggregating over hundreds of thousands of lap rows on a profile request (DL-5, S-10). |
+| 25 | **`driver_championship` / `team_championship` are per-round snapshots, so `WHERE position = 1` finds every championship *leader*, not every champion** | `SELECT count(DISTINCT driver_id) FROM driver_championship WHERE position = 1` returns **66**. The number of drivers who have won a title is **35**; the same query against `team_championship` returns **24** teams where the answer is **17**. The table carries one row per entity **per round**, so anyone who topped the standings after any round of any season satisfies `position = 1` — the 31 who satisfy it without a title include Moss, Massa, Coulthard, Webber, Bottas, Leclerc and Piastri, and two of them — Russell and Antonelli — lead only because of 2026's unfinished rounds. **Two filters are needed and both are easy to forget.** First, take only the season's **final** snapshot, §6.6's `last_snapshot` key — this alone takes 66 down to 36. Second, **exclude seasons that are not finished**: the final snapshot of an in-progress season is a live standing, and on the present data (2026, 10 of 22 rounds) it hands Antonelli a drivers' title and Mercedes a ninth constructors' title. For teams the completeness gate does not change the *count* — Mercedes already has titles — but it changes **Mercedes' own total from 9 to 8**, which is the same defect one level down and the case this project has already hit once. Completeness is *not* in these tables — it is `max(round.number)` numbered rounds all holding race classification rows (trap 15, §6.7a) — so the gate has to come from outside the query, which is why `server/queries/directory.ts` takes the season-completeness map as a **required argument** rather than looking it up. The canonical shape is §6.6a. |
 
 ---
 
