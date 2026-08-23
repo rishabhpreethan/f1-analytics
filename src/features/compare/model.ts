@@ -595,3 +595,80 @@ export function careerArc(entities: readonly CompareEntity[]): CareerArc {
 
   return { series, absences, unranked };
 }
+
+/* ---------------------------------------------------------------------------- places gained */
+
+/** One driver's grid-to-finish record, laid out for a diverging bar. */
+export interface GainRow {
+  ref: string;
+  surname: string;
+  /** Mean places gained per counted race. **Null is a state, not a zero** (§6.6.6.14 C). */
+  mean: number | null;
+  racesCounted: number;
+  gained: number;
+  lost: number;
+  held: number;
+  /** Races with no place change to measure, because they ended without a classification. */
+  excluded: number;
+  /** `|mean| / scale`, 0–1. The bar's length as a fraction of **half** the track. */
+  extent: number;
+  /** Which way it points. `'held'` when the mean is exactly zero — a real result, not an absence. */
+  direction: 'forward' | 'back' | 'held';
+}
+
+export interface PlacesGained {
+  rows: GainRow[];
+  /** The larger of the two half-axes, so the zero line stays in the middle of the track. */
+  scale: number;
+}
+
+/**
+ * **Places gained from the grid.** `DESIGN_SYSTEM.md` §6.6.6.14 C.
+ *
+ * The one instrument here that needed new data, published by `GET /api/compare` from the same
+ * `buildGridVsFinish` the driver page uses — so the two pages cannot disagree about a career.
+ *
+ * **The scale is symmetric and shared**, computed from the selection's own largest absolute mean
+ * and floored at one whole place. Symmetric because the zero line has to sit in the middle of every
+ * track or a reader cannot compare two rows by eye; shared because the measure is the same on every
+ * row, unlike the rate board's five, where each measure keeps its own ceiling. Floored at 1 so a
+ * selection of four drivers who all hover around +0.2 does not draw one of them at the full width
+ * of the track and imply a rout.
+ *
+ * ⚠ **A null mean is a state and never a zero.** 155 of the 818 drivers with a race were never
+ * classified in one they started from a grid slot, and all of them are pickable. A zero-length bar
+ * at the origin says "started and finished level every time", which is a different and false claim
+ * — §1.0's failure mode exactly, absent given the meaning of present.
+ *
+ * ⚠ **`gained`/`lost`/`held` travel with the mean because the two can disagree in sign**, and the
+ * disagreement is the honest part rather than an anomaly: a handful of large losses outweighs many
+ * small gains, and a bar drawn on the mean alone puts such a driver on the side of zero a reader
+ * counting races would not expect.
+ */
+export function placesGained(entities: readonly CompareEntity[]): PlacesGained {
+  const means = entities
+    .map((entity) => entity.gridVsFinish.meanPositionsGained)
+    .filter((mean): mean is number => mean !== null)
+    .map(Math.abs);
+  const scale = Math.max(1, ...means);
+
+  return {
+    scale,
+    rows: entities.map((entity) => {
+      const gvf = entity.gridVsFinish;
+      const mean = gvf.meanPositionsGained;
+      return {
+        ref: entity.identity.ref,
+        surname: entity.identity.surname,
+        mean,
+        racesCounted: gvf.racesCounted,
+        gained: gvf.gained,
+        lost: gvf.lost,
+        held: gvf.held,
+        excluded: gvf.excluded.unclassified + gvf.excluded.pitLaneStarts + gvf.excluded.unknownGrid,
+        extent: mean === null ? 0 : Math.min(1, Math.abs(mean) / scale),
+        direction: mean === null || mean === 0 ? 'held' : mean > 0 ? 'forward' : 'back',
+      };
+    }),
+  };
+}

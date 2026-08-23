@@ -7,6 +7,7 @@ import { CompareTray, type TrayBay } from './CompareTray';
 import { EraStrip } from './EraStrip';
 import { LineageChain } from './LineageChain';
 import { RateRailBoard } from './RateRailBoard';
+import { PlacesGained } from './PlacesGained';
 import { RelationBand } from './RelationBand';
 import { ResultMix } from './ResultMix';
 import { SeasonLens } from './SeasonLens';
@@ -409,6 +410,8 @@ export function ComparePage({
             <ResultMix entities={entities} />
 
             <CareerArc entities={entities} />
+
+            <PlacesGained channels={ladder.series} entities={entities} />
 
             <RateRailBoard channels={ladder.series} entities={entities} />
 

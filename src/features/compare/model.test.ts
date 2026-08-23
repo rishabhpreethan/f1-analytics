@@ -11,6 +11,7 @@ import {
   orientChain,
   orientLedger,
   pairFor,
+  placesGained,
   rateRails,
   resultMix,
   scoreLabel,
@@ -467,6 +468,7 @@ describe('the career-relative arc (§6.6.6.14 B)', () => {
           podiums: 0,
           dnfs: 2,
           championshipPosition: 10,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2004,
@@ -476,6 +478,7 @@ describe('the career-relative arc (§6.6.6.14 B)', () => {
           podiums: 3,
           dnfs: 1,
           championshipPosition: 7,
+          championshipPositionIsFinal: true,
         },
       ],
     };
@@ -508,6 +511,7 @@ describe('the career-relative arc (§6.6.6.14 B)', () => {
             podiums: 0,
             dnfs: 2,
             championshipPosition: null,
+            championshipPositionIsFinal: true,
           },
           {
             year: 1959,
@@ -517,6 +521,7 @@ describe('the career-relative arc (§6.6.6.14 B)', () => {
             podiums: 1,
             dnfs: 3,
             championshipPosition: 9,
+            championshipPositionIsFinal: true,
           },
         ],
       },
@@ -538,5 +543,133 @@ describe('the career-relative arc (§6.6.6.14 B)', () => {
     const entity = COMPARE_FIXTURE.entities[0];
     if (entity === undefined) throw new Error('fixture has no entities');
     expect(careerArc([{ ...entity, seasons: [] }]).series).toEqual([]);
+  });
+});
+
+describe('places gained from the grid (§6.6.6.14 C)', () => {
+  const gained = () => placesGained(COMPARE_FIXTURE.entities);
+  const rowFor = (ref: string) => gained().rows.find((row) => row.ref === ref);
+
+  it('reproduces the endpoint’s own figures', () => {
+    /*
+     * These came out of `buildGridVsFinish` itself rather than a second implementation, which is
+     * the point of the driver page and this page sharing a builder. ⚠ Fangio is **41 counted races
+     * and +0.49**, not the 44 and 0.00 first relayed: 44 was an un-collapsed `session_entry` count
+     * and he is the only one of the four with shared drives (trap 17).
+     */
+    expect(rowFor('fangio')?.racesCounted).toBe(41);
+    expect(rowFor('fangio')?.mean).toBeCloseTo(0.4878, 4);
+    expect(rowFor('max_verstappen')?.mean).toBeCloseTo(1.2238, 4);
+    expect(rowFor('hamilton')?.mean).toBeCloseTo(0.7626, 4);
+  });
+
+  it('keeps the zero line in the middle by scaling both halves the same', () => {
+    /*
+     * A shared symmetric scale, unlike the rate board's five per-measure ceilings: every row here
+     * is the same measure, so a per-row scale would make two bars of equal length mean different
+     * things. The largest absolute mean takes half the track.
+     */
+    const { rows, scale } = gained();
+    expect(scale).toBeCloseTo(1.2238, 4);
+    expect(rowFor('max_verstappen')?.extent).toBeCloseTo(1, 6);
+    for (const row of rows) expect(row.extent).toBeLessThanOrEqual(1);
+  });
+
+  it('floors the scale at one whole place, so a flat field is not magnified into a rout', () => {
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const flat = placesGained([
+      { ...entity, gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 0.2 } },
+    ]);
+    expect(flat.scale).toBe(1);
+    expect(flat.rows[0]?.extent).toBeCloseTo(0.2, 6);
+  });
+
+  it('gives a null mean no bar at all — never a zero-length one at the origin', () => {
+    /*
+     * ⚠ 155 of the 818 drivers with a race were never classified in one they started from the
+     * grid, and all of them are pickable. A bar of zero length says "started and finished level
+     * every time", which is a different and false claim.
+     */
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const [row] = placesGained([
+      {
+        ...entity,
+        gridVsFinish: {
+          racesCounted: 0,
+          meanPositionsGained: null,
+          bestGain: null,
+          worstLoss: null,
+          gained: 0,
+          lost: 0,
+          held: 0,
+          excluded: { unclassified: 4, pitLaneStarts: 0, unknownGrid: 0 },
+        },
+      },
+    ]).rows;
+    expect(row?.mean).toBeNull();
+    expect(row?.extent).toBe(0);
+    expect(row?.direction).toBe('held');
+  });
+
+  it('distinguishes an exact zero from an absent measurement', () => {
+    // Both draw no bar, and they are not the same statement: one is a measured result over real
+    // races, the other is the absence of any. The counts and the figure column say which.
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const [row] = placesGained([
+      {
+        ...entity,
+        gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 0, racesCounted: 30 },
+      },
+    ]).rows;
+    expect(row?.mean).toBe(0);
+    expect(row?.racesCounted).toBe(30);
+    expect(row?.direction).toBe('held');
+  });
+
+  it('carries the split, which can disagree with the mean’s sign', () => {
+    /*
+     * The reason `gained`/`lost`/`held` are published beside the bar rather than folded into it: a
+     * driver can be ahead in more races than he is behind and still average a loss, because one
+     * race lost by fifteen outweighs ten gained by one.
+     */
+    const row = rowFor('max_verstappen');
+    expect((row?.gained ?? 0) + (row?.lost ?? 0) + (row?.held ?? 0)).toBe(row?.racesCounted);
+    const contrarian = placesGained([
+      {
+        ...(COMPARE_FIXTURE.entities[0] as (typeof COMPARE_FIXTURE.entities)[number]),
+        gridVsFinish: {
+          racesCounted: 30,
+          meanPositionsGained: -0.14,
+          bestGain: 4,
+          worstLoss: -18,
+          gained: 18,
+          lost: 6,
+          held: 6,
+          excluded: { unclassified: 5, pitLaneStarts: 0, unknownGrid: 0 },
+        },
+      },
+    ]).rows[0];
+    expect(contrarian?.direction).toBe('back');
+    expect(contrarian?.gained).toBeGreaterThan(contrarian?.lost ?? 0);
+  });
+
+  it('sums every exclusion, not only the unclassified ones', () => {
+    // Pit-lane starts (trap 9) and a null grid are excluded for different reasons and both leave a
+    // race out of the denominator, so the caption counts all three.
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const [row] = placesGained([
+      {
+        ...entity,
+        gridVsFinish: {
+          ...entity.gridVsFinish,
+          excluded: { unclassified: 32, pitLaneStarts: 2, unknownGrid: 1 },
+        },
+      },
+    ]).rows;
+    expect(row?.excluded).toBe(35);
   });
 });

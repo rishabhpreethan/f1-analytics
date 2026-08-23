@@ -19,7 +19,7 @@ vi.hoisted(() => {
   });
 });
 
-import { TIER_BAR_ATTR } from '@/lib/motion/scroll';
+import { GAIN_BAR_ATTR, TIER_BAR_ATTR } from '@/lib/motion/scroll';
 import { ComparePage } from './ComparePage';
 import { COMPARE_FIXTURE } from './fixture';
 import { COMPARE_DIRECTORY, SEASON_LENS_FIXTURE } from './lensFixture';
@@ -558,5 +558,46 @@ describe('the career-relative arc (§6.6.6.14 B)', () => {
     // 1996, 2000) and 29 at the most (1989).
     render_();
     expect(screen.getByText(/ranked between 16 and 29 drivers/)).toBeTruthy();
+  });
+});
+
+describe('places gained from the grid (§6.6.6.14 C)', () => {
+  it('anchors every bar at zero and points it by sign, never by colour', () => {
+    /*
+     * The origin is on the mark because the component that decides the sign is the thing that has
+     * to state the anchor — `usePopulationMount` reads `data-origin` per target. A fixed `left`
+     * would animate a negative bar sliding across the axis it is measured from.
+     */
+    const { container } = render_();
+    const bars = [...container.querySelectorAll('.gain-bar')];
+    expect(bars.length).toBeGreaterThan(0);
+    for (const bar of bars) {
+      const direction = bar.getAttribute('data-direction');
+      expect(direction === 'forward' || direction === 'back').toBe(true);
+      expect(bar.getAttribute('data-origin')).toBe(direction === 'forward' ? 'left' : 'right');
+      expect(bar.getAttribute('data-motion')).toBe(GAIN_BAR_ATTR);
+    }
+  });
+
+  it('draws the zero line on every row — the chart’s one axis', () => {
+    // §6.6.6.3's rule about the balance bar's even mark, in the other diverging form: without a
+    // drawn zero a diverging bar is just a bar, and its sign is a guess about where the middle is.
+    const { container } = render_();
+    expect(container.querySelectorAll('.gain-zero')).toHaveLength(COMPARE_FIXTURE.entities.length);
+  });
+
+  it('prints the split beside every bar, because it can disagree with the average', () => {
+    const { container } = render_();
+    const splits = [...container.querySelectorAll('.gain-split')];
+    expect(splits).toHaveLength(COMPARE_FIXTURE.entities.length);
+    for (const split of splits) expect(split.textContent).toMatch(/ahead of his grid slot/);
+    expect(
+      screen.getByText(/one race lost by fifteen places outweighs ten gained by one/),
+    ).toBeTruthy();
+  });
+
+  it('counts the races it could not measure rather than folding them in as no movement', () => {
+    render_();
+    expect(screen.getByText(/no place change to measure/)).toBeTruthy();
   });
 });
