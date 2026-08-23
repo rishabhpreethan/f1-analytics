@@ -166,3 +166,116 @@ export interface CompareData {
   people: Record<string, CompareIdentity>;
   archive: ArchiveSeason[];
 }
+
+/* ------------------------------------------------------------------ the picker's directory */
+
+/**
+ * One driver the reader may add. **A superset of `CompareIdentity`, with every extra field
+ * optional**, so a caller that has only identities is still a valid caller and the picker degrades
+ * to names rather than breaking.
+ *
+ * The extras are what make the picker usable rather than a list of 818 surnames: a span and a race
+ * count are how a reader tells one Brabham from another, and the colour is how the bay they are
+ * about to fill is recognisable before it is filled.
+ */
+export interface CompareCandidate extends CompareIdentity {
+  /** The team whose colour represents this driver: most starts, ties to the most recent. */
+  colorTeamRef?: string;
+  firstSeason?: number;
+  lastSeason?: number;
+  /** Races **started**, collapsed to one row per driver per race (trap 17). */
+  races?: number;
+}
+
+/* ------------------------------------------------------------------------- the season lens */
+
+/** One numbered round. Cancelled rounds carry `number IS NULL` and are excluded (trap 15). */
+export interface SeasonRound {
+  number: number;
+  name: string;
+}
+
+/**
+ * A contiguous run of rounds during which one person occupied the other seat.
+ *
+ * `ref === null` is not an absence of data — it is the statement that **the car had no single
+ * other seat** at those rounds, either because the driver's team fielded nothing else or because
+ * it fielded several. Both happen: 1957's Maserati entered between four and eleven other cars at
+ * every round Fangio started.
+ */
+export interface SeatSegment {
+  ref: string | null;
+  /** The occupant's full name. Empty when `ref` is null. */
+  label: string;
+  fromRound: number;
+  toRound: number;
+}
+
+/**
+ * **The other seat in one principal's car, across one season.**
+ *
+ * A seat, not a person — Rishabh's model, and the truthful one: only **890 of 3,435
+ * driver-seasons (26%) have exactly one team-mate all year**, so nominating a primary team-mate
+ * would be wrong three times in four. Every array is indexed by the season's round list, so
+ * `points[i]` belongs to `rounds[i]`.
+ */
+export interface SeasonSeat {
+  /** Who held the seat at each round; `null` where there was no single other car. */
+  occupant: (string | null)[];
+  /** That occupant's **own** cumulative championship points at that round. */
+  points: (number | null)[];
+  /** That occupant's finishing position at that round; `null` if unclassified or absent. */
+  finish: (number | null)[];
+  /** The occupant runs, in round order. One entry per contiguous run, including the null runs. */
+  segments: SeatSegment[];
+  /** How many other cars the team fielded at each round. `> 1` is the 1950s works-team case. */
+  carsBeside: (number | null)[];
+}
+
+/** One selected driver's season, round by round. Arrays are indexed by the season's round list. */
+export interface SeasonEntrant {
+  ref: string;
+  /** `false` when the driver started no race that season — a designed state, not an empty array. */
+  entered: boolean;
+  /** Every team the driver raced for that season, in round order. 318 driver-seasons have two. */
+  teamRefs: string[];
+  /**
+   * The team at each round, `null` where the driver did not start it.
+   *
+   * Present as well as `teamRefs` because a series takes **one** colour and a driver who changed
+   * teams mid-season has two. The surface picks the car he raced most and says so in a note
+   * (§6.6.6.10) — it cannot do that from a de-duplicated list.
+   */
+  teamAt: (string | null)[];
+  /** Cumulative championship points after each round, **net of dropped scores** where they apply. */
+  points: (number | null)[];
+  /** Championship position after each round. */
+  standing: (number | null)[];
+  /** Finishing position at each round; `null` if unclassified or absent. */
+  finish: (number | null)[];
+  seat: SeasonSeat;
+}
+
+/**
+ * **One season, round by round** — the second lens on `/compare` (`DESIGN_SYSTEM.md` §6.6.6.10).
+ *
+ * This is the one place in the product that can honestly show **points**. Trap 4 forbids summing
+ * points *across* eras, not within a season: one calendar, one scoring system, one set of rules.
+ * The career lens refuses totals loudly, so this lens has to say out loud why the rule changed
+ * here — see `bestResults`, which is the sharpest case of it.
+ */
+export interface CompareSeasonLens {
+  year: number;
+  /** `false` while the season is in progress. 2026 has raced 10 of its 22 numbered rounds. */
+  complete: boolean;
+  /**
+   * `> 0` when only the best N results counted toward the championship that season, `null`
+   * otherwise. 1957 counted the best **5 of 8**, which is why Fangio's line is flat from round 6.
+   * From `championship_system.driver_best_results`.
+   */
+  bestResults: number | null;
+  /** The championship system's own name, for the copy. Never an undocumented enum (trap 14). */
+  systemName: string;
+  rounds: SeasonRound[];
+  entrants: SeasonEntrant[];
+}

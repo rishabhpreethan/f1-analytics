@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react';
-import { assignLadder } from '@/components/charts/ladder';
+import { useId, useMemo, useState } from 'react';
+import { assignLadder, COMPARISON_CAP } from '@/components/charts/ladder';
 import { assignEntityColours } from '@/lib/entityColor';
 import { BalanceBar } from './CompareLedger';
-import { CompareTray } from './CompareTray';
+import { CompareTray, type TrayBay } from './CompareTray';
 import { EraStrip } from './EraStrip';
 import { LineageChain } from './LineageChain';
 import { RateRailBoard } from './RateRailBoard';
 import { RelationBand } from './RelationBand';
+import { SeasonLens } from './SeasonLens';
 import { archiveDomain, chainFor, orientChain, orientLedger, pairFor, type Domain } from './model';
-import type { CompareData, CompareIdentity } from './types';
+import type { CompareCandidate, CompareData, CompareSeasonLens, CompareIdentity } from './types';
 
 /**
  * **`/compare` — the comparison workspace.** `DESIGN_SYSTEM.md` §6.6.6.
@@ -40,21 +41,91 @@ import type { CompareData, CompareIdentity } from './types';
  * which it does.
  */
 
+/** Which question the page is answering. §6.6.6.10. */
+export type Lens = 'career' | 'season';
+
 export interface ComparePageProps {
   data: CompareData;
-  /** Refs the reader may add. In the shipped page this is the driver directory. */
-  available?: CompareIdentity[];
+  /**
+   * Every driver the reader may add — the picker's directory (§7.16).
+   *
+   * `CompareCandidate` is a superset of `CompareIdentity` with every extra field optional, so a
+   * caller that has only identities is still a valid caller and the picker degrades to names.
+   */
+  available?: readonly CompareCandidate[];
+  /**
+   * Round-by-round data for the season lens, one entry per season the payload carries.
+   *
+   * Separate from `data` because it is fetched per season: choosing a year on the rail is a new
+   * request, not a slice of one the page already has.
+   */
+  seasons?: readonly CompareSeasonLens[];
 }
 
-export function ComparePage({ data, available = [] }: ComparePageProps) {
+export function ComparePage({ data, available = [], seasons = [] }: ComparePageProps) {
   const allRefs = data.entities.map((entity) => entity.identity.ref);
   const [selected, setSelected] = useState<string[]>(allRefs);
   const [focus, setFocus] = useState<[string, string] | null>(null);
+  const [lens, setLens] = useState<Lens>('career');
+  const [year, setYear] = useState<number | null>(null);
+  const lensName = useId();
 
   const entities = useMemo(
     () => selected.flatMap((ref) => data.entities.filter((entity) => entity.identity.ref === ref)),
     [data.entities, selected],
   );
+
+  /**
+   * The tray's four bays, in the order the reader added them.
+   *
+   * A ref the reader has chosen whose record has not arrived is a **pending** bay, drawn from the
+   * directory. That is the genuine loading state — and while `GET /api/compare` is being built it
+   * is also every driver outside the fixture's four, which is exactly the state the endpoint will
+   * put a bay into for a moment anyway.
+   */
+  const bays: TrayBay[] = useMemo(
+    () =>
+      selected.flatMap<TrayBay>((ref) => {
+        const entity = data.entities.find((candidate) => candidate.identity.ref === ref);
+        if (entity !== undefined) return [{ kind: 'ready', entity }];
+        const candidate = available.find((person) => person.ref === ref);
+        return candidate === undefined ? [] : [{ kind: 'pending', candidate }];
+      }),
+    [available, data.entities, selected],
+  );
+
+  const candidates = useMemo(
+    () => available.filter((candidate) => !selected.includes(candidate.ref)),
+    [available, selected],
+  );
+
+  /**
+   * The season rail's domain: **every season the selection entered *that the lens has data for***.
+   *
+   * Not simply every season anyone raced. `GET /api/compare/seasons` publishes the whole set in one
+   * response — the engineer's ruling, and a better one than this surface's original assumption that
+   * a year would be fetched on demand: the chosen year is local state the page never publishes, so
+   * a per-year endpoint could not have been told which year to ask for, and sending them all costs
+   * nothing and puts **no network on the year rail at all**. So a rail built from the payload has no
+   * dead ends in it, which a rail built from the careers would have had one of for every year the
+   * response happened not to carry.
+   *
+   * The fallback to the careers exists for the caller that passes no seasons at all; that caller
+   * gets the loading state, which is correct rather than empty.
+   */
+  const years = useMemo(() => {
+    const entered = new Set<number>();
+    for (const entity of entities) for (const season of entity.seasons) entered.add(season.year);
+    if (seasons.length === 0) return [...entered].sort((a, b) => a - b);
+    return seasons
+      .map((entry) => entry.year)
+      .filter((candidate) => entered.has(candidate))
+      .sort((a, b) => a - b);
+  }, [entities, seasons]);
+
+  /* The most recent season on the rail, so the lens opens on something worth looking at. */
+  const activeYear = year !== null && years.includes(year) ? year : (years.at(-1) ?? 0);
+  const activeLens = seasons.find((entry) => entry.year === activeYear) ?? null;
 
   /*
    * Colour and the ladder are decided for the **whole selection at once**, because the teammate
@@ -77,6 +148,16 @@ export function ComparePage({ data, available = [] }: ComparePageProps) {
   );
 
   const domain: Domain = useMemo(() => archiveDomain(data.archive), [data.archive]);
+
+  /** Every identity the page can name: the chain's cast, plus the selection itself. */
+  const people: Record<string, CompareIdentity> = useMemo(
+    () => ({
+      ...data.people,
+      ...Object.fromEntries(data.entities.map((entity) => [entity.identity.ref, entity.identity])),
+      ...Object.fromEntries(available.map((candidate) => [candidate.ref, candidate])),
+    }),
+    [available, data.entities, data.people],
+  );
 
   const firstEntity = entities[0];
   const secondEntity = entities[1];
@@ -134,18 +215,64 @@ export function ComparePage({ data, available = [] }: ComparePageProps) {
       </header>
 
       <CompareTray
-        available={available.filter((candidate) => !selected.includes(candidate.ref))}
+        bays={bays}
+        candidates={candidates}
         channels={ladder.series}
-        entities={entities}
         onAdd={(ref) => {
-          setSelected((current) => (current.includes(ref) ? current : [...current, ref]));
+          setSelected((current) =>
+            current.includes(ref) || current.length >= COMPARISON_CAP ? current : [...current, ref],
+          );
         }}
         onRemove={(ref) => {
           setSelected((current) => current.filter((item) => item !== ref));
         }}
       />
 
-      {entities.length < 2 ? (
+      {/*
+       * §6.6.6.10 — the lens switch. A real `<fieldset>` of radios, like the index console's
+       * (§7.13): arrow-key roving, `:checked` and the group's accessible name all come from the
+       * platform. It sits under the tray because the tray answers "who", and the lens answers
+       * "which question about them" — the selection survives the switch, which is the point of it
+       * not being a second route.
+       */}
+      {entities.length >= 1 && (
+        <fieldset className="lens-switch">
+          <legend className="lens-switch-legend">What would you like to compare?</legend>
+          {(
+            [
+              ['career', 'Whole careers', 'Every season, normalised against opportunity'],
+              ['season', 'One season', 'Round by round, and the only place points are comparable'],
+            ] as const
+          ).map(([id, label, hint]) => (
+            <label className="lens-switch-option" key={id}>
+              <input
+                type="radio"
+                name={lensName}
+                value={id}
+                checked={lens === id}
+                onChange={() => {
+                  setLens(id);
+                }}
+              />
+              <span className="lens-switch-label">{label}</span>
+              <span className="lens-switch-hint">{hint}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+
+      {lens === 'season' && (
+        <SeasonLens
+          lens={activeLens}
+          onYear={setYear}
+          people={people}
+          principals={entities.map((entity) => entity.identity.ref)}
+          year={activeYear}
+          years={years}
+        />
+      )}
+
+      {lens === 'career' && entities.length < 2 ? (
         <section className="compare-empty">
           <p className="compare-empty-title">Choose a second driver.</p>
           <p className="compare-empty-copy">
@@ -155,84 +282,77 @@ export function ComparePage({ data, available = [] }: ComparePageProps) {
           </p>
         </section>
       ) : (
-        <>
-          <RelationBand
-            chains={data.chains}
-            channels={ladder.series}
-            entities={entities}
-            focus={active ?? [firstEntity?.identity.ref ?? '', secondEntity?.identity.ref ?? '']}
-            onFocus={setFocus}
-            pairs={data.pairs}
-          />
+        lens === 'career' && (
+          <>
+            <RelationBand
+              chains={data.chains}
+              channels={ladder.series}
+              entities={entities}
+              focus={active ?? [firstEntity?.identity.ref ?? '', secondEntity?.identity.ref ?? '']}
+              onFocus={setFocus}
+              pairs={data.pairs}
+            />
 
-          {pair !== null && oriented !== null && active !== null && pair.sameTeamRaces > 0 && (
-            <section className="ledgers" aria-label="Same-car head to head">
-              <BalanceBar
-                a={sideFor(active[0])}
-                b={sideFor(active[1])}
-                caption={`of ${String(pair.sameTeamRaces)} races as teammates, both classified in ${String(oriented.race.rated)}`}
-                emptyCopy="They shared a car, but no race in which both were classified — so there is no result to report."
-                ledger={oriented.race}
-                title="Finished ahead, in the same car"
-              />
-              <BalanceBar
-                a={sideFor(active[0])}
-                b={sideFor(active[1])}
-                caption={`of ${String(pair.sameTeamRaces)} races as teammates, both on the grid in ${String(oriented.grid.rated)}`}
-                emptyCopy="No race as teammates has a starting slot recorded for both."
-                ledger={oriented.grid}
-                title="Started ahead, in the same car"
-              />
-            </section>
-          )}
-
-          {pair !== null &&
-            oriented !== null &&
-            active !== null &&
-            pair.sameTeamRaces === 0 &&
-            pair.sharedRaces > 0 && (
-              <section className="ledgers" aria-label="Shared-race head to head">
+            {pair !== null && oriented !== null && active !== null && pair.sameTeamRaces > 0 && (
+              <section className="ledgers" aria-label="Same-car head to head">
                 <BalanceBar
                   a={sideFor(active[0])}
                   b={sideFor(active[1])}
-                  caption={`of ${String(pair.sharedRaces)} shared races, both classified in ${String(oriented.race.rated)} — in different cars every time`}
-                  emptyCopy="They shared a grid but never a race both finished."
+                  caption={`of ${String(pair.sameTeamRaces)} races as teammates, both classified in ${String(oriented.race.rated)}`}
+                  emptyCopy="They shared a car, but no race in which both were classified — so there is no result to report."
                   ledger={oriented.race}
-                  title="Finished ahead, in different cars"
+                  title="Finished ahead, in the same car"
                 />
                 <BalanceBar
                   a={sideFor(active[0])}
                   b={sideFor(active[1])}
-                  caption={`of ${String(pair.sharedRaces)} shared races, both on the grid in ${String(oriented.grid.rated)} — in different cars every time`}
-                  emptyCopy="No shared race has a starting slot recorded for both."
+                  caption={`of ${String(pair.sameTeamRaces)} races as teammates, both on the grid in ${String(oriented.grid.rated)}`}
+                  emptyCopy="No race as teammates has a starting slot recorded for both."
                   ledger={oriented.grid}
-                  title="Started ahead, in different cars"
+                  title="Started ahead, in the same car"
                 />
               </section>
             )}
 
-          {chain !== null && active !== null && (
-            <LineageChain
-              chain={orientChain(chain, active[0])}
+            {pair !== null &&
+              oriented !== null &&
+              active !== null &&
+              pair.sameTeamRaces === 0 &&
+              pair.sharedRaces > 0 && (
+                <section className="ledgers" aria-label="Shared-race head to head">
+                  <BalanceBar
+                    a={sideFor(active[0])}
+                    b={sideFor(active[1])}
+                    caption={`of ${String(pair.sharedRaces)} shared races, both classified in ${String(oriented.race.rated)} — in different cars every time`}
+                    emptyCopy="They shared a grid but never a race both finished."
+                    ledger={oriented.race}
+                    title="Finished ahead, in different cars"
+                  />
+                  <BalanceBar
+                    a={sideFor(active[0])}
+                    b={sideFor(active[1])}
+                    caption={`of ${String(pair.sharedRaces)} shared races, both on the grid in ${String(oriented.grid.rated)} — in different cars every time`}
+                    emptyCopy="No shared race has a starting slot recorded for both."
+                    ledger={oriented.grid}
+                    title="Started ahead, in different cars"
+                  />
+                </section>
+              )}
+
+            {chain !== null && active !== null && (
+              <LineageChain chain={orientChain(chain, active[0])} domain={domain} people={people} />
+            )}
+
+            <RateRailBoard channels={ladder.series} entities={entities} />
+
+            <EraStrip
+              archive={data.archive}
+              channels={ladder.series}
               domain={domain}
-              people={{
-                ...data.people,
-                ...Object.fromEntries(
-                  data.entities.map((entity) => [entity.identity.ref, entity.identity]),
-                ),
-              }}
+              entities={entities}
             />
-          )}
-
-          <RateRailBoard channels={ladder.series} entities={entities} />
-
-          <EraStrip
-            archive={data.archive}
-            channels={ladder.series}
-            domain={domain}
-            entities={entities}
-          />
-        </>
+          </>
+        )
       )}
     </div>
   );

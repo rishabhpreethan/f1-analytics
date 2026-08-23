@@ -22,6 +22,7 @@ vi.hoisted(() => {
 import { TIER_BAR_ATTR } from '@/lib/motion/scroll';
 import { ComparePage } from './ComparePage';
 import { COMPARE_FIXTURE } from './fixture';
+import { COMPARE_DIRECTORY, SEASON_LENS_FIXTURE } from './lensFixture';
 
 /**
  * **What this file can prove, and what it cannot.**
@@ -42,10 +43,16 @@ afterEach(cleanup);
 const render_ = () =>
   render(
     <ComparePage
-      available={COMPARE_FIXTURE.entities.map((entity) => entity.identity)}
+      available={COMPARE_DIRECTORY}
       data={COMPARE_FIXTURE}
+      seasons={SEASON_LENS_FIXTURE}
     />,
   );
+
+/** Switch to the season lens. The selection survives — that is the point of it not being a route. */
+const openSeasonLens = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole('radio', { name: /One season/ }));
+};
 
 describe('the tray', () => {
   it('draws four bays, because four is the cap and a cap that is hidden is not a cap', () => {
@@ -54,12 +61,19 @@ describe('the tray', () => {
     expect(within(tray).getAllByRole('listitem')).toHaveLength(4);
   });
 
-  it('removes a driver and puts an add control in the freed bay', async () => {
+  it('removes a driver and frees the bay, leaving the picker to refill it', async () => {
     const user = userEvent.setup();
     render_();
     await user.click(screen.getByRole('button', { name: /Remove Nico Rosberg/ }));
     expect(screen.queryByRole('button', { name: /Remove Nico Rosberg/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /Add Nico Rosberg/ })).toBeTruthy();
+    /*
+     * The freed bay is a **slot**, not an add button (§7.16). Four buttons that all do the same
+     * thing is four times the control for one job, and it made the bays look like the thing you
+     * operate when the thing you operate is the field below them.
+     */
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    expect(within(tray).getByText('Bay 4')).toBeTruthy();
+    expect(screen.getByRole('combobox')).toBeTruthy();
   });
 
   it('asks for a second driver rather than rendering an empty comparison', async () => {
@@ -213,5 +227,168 @@ describe('the honesty rules the whole surface is built on', () => {
     ).toBeTruthy();
     const strip = screen.getByRole('img', { name: /Grands Prix per season from 1950 to 2026/ });
     expect(strip).toBeTruthy();
+  });
+});
+
+describe('§7.16 — the picker, in place', () => {
+  it('fills a freed bay from the search field', async () => {
+    const user = userEvent.setup();
+    render_();
+    await user.click(screen.getByRole('button', { name: /Remove Juan Fangio/ }));
+    await user.type(screen.getByRole('combobox'), 'ayrton');
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: /Remove Ayrton Senna/ })).toBeTruthy();
+  });
+
+  it('draws a chosen driver whose record has not arrived as pending, not as a blank', async () => {
+    /*
+     * The genuine loading state, and while `GET /api/compare` is being built it is every driver
+     * outside the fixture's four. The bay still carries real queried identity — name, span, races,
+     * team colour — and refuses only the figure it does not have (§1.0).
+     */
+    const user = userEvent.setup();
+    render_();
+    await user.click(screen.getByRole('button', { name: /Remove Juan Fangio/ }));
+    await user.type(screen.getByRole('combobox'), 'ayrton');
+    await user.keyboard('{Enter}');
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    const bay = within(tray)
+      .getAllByRole('listitem')
+      .find((item) => item.textContent?.includes('Senna'));
+    expect(bay?.getAttribute('data-pending')).toBe('true');
+    expect(bay?.textContent).toContain('1984–1994');
+    expect(bay?.textContent).toContain('record loading');
+  });
+
+  it('refuses a fifth driver at the control, not by discarding the click', () => {
+    render_();
+    expect(screen.getByRole('combobox')).toHaveProperty('disabled', true);
+  });
+});
+
+describe('§6.6.6.10 — the season lens', () => {
+  it('keeps the selection across the switch, which is why it is a lens and not a route', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    expect(within(tray).getByText('Hamilton')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Same car.', level: 2 })).toBeNull();
+  });
+
+  it('puts only seasons the payload carries on the rail, so there are no dead ends', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    const rail = screen.getByRole('group', { name: 'Choose a season' });
+    expect(within(rail).getAllByRole('radio').map((node) => node.getAttribute('value'))).toEqual([
+      '1957',
+      '2016',
+      '2021',
+      '2026',
+    ]);
+  });
+
+  it('opens on the most recent season it has data for, not blindly on the latest', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    expect(screen.getByRole('radio', { name: '2026' })).toHaveProperty('checked', true);
+    expect(
+      screen.getByRole('img', { name: /Championship points after each round of 2026/ }),
+    ).toBeTruthy();
+  });
+
+  it('says out loud why points are allowed here, since the career lens refuses them', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    expect(screen.getByText(/Points are comparable here\./)).toBeTruthy();
+  });
+
+  it('explains an unfinished season rather than leaving half a chart unexplained', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    expect(screen.getByText(/2026 is in progress: 10 of 22 rounds have been run\./)).toBeTruthy();
+  });
+
+  it('explains dropped scores in 1957, where a flat line is the truth', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    await user.click(screen.getByRole('radio', { name: '1957' }));
+    expect(
+      screen.getByText(/Only the best 5 results of 8 counted toward the 1957 championship\./),
+    ).toBeTruthy();
+    expect(screen.getByText(/had no single team-mate in 1957/)).toBeTruthy();
+  });
+
+  it('names a driver who did not race that season instead of plotting a flat zero', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    await user.click(screen.getByRole('radio', { name: '1957' }));
+    expect(screen.getByText(/Lewis Hamilton did not start a race in 1957\./)).toBeTruthy();
+  });
+
+  it('draws four principals and their seats as pairs, never as eight unrelated lines', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    await user.click(screen.getByRole('radio', { name: '2021' }));
+
+    /*
+     * 2021: Hamilton (Mercedes, Bottas beside him) and Verstappen (Red Bull, Pérez). Rosberg and
+     * Fangio did not race. Four series, two cars — and the encoding is what makes them two pairs:
+     * one colour and one marker shape per car, the seat carried by the dash (§6.4a).
+     */
+    const points = screen.getByRole('img', {
+      name: /Championship points after each round of 2021/,
+    });
+    const lines = [...points.querySelectorAll('g.chart-marks path.chart-line')];
+    expect(lines).toHaveLength(4);
+    expect(lines.map((line) => line.getAttribute('data-role'))).toEqual([
+      'principal',
+      'shadow',
+      'principal',
+      'shadow',
+    ]);
+    // Two cars → two colours, each used twice.
+    const colours = lines.map((line) => line.getAttribute('style'));
+    expect(new Set(colours).size).toBe(2);
+    // Solid for the principal, `6 3` for the seat beside him, in both pairs.
+    expect(lines.map((line) => line.getAttribute('stroke-dasharray'))).toEqual([
+      null,
+      '6 3',
+      null,
+      '6 3',
+    ]);
+
+    /*
+     * ⚠ **Whether that actually reads as two pairs on screen is untested by construction.** jsdom
+     * performs no layout and no compositing, so nothing above says the shadow looks lighter, that
+     * the direct labels do not collide, or that four lines are distinguishable at 1440px.
+     */
+  });
+
+  it('suppresses a shadow that would duplicate a principal already on the chart', async () => {
+    const user = userEvent.setup();
+    render_();
+    await openSeasonLens(user);
+    await user.click(screen.getByRole('radio', { name: '2016' }));
+    /*
+     * 2016: Hamilton and Rosberg are each other's team-mate. Drawing both seats would put four
+     * Mercedes lines on the chart carrying two drivers' data twice.
+     */
+    const points = screen.getByRole('img', {
+      name: /Championship points after each round of 2016/,
+    });
+    const roles = [...points.querySelectorAll('g.chart-marks path.chart-line')].map((line) =>
+      line.getAttribute('data-role'),
+    );
+    expect(roles.filter((role) => role === 'principal')).toHaveLength(3);
+    // Only Verstappen's seat survives — and it is two series, because it changed hands at R5.
+    expect(roles.filter((role) => role === 'shadow')).toHaveLength(2);
   });
 });

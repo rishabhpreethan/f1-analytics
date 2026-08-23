@@ -234,37 +234,6 @@
     box-shadow: none;
   }
 
-  .tray-add {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: center;
-    gap: calc(var(--spacing) * 2);
-    padding: calc(var(--spacing) * 4);
-    text-align: left;
-    transition: background-color var(--dur-instant) var(--ease-enter);
-  }
-
-  .tray-add:hover {
-    background-color: var(--accent-wash);
-  }
-
-  .tray-add-plus {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--border-control);
-    border-radius: var(--radius-md);
-    color: var(--ink-secondary);
-    font-family: var(--font-mono);
-    font-size: var(--text-md);
-    line-height: 1;
-  }
-
-  .tray-add-label,
   .tray-empty-copy {
     display: flex;
     flex-direction: column;
@@ -276,14 +245,291 @@
     line-height: var(--text-sm--line-height);
   }
 
-  .tray-add-label {
-    padding: 0;
-  }
-
   .tray-empty-copy span {
     color: var(--ink-tertiary);
     font-size: var(--text-xs);
     line-height: var(--text-xs--line-height);
+  }
+
+  /*
+   * The tray is bays **then** the picker: here is your selection, now add to it (§7.16). The
+   * picker below rather than beside, because a field beside four cards competes with them for the
+   * one place on the page the reader is guaranteed to look.
+   */
+  .tray {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 4);
+  }
+
+  /*
+   * A bay whose driver is chosen and whose record has not arrived. Dashed like an empty bay, so
+   * the difference from a filled one is visible at a glance, but **filled with the driver's real
+   * identity** — name, span, races, team colour — because all of that is known. Only the metric is
+   * missing, and it says so rather than showing a plausible zero (§1.0).
+   */
+  .tray-bay[data-pending='true'] {
+    border-style: dashed;
+    box-shadow: none;
+  }
+
+  .tray-bay[data-pending='true'] .tray-metric-figure {
+    color: var(--ink-tertiary);
+  }
+
+  /* ============================================================== the picker */
+
+  .picker {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  /*
+   * The results are **in flow**, not floated over the bays. §5.2a reserves every z-index above 1
+   * inside `main` for an overlay, and a combobox that pushes the page down instead of covering it
+   * needs no layer at all — which also means it can never be clipped by an ancestor's `overflow`.
+   */
+  .picker-results {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-raised);
+    box-shadow: var(--elev-1-shadow);
+    list-style: none;
+  }
+
+  .picker-option {
+    display: grid;
+    grid-template-columns: 3px 1fr auto;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+    cursor: pointer;
+  }
+
+  .picker-option + .picker-option {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /*
+   * The active option is the one Enter takes. It is marked with the accent wash **and** a leading
+   * rule, never colour alone — the same rule §3.4.3 applies to status: a single-channel state is
+   * unreadable to a reader who cannot see the channel.
+   */
+  .picker-option[data-active='true'] {
+    background-color: var(--accent-wash);
+    box-shadow: inset 2px 0 0 var(--accent-mark);
+  }
+
+  /* §3.3a.4's identity form again: a 3px bar in the team colour, never a tinted row. */
+  .picker-swatch {
+    align-self: stretch;
+    min-height: 20px;
+    border-radius: 1px;
+    background-color: var(--identity, var(--border-strong));
+  }
+
+  .picker-name {
+    color: var(--ink-primary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+    overflow-wrap: anywhere;
+  }
+
+  .picker-span,
+  .picker-races {
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Below 30rem the span and the race count would push the name to two lines; the span goes. */
+  .picker-span {
+    display: none;
+  }
+
+  @media (min-width: 30rem) {
+    .picker-option {
+      grid-template-columns: 3px 1fr auto auto;
+    }
+
+    .picker-span {
+      display: inline;
+    }
+  }
+
+  /* ============================================================== the lens switch */
+
+  /*
+   * Two questions, one selection. The switch is a `<fieldset>` of radios for §7.13's reason — the
+   * platform gives arrow-key roving, `:checked` and the group's accessible name, and the
+   * alternative is thirty lines of keyboard code that has to be right.
+   */
+  .lens-switch {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  @media (min-width: 40rem) {
+    .lens-switch {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .lens-switch-legend {
+    grid-column: 1 / -1;
+    padding: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  .lens-switch-option {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+    border: 1px solid var(--border-control);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      border-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .lens-switch-option:hover {
+    border-color: var(--border-strong);
+  }
+
+  /*
+   * §3.5.1a — **a pressed state is never carried by fill alone.** The chosen lens takes the accent
+   * wash *and* a 2px leading rule *and* an ink-primary label, so it is legible without colour.
+   */
+  .lens-switch-option:has(input:checked) {
+    border-color: var(--accent-mark);
+    background-color: var(--accent-wash);
+    box-shadow: inset 3px 0 0 var(--accent-mark);
+  }
+
+  /*
+   * §3.5.1's one achromatic double ring, moved to the visible card because the input it belongs to
+   * is one clipped pixel — `.index-sort` does the same for the same reason. Achromatic, so it is
+   * still visible when the card is already wearing the accent wash as its checked state.
+   */
+  .lens-switch-option:has(input:focus-visible) {
+    outline: 2px solid var(--ink-primary);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--surface-raised);
+  }
+
+  .lens-switch-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .lens-switch-label {
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    line-height: var(--text-sm--line-height);
+  }
+
+  .lens-switch-option:has(input:checked) .lens-switch-label {
+    color: var(--ink-primary);
+  }
+
+  .lens-switch-hint {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+  }
+
+  /* ============================================================== the season lens */
+
+  .lens {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  /*
+   * The season rail. Every season any selected driver entered — the shape of the overlap, which a
+   * closed `<select>` would hide. It scrolls rather than wraps so the row stays one line at any
+   * width, and `scroll-snap` puts a year under the pointer rather than between two.
+   */
+  .lens-rail {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .lens-rail-track {
+    display: flex;
+    gap: calc(var(--spacing) * 1);
+    overflow-x: auto;
+    padding-bottom: calc(var(--spacing) * 1);
+    scroll-snap-type: x proximity;
+  }
+
+  .lens-year {
+    flex: none;
+    padding: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--ink-tertiary);
+    cursor: pointer;
+    font-size: var(--text-xs);
+    scroll-snap-align: center;
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      color var(--dur-instant) var(--ease-enter);
+  }
+
+  .lens-year:hover {
+    color: var(--ink-secondary);
+  }
+
+  .lens-year:has(input:checked) {
+    border-color: var(--accent-mark);
+    background-color: var(--accent-wash);
+    color: var(--accent-ink);
+  }
+
+  .lens-year:has(input:focus-visible) {
+    outline: 2px solid var(--ink-primary);
+    outline-offset: 2px;
+  }
+
+  .lens-year input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .lens-pending {
+    margin: 0;
+    padding: calc(var(--spacing) * 6);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-lg);
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
   }
 
   /* ============================================================== the verdict */
@@ -1166,8 +1412,9 @@
    */
   @media (prefers-reduced-motion: reduce) {
     .tray-remove,
-    .tray-add,
-    .relation-cell {
+    .relation-cell,
+    .lens-switch-option,
+    .lens-year {
       transition: none;
     }
   }

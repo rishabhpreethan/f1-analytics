@@ -3,9 +3,10 @@ import type { SeriesChannels } from '@/components/charts/ladder';
 import { LegendKey } from '@/components/charts/MarkerGlyph';
 import { COMPARISON_CAP } from '@/components/charts/ladder';
 import { X } from '@/components/ui/icons';
-import { cssVar } from '@/lib/entityColor';
+import { cssVar, identityToken } from '@/lib/entityColor';
+import { EntityPicker } from './EntityPicker';
 import { winShare } from './model';
-import type { CompareEntity, CompareIdentity } from './types';
+import type { CompareCandidate, CompareEntity } from './types';
 
 /**
  * **`CompareTray`** — `DESIGN_SYSTEM.md` §6.6.6.2. The selection, and the page's masthead at the
@@ -28,108 +29,194 @@ import type { CompareEntity, CompareIdentity } from './types';
  * **The `LegendKey` is here and not only in the charts below.** It is the tray that teaches the
  * reader which mark is whose, and it carries all three channels at once — colour, dash, marker —
  * so the rest of the page can be read without a second legend per chart (§6.5.2).
+ *
+ * ---
+ *
+ * **The picker sits below the bays** _(added 2026-08-23, §7.16)_. Reading order: here is your
+ * selection, now add to it. An empty bay is a **slot**, never a button — four buttons that all do
+ * the same thing is four times the control for one job, and it made the bays look operable when
+ * the thing you operate is the field.
  */
 
+/**
+ * A bay's contents. `pending` is a driver the reader has chosen whose comparison payload has not
+ * arrived — the real loading state, and while `GET /api/compare` is still being built it is also
+ * what every driver outside the fixture's four resolves to.
+ */
+export type TrayBay =
+  { kind: 'ready'; entity: CompareEntity } | { kind: 'pending'; candidate: CompareCandidate };
+
 export interface CompareTrayProps {
-  entities: CompareEntity[];
-  channels: SeriesChannels[];
-  available: CompareIdentity[];
+  bays: readonly TrayBay[];
+  channels: readonly SeriesChannels[];
+  /** Everyone who may be added. Already excludes whoever is selected. */
+  candidates: readonly CompareCandidate[];
   onRemove: (ref: string) => void;
   onAdd: (ref: string) => void;
 }
 
-export function CompareTray({ entities, channels, available, onRemove, onAdd }: CompareTrayProps) {
-  const bays = COMPARISON_CAP;
-  const empties = Math.max(0, bays - entities.length);
+const BAYS_ID = 'compare-tray-bays';
+
+export function CompareTray({ bays, channels, candidates, onRemove, onAdd }: CompareTrayProps) {
+  const empties = Math.max(0, COMPARISON_CAP - bays.length);
 
   return (
     <section className="tray" aria-label="Selected drivers">
-      <ol className="tray-bays">
-        {entities.map((entity, index) => {
-          const channel = channels[index];
-          if (channel === undefined) return null;
-          const share = winShare(entity.teammates.race, 'a');
-          return (
-            <li
-              className="tray-bay"
-              key={entity.identity.ref}
-              style={
-                {
-                  '--identity': cssVar(channel.identity),
-                  '--series': cssVar(channel.plot),
-                } as CSSProperties
-              }
-            >
-              <span className="tray-identity" aria-hidden="true" />
-              <div className="tray-body">
-                <p className="tray-forename">{entity.identity.forename}</p>
-                <p className="tray-surname">{entity.identity.surname}</p>
-                <p className="tray-span">
-                  {entity.firstSeason}–{entity.lastSeason}
-                  <span className="tray-dot" aria-hidden="true">
-                    ·
-                  </span>
-                  {entity.seasonsEntered} seasons
-                </p>
-                <p className="tray-metric">
-                  <span className="tray-metric-figure">
-                    {share === null ? '—' : `${String(Math.round(share * 100))}%`}
-                  </span>
-                  <span className="tray-metric-label">
-                    ahead of a teammate
-                    <br />
-                    {entity.teammates.race.a + entity.teammates.race.b} same-car races
-                  </span>
-                </p>
-                <span className="tray-key">
-                  <LegendKey shape={channel.marker} dash={channel.dash} token={channel.plot} />
-                </span>
-              </div>
-              <button
-                className="tray-remove"
-                onClick={() => {
-                  onRemove(entity.identity.ref);
-                }}
-                type="button"
-              >
-                <X size={16} aria-hidden="true" />
-                <span className="sr-only">
-                  Remove {entity.identity.forename} {entity.identity.surname}
-                </span>
-              </button>
-            </li>
-          );
-        })}
+      <ol className="tray-bays" id={BAYS_ID}>
+        {bays.map((bay, index) =>
+          bay.kind === 'ready' ? (
+            <ReadyBay
+              key={bay.entity.identity.ref}
+              channel={channels[index]}
+              entity={bay.entity}
+              onRemove={onRemove}
+            />
+          ) : (
+            <PendingBay key={bay.candidate.ref} candidate={bay.candidate} onRemove={onRemove} />
+          ),
+        )}
 
-        {Array.from({ length: empties }, (_, slot) => {
-          const candidate = available[slot];
-          return (
-            <li className="tray-bay" data-empty="true" key={`empty-${String(slot)}`}>
-              {candidate === undefined ? (
-                <p className="tray-empty-copy">
-                  Bay {entities.length + slot + 1}
-                  <span>Comparison holds four drivers.</span>
-                </p>
-              ) : (
-                <button
-                  className="tray-add"
-                  onClick={() => {
-                    onAdd(candidate.ref);
-                  }}
-                  type="button"
-                >
-                  <span className="tray-add-plus" aria-hidden="true">
-                    +
-                  </span>
-                  <span className="tray-add-label">
-                    Add {candidate.forename} {candidate.surname}
-                  </span>
-                </button>
-              )}
-            </li>
-          );
-        })}
+        {Array.from({ length: empties }, (_, slot) => (
+          <li className="tray-bay" data-empty="true" key={`empty-${String(slot)}`}>
+            <p className="tray-empty-copy">
+              Bay {bays.length + slot + 1}
+              <span>Comparison holds four drivers.</span>
+            </p>
+          </li>
+        ))}
       </ol>
+
+      <EntityPicker baysId={BAYS_ID} candidates={candidates} filled={bays.length} onAdd={onAdd} />
     </section>
+  );
+}
+
+function ReadyBay({
+  entity,
+  channel,
+  onRemove,
+}: {
+  entity: CompareEntity;
+  channel: SeriesChannels | undefined;
+  onRemove: (ref: string) => void;
+}) {
+  if (channel === undefined) return null;
+  const share = winShare(entity.teammates.race, 'a');
+  return (
+    <li
+      className="tray-bay"
+      style={
+        {
+          '--identity': cssVar(channel.identity),
+          '--series': cssVar(channel.plot),
+        } as CSSProperties
+      }
+    >
+      <span className="tray-identity" aria-hidden="true" />
+      <div className="tray-body">
+        <p className="tray-forename">{entity.identity.forename}</p>
+        <p className="tray-surname">{entity.identity.surname}</p>
+        <p className="tray-span">
+          {entity.firstSeason}–{entity.lastSeason}
+          <span className="tray-dot" aria-hidden="true">
+            ·
+          </span>
+          {entity.seasonsEntered} seasons
+        </p>
+        <p className="tray-metric">
+          <span className="tray-metric-figure">
+            {share === null ? '—' : `${String(Math.round(share * 100))}%`}
+          </span>
+          <span className="tray-metric-label">
+            ahead of a teammate
+            <br />
+            {entity.teammates.race.a + entity.teammates.race.b} same-car races
+          </span>
+        </p>
+        <span className="tray-key">
+          <LegendKey shape={channel.marker} dash={channel.dash} token={channel.plot} />
+        </span>
+      </div>
+      <RemoveButton identity={entity.identity} onRemove={onRemove} />
+    </li>
+  );
+}
+
+/**
+ * A bay whose driver is chosen and whose record has not arrived.
+ *
+ * It is drawn from the **directory**, which is real queried data — name, span, races, team colour
+ * — so the bay is recognisably that driver rather than a grey box. What it does not claim is the
+ * one figure it does not have: the metric slot reads `—` and says why. §1.0's rule, applied to a
+ * loading state: something absent must never be given the meaning of something present.
+ */
+function PendingBay({
+  candidate,
+  onRemove,
+}: {
+  candidate: CompareCandidate;
+  onRemove: (ref: string) => void;
+}) {
+  return (
+    <li
+      className="tray-bay"
+      data-pending="true"
+      style={
+        candidate.colorTeamRef === undefined
+          ? undefined
+          : ({ '--identity': cssVar(identityToken(candidate.colorTeamRef)) } as CSSProperties)
+      }
+    >
+      <span className="tray-identity" aria-hidden="true" />
+      <div className="tray-body">
+        <p className="tray-forename">{candidate.forename}</p>
+        <p className="tray-surname">{candidate.surname}</p>
+        {candidate.firstSeason !== undefined && candidate.lastSeason !== undefined && (
+          <p className="tray-span">
+            {candidate.firstSeason}–{candidate.lastSeason}
+            {candidate.races !== undefined && (
+              <>
+                <span className="tray-dot" aria-hidden="true">
+                  ·
+                </span>
+                {candidate.races} races
+              </>
+            )}
+          </p>
+        )}
+        <p className="tray-metric">
+          <span className="tray-metric-figure">—</span>
+          <span className="tray-metric-label">
+            record loading
+            <br />
+            not yet published by the API
+          </span>
+        </p>
+      </div>
+      <RemoveButton identity={candidate} onRemove={onRemove} />
+    </li>
+  );
+}
+
+function RemoveButton({
+  identity,
+  onRemove,
+}: {
+  identity: { ref: string; forename: string; surname: string };
+  onRemove: (ref: string) => void;
+}) {
+  return (
+    <button
+      className="tray-remove"
+      onClick={() => {
+        onRemove(identity.ref);
+      }}
+      type="button"
+    >
+      <X size={16} aria-hidden="true" />
+      <span className="sr-only">
+        Remove {identity.forename} {identity.surname}
+      </span>
+    </button>
   );
 }
