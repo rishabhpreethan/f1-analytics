@@ -24,7 +24,9 @@ function body(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = new RegExp(`(^|[},{])\\s*${escaped}\\s*\\{`).exec(CSS);
   expect(match, `no rule for ${selector}`).not.toBeNull();
-  const open = CSS.indexOf('{', match?.index ?? 0);
+  /* From the END of the match — see `compare.css.test.ts`: the prefix group swallows the preceding
+   * brace, so on the first rule inside an `@layer` this would open at the layer's own brace. */
+  const open = (match?.index ?? 0) + (match?.[0].length ?? 1) - 1;
   let depth = 0;
   for (let i = open; i < CSS.length; i += 1) {
     if (CSS[i] === '{') depth += 1;

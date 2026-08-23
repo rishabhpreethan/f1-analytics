@@ -1,11 +1,20 @@
 /**
- * ⚠ **TEMPORARY, AND GENERATED FROM `data/f1.db`.** Delete this file when
- * `GET /api/compare` publishes the season lens and the driver directory.
+ * **A TEST FIXTURE, GENERATED FROM `data/f1.db`. The "delete this" header was stale**
+ * _(rewritten 2026-08-23, when `GET /api/compare/seasons` and the driver directory landed)_.
  *
- * It exists for the same reason `fixture.ts` does and is the designer's half of that
- * arrangement (`DESIGN_SYSTEM.md` §6.6.6.10): the season lens was designed and built in
- * parallel with its endpoint, so the payload is specified by the surface that needs it rather
- * than discovered after a schema has already foreclosed the design.
+ * It was written before those endpoints existed, for the same reason `fixture.ts` was
+ * (`DESIGN_SYSTEM.md` §6.6.6.10): the season lens was designed and built in parallel with its
+ * endpoint, so the payload was specified by the surface that needs it rather than discovered after
+ * a schema had foreclosed the design. That worked — the shipped schema matches these shapes field
+ * for field, including `teamAt`, `carsBeside` and the seat segments.
+ *
+ * **Keep it.** `src/routes/Compare.tsx` no longer imports it and it is absent from `dist`, but
+ * `seasonModel.test.ts` rests entirely on it, and the four seasons in it are not a convenience —
+ * they are chosen because between them they hold **every shape the model has to survive**: 2021
+ * two clean pairs, 2016 two principals in one car *and* a mid-season team change, 2026 a season in
+ * progress, 1957 dropped scores and a works team with no single second seat. No hand-written
+ * fixture would have found the seat-change defect, because it would have been built from the same
+ * assumptions as the code.
  *
  * **Every figure here is queried. Nothing is invented.** Two things the queries had to get right
  * and one that they deliberately do not:

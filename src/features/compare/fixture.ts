@@ -1,20 +1,28 @@
 import type { CompareData } from './types';
 
 /**
- * ⚠ **A FIXTURE, AND A TEMPORARY ONE.** `GET /api/compare` does not exist yet — this feature was
- * designed and built in parallel with it, deliberately, so that the payload was specified by the
- * surface that needs it rather than discovered afterwards (`DESIGN_SYSTEM.md` §6.6.5's rule, which
- * the entity indexes were rejected for breaking).
+ * **A TEST FIXTURE. It is no longer temporary, and the header that said so was stale**
+ * _(rewritten 2026-08-23, when `GET /api/compare` landed)_.
+ *
+ * It was written before the endpoint existed, deliberately, so the payload would be specified by
+ * the surface that needs it rather than discovered afterwards (`DESIGN_SYSTEM.md` §6.6.5's rule,
+ * which the entity indexes were rejected for breaking). That worked — the schema the engineer
+ * shipped matches these shapes field for field — and the old header then told the next reader to
+ * delete the file.
+ *
+ * **Do not.** `src/routes/Compare.tsx` no longer imports it and it is absent from `dist`, but
+ * `model.test.ts`, `ComparePage.test.tsx` and `CompareTray.test.tsx` do, and between them that is
+ * roughly **45 assertions on the pure model layer** — the verdict's four cases, the chain, the
+ * ledgers, the rate rails, the tray's two kinds of bay. Deleting it would delete those. It has
+ * become what a fixture is for: a known payload that lets `ComparePage` be tested as a pure
+ * function with no router and no network.
  *
  * **Every figure below was queried from `data/f1.db`**, not invented: Hamilton 106 wins and 7
  * titles, Verstappen 71 and 4 through 2026 R10, Fangio 24 wins from 51 starts and 5 titles. The
  * chains reproduce by BFS over 4,637 round-level teammate pairings. Two were checked against the
  * record before anything was drawn: 2016 Hamilton–Rosberg **10–9** over 19 shared finishes, and
- * 1988 Senna–Prost **7–5** over 12.
- *
- * **Delete this file the day the endpoint lands.** `ComparePage` is a pure function of
- * `CompareData` and takes it as a prop, so the swap is one line in `src/routes/Compare.tsx` and
- * nothing in this directory changes.
+ * 1988 Senna–Prost **7–5** over 12. It is a snapshot, so a data refresh will move some of them;
+ * when a test fails on a figure, re-query before changing the expectation.
  */
 export const COMPARE_FIXTURE: CompareData = {
   entities: [

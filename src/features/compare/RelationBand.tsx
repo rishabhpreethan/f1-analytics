@@ -38,12 +38,6 @@ export interface RelationBandProps {
   onFocus: (pair: [string, string]) => void;
 }
 
-const RELATION_LABEL: Record<string, string> = {
-  teammate: 'Same car',
-  contemporary: 'Same grid',
-  disjoint: 'Never met',
-};
-
 export function RelationBand({
   entities,
   channels,
@@ -132,15 +126,23 @@ export function RelationBand({
                           }}
                           type="button"
                         >
+                          {/*
+                           * The tier comes from `verdict`, not from a lookup on `relation`, so a
+                           * cell and the band beneath it can never disagree. `contemporary` covers
+                           * two different facts — shared a season, and shared a race — and the
+                           * lookup printed "Same grid" for a pair who were never on one together.
+                           */}
                           <span className="relation-cell-tier">
-                            {RELATION_LABEL[pair.relation]}
+                            {verdict(pair, row, column, null).tier}
                           </span>
                           <span className="relation-cell-figure">
                             {pair.relation === 'teammate'
                               ? scoreLabel(oriented.race)
-                              : pair.relation === 'contemporary'
-                                ? `${String(pair.sharedRaces)} shared`
-                                : `${String(chain?.length ?? 0)} steps apart`}
+                              : pair.relation === 'disjoint'
+                                ? `${String(chain?.length ?? 0)} steps apart`
+                                : pair.sharedRaces > 0
+                                  ? `${String(pair.sharedRaces)} shared`
+                                  : `${String(pair.sharedSeasons.length)} shared ${pair.sharedSeasons.length === 1 ? 'season' : 'seasons'}`}
                           </span>
                         </button>
                       </td>

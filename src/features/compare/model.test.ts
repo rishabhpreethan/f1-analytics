@@ -16,7 +16,7 @@ import {
   winShare,
   yearFraction,
 } from './model';
-import type { ChainLink, Ledger } from './types';
+import type { ChainLink, ComparePair, Ledger } from './types';
 
 /**
  * The compare surface's arithmetic (`DESIGN_SYSTEM.md` §6.6.6).
@@ -219,6 +219,50 @@ describe('the verdict', () => {
     const spoken = spokenFor('hamilton', 'max_verstappen', null);
     expect(spoken?.relation).toBe('contemporary');
     expect(spoken?.lead).toContain('never one of them in the same car');
+  });
+
+  it('does not claim a shared grid for two drivers who shared only a season', () => {
+    /*
+     * **Senna and Coulthard, 1994** — the fourth case, and the one the three-tier copy got wrong.
+     * Queried: Senna started rounds 1–3 of 1994 and Coulthard rounds 5–13, so they shared the
+     * season and **no race at all**. `contemporary` is the right tier — `disjoint`'s sentence
+     * denies them a shared points system and in 1994 they had one — but "Same grid, different
+     * cars" was simply false, since they were never on a grid together.
+     *
+     * Built here rather than taken from the fixture because the fixture's four drivers hold no
+     * such pair, and `verdict` is a pure function of the three arguments.
+     */
+    const pair: ComparePair = {
+      a: 'senna',
+      b: 'coulthard',
+      relation: 'contemporary',
+      sharedRaces: 0,
+      sameTeamRaces: 0,
+      sharedSeasons: [1994],
+      sameTeamSeasons: [],
+      yearsApart: 0,
+      race: { rated: 0, pool: 0, a: 0, b: 0, tied: 0 },
+      grid: { rated: 0, pool: 0, a: 0, b: 0, tied: 0 },
+    };
+    const first = byRef.get('hamilton');
+    const second = byRef.get('rosberg');
+    if (first === undefined || second === undefined) throw new Error('fixture');
+    const spoken = verdict(pair, first, second, null);
+
+    expect(spoken.relation).toBe('contemporary');
+    expect(spoken.tier).toBe('Same season');
+    expect(spoken.headline).toBe('Same season, never the same race.');
+    expect(spoken.headline).not.toContain('grid');
+    expect(spoken.lead).toContain('both raced in 1994');
+    expect(spoken.lead).toContain('never started a Grand Prix together');
+    /* And it points at the one thing that IS comparable, rather than only refusing. */
+    expect(spoken.lead).toContain('points system');
+  });
+
+  it('still calls a genuinely shared grid a shared grid', () => {
+    const spoken = spokenFor('hamilton', 'max_verstappen', null);
+    expect(spoken?.tier).toBe('Same grid');
+    expect(spoken?.headline).toBe('Same grid, different cars.');
   });
 
   it('refuses the comparison outright when the careers never met, and says which way round', () => {

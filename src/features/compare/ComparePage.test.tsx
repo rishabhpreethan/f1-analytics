@@ -391,3 +391,96 @@ describe('§6.6.6.10 — the season lens', () => {
     expect(roles.filter((role) => role === 'shadow')).toHaveLength(2);
   });
 });
+
+describe('the selection is the caller’s, when the caller wants it', () => {
+  /**
+   * ⚠ **The defect this closes.** `selected` was local state with no way out, so the route could
+   * not lift a picker choice into `?e=`, nothing refetched, and a driver added from the tray became
+   * a pending bay that **never resolved**. Confirmed live before the fix: adding Senna left the URL
+   * at `?e=alonso,hamilton` and the bay reading "record loading" indefinitely.
+   */
+  const renderControlled = (selected: string[]) => {
+    const onSelect = vi.fn();
+    const view = render(
+      <ComparePage
+        available={COMPARE_DIRECTORY}
+        data={COMPARE_FIXTURE}
+        onSelect={onSelect}
+        seasons={SEASON_LENS_FIXTURE}
+        selected={selected}
+      />,
+    );
+    return { onSelect, view };
+  };
+
+  it('reports an addition to the caller instead of swallowing it into local state', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderControlled(['hamilton', 'rosberg']);
+    await user.type(screen.getByRole('combobox'), 'ayrton');
+    await user.keyboard('{Enter}');
+    expect(onSelect).toHaveBeenCalledWith(['hamilton', 'rosberg', 'senna']);
+  });
+
+  it('reports a removal the same way', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderControlled(['hamilton', 'rosberg']);
+    await user.click(screen.getByRole('button', { name: /Remove Nico Rosberg/ }));
+    expect(onSelect).toHaveBeenCalledWith(['hamilton']);
+  });
+
+  it('does not move on its own — the caller decides what the next selection is', async () => {
+    /*
+     * A controlled page that also updated a private copy would show the addition before the URL
+     * agreed, and then flicker when the payload for the *old* selection came back. The rendered
+     * tray must be a function of the prop and nothing else.
+     */
+    const user = userEvent.setup();
+    renderControlled(['hamilton', 'rosberg']);
+    await user.click(screen.getByRole('button', { name: /Remove Nico Rosberg/ }));
+    expect(screen.getByRole('button', { name: /Remove Nico Rosberg/ })).toBeTruthy();
+  });
+
+  it('still refuses a fifth, because the cap belongs to the palette and not to the caller', async () => {
+    const user = userEvent.setup();
+    const { onSelect } = renderControlled(['hamilton', 'rosberg', 'max_verstappen', 'fangio']);
+    expect(screen.getByRole('combobox')).toHaveProperty('disabled', true);
+    await user.click(screen.getByRole('button', { name: /Remove Juan Fangio/ }));
+    expect(onSelect).toHaveBeenCalledWith(['hamilton', 'rosberg', 'max_verstappen']);
+  });
+
+  it('keeps its own selection when the caller supplies no handler', async () => {
+    /* The uncontrolled path is what lets this component be a pure function of a payload in a test
+     * with no router and no network — it is not a convenience. */
+    const user = userEvent.setup();
+    render(<ComparePage available={COMPARE_DIRECTORY} data={COMPARE_FIXTURE} />);
+    await user.click(screen.getByRole('button', { name: /Remove Nico Rosberg/ }));
+    expect(screen.queryByRole('button', { name: /Remove Nico Rosberg/ })).toBeNull();
+  });
+});
+
+describe('the notice slot keeps the document outline in order', () => {
+  it('renders the route’s card BELOW the h1, not above it', () => {
+    /*
+     * The route used to render this as a sibling *before* `ComparePage`, and `ComparePage` carries
+     * the page's `h1` — so an `h2` came first in the outline. Reachable only through a hand-edited
+     * URL, and wrong on every one of them.
+     */
+    render(
+      <ComparePage
+        available={COMPARE_DIRECTORY}
+        data={COMPARE_FIXTURE}
+        notice={<h2>Part of that link could not be read</h2>}
+        seasons={SEASON_LENS_FIXTURE}
+      />,
+    );
+    const headings = screen.getAllByRole('heading');
+    const levels = headings.map((node) => node.tagName);
+    expect(levels.indexOf('H1')).toBeGreaterThanOrEqual(0);
+    expect(levels.indexOf('H1')).toBeLessThan(levels.indexOf('H2'));
+  });
+
+  it('renders nothing at all when there is no notice', () => {
+    render(<ComparePage available={COMPARE_DIRECTORY} data={COMPARE_FIXTURE} />);
+    expect(screen.queryByText('Part of that link could not be read')).toBeNull();
+  });
+});

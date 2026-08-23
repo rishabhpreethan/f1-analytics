@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
@@ -30,15 +30,18 @@ import { useDriverIndex } from '@/features/entity/useEntityIndex';
  * link says nothing. They are pure and unit-tested there rather than inline here, which is also
  * what keeps this file exporting nothing but a component.
  *
- * ⚠ **The tray's picker cannot yet change what is fetched.** `ComparePage` keeps `selected` in
- * local state and publishes no callback, so a driver added from the picker becomes a *pending* bay
- * that never resolves — the component's own comment predicts exactly that and expects the endpoint
- * to fill it. Filling it needs `ComparePage` to accept `selected` and an `onSelect` (or to call
- * back on add and remove); the moment it does, this route lifts the selection into `?e=` and the
- * bay resolves with no other change here. **Every comparison addressed by a URL works today** —
- * only changing the selection from inside the page does not. The same gap applies to the season
- * lens's year rail, which is why `GET /api/compare/seasons` sends every season at once instead of
- * one per request.
+ * **The picker writes to the URL** _(closed 2026-08-23)_. `ComparePage` takes `selected` and
+ * `onSelect`, so adding or removing a driver in the tray is a navigation: `?e=` changes, the two
+ * queries refetch on their new key, and the bay resolves. Until those props existed the page kept a
+ * private copy of the selection and a driver added from the picker became a *pending* bay that
+ * never resolved — a page that owns a private copy of its own URL state is a page that cannot be
+ * linked to.
+ *
+ * `replace: false` here, unlike the default-fill effect below: adding a driver is a thing the
+ * reader did on purpose, so Back should undo it.
+ *
+ * The year rail needs no equivalent, because `GET /api/compare/seasons` sends every season the
+ * selection ran in one response — there is no network on the rail at all.
  *
  * ================================================================================ the five states
  *
@@ -66,13 +69,17 @@ import { useDriverIndex } from '@/features/entity/useEntityIndex';
  * level-one heading while it is loading, and a different one on every failure. A page's name does
  * not depend on whether its data arrived. It is `sr-only` because the card beneath it already says
  * what is happening on screen, and two titles would be one too many.
+ *
+ * ⚠ **`className="compare"` and nothing else.** These three branches used to carry
+ * `shell-container px-4 md:px-6 xl:px-8` as a literal while the success branch inside `ComparePage`
+ * carried none, and the page measured **left gutter 96px, right gutter 0** — `.shell-main` reserves
+ * the dock's rail clearance on the left, and nothing supplied the right. Three copies of a rule in
+ * three branches is what let the fourth drift, so the width, the centring and the inline padding
+ * now live once, in `.compare` (`compare.css`), and every branch names only the class.
  */
 function Shell({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
   return (
-    <div
-      className="shell-container compare px-4 md:px-6 xl:px-8"
-      {...(busy ? { 'aria-busy': true } : {})}
-    >
+    <div className="compare" {...(busy ? { 'aria-busy': true } : {})}>
       <h1 className="sr-only">Compare</h1>
       {children}
     </div>
@@ -117,6 +124,34 @@ export function Compare() {
       { replace: true },
     );
   }, [joined, missingParam, setParams]);
+
+  /**
+   * The tray's add and remove, lifted into the URL — `ARCHITECTURE.md` §5, *"comparison state lives
+   * entirely in the query string so any comparison is shareable"*.
+   *
+   * `replace: false`, unlike the default-fill effect above: adding a driver is something the reader
+   * did on purpose, so Back should undo it.
+   *
+   * **Emptying the tray restores the default rather than showing an empty page**, and that is
+   * forced rather than chosen: `?e=` with nothing in it parses as absent, so the effect above
+   * re-derives the default from the directory. Stated here because it is surprising if you meet it
+   * without knowing why. Removing down to *one* driver behaves normally — the career lens has a
+   * designed state for that and asks for a second.
+   */
+  const select = useCallback(
+    (next: string[]) => {
+      setParams(
+        (current) => {
+          const params_ = new URLSearchParams(current);
+          if (next.length === 0) params_.delete('e');
+          else params_.set('e', next.join(','));
+          return params_;
+        },
+        { replace: false },
+      );
+    },
+    [setParams],
+  );
 
   const error = directory.error ?? career.error ?? seasons.error;
   const pending =
@@ -168,28 +203,28 @@ export function Compare() {
     );
   }
 
+  /*
+   * **Inside `ComparePage`, not above it.** Rendered as a sibling it landed before the page's `h1`
+   * and put an `h2` first in the document outline. The slot places it under the masthead, which is
+   * also where the sentence reads best — it is about the comparison below it.
+   */
+  const notice = selection.corrected ? (
+    <StateCard as="h2" icon={<Users />} tone="neutral" title="Part of that link could not be read">
+      <p>
+        A comparison holds up to four drivers, each addressed by their reference. Anything else in
+        the link was dropped, and the comparison below is what remains of it.
+      </p>
+    </StateCard>
+  ) : null;
+
   return (
-    <>
-      {selection.corrected && (
-        <div className="shell-container compare px-4 md:px-6 xl:px-8">
-          <StateCard
-            as="h2"
-            icon={<Users />}
-            tone="neutral"
-            title="Part of that link could not be read"
-          >
-            <p>
-              A comparison holds up to four drivers, each addressed by their reference. Anything
-              else in the link was dropped, and the comparison below is what remains of it.
-            </p>
-          </StateCard>
-        </div>
-      )}
-      <ComparePage
-        available={candidates}
-        data={career.data}
-        seasons={seasons.data?.seasons ?? []}
-      />
-    </>
+    <ComparePage
+      available={candidates}
+      data={career.data}
+      notice={notice}
+      onSelect={select}
+      seasons={seasons.data?.seasons ?? []}
+      selected={refs}
+    />
   );
 }

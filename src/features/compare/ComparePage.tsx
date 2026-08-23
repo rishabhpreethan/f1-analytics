@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { assignLadder, COMPARISON_CAP } from '@/components/charts/ladder';
 import { assignEntityColours } from '@/lib/entityColor';
 import { BalanceBar } from './CompareLedger';
@@ -54,17 +54,68 @@ export interface ComparePageProps {
    */
   available?: readonly CompareCandidate[];
   /**
-   * Round-by-round data for the season lens, one entry per season the payload carries.
+   * Round-by-round data for the season lens, **every season the selection entered, in one
+   * response**.
    *
-   * Separate from `data` because it is fetched per season: choosing a year on the rail is a new
-   * request, not a slice of one the page already has.
+   * Separate from `data` because it is a separate request — but not a per-year one. This surface
+   * originally assumed the year rail would fetch; the engineer overruled it, correctly, because the
+   * chosen year is local state this page never publishes, so a per-year endpoint could not be told
+   * which year to ask for. Sending them all costs nothing and puts no network on the rail at all.
    */
   seasons?: readonly CompareSeasonLens[];
+  /**
+   * The selection, and how to change it. **Supply both to make the page controlled**; supply
+   * neither and it keeps its own.
+   *
+   * ⚠ **This is the pair that makes the picker work.** Without it `selected` was local state with
+   * no way out, so a driver added from the tray became a *pending* bay that never resolved: the
+   * route could not lift the choice into `?e=`, so nothing refetched and the record never arrived.
+   * `ARCHITECTURE.md` §5 makes the query string the whole of comparison state, and a page that
+   * owns a private copy of it is a page that cannot be linked to.
+   *
+   * The uncontrolled fallback is not a convenience — it is what lets `ComparePage` stay a pure
+   * function of a payload in tests, with no router and no network.
+   */
+  selected?: readonly string[];
+  onSelect?: (refs: string[]) => void;
+  /**
+   * A card the route needs to show **about** this comparison — today, only the notice that part of
+   * a hand-edited link could not be read.
+   *
+   * It is a slot rather than the route's own sibling because the route rendered it **above**
+   * `ComparePage`, and `ComparePage` carries the page's `h1`. That put an `h2` before the `h1` and
+   * left the document outline out of order. Rendered here it lands under the masthead, which is
+   * also where it reads best: the sentence is about the comparison below it.
+   */
+  notice?: ReactNode;
 }
 
-export function ComparePage({ data, available = [], seasons = [] }: ComparePageProps) {
+export function ComparePage({
+  data,
+  available = [],
+  seasons = [],
+  selected: controlled,
+  onSelect,
+  notice,
+}: ComparePageProps) {
   const allRefs = data.entities.map((entity) => entity.identity.ref);
-  const [selected, setSelected] = useState<string[]>(allRefs);
+  const [own, setOwn] = useState<string[]>(allRefs);
+
+  /*
+   * Controlled when the caller supplies both halves. `onSelect` alone would leave the page unable
+   * to reflect its own change, and `selected` alone would leave it unable to make one — so the
+   * pair is checked together rather than independently, and a caller that passes one gets the
+   * uncontrolled page rather than a half-broken one.
+   */
+  const isControlled = controlled !== undefined && onSelect !== undefined;
+  /* `readonly` and never copied: a fresh array on every render would invalidate the three `useMemo`
+   * hooks below it on every render, which is the whole reason they are memoised. */
+  const selected: readonly string[] = isControlled ? controlled : own;
+  const setSelected = (next: (current: readonly string[]) => string[]) => {
+    if (isControlled) onSelect(next(controlled));
+    else setOwn((current) => next(current));
+  };
+
   const [focus, setFocus] = useState<[string, string] | null>(null);
   const [lens, setLens] = useState<Lens>('career');
   const [year, setYear] = useState<number | null>(null);
@@ -214,13 +265,17 @@ export function ComparePage({ data, available = [], seasons = [] }: ComparePageP
         </p>
       </header>
 
+      {notice}
+
       <CompareTray
         bays={bays}
         candidates={candidates}
         channels={ladder.series}
         onAdd={(ref) => {
           setSelected((current) =>
-            current.includes(ref) || current.length >= COMPARISON_CAP ? current : [...current, ref],
+            current.includes(ref) || current.length >= COMPARISON_CAP
+              ? [...current]
+              : [...current, ref],
           );
         }}
         onRemove={(ref) => {

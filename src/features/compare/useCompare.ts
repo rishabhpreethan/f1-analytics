@@ -1,4 +1,9 @@
-import { type UseQueryResult, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  type UseQueryResult,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   type CompareData,
   type CompareSeasons,
@@ -47,12 +52,33 @@ export const compareSeasonsQueryKey = (refs: readonly string[]) =>
 const retry = (failureCount: number, error: ApiRequestError): boolean =>
   !isTerminalApiError(error) && failureCount < 1;
 
+/**
+ * ⚠ **`keepPreviousData` is load-bearing here, not a nicety** _(added 2026-08-23 with the picker's
+ * URL write; flagged to the engineer, whose layer this is)_.
+ *
+ * The selection is the query key, so adding a driver in the tray changes it. Without this the new
+ * key has no cached data, `career.data` goes `undefined`, and the route swaps the whole page for
+ * the loading skeleton — which **unmounts `ComparePage`**. Three things break at once and only the
+ * first is cosmetic:
+ *
+ * 1. The tray and the picker vanish mid-interaction, so the field the reader was typing in is gone.
+ * 2. The **pending bay never appears at all** — the state §7.16 designed for exactly this moment.
+ * 3. `lens` and `year` are `ComparePage`'s local state, so **adding a driver while reading the
+ *    season lens throws the reader back to the career lens**. That is a defect, not roughness.
+ *
+ * With it, the previous payload stays on screen, the added driver is a pending bay for the length
+ * of the fetch, and everything else holds still. `isPlaceholderData` is deliberately not read: the
+ * page already distinguishes a bay it has a record for from one it does not, so a second staleness
+ * signal would say the same thing twice.
+ */
+
 /** The career lens. `refs` empty disables the query rather than asking for nothing. */
 export function useCompare(refs: readonly string[]): UseQueryResult<CompareData, ApiRequestError> {
   return useQuery<CompareData, ApiRequestError>({
     queryKey: compareQueryKey(refs),
     queryFn: () => apiGet(`/api/compare?e=${refs.join(',')}`, compareDataSchema),
     enabled: refs.length > 0,
+    placeholderData: keepPreviousData,
     staleTime: HOUR_MS,
     gcTime: SESSION_MS,
     retry,
@@ -67,6 +93,7 @@ export function useCompareSeasons(
     queryKey: compareSeasonsQueryKey(refs),
     queryFn: () => apiGet(`/api/compare/seasons?e=${refs.join(',')}`, compareSeasonsSchema),
     enabled: refs.length > 0,
+    placeholderData: keepPreviousData,
     staleTime: HOUR_MS,
     gcTime: SESSION_MS,
     retry,

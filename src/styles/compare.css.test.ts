@@ -25,7 +25,15 @@ function bodies(css: string, selector: string): string[] {
   const needle = new RegExp(`(^|[},{])\\s*${escaped}\\s*\\{`, 'g');
   let match: RegExpExecArray | null;
   while ((match = needle.exec(css)) !== null) {
-    const open = css.indexOf('{', match.index);
+    /*
+     * ⚠ **From the end of the match, not from its start.** The pattern's prefix group swallows the
+     * `{` or `}` before the selector, so on the *first* rule inside `@layer components {` the match
+     * begins at the layer's own brace and `indexOf('{', match.index)` returns that — handing back
+     * the whole layer as the rule body. Every assertion on it then passes for the wrong reason, and
+     * a `not.toMatch` fails for the wrong reason. `match[0]` ends with the selector's brace, so its
+     * last index is the one to open from. Found by `.compare` becoming the first rule in the layer.
+     */
+    const open = match.index + match[0].length - 1;
     if (open === -1) continue;
     let depth = 0;
     for (let i = open; i < css.length; i += 1) {
@@ -289,5 +297,51 @@ describe('reduced motion', () => {
     expect(reduce).toMatch(/\.tray-remove/);
     expect(reduce).toMatch(/\.relation-cell/);
     expect(reduce).toMatch(/transition:\s*none/);
+  });
+});
+
+describe('the page is its own container — one source of truth for the gutters', () => {
+  /**
+   * ⚠ **Measured on the live page before this rule existed: left gutter 96px, right gutter 0.**
+   *
+   * `.shell-main` reserves the dock's rail clearance on the left; nothing supplied the right,
+   * because the route's three pre-payload branches each carried `shell-container px-4 md:px-6
+   * xl:px-8` as a literal while the success branch carried none. Every right-hand element — the
+   * chart's direct labels, the Chart/Table toggle, bay 4 — sat flush against the window edge.
+   *
+   * It is **asymmetry, not overflow**, which is why a `scrollWidth` check came back clean and why
+   * it first read as clipping. Three copies of a rule in three branches is what let the fourth
+   * drift, so all of it lives here and every branch names only the class. These assertions are the
+   * only thing that can catch it coming back: jsdom computes no box, so no DOM test can measure a
+   * gutter.
+   */
+  const base = () => bodies(CSS, '.compare')[0] ?? '';
+
+  it('centres itself and takes the shell width, so no caller has to add a container', () => {
+    expect(base()).toContain('max-width: var(--size-shell-max)');
+    expect(base()).toContain('margin-inline: auto');
+    expect(base()).toContain('width: 100%');
+  });
+
+  it('carries inline padding, which is the half that was missing', () => {
+    expect(base()).toMatch(/padding-inline:/);
+  });
+
+  it('steps the inline padding at the same two breakpoints the utilities did', () => {
+    /* `px-4 md:px-6 xl:px-8` — 1rem, then 1.5rem at 48rem, then 2rem at 80rem. Spelt as multiples
+     * of `--spacing` so the page cannot drift from the scale. */
+    const all = bodies(CSS, '.compare');
+    const inline = all
+      .map((body) => /padding-inline:\s*([^;]+);/.exec(body)?.[1]?.trim())
+      .filter((value): value is string => value !== undefined);
+    expect(inline).toEqual([
+      'calc(var(--spacing) * 4)',
+      'calc(var(--spacing) * 6)',
+      'calc(var(--spacing) * 8)',
+    ]);
+  });
+
+  it('never hardcodes a max-width in px, which is how a container drifts from the shell', () => {
+    expect(base()).not.toMatch(/max-width:\s*\d/);
   });
 });

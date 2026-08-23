@@ -3186,6 +3186,25 @@ a time, unlike §7.14's independent toggles, because the instruments below can o
 — and each cell prints the figure that decides its tier: a score, a shared-race count, or a chain
 length. **The matrix is the navigator.**
 
+
+> **A fourth headline inside the third tier** _(2026-08-23)_. `contemporary` means the two shared a
+> **season**, not a **race**, and for a pair who shared only the season the headline *"Same grid,
+> different cars"* is false. Senna started rounds 1–3 of 1994 and Coulthard rounds 5–13 (queried);
+> they were never on a grid together. `disjoint` is worse — its sentence denies a shared points
+> system, and in 1994 they had one — so the tier stands and the copy changed:
+>
+> | | |
+> |---|---|
+> | **Tier** | Same season |
+> | **Headline** | **Same season, never the same race.** |
+> | **Cell figure** | `1 shared season`, not `0 shared` |
+>
+> The lead refuses the head-to-head and then names the one thing that *is* comparable — figures
+> **inside** a season, which is the season lens's own licence (§6.6.6.10). And the matrix cell's
+> tier now comes from `verdict()` rather than a `Record<Relation, string>` lookup, so a cell and the
+> band beneath it cannot disagree: **a label keyed on an enum is only correct while the enum has one
+> meaning per value.**
+
 ##### 6.6.6.2 `CompareTray` — four bays, and the cap is drawn
 
 Not a chip row. A chip row is the obvious build and it wastes the one place on the page the reader
@@ -3563,6 +3582,12 @@ jsdom performs no layout and no compositing, and CR-006 removed the visual gate.
 - **Whether the picker's result list is legible over the tray**, and whether the active row is
   visibly distinct from its neighbours.
 
+⚠ **This list was incomplete, and the omission cost a blocking defect.** It named five things about
+*motion, size and legibility* and nothing about **the page's own box**. The missing right gutter
+(§6.6.6.13 defect 1) is exactly the kind of thing it should have caught: invisible to every test,
+invisible to `scrollWidth`, and visible in the first second to a human. **Add "the container's own
+margins and padding" to what a surface names as unverified**, not just what is inside it.
+
 ##### 6.6.6.12 Proposed and not built — with the figures that would justify each
 
 Offered in the brief, weighed, and deliberately left out of this change so that the picker and the
@@ -3585,6 +3610,67 @@ lens could be built properly. Each is cheap and each has its number already:
 4. **Finishing position per round as a dot strip**, in the season lens. `SeasonEntrant.finish` is
    already published for it.
 
+##### 6.6.6.13 Four defects found on the live page, and what each one teaches _(2026-08-23)_
+
+Rishabh ran `/compare` against the endpoints. Two were blocking; all four are fixed. They are
+recorded because three of them are **classes** of mistake rather than incidents.
+
+**1. The page had no right gutter — 96px left, 0 right.** `.shell-main` reserves the dock's rail
+clearance on the left; nothing supplied the right. The cause was a **seam** (§1.0a): the route's
+three pre-payload branches each carried `shell-container px-4 md:px-6 xl:px-8` as a literal, and
+the success branch — `ComparePage`, a different file, a different owner — carried none. So the two
+states nobody looks at were correctly inset and the actual page was not.
+
+Two things make this the sharpest lesson in the section. **It is asymmetry, not overflow**, so a
+`scrollWidth` check comes back clean and it first reads as clipping — the wrong diagnosis leads to
+the wrong fix. And **three copies of a rule in three branches is what let the fourth drift**;
+nothing was wrong with any of the three. The fix is therefore not "add the classes to the fourth
+branch" but *"there is one container rule, it lives in `.compare`, and every branch names only the
+class"* — width, centring and inline padding included. `compare.css.test.ts` asserts all four
+declarations and the two breakpoint steps, because **jsdom computes no box, so no DOM test can
+measure a gutter.**
+
+> **Generalise it.** A page's container belongs to the page's stylesheet, not to whichever component
+> happens to render a given state. If two files can both render a route, neither should be
+> describing its width.
+
+**2. A driver added from the picker never resolved.** `ComparePage` kept `selected` in local state
+and published no callback, so the route could not lift the choice into `?e=` and nothing refetched:
+the bay sat at "record loading" forever. `ARCHITECTURE.md` §5 makes the query string the whole of
+comparison state, and **a page that owns a private copy of its own URL state is a page that cannot
+be linked to.** `ComparePage` now takes `selected` and `onSelect` and is controlled when it gets
+both; the uncontrolled fallback is kept, and is not a convenience — it is what lets the component
+stay a pure function of a payload in a test with no router and no network.
+
+**One thing that fell out of the fix and is worth its own line.** The selection is the query key, so
+lifting it meant every add changed the key, and without `placeholderData: keepPreviousData` the
+route swapped the whole page for the loading skeleton — **unmounting `ComparePage`**. Three things
+broke at once and only the first is cosmetic: the picker vanished mid-typing; the **pending bay
+never appeared at all**, which is the state §7.16 designed for exactly that moment; and `lens` and
+`year` are local state, so **adding a driver while reading the season lens threw the reader back to
+the career lens.** Fixed in `useCompare.ts`.
+
+> **Generalise it.** When a surface's selection is also its query key, changing the selection is a
+> remount unless something holds the previous data. Any local UI state the surface owns is lost with
+> it, silently.
+
+**3. A fourth relation case the three-tier copy did not cover.** `contemporary` means the two shared
+a **season**; it does not mean they shared a **race**. Senna started rounds 1–3 of 1994 and
+Coulthard rounds 5–13 (queried), so the headline *"Same grid, different cars"* was false — they were
+never on a grid together. `disjoint` is worse, because its sentence denies a shared points system
+and in 1994 they had one. So the tier was right and the copy was not. §6.6.6.1's band now carries a
+fourth headline, **"Same season, never the same race,"** which refuses the head-to-head and then
+points at the one thing that *is* comparable: figures inside a season, which is the season lens's
+own licence (§6.6.6.10).
+
+The matrix cell's tier now comes from `verdict()` rather than a `Record<Relation, string>` lookup,
+so a cell and the band beneath it cannot disagree about what a pair is. **A label keyed on an enum
+is only correct while the enum has one meaning per value.**
+
+**4. `h2` before `h1`.** The route rendered its "part of that link could not be read" card as a
+sibling *above* `ComparePage`, which carries the page's `h1`. `ComparePage` now takes a `notice`
+slot and renders it under the masthead — where the sentence also reads better, being about the
+comparison below it. Reachable only through a hand-edited URL, and wrong on every one of them.
 
 ## 7. Components
 
@@ -4324,6 +4410,15 @@ reads `—` above "record loading". §1.0's rule applied to a loading state: som
 never be given the meaning of something present. It is the genuine loading state, and while
 `GET /api/compare` is being built it is also every driver outside the fixture's four.
 
+**The pick has to reach the URL, or the bay never resolves** _(closed 2026-08-23)_. `ComparePage`
+takes `selected` and `onSelect`; the route lifts both into `?e=`, the queries refetch on the new key,
+and the pending bay becomes a real one. Two rules came out of getting this wrong first:
+`ARCHITECTURE.md` §5 makes the query string the whole of comparison state, so **a page holding a
+private copy of it cannot be linked to**; and because the selection *is* the query key,
+`placeholderData: keepPreviousData` is load-bearing rather than cosmetic — without it the route
+unmounts the page mid-interaction and takes the picker, the pending bay and the reader's chosen lens
+with it (§6.6.6.13 defect 2).
+
 **⚠ Untested by construction**: whether the result list is legible over the tray, whether the active
 row is visibly distinct, whether the field's focus underline animates, and whether the list overflows
 at 390px.
@@ -4700,3 +4795,4 @@ figure as its justification.
 | 2026-08-23 | **§9.2.7 M-1** — budget measurement, not a palette run: the 84 retired `--*-plot-deep` / `-bright` declarations cost **0.61 KB gzipped** (20.35 → 19.74 KB), measured by build and `check:budget` rather than reasoned about | designer |
 | 2026-08-23 | **§7.16 `EntityPicker`** — the search-and-add control `/compare` shipped without. `/drivers`' field reused class for class and `indexModel.ts`'s `normalise` imported literally; ARIA 1.2 combobox, results in flow so nothing needs a z-index, cap drawn at four, 818 drivers rather than 881. The pending bay is specified with it | designer |
 | 2026-08-23 | **§6.6.6.10–12 the season lens** — one season, round by round, on `/compare` rather than a second route. Records why points are legitimately comparable within a season and never across; the shadow as a **seat** rather than a person, with the four consequences drawn; the two charts through §6.1's six steps; six designed states with their copy; and §6.6.6.11, five behaviours no test in this project can reach. §6.6.6.12 records the four charts proposed and not built, each with the figures that would justify it | designer |
+| 2026-08-23 | **Four live-page defects fixed and generalised, §6.6.6.13.** (1) `/compare` measured **left gutter 96px, right gutter 0** — three branches carried the container as a literal and the fourth carried none; the width, centring and inline padding now live once in `.compare`, asserted in `compare.css.test.ts`, because **jsdom computes no box and no DOM test can measure a gutter**. §6.6.6.11's untested list is corrected: it named five things about motion and legibility and nothing about the page's own box. (2) `ComparePage` takes `selected` / `onSelect`, so the picker writes to `?e=` — with `placeholderData: keepPreviousData`, without which changing the selection unmounts the page and loses the picker, the pending bay and the chosen lens. (3) §6.6.6.1 gains a fourth headline, **"Same season, never the same race"**, for a `contemporary` pair who shared no race — Senna R1–3 of 1994, Coulthard R5–13; the matrix tier now comes from `verdict()` so a cell cannot disagree with the band. (4) The route's link-correction card moves into a `notice` slot under the masthead, so an `h2` no longer precedes the `h1` | designer |

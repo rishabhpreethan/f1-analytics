@@ -347,6 +347,14 @@ export function fullName(entity: { forename: string; surname: string }): string 
 
 export interface Verdict {
   relation: Relation;
+  /**
+   * The tier as the matrix prints it — three or four words in a cell.
+   *
+   * Not `RELATION_LABEL[relation]`, because **`contemporary` covers two different facts** and one
+   * of the labels was false for the second (see `verdict`). Derived with the headline so the cell
+   * and the band can never disagree about what a pair is.
+   */
+  tier: string;
   /** Three or four words. The largest type in the band and the page's actual thesis. */
   headline: string;
   /** One sentence that names the figure the headline rests on, and what it does not licence. */
@@ -378,14 +386,40 @@ export function verdict(
     const at = teamName === null ? '' : ` at ${teamName}`;
     return {
       relation: 'teammate',
+      tier: 'Same car',
       headline: 'Same car.',
       lead: `${a} and ${b} started ${String(pair.sameTeamRaces)} Grands Prix as teammates${at}. Same machinery, same races, same conditions — this is the only like-for-like comparison the sport produces, and everything below rests on it.`,
     };
   }
 
   if (pair.relation === 'contemporary') {
+    /*
+     * **A fourth case, inside the third tier** _(added 2026-08-23)_. `contemporary` means the two
+     * shared a *season*; it does not mean they shared a *race*. Senna and Coulthard are both 1994
+     * drivers — Senna started rounds 1–3, Coulthard rounds 5–13 (queried) — so they were never on
+     * a grid together and the headline "Same grid, different cars" was simply false for them.
+     *
+     * `disjoint` would be worse: its sentence denies them a shared points system, and in 1994 they
+     * had one. So the tier is right and the copy was not. This branch says what is true and points
+     * at the one thing that *is* comparable — figures inside a season, which is the season lens's
+     * own licence (§6.6.6.10) and the only place in the product points may be drawn.
+     */
+    if (pair.sharedRaces === 0) {
+      const years = pair.sharedSeasons;
+      const when =
+        years.length === 1
+          ? `both raced in ${String(years[0])}`
+          : `both raced in ${String(years.length)} of the same seasons`;
+      return {
+        relation: 'contemporary',
+        tier: 'Same season',
+        headline: 'Same season, never the same race.',
+        lead: `${a} and ${b} ${when}, and never started a Grand Prix together — so there is no head-to-head to report, in the same car or in different ones. What they do share is a points system, which two drivers separated by decades never do: inside those seasons their figures are directly comparable, and the season lens is where to read them.`,
+      };
+    }
     return {
       relation: 'contemporary',
+      tier: 'Same grid',
       headline: 'Same grid, different cars.',
       lead: `${a} and ${b} started ${String(pair.sharedRaces)} of the same Grands Prix across ${String(pair.sharedSeasons.length)} seasons, and never one of them in the same car. A head-to-head here measures two cars at least as much as it measures two drivers.`,
     };
@@ -395,6 +429,7 @@ export function verdict(
   const later = earlier === first ? second : first;
   return {
     relation: 'disjoint',
+    tier: 'Never met',
     headline: 'Never on the same grid.',
     lead: `${String(pair.yearsApart)} years separate ${earlier.identity.surname}'s last Grand Prix in ${String(earlier.lastSeason)} from ${later.identity.surname}'s first in ${String(later.firstSeason)}. There is no race, no car and no points system the two of them share, so nothing on this page is a direct result — and the rates below are indexed to opportunity, not summed.`,
   };

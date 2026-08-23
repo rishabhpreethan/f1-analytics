@@ -21,14 +21,41 @@
  */
 
 @layer components {
+  /*
+   * **`.compare` is the container, not just a theme for one.** _(Corrected 2026-08-23.)_
+   *
+   * It shipped with `padding-block` only, and the route's three pre-payload branches each carried
+   * `shell-container px-4 md:px-6 xl:px-8` as a literal beside it while the success branch carried
+   * none. The result measured **left gutter 96px, right gutter 0** — `.shell-main` reserves the
+   * dock's rail clearance on the left, and with no inline padding of its own the page had nothing
+   * on the right. Every right-hand element (the direct labels, the chart toggles, bay 4) sat flush
+   * against the window edge.
+   *
+   * It is **asymmetry, not overflow**, which is why a `scrollWidth` check came back clean and why
+   * it was first misread as clipping. Three literals in three branches is what let the fourth
+   * branch drift, so the width, the centring and the inline padding all live **here**, once, and
+   * every branch says `className="compare"` and nothing else. `--size-shell-max` and the step
+   * values are the same ones `.shell-container` and the `px-4 md:px-6 xl:px-8` utilities resolved
+   * to, so nothing about the other four pages moves.
+   */
   .compare {
     /* The year gutter to the left of every axis-aligned track. One value, inherited by all of
      * them, so the chain's 1957 and the era strip's 1957 are the same x. */
     --axis-inset: 64px;
+    width: 100%;
+    max-width: var(--size-shell-max);
+    margin-inline: auto;
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing) * 12);
+    padding-inline: calc(var(--spacing) * 4);
     padding-block: calc(var(--spacing) * 8) calc(var(--spacing) * 16);
+  }
+
+  @media (min-width: 48rem) {
+    .compare {
+      padding-inline: calc(var(--spacing) * 6);
+    }
   }
 
   @media (min-width: 64rem) {
@@ -36,6 +63,12 @@
       --axis-inset: 88px;
       gap: calc(var(--spacing) * 16);
       padding-block: calc(var(--spacing) * 12) calc(var(--spacing) * 16);
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .compare {
+      padding-inline: calc(var(--spacing) * 8);
     }
   }
 
