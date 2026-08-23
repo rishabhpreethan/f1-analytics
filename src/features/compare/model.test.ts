@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COMPARE_FIXTURE } from './fixture';
 import {
   archiveDomain,
+  careerArc,
   balanceFractions,
   chainGeometry,
   chainPivots,
@@ -10,7 +11,9 @@ import {
   orientChain,
   orientLedger,
   pairFor,
+  placesGained,
   rateRails,
+  resultMix,
   scoreLabel,
   verdict,
   winShare,
@@ -318,5 +321,355 @@ describe('the rate rails', () => {
     const [only] = rateRails([{ ...sample, totals: { ...sample.totals, starts: 0, wins: 0 } }]);
     /* Never `0`, which reads as "never did it" for a driver who never had the chance. */
     expect(only?.values[0]?.value).toBeNull();
+  });
+});
+
+describe('the result mix (§6.6.6.14)', () => {
+  const mix = () => resultMix(COMPARE_FIXTURE.entities);
+  const rowFor = (ref: string) => mix().find((row) => row.ref === ref);
+  const partOf = (ref: string, tone: string) =>
+    rowFor(ref)?.parts.find((part) => part.tone === tone)?.value;
+
+  it('splits every driver into exactly four parts that sum to his OWN starts', () => {
+    /*
+     * The invariant the whole chart rests on. `ShareChart` normalises whatever it is handed, so a
+     * row that summed to 0.94 of the starts would still render as a full bar and would overstate
+     * every part in it by 6% with nothing on screen looking wrong.
+     */
+    for (const row of mix()) {
+      expect(row.parts).toHaveLength(4);
+      const total = row.parts.reduce((sum, part) => sum + part.value, 0);
+      expect(total, `${row.surname} sums to ${String(total)} of ${String(row.starts)}`).toBe(
+        row.starts,
+      );
+    }
+  });
+
+  it('reproduces the three measured mixes, on the payload’s own starts', () => {
+    /*
+     * ⚠ Fangio reads **24/11/6/10 of 51**, not the 24/11/9/14 of 58 §6.6.6.12 recorded when this
+     * chart was proposed. 58 is a raw count of classification rows and 51 is `starts`: 40 races
+     * between 1950 and 1964 classify one driver two or three times (trap 17). The index says 51,
+     * so this says 51 — a chart that disagreed with the rest of the product about how many races a
+     * man started would be a defect however readable it was.
+     */
+    expect(rowFor('fangio')?.parts.map((part) => part.value)).toEqual([24, 11, 6, 10]);
+    expect(rowFor('fangio')?.starts).toBe(51);
+    expect(rowFor('hamilton')?.parts.map((part) => part.value)).toEqual([106, 101, 151, 32]);
+    expect(rowFor('hamilton')?.starts).toBe(390);
+  });
+
+  it('keeps the parts nested — a win is a podium is a classified finish', () => {
+    // Every part after the first is a subtraction, so double-counting a win as a podium too is the
+    // failure this catches. Fangio: 35 podiums of which 24 were wins, so 11 podium-only.
+    expect(partOf('fangio', 'win')).toBe(24);
+    expect(partOf('fangio', 'podium')).toBe(11);
+  });
+
+  it('takes the fourth part from `starts − classified`, never from `dnfs`', () => {
+    /*
+     * They are different numbers and both are right: Hamilton retired from **34** races and has
+     * **32** starts with no classification, because a car that covers enough of the distance is
+     * still given a finishing position when it stops. Using `dnfs` would break the sum by two AND
+     * mislabel the band, so the subtraction is the value and `dnfs` travels beside it for the copy.
+     */
+    expect(partOf('hamilton', 'unclassified')).toBe(32);
+    expect(rowFor('hamilton')?.dnfs).toBe(34);
+  });
+
+  it('is in selection order and is never sorted by any value', () => {
+    // §6.2, and §6.6.6.5's own correction: reading one driver across the page is a vertical scan at
+    // a fixed offset, which a value sort would turn into a search that moves when a bay is added.
+    expect(mix().map((row) => row.ref)).toEqual(
+      COMPARE_FIXTURE.entities.map((entity) => entity.identity.ref),
+    );
+  });
+
+  it('emits the four tones in ramp order, strongest first', () => {
+    expect(rowFor('fangio')?.parts.map((part) => part.tone)).toEqual([
+      'win',
+      'podium',
+      'classified',
+      'unclassified',
+    ]);
+  });
+
+  it('gives a driver who entered and never started four zeroes, not a negative band', () => {
+    /*
+     * 91 drivers in this archive entered a Grand Prix and started none. A share of zero starts is
+     * `0/0`, and the row is a designed state in `ShareChart` rather than a division — but only if
+     * this returns zeroes rather than, say, `starts − classifiedFinishes` going negative on a
+     * payload where the two disagree.
+     */
+    const entered = COMPARE_FIXTURE.entities[0];
+    if (entered === undefined) throw new Error('fixture has no entities');
+    const [row] = resultMix([
+      {
+        ...entered,
+        totals: { ...entered.totals, starts: 0, wins: 0, podiums: 0, classifiedFinishes: 0 },
+      },
+    ]);
+    expect(row?.parts.map((part) => part.value)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('clamps rather than emitting a negative part when totals disagree', () => {
+    const entered = COMPARE_FIXTURE.entities[0];
+    if (entered === undefined) throw new Error('fixture has no entities');
+    const [row] = resultMix([
+      /* A selector that counted more podiums than classified finishes would otherwise draw a
+       * negative width, which SVG renders as nothing at all — absent given the meaning of
+       * present (§1.0). */
+      {
+        ...entered,
+        totals: { ...entered.totals, starts: 10, wins: 2, podiums: 8, classifiedFinishes: 5 },
+      },
+    ]);
+    expect(row?.parts.map((part) => part.value)).toEqual([2, 6, 0, 5]);
+  });
+});
+
+describe('the career-relative arc (§6.6.6.14 B)', () => {
+  const arc = () => careerArc(COMPARE_FIXTURE.entities);
+  const seriesFor = (ref: string) => arc().series.find((entry) => entry.reference === ref);
+
+  it('starts every driver at x = 1, whatever year his debut was', () => {
+    /*
+     * The whole chart. Fangio debuts in 1950 and Verstappen in 2015, and they occupy the same
+     * column — the axis IS the normalisation, which is why this one needs no caveat about what is
+     * being held constant.
+     */
+    for (const entry of arc().series) {
+      expect(entry.points[0]?.x, entry.label).toBe(1);
+    }
+  });
+
+  it('runs each line exactly as long as the career, not as long as the longest', () => {
+    const fangio = COMPARE_FIXTURE.entities.find((e) => e.identity.ref === 'fangio');
+    const span = (fangio?.lastSeason ?? 0) - (fangio?.firstSeason ?? 0) + 1;
+    expect(seriesFor('fangio')?.points).toHaveLength(span);
+  });
+
+  it('emits a null point for a year inside the career with no season — never omits it', () => {
+    /*
+     * ⚠ The defect this exists to prevent. `d3-shape`'s `defined` breaks a line at a null and joins
+     * straight through a **missing** array entry, so omitting a sabbatical would draw one unbroken
+     * line across it and state that the driver raced. The point has to be present and null.
+     */
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const sabbatical = {
+      ...entity,
+      seasons: [
+        {
+          year: 2001,
+          teamRefs: [],
+          starts: 17,
+          wins: 0,
+          podiums: 0,
+          dnfs: 2,
+          championshipPosition: 10,
+          championshipPositionIsFinal: true,
+        },
+        {
+          year: 2004,
+          teamRefs: [],
+          starts: 18,
+          wins: 1,
+          podiums: 3,
+          dnfs: 1,
+          championshipPosition: 7,
+          championshipPositionIsFinal: true,
+        },
+      ],
+    };
+    const { series, absences } = careerArc([sabbatical]);
+    expect(series[0]?.points).toEqual([
+      { x: 1, y: 10 },
+      { x: 2, y: null },
+      { x: 3, y: null },
+      { x: 4, y: 7 },
+    ]);
+    expect(absences[0]?.years).toEqual([2002, 2003]);
+  });
+
+  it('separates "did not race" from "raced but was not ranked" — one gap, two facts', () => {
+    /*
+     * The chart draws both as a break and cannot tell them apart, so the model returns them apart
+     * and the copy names which is which. `championshipPosition: null` means unranked, never last.
+     */
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const { absences, unranked } = careerArc([
+      {
+        ...entity,
+        seasons: [
+          {
+            year: 1958,
+            teamRefs: [],
+            starts: 2,
+            wins: 0,
+            podiums: 0,
+            dnfs: 2,
+            championshipPosition: null,
+            championshipPositionIsFinal: true,
+          },
+          {
+            year: 1959,
+            teamRefs: [],
+            starts: 8,
+            wins: 0,
+            podiums: 1,
+            dnfs: 3,
+            championshipPosition: 9,
+            championshipPositionIsFinal: true,
+          },
+        ],
+      },
+    ]);
+    expect(absences).toEqual([]);
+    expect(unranked[0]?.years).toEqual([1958]);
+  });
+
+  it('carries the driver code as the short label and never invents one', () => {
+    // `driver.code` is null for 774 of 881 drivers; `RankChart` falls back to the full label, and a
+    // surname sliced to three letters would be a fabricated abbreviation.
+    for (const entry of arc().series) {
+      const entity = COMPARE_FIXTURE.entities.find((e) => e.identity.ref === entry.reference);
+      expect(entry.shortLabel).toBe(entity?.identity.code ?? null);
+    }
+  });
+
+  it('skips a driver with no seasons rather than drawing an empty line at the axis', () => {
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    expect(careerArc([{ ...entity, seasons: [] }]).series).toEqual([]);
+  });
+});
+
+describe('places gained from the grid (§6.6.6.14 C)', () => {
+  const gained = () => placesGained(COMPARE_FIXTURE.entities);
+  const rowFor = (ref: string) => gained().rows.find((row) => row.ref === ref);
+
+  it('reproduces the endpoint’s own figures', () => {
+    /*
+     * These came out of `buildGridVsFinish` itself rather than a second implementation, which is
+     * the point of the driver page and this page sharing a builder. ⚠ Fangio is **41 counted races
+     * and +0.49**, not the 44 and 0.00 first relayed: 44 was an un-collapsed `session_entry` count
+     * and he is the only one of the four with shared drives (trap 17).
+     */
+    expect(rowFor('fangio')?.racesCounted).toBe(41);
+    expect(rowFor('fangio')?.mean).toBeCloseTo(0.4878, 4);
+    expect(rowFor('max_verstappen')?.mean).toBeCloseTo(1.2238, 4);
+    expect(rowFor('hamilton')?.mean).toBeCloseTo(0.7626, 4);
+  });
+
+  it('keeps the zero line in the middle by scaling both halves the same', () => {
+    /*
+     * A shared symmetric scale, unlike the rate board's five per-measure ceilings: every row here
+     * is the same measure, so a per-row scale would make two bars of equal length mean different
+     * things. The largest absolute mean takes half the track.
+     */
+    const { rows, scale } = gained();
+    expect(scale).toBeCloseTo(1.2238, 4);
+    expect(rowFor('max_verstappen')?.extent).toBeCloseTo(1, 6);
+    for (const row of rows) expect(row.extent).toBeLessThanOrEqual(1);
+  });
+
+  it('floors the scale at one whole place, so a flat field is not magnified into a rout', () => {
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const flat = placesGained([
+      { ...entity, gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 0.2 } },
+    ]);
+    expect(flat.scale).toBe(1);
+    expect(flat.rows[0]?.extent).toBeCloseTo(0.2, 6);
+  });
+
+  it('gives a null mean no bar at all — never a zero-length one at the origin', () => {
+    /*
+     * ⚠ 155 of the 818 drivers with a race were never classified in one they started from the
+     * grid, and all of them are pickable. A bar of zero length says "started and finished level
+     * every time", which is a different and false claim.
+     */
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const [row] = placesGained([
+      {
+        ...entity,
+        gridVsFinish: {
+          racesCounted: 0,
+          meanPositionsGained: null,
+          bestGain: null,
+          worstLoss: null,
+          gained: 0,
+          lost: 0,
+          held: 0,
+          excluded: { unclassified: 4, pitLaneStarts: 0, unknownGrid: 0 },
+        },
+      },
+    ]).rows;
+    expect(row?.mean).toBeNull();
+    expect(row?.extent).toBe(0);
+    expect(row?.direction).toBe('held');
+  });
+
+  it('distinguishes an exact zero from an absent measurement', () => {
+    // Both draw no bar, and they are not the same statement: one is a measured result over real
+    // races, the other is the absence of any. The counts and the figure column say which.
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const [row] = placesGained([
+      {
+        ...entity,
+        gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 0, racesCounted: 30 },
+      },
+    ]).rows;
+    expect(row?.mean).toBe(0);
+    expect(row?.racesCounted).toBe(30);
+    expect(row?.direction).toBe('held');
+  });
+
+  it('carries the split, which can disagree with the mean’s sign', () => {
+    /*
+     * The reason `gained`/`lost`/`held` are published beside the bar rather than folded into it: a
+     * driver can be ahead in more races than he is behind and still average a loss, because one
+     * race lost by fifteen outweighs ten gained by one.
+     */
+    const row = rowFor('max_verstappen');
+    expect((row?.gained ?? 0) + (row?.lost ?? 0) + (row?.held ?? 0)).toBe(row?.racesCounted);
+    const contrarian = placesGained([
+      {
+        ...(COMPARE_FIXTURE.entities[0] as (typeof COMPARE_FIXTURE.entities)[number]),
+        gridVsFinish: {
+          racesCounted: 30,
+          meanPositionsGained: -0.14,
+          bestGain: 4,
+          worstLoss: -18,
+          gained: 18,
+          lost: 6,
+          held: 6,
+          excluded: { unclassified: 5, pitLaneStarts: 0, unknownGrid: 0 },
+        },
+      },
+    ]).rows[0];
+    expect(contrarian?.direction).toBe('back');
+    expect(contrarian?.gained).toBeGreaterThan(contrarian?.lost ?? 0);
+  });
+
+  it('sums every exclusion, not only the unclassified ones', () => {
+    // Pit-lane starts (trap 9) and a null grid are excluded for different reasons and both leave a
+    // race out of the denominator, so the caption counts all three.
+    const entity = COMPARE_FIXTURE.entities[0];
+    if (entity === undefined) throw new Error('fixture has no entities');
+    const [row] = placesGained([
+      {
+        ...entity,
+        gridVsFinish: {
+          ...entity.gridVsFinish,
+          excluded: { unclassified: 32, pitLaneStarts: 2, unknownGrid: 1 },
+        },
+      },
+    ]).rows;
+    expect(row?.excluded).toBe(35);
   });
 });

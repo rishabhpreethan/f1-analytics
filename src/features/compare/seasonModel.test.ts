@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SEASON_LENS_FIXTURE } from './lensFixture';
 import {
   absentFrom,
+  FINISH_AXIS_FLOOR,
+  finishStrip,
   plotTeamFor,
   racedRounds,
   seasonPairs,
@@ -224,5 +226,104 @@ describe('an unfinished season is drawn against its whole calendar', () => {
     expect(pairs[0]?.principal.points[9]?.y).not.toBeNull();
     expect(pairs[0]?.principal.points[10]?.y).toBeNull();
     expect(pairs[0]?.principal.points.at(-1)?.y).toBeNull();
+  });
+});
+
+describe('the finishing strip (§6.6.6.14 D)', () => {
+  const strip2021 = () =>
+    finishStrip(lensFor(2021), ['hamilton', 'rosberg', 'max_verstappen', 'fangio'], name);
+
+  it('draws a row only for a driver who actually raced that season', () => {
+    // Rosberg and Fangio have entries for 2021 with `entered: false`. A row of 22 blanks would be
+    // an accusation rather than a fact; they are named in the notes above the plot instead.
+    expect(strip2021().rows.map((row) => row.ref)).toEqual(['hamilton', 'max_verstappen']);
+  });
+
+  it('places P1 at the top and the deepest finish at the bottom', () => {
+    const row = strip2021().rows[0];
+    const first = row?.cells.find((cell) => cell.finish === 1);
+    expect(first?.y).toBe(0);
+    const deepest = strip2021().deepest;
+    const worst = row?.cells.find((cell) => cell.finish === deepest);
+    if (worst !== undefined) expect(worst.y).toBe(1);
+  });
+
+  it('never runs the axis shallower than P10, however well the selection finished', () => {
+    /*
+     * Four front-runners whose worst result is fourth would otherwise spread P1–P4 over the full
+     * height and draw a one-place difference as the height of the chart. Hamilton's 2021 reaches
+     * P15, so this fixture exercises the other branch too.
+     */
+    expect(strip2021().deepest).toBeGreaterThanOrEqual(FINISH_AXIS_FLOOR);
+    const shallow = finishStrip(
+      {
+        ...lensFor(2021),
+        entrants: lensFor(2021).entrants.map((entrant) => ({
+          ...entrant,
+          finish: entrant.finish.map((value) => (value === null ? null : Math.min(value, 3))),
+        })),
+      },
+      ['hamilton'],
+      name,
+    );
+    expect(shallow.deepest).toBe(FINISH_AXIS_FLOOR);
+  });
+
+  it('separates a start with no classification from a round he did not start', () => {
+    /*
+     * ⚠ The distinction the whole component exists to draw. `finish === null` means both in the
+     * payload, and `teamAt` is the only thing that separates them: null exactly where he did not
+     * start. Verstappen's 2021 round 6 is a retirement — a ring below the axis — and it must not
+     * be drawn the same way as a weekend he was not at.
+     */
+    const row = strip2021().rows.find((entry) => entry.ref === 'max_verstappen');
+    const retired = row?.cells[5];
+    expect(retired?.started).toBe(true);
+    expect(retired?.finish).toBeNull();
+    expect(retired?.y).toBeNull();
+    expect(row?.unclassified).toBeGreaterThan(0);
+    expect(row?.missed).toBe(0);
+  });
+
+  it('spaces the rounds evenly from 0 to 1, first to last', () => {
+    // Percentages, because jsdom measures nothing: the geometry is decided here and readable off
+    // the element, which is the only way any of it can be asserted at all.
+    const cells = strip2021().rows[0]?.cells ?? [];
+    expect(cells[0]?.x).toBe(0);
+    expect(cells.at(-1)?.x).toBe(1);
+    expect(cells).toHaveLength(lensFor(2021).rounds.length);
+  });
+
+  it('puts the podium rule two places down the axis, not at a third of the height', () => {
+    // P3 is `(3 − 1) / (deepest − 1)`, so the rule moves when the axis deepens — it is a position
+    // on the scale and not a fraction of the box.
+    const strip = strip2021();
+    expect(strip.podium).toBeCloseTo(2 / (strip.deepest - 1), 12);
+  });
+
+  it('survives a one-position axis without dividing by zero', () => {
+    const single = finishStrip(
+      {
+        ...lensFor(2021),
+        rounds: lensFor(2021).rounds.slice(0, 1),
+        entrants: lensFor(2021).entrants.map((entrant) => ({
+          ...entrant,
+          finish: entrant.finish.slice(0, 1),
+          teamAt: entrant.teamAt.slice(0, 1),
+        })),
+      },
+      ['hamilton'],
+      name,
+    );
+    for (const cell of single.rows[0]?.cells ?? []) {
+      expect(Number.isFinite(cell.y ?? 0)).toBe(true);
+    }
+    expect(single.rows[0]?.cells[0]?.x).toBe(0);
+  });
+
+  it('carries the round’s own name on every cell, for the mark and for the table', () => {
+    const cell = strip2021().rows[0]?.cells[0];
+    expect(cell?.name).toBe(lensFor(2021).rounds[0]?.name);
+    expect(cell?.round).toBe(lensFor(2021).rounds[0]?.number);
   });
 });

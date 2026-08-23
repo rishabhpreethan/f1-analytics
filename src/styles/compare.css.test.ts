@@ -273,6 +273,10 @@ describe('colour and tokens', () => {
       '--column-extent',
       '--size-rate-figure',
       '--rate-extent',
+      '--size-gain-split',
+      '--gain-extent',
+      '--x',
+      '--y',
       '--balance-a',
       '--balance-b',
       '--balance-a-share',
@@ -343,5 +347,103 @@ describe('the page is its own container — one source of truth for the gutters'
 
   it('never hardcodes a max-width in px, which is how a container drifts from the shell', () => {
     expect(base()).not.toMatch(/max-width:\s*\d/);
+  });
+});
+
+describe('the diverging bar — the axis is in the middle, and it is drawn (§6.6.6.14 C)', () => {
+  it('anchors each direction at 50% and lets neither cross the zero line', () => {
+    /*
+     * jsdom computes no box, so this is the only place the geometry can be checked at all. A
+     * forward bar starts at the zero line and grows right; a backward bar ends at it and grows
+     * left. If both were `left: 50%` the negative ones would point the wrong way while still
+     * looking like a chart.
+     */
+    expect(body(".gain-bar[data-direction='forward']")).toContain('left: 50%');
+    expect(body(".gain-bar[data-direction='back']")).toContain('right: 50%');
+  });
+
+  it('keeps a near-zero mean visible as a mark rather than as an absence', () => {
+    expect(body('.gain-bar')).toContain('min-width: 3px');
+  });
+
+  it('sizes a bar against HALF the track, so the zero line stays central', () => {
+    // The component passes `extent * 50%`; the rule has to consume it as a width and nothing else.
+    expect(body('.gain-bar')).toContain('width: var(--gain-extent)');
+  });
+
+  it('draws the zero line and gives it the axis weight, never the gridline weight', () => {
+    const zero = body('.gain-zero');
+    expect(zero).toContain('left: 50%');
+    expect(zero).toContain('var(--border-strong)');
+  });
+
+  it('carries the sign in direction alone — no second colour anywhere on the mark', () => {
+    /*
+     * Green is a reserved timing semantic (§3.4) and a red/green pair is the commonest CVD failure
+     * in charting, so the bar takes the entity's own plot token whichever way it points. A future
+     * "make losses red" edit fails here.
+     */
+    for (const rule of [
+      '.gain-bar',
+      ".gain-bar[data-direction='forward']",
+      ".gain-bar[data-direction='back']",
+    ]) {
+      expect(body(rule), rule).not.toMatch(/--status-|--timing-/);
+    }
+    expect(body('.gain-bar')).toContain('background-color: var(--series)');
+  });
+
+  it('reuses the rate board’s figure column width rather than inventing a second one', () => {
+    // Two boards a screen apart that print a driver's figure in different widths read as two
+    // products. Both are declared locally, and both are the same pair of values.
+    expect(body('.gain-rows')).toContain('--size-rate-figure: 96px');
+    expect(body('.gain-rows')).toContain('--size-rate-figure: 112px');
+  });
+
+  it('puts the row gutter on the page’s spine at ≥768', () => {
+    // `--axis-inset`, so a zero line sits at the same x as the chain's 1950 and the era strip's
+    // first column — the one geometric idea the page is built on.
+    expect(body('.gain-row')).toContain('var(--axis-inset)');
+  });
+});
+
+describe('the finishing strip — three states, and only one of them is a position (§6.6.6.14 D)', () => {
+  it('places a dot from the two custom properties the model computes', () => {
+    const dot = body('.strip-dot');
+    expect(dot).toContain('left: var(--x)');
+    expect(dot).toContain('top: var(--y)');
+  });
+
+  it('centres a mark with margins and not a transform, because GSAP owns the transform', () => {
+    /*
+     * G-33 tweens `scale` on this element. A base `translate(-50%, -50%)` would be a transform the
+     * tween has to parse and preserve, and a mark that ended up half a dot out of position is
+     * exactly the class of defect no test here can see. Negative margins are layout and cannot
+     * collide with it.
+     */
+    expect(body('.strip-dot')).not.toMatch(/transform:/);
+    expect(body('.strip-dot')).toMatch(/margin:\s*calc\(var\(--size-mark-marker\) \/ -2\)/);
+  });
+
+  it('separates a retirement from a finish by FORM, never by colour', () => {
+    // A filled dot against a hollow ring survives any colour vision (§6.3); a red dot would not,
+    // and red is a status colour besides.
+    expect(body('.strip-dot')).toContain('background-color: var(--series)');
+    const miss = body('.strip-miss');
+    expect(miss).toContain('box-shadow: inset');
+    expect(miss).not.toContain('background-color');
+  });
+
+  it('puts the retirement lane below the axis rather than at the bottom of it', () => {
+    // "No result" is not a position, and drawing it as the last one says he came last.
+    expect(body('.strip-out')).toContain('border-top');
+  });
+
+  it('gives an 8px mark a hit target it does not have on its own', () => {
+    expect(body('.strip-dot::after,\n  .strip-miss::after')).toContain('inset: -8px');
+  });
+
+  it('insets the field by half a mark, so a first or last round is not clipped', () => {
+    expect(body('.strip-field')).toContain('margin-inline: 4px');
   });
 });

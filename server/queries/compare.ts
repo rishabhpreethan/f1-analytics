@@ -10,7 +10,10 @@ import type {
   Ledger,
   Relation,
 } from '../schemas/compare';
+import type { GridStatus } from '../schemas/race';
+import { buildGridVsFinish, positionsGained } from './drivers';
 import { prepared } from './prepared';
+import { toGrid } from './race';
 import { readSeasonCompleteness, readSeasonList } from './seasons';
 import { findChain, readTeammateGraph } from './teammateGraph';
 
@@ -337,7 +340,28 @@ export interface IdentityRow {
 
 /* --------------------------------------------------------- pure builders (no database access) */
 
-/** One race, after the rows for it have been collapsed. */
+/**
+ * One race, after the rows for it have been collapsed.
+ *
+ * ============================================ two readings of one race, and the naming rule
+ *
+ * A shared drive gives one (driver, race) pair **two grid slots and two finishing positions**
+ * — 40 races between 1950 and 1964 do (trap 17), and 1951 R4 is the sharpest: Fangio started
+ * his own car from pole, retired it, took over Fagioli's car which had started 7th, and won.
+ * There is no single true "he started Nth and finished Mth" for that race, so this struct
+ * carries both readings under a naming rule that has to hold for every field added later:
+ *
+ * - **unprefixed** — `position`, `isClassified`, `teamRef`, `gridPosition`, `gridStatus` —
+ *   is the **outcome row**, `queries/drivers.ts`'s rule verbatim. Fangio's 1951 R4 reads
+ *   grid 7, P1. This is the reading the driver profile publishes, and everything the two
+ *   endpoints must agree on is built from it.
+ * - **`best…`** is the minimum across the driver's rows, which is what a head-to-head wants:
+ *   asking whether Fangio out-qualified a rival should use the pole, not the second car.
+ *
+ * Mixing them is the defect to avoid. The pair ledgers use `best…`; `gridVsFinish` uses the
+ * outcome row, because agreeing with `GET /api/drivers/:reference` is a stated contract of
+ * this module and a reader on two pages must not be told two different careers.
+ */
 export interface CollapsedRace {
   sessionId: number;
   year: number;
@@ -346,16 +370,22 @@ export interface CollapsedRace {
   teamRefs: string[];
   /** The outcome row's team — the one the profile page also attributes the race to. */
   teamRef: string;
-  /** The outcome row's finishing position. */
+  /** The outcome row's finishing position. Never null on the present data (trap 27). */
   position: number | null;
   /** The outcome row's `status` (`DATABASE.md` §3). */
   status: number;
   /** The outcome row's classification flag. */
   isClassified: boolean;
-  /** Best **classified** finishing position across the driver's rows. Null when none was. */
-  classifiedPosition: number | null;
-  /** Best grid slot across the driver's rows, excluding a pit-lane start (`grid = 0`, trap 9). */
+  /** The outcome row's grid slot, null for a pit-lane start or an unknown grid. */
   gridPosition: number | null;
+  /** Which of those the null is (trap 9). `queries/race.ts`'s `toGrid`. */
+  gridStatus: GridStatus;
+  /** `grid - position` on the outcome row, or null. `queries/drivers.ts`'s `positionsGained`. */
+  positionsGained: number | null;
+  /** Best **classified** finishing position across the driver's rows. Null when none was. */
+  bestClassifiedPosition: number | null;
+  /** Best grid slot across the driver's rows, excluding a pit-lane start (`grid = 0`, trap 9). */
+  bestGridPosition: number | null;
 }
 
 const NEVER_STARTED = new Set([30, 40]);
@@ -376,13 +406,16 @@ export function collapseRaces(rows: readonly CompareRaceRow[]): Map<string, Coll
     const key = `${row.driverRef} ${String(row.sessionId)}`;
     const existing = seen.get(key);
     const classified = row.isClassified === 1;
-    const grid = row.grid !== null && row.grid > 0 ? row.grid : null;
+    const grid = toGrid(row.grid);
     const classifiedPosition = classified ? row.position : null;
 
     if (existing !== undefined) {
       if (!existing.teamRefs.includes(row.teamRef)) existing.teamRefs.push(row.teamRef);
-      existing.classifiedPosition = smaller(existing.classifiedPosition, classifiedPosition);
-      existing.gridPosition = smaller(existing.gridPosition, grid);
+      existing.bestClassifiedPosition = smaller(
+        existing.bestClassifiedPosition,
+        classifiedPosition,
+      );
+      existing.bestGridPosition = smaller(existing.bestGridPosition, grid.gridPosition);
       continue;
     }
 
@@ -395,8 +428,11 @@ export function collapseRaces(rows: readonly CompareRaceRow[]): Map<string, Coll
       position: row.position,
       status: row.status,
       isClassified: classified,
-      classifiedPosition,
-      gridPosition: grid,
+      gridPosition: grid.gridPosition,
+      gridStatus: grid.gridStatus,
+      positionsGained: positionsGained(grid.gridPosition, row.position, classified),
+      bestClassifiedPosition: classifiedPosition,
+      bestGridPosition: grid.gridPosition,
     };
     seen.set(key, race);
     const list = byDriver.get(row.driverRef);
@@ -568,16 +604,16 @@ export function buildPairLedgers(
     race.pool += 1;
     grid.pool += 1;
 
-    if (mine.classifiedPosition !== null && theirs.classifiedPosition !== null) {
+    if (mine.bestClassifiedPosition !== null && theirs.bestClassifiedPosition !== null) {
       race.rated += 1;
-      if (mine.classifiedPosition < theirs.classifiedPosition) race.a += 1;
-      else if (theirs.classifiedPosition < mine.classifiedPosition) race.b += 1;
+      if (mine.bestClassifiedPosition < theirs.bestClassifiedPosition) race.a += 1;
+      else if (theirs.bestClassifiedPosition < mine.bestClassifiedPosition) race.b += 1;
       else race.tied += 1;
     }
-    if (mine.gridPosition !== null && theirs.gridPosition !== null) {
+    if (mine.bestGridPosition !== null && theirs.bestGridPosition !== null) {
       grid.rated += 1;
-      if (mine.gridPosition < theirs.gridPosition) grid.a += 1;
-      else if (theirs.gridPosition < mine.gridPosition) grid.b += 1;
+      if (mine.bestGridPosition < theirs.bestGridPosition) grid.a += 1;
+      else if (theirs.bestGridPosition < mine.bestGridPosition) grid.b += 1;
       else grid.tied += 1;
     }
   }
@@ -688,6 +724,19 @@ function buildEntity(
     lastSeason: Math.max(...years),
     seasonsEntered: seasons.length,
     totals: { ...totals, championships: countTitles(championships, seasonComplete) },
+    /*
+     * **The driver profile's builder, not a second one.** `buildGridVsFinish` reads only the
+     * outcome-row fields of `CollapsedRace`, which are `queries/drivers.ts`'s collapse rule
+     * verbatim, so `GET /api/compare` and `GET /api/drivers/:reference` cannot report
+     * different careers for the same driver — and `compare.test.ts` asserts it rather than
+     * trusting it, the same way it already does for `totals`.
+     *
+     * Career only, deliberately. Measured before deciding: a per-season figure would sit on
+     * 14–22 counted races in a modern season and 2–8 in a 1950s one, and Hamilton's season
+     * means swing −1.67 to +3.25 with medians that stay at 0 — a noise series, and nothing
+     * has asked for one. The season lens already carries per-round finishing positions.
+     */
+    gridVsFinish: buildGridVsFinish(races),
     teammates: {
       count: teammates?.mates ?? 0,
       race: {

@@ -63,6 +63,20 @@ export const COMPARE_FIXTURE: CompareData = {
           tied: 0,
         },
       },
+      /* Queried through `buildGridVsFinish` itself, so the fixture and the endpoint cannot
+       * disagree. All four have `unknownGrid: 0` and `pitLaneStarts: 0`, which is the present
+       * data: `grid` is non-NULL on all 26,093 race rows and no pit-lane start falls in this
+       * selection. */
+      gridVsFinish: {
+        racesCounted: 358,
+        meanPositionsGained: 0.7625698324022346,
+        bestGain: 19,
+        worstLoss: -17,
+        gained: 157,
+        lost: 88,
+        held: 113,
+        excluded: { unclassified: 32, pitLaneStarts: 0, unknownGrid: 0 },
+      },
       seasons: [
         {
           year: 2007,
@@ -72,6 +86,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 12,
           dnfs: 1,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2008,
@@ -81,6 +96,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 10,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2009,
@@ -90,6 +106,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 3,
           championshipPosition: 5,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2010,
@@ -99,6 +116,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 9,
           dnfs: 4,
           championshipPosition: 4,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2011,
@@ -108,6 +126,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 6,
           dnfs: 3,
           championshipPosition: 5,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2012,
@@ -117,6 +136,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 7,
           dnfs: 6,
           championshipPosition: 4,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2013,
@@ -126,6 +146,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 1,
           championshipPosition: 4,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2014,
@@ -135,6 +156,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 16,
           dnfs: 3,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2015,
@@ -144,6 +166,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 17,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2016,
@@ -153,6 +176,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 17,
           dnfs: 2,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2017,
@@ -162,6 +186,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 13,
           dnfs: 0,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2018,
@@ -171,6 +196,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 17,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2019,
@@ -180,6 +206,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 17,
           dnfs: 0,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2020,
@@ -189,6 +216,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 14,
           dnfs: 0,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2021,
@@ -198,6 +226,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 17,
           dnfs: 1,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2022,
@@ -207,6 +236,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 9,
           dnfs: 2,
           championshipPosition: 6,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2023,
@@ -216,6 +246,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 6,
           dnfs: 1,
           championshipPosition: 3,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2024,
@@ -225,6 +256,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 2,
           championshipPosition: 7,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2025,
@@ -234,6 +266,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 2,
           championshipPosition: 6,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2026,
@@ -243,6 +276,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 0,
           championshipPosition: 2,
+          championshipPositionIsFinal: false,
         },
       ],
     },
@@ -283,6 +317,20 @@ export const COMPARE_FIXTURE: CompareData = {
           tied: 0,
         },
       },
+      /* Queried through `buildGridVsFinish` itself, so the fixture and the endpoint cannot
+       * disagree. All four have `unknownGrid: 0` and `pitLaneStarts: 0`, which is the present
+       * data: `grid` is non-NULL on all 26,093 race rows and no pit-lane start falls in this
+       * selection. */
+      gridVsFinish: {
+        racesCounted: 177,
+        meanPositionsGained: 0.3163841807909605,
+        bestGain: 15,
+        worstLoss: -15,
+        gained: 70,
+        lost: 59,
+        held: 48,
+        excluded: { unclassified: 29, pitLaneStarts: 0, unknownGrid: 0 },
+      },
       seasons: [
         {
           year: 2006,
@@ -292,6 +340,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 9,
           championshipPosition: 17,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2007,
@@ -301,6 +350,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 4,
           championshipPosition: 9,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2008,
@@ -310,6 +360,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 2,
           dnfs: 2,
           championshipPosition: 13,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2009,
@@ -319,6 +370,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 1,
           championshipPosition: 7,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2010,
@@ -328,6 +380,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 3,
           dnfs: 3,
           championshipPosition: 7,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2011,
@@ -337,6 +390,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 2,
           championshipPosition: 7,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2012,
@@ -346,6 +400,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 2,
           dnfs: 3,
           championshipPosition: 9,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2013,
@@ -355,6 +410,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 4,
           dnfs: 3,
           championshipPosition: 6,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2014,
@@ -364,6 +420,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 15,
           dnfs: 2,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2015,
@@ -373,6 +430,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 15,
           dnfs: 1,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2016,
@@ -382,6 +440,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 16,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
       ],
     },
@@ -422,6 +481,20 @@ export const COMPARE_FIXTURE: CompareData = {
           tied: 0,
         },
       },
+      /* Queried through `buildGridVsFinish` itself, so the fixture and the endpoint cannot
+       * disagree. All four have `unknownGrid: 0` and `pitLaneStarts: 0`, which is the present
+       * data: `grid` is non-NULL on all 26,093 race rows and no pit-lane start falls in this
+       * selection. */
+      gridVsFinish: {
+        racesCounted: 210,
+        meanPositionsGained: 1.223809523809524,
+        bestGain: 18,
+        worstLoss: -17,
+        gained: 100,
+        lost: 41,
+        held: 69,
+        excluded: { unclassified: 33, pitLaneStarts: 0, unknownGrid: 0 },
+      },
       seasons: [
         {
           year: 2015,
@@ -431,6 +504,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 5,
           championshipPosition: 12,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2016,
@@ -440,6 +514,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 7,
           dnfs: 3,
           championshipPosition: 5,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2017,
@@ -449,6 +524,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 4,
           dnfs: 7,
           championshipPosition: 6,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2018,
@@ -458,6 +534,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 11,
           dnfs: 4,
           championshipPosition: 4,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2019,
@@ -467,6 +544,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 9,
           dnfs: 2,
           championshipPosition: 3,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2020,
@@ -476,6 +554,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 11,
           dnfs: 5,
           championshipPosition: 3,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2021,
@@ -485,6 +564,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 18,
           dnfs: 3,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2022,
@@ -494,6 +574,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 17,
           dnfs: 2,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2023,
@@ -503,6 +584,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 21,
           dnfs: 0,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2024,
@@ -512,6 +594,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 14,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2025,
@@ -521,6 +604,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 15,
           dnfs: 1,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 2026,
@@ -530,6 +614,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 3,
           dnfs: 3,
           championshipPosition: 7,
+          championshipPositionIsFinal: false,
         },
       ],
     },
@@ -570,6 +655,20 @@ export const COMPARE_FIXTURE: CompareData = {
           tied: 7,
         },
       },
+      /* Queried through `buildGridVsFinish` itself, so the fixture and the endpoint cannot
+       * disagree. All four have `unknownGrid: 0` and `pitLaneStarts: 0`, which is the present
+       * data: `grid` is non-NULL on all 26,093 race rows and no pit-lane start falls in this
+       * selection. */
+      gridVsFinish: {
+        racesCounted: 41,
+        meanPositionsGained: 0.4878048780487805,
+        bestGain: 7,
+        worstLoss: -8,
+        gained: 18,
+        lost: 7,
+        held: 16,
+        excluded: { unclassified: 10, pitLaneStarts: 0, unknownGrid: 0 },
+      },
       seasons: [
         {
           year: 1950,
@@ -579,6 +678,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 3,
           dnfs: 3,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1951,
@@ -588,6 +688,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1953,
@@ -597,6 +698,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 4,
           dnfs: 3,
           championshipPosition: 2,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1954,
@@ -606,6 +708,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 7,
           dnfs: 0,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1955,
@@ -615,6 +718,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1956,
@@ -624,6 +728,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 5,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1957,
@@ -633,6 +738,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 6,
           dnfs: 1,
           championshipPosition: 1,
+          championshipPositionIsFinal: true,
         },
         {
           year: 1958,
@@ -642,6 +748,7 @@ export const COMPARE_FIXTURE: CompareData = {
           podiums: 0,
           dnfs: 0,
           championshipPosition: 14,
+          championshipPositionIsFinal: true,
         },
       ],
     },

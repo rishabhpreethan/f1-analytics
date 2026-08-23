@@ -19,7 +19,8 @@ vi.hoisted(() => {
   });
 });
 
-import { TIER_BAR_ATTR } from '@/lib/motion/scroll';
+import { STRIP_DOT_ATTR } from '@/lib/motion/chart';
+import { GAIN_BAR_ATTR, TIER_BAR_ATTR } from '@/lib/motion/scroll';
 import { ComparePage } from './ComparePage';
 import { COMPARE_FIXTURE } from './fixture';
 import { COMPARE_DIRECTORY, SEASON_LENS_FIXTURE } from './lensFixture';
@@ -121,10 +122,19 @@ describe('the matrix', () => {
     render_();
     /* Four entities, six relationships, and a relationship is symmetric — so six cells, not
      * twelve, and never a diagonal. */
-    const cells = screen.getAllByRole('button', { pressed: false });
-    const matrix = cells.filter((cell) => cell.className === 'relation-cell');
-    expect(matrix).toHaveLength(5);
-    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(1);
+    const pressed = (state: boolean) =>
+      screen
+        .getAllByRole('button', { pressed: state })
+        .filter((cell) => cell.className === 'relation-cell');
+    expect(pressed(false)).toHaveLength(5);
+    /*
+     * Scoped to `.relation-cell`, and the scope is the assertion's whole point: every `ChartFrame`
+     * on the page carries an `aria-pressed` view toggle of its own, so a page-wide count of pressed
+     * buttons measures how many charts are rendered rather than how many pairs are selected. It
+     * counted 1 until §6.6.6.14 added a chart, and then failed for a reason that had nothing to do
+     * with the matrix.
+     */
+    expect(pressed(true)).toHaveLength(1);
   });
 });
 
@@ -176,7 +186,7 @@ describe('the rate bars are actually wired to a mount motion', () => {
    * claimed existed but nothing implemented", shipped a second time.
    *
    * The selector is now an exported constant consumed by both the hook and the markup, so the pair
-   * cannot drift. This asserts the markup half; the hook half is `usePopulationMount`'s own test.
+   * cannot drift. This asserts the markup half; the hook half is `src/lib/motion/scroll.test.tsx`.
    * **Whether the growth looks right is untested by construction** — jsdom composites nothing.
    */
   it('gives every bar the exact attribute the hook queries', () => {
@@ -482,5 +492,251 @@ describe('the notice slot keeps the document outline in order', () => {
   it('renders nothing at all when there is no notice', () => {
     render(<ComparePage available={COMPARE_DIRECTORY} data={COMPARE_FIXTURE} />);
     expect(screen.queryByText('Part of that link could not be read')).toBeNull();
+  });
+});
+
+describe('the result mix (§6.6.6.14)', () => {
+  it('draws one four-step row per selected driver, in selection order', () => {
+    const { container } = render_();
+    const marks = [...container.querySelectorAll('.chart-marks .chart-span')];
+    expect(marks).toHaveLength(COMPARE_FIXTURE.entities.length * 4);
+    expect(marks.slice(0, 4).map((mark) => mark.getAttribute('data-tone'))).toEqual([
+      'win',
+      'podium',
+      'classified',
+      'unclassified',
+    ]);
+  });
+
+  it('prints the denominators the shares throw away', () => {
+    /*
+     * A 100% bar is comparable *because* it discards the size, which also makes it incomplete: a
+     * reader cannot tell Fangio's 51 races from Hamilton's 390 by looking at two full-width bars.
+     * The caption is where that difference lives, and it is generated from the same totals the
+     * bars are, so it cannot drift from them.
+     */
+    render_();
+    expect(screen.getByText(/Fangio 51/)).toBeTruthy();
+    expect(screen.getByText(/Hamilton 390/)).toBeTruthy();
+  });
+
+  it('explains a retirement count that differs from the unclassified count', () => {
+    // Hamilton: 34 retirements, 32 unclassified starts. The note appears because they differ, with
+    // both figures in it — not as a standing disclaimer on every comparison.
+    render_();
+    expect(
+      screen.getByText(/Hamilton retired from 34 races and has 32 starts with no classification/),
+    ).toBeTruthy();
+  });
+
+  it('never draws a number inside a tone, whatever the fills resolve to', () => {
+    /*
+     * V-38: neither ink clears 4.5:1 across all 44 fills. The rule is enforced in `ShareChart`, and
+     * this asserts the page actually gets it — a future caller adding a `shortLabel` for
+     * "readability" is exactly the change that would put 3.40:1 text on a McLaren bar.
+     */
+    const { container } = render_();
+    expect(container.querySelectorAll('.chart-span-label')).toHaveLength(0);
+  });
+});
+
+describe('the career-relative arc (§6.6.6.14 B)', () => {
+  it('is on the career lens, with the axis stated as a career and not a calendar', () => {
+    render_();
+    expect(screen.getByText('Season by season of a career')).toBeTruthy();
+    expect(screen.getByText(/season 1 is his debut season, whenever it happened/)).toBeTruthy();
+  });
+
+  it('draws one line per selected driver', () => {
+    const { container } = render_();
+    expect(container.querySelectorAll('.chart-rank-line')).toHaveLength(
+      COMPARE_FIXTURE.entities.length,
+    );
+  });
+
+  it('states the field-size limit rather than implying a placing is a fixed fraction', () => {
+    // An honesty caption, and the figure is queried: 77 seasons, 16 ranked at the fewest (1965,
+    // 1996, 2000) and 29 at the most (1989).
+    render_();
+    expect(screen.getByText(/ranked between 16 and 29 drivers/)).toBeTruthy();
+  });
+});
+
+describe('places gained from the grid (§6.6.6.14 C)', () => {
+  it('anchors every bar at zero and points it by sign, never by colour', () => {
+    /*
+     * The origin is on the mark because the component that decides the sign is the thing that has
+     * to state the anchor — `usePopulationMount` reads `data-origin` per target. A fixed `left`
+     * would animate a negative bar sliding across the axis it is measured from.
+     */
+    const { container } = render_();
+    const bars = [...container.querySelectorAll('.gain-bar')];
+    expect(bars.length).toBeGreaterThan(0);
+    for (const bar of bars) {
+      const direction = bar.getAttribute('data-direction');
+      expect(direction === 'forward' || direction === 'back').toBe(true);
+      expect(bar.getAttribute('data-origin')).toBe(direction === 'forward' ? 'left' : 'right');
+      expect(bar.getAttribute('data-motion')).toBe(GAIN_BAR_ATTR);
+    }
+  });
+
+  it('draws the zero line on every row — the chart’s one axis', () => {
+    // §6.6.6.3's rule about the balance bar's even mark, in the other diverging form: without a
+    // drawn zero a diverging bar is just a bar, and its sign is a guess about where the middle is.
+    const { container } = render_();
+    expect(container.querySelectorAll('.gain-zero')).toHaveLength(COMPARE_FIXTURE.entities.length);
+  });
+
+  it('prints the split beside every bar, because it can disagree with the average', () => {
+    const { container } = render_();
+    const splits = [...container.querySelectorAll('.gain-split')];
+    expect(splits).toHaveLength(COMPARE_FIXTURE.entities.length);
+    for (const split of splits) expect(split.textContent).toMatch(/ahead of his grid slot/);
+    expect(
+      screen.getByText(/one race lost by fifteen places outweighs ten gained by one/),
+    ).toBeTruthy();
+  });
+
+  it('counts the races it could not measure rather than folding them in as no movement', () => {
+    render_();
+    expect(screen.getByText(/no place change to measure/)).toBeTruthy();
+  });
+});
+
+describe('the finishing strip (§6.6.6.14 D)', () => {
+  it('is on the season lens, under the two points charts', () => {
+    const { container } = render_();
+    /* Career lens first: the strip is a season instrument and must not be on the career page. */
+    expect(container.querySelectorAll('.strip-row')).toHaveLength(0);
+  });
+
+  it('draws a dot per classified finish and a ring per start without one', async () => {
+    const user = userEvent.setup();
+    const { container } = render_();
+    await openSeasonLens(user);
+
+    const dots = container.querySelectorAll('.strip-dot');
+    const rings = container.querySelectorAll('.strip-miss');
+    expect(dots.length).toBeGreaterThan(0);
+    expect(rings.length).toBeGreaterThan(0);
+    /*
+     * The two carry the same motion attribute and different classes, which is the encoding: form,
+     * never colour (§6.3). A reader with no colour vision still sees a filled dot against a ring.
+     */
+    for (const mark of [...dots, ...rings]) {
+      expect(mark.getAttribute('data-motion')).toBe(STRIP_DOT_ATTR);
+    }
+  });
+
+  it('places every mark by percentage, so the geometry is readable off the element', async () => {
+    // jsdom computes no box. The percentages `finishStrip` sets are the only part of a position
+    // any test can reach, which is why the model decides them and the browser is not asked.
+    const user = userEvent.setup();
+    const { container } = render_();
+    await openSeasonLens(user);
+    for (const dot of container.querySelectorAll('.strip-dot')) {
+      const style = dot.getAttribute('style') ?? '';
+      expect(style).toMatch(/--x:\s*[\d.]+%/);
+      expect(style).toMatch(/--y:\s*[\d.]+%/);
+    }
+  });
+
+  it('gives every round a row in the table view, including the ones with no result', async () => {
+    /*
+     * §6.5.5, and it does more work here than on most charts: the marks carry no text at all, so
+     * the table is the only place a finishing position appears as a number. `NC` for a start with
+     * no classification and an em dash for a round not started — the same three states the marks
+     * draw, in the same order.
+     */
+    const user = userEvent.setup();
+    const { container } = render_();
+    await openSeasonLens(user);
+    const table = [...container.querySelectorAll('table.chart-table')].find((node) =>
+      node.querySelector('caption')?.textContent?.includes('Finishing position at each round'),
+    );
+    expect(table).toBeDefined();
+    expect(table?.querySelectorAll('tbody tr')).toHaveLength(22);
+    expect(table?.textContent).toContain('NC');
+  });
+});
+
+describe('a zero draws no mark, on every board that has a minimum width', () => {
+  /**
+   * Measured on the live page 2026-08-23: Jos Verstappen's 0 wins rendered a 1px win segment on the
+   * result mix. The same floor existed on the rate board, where a rate of exactly 0 is not null and
+   * so still drew `min-width: 3px`. The rule that came out of it is general — **a floor is right
+   * for a small non-zero value and wrong for a true zero, and they are different cases** — so it is
+   * asserted here for every mark on this page at once.
+   */
+  const zeroWinner = {
+    ...COMPARE_FIXTURE,
+    entities: COMPARE_FIXTURE.entities.map((entity, index) =>
+      index === 0
+        ? {
+            ...entity,
+            totals: { ...entity.totals, wins: 0 },
+            gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 0 },
+          }
+        : entity,
+    ),
+  };
+
+  const renderZero = () =>
+    render(
+      <ComparePage available={COMPARE_DIRECTORY} data={zeroWinner} seasons={SEASON_LENS_FIXTURE} />,
+    );
+
+  it('drops the win segment from the result mix and nothing else', () => {
+    const { container } = renderZero();
+    const firstRow = [...container.querySelectorAll('.chart-marks .chart-span')]
+      .slice(0, 3)
+      .map((mark) => mark.getAttribute('data-tone'));
+    expect(firstRow).toEqual(['podium', 'classified', 'unclassified']);
+  });
+
+  it('drops the win-rate bar but keeps the printed 0%', () => {
+    /*
+     * `null` and `0` stay different states and both are said in the figure column: `null` is "he
+     * never started, so there is no rate", `0` is "there is a rate and it is zero". Only the mark
+     * goes, because a mark is the thing the reader cannot check against an axis.
+     */
+    const { container } = renderZero();
+    const rows = [...container.querySelectorAll('.rate-measure')];
+    const winRate = rows[0];
+    expect(winRate?.textContent).toContain('Win rate');
+    const bars = winRate?.querySelectorAll('.rate-bar') ?? [];
+    expect(bars).toHaveLength(COMPARE_FIXTURE.entities.length - 1);
+    expect(winRate?.textContent).toContain('0%');
+  });
+
+  it('draws no diverging bar for a mean of exactly zero, which it never did', () => {
+    // The one of the three that was already right: `direction: 'held'` covers `mean === 0`, so the
+    // 3px floor was unreachable there. Asserted so it stays unreachable.
+    const { container } = renderZero();
+    expect(container.querySelectorAll('.gain-bar')).toHaveLength(
+      COMPARE_FIXTURE.entities.length - 1,
+    );
+  });
+});
+
+describe('the figure beside a bar never contradicts the bar', () => {
+  it('prints a tiny non-zero mean as <0.01 rather than as 0.00', () => {
+    /*
+     * Found while fixing the zero-bar defect, and the same family: a mean is `k / n`, so one place
+     * gained over 358 races is `+0.0028` and `toFixed(2)` renders `+0.00` — a figure claiming
+     * exactly level beside a 3px bar claiming movement. A true zero prints bare and draws nothing,
+     * so the two states cannot be confused.
+     */
+    const tiny = {
+      ...COMPARE_FIXTURE,
+      entities: COMPARE_FIXTURE.entities.map((entity, index) =>
+        index === 0
+          ? { ...entity, gridVsFinish: { ...entity.gridVsFinish, meanPositionsGained: 1 / 358 } }
+          : entity,
+      ),
+    };
+    render(<ComparePage available={COMPARE_DIRECTORY} data={tiny} seasons={SEASON_LENS_FIXTURE} />);
+    expect(screen.getByText('+<0.01')).toBeTruthy();
+    expect(screen.queryByText('+0.00')).toBeNull();
   });
 });

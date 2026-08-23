@@ -7,6 +7,7 @@ import type {
   GridVsFinish,
   QualifyingVsRace,
 } from '../schemas/driver';
+import type { GridStatus } from '../schemas/race';
 import type { DriverTeam } from '../schemas/season';
 import { classifyAdjustment, readSeasonCompleteness, toBoolean } from './seasons';
 import { decodeOutcome, toGrid } from './race';
@@ -64,6 +65,10 @@ import { prepared } from './prepared';
  * ==================================================================== traps handled here
  *
  *  3  `position IS NULL` is never read as a DNF. `status` is decoded through §3.
+ * 27  and `position IS NULL` is never read as **anything**, because it never happens: the
+ *     column is non-NULL on all 26,093 race rows and holds a retirement order on the 9,683
+ *     unclassified ones. Both career deltas here — `positionsGained` and `meanDelta` — gate
+ *     on `is_classified`. They gated on the NULL until 2026-08-23 and were wrong for it.
  *  4  championship points and titles are **read** from `driver_championship`, never
  *     summed from `session_entry` (DL-8). Per-race `points` is published as a per-race
  *     figure and nothing here adds it across seasons.
@@ -312,11 +317,27 @@ export function ageYears(dateOfBirth: string | null, on: string | null): number 
  * started" and nothing else. Returning 0 for a retirement would put 61 zeroes into
  * Senna's mean and pull it toward the middle; returning 0 for a pit-lane start would
  * credit a car that started from nowhere with holding its place.
+ *
+ * ⚠ **`isClassified` is the retirement test and `position === null` is not** — trap 27,
+ * and this function shipped the wrong one. `session_entry.position` is non-NULL on **all
+ * 26,093 race rows**, 9,683 of them unclassified, where it is the order cars *stopped* and
+ * not a result: the minimum position on an unclassified row is **5**, so the value is a
+ * plausible-looking integer that no `null` check will ever catch. Guarding on the NULL
+ * made the guard dead code and put `grid - retirement order` into the career mean —
+ * Senna read **−4.99** places lost per race against an honest **−0.30** over the 108 races
+ * he was classified in, and `excluded.unclassified` read **0** for every driver in the
+ * archive while `DriverProgress` rendered a caption saying so.
+ *
+ * The `position === null` branch stays because the column's nullability is the schema's
+ * and not this function's to assume, and `gridPosition === null` covers trap 9's pit-lane
+ * start plus an unknown grid.
  */
 export function positionsGained(
   gridPosition: number | null,
   position: number | null,
+  isClassified: boolean,
 ): number | null {
+  if (!isClassified) return null;
   if (gridPosition === null || position === null) return null;
   return gridPosition - position;
 }
@@ -416,7 +437,11 @@ export function collapseRaces(
       roundHasQualifying: toBoolean(row.roundHasQualifying),
       hasFastestLap: row.fastestLapRank === 1,
       roundHasFastestLapData: toBoolean(row.roundHasFastestLapData),
-      positionsGained: positionsGained(grid.gridPosition, row.position),
+      positionsGained: positionsGained(
+        grid.gridPosition,
+        row.position,
+        toBoolean(row.isClassified),
+      ),
     });
   }
 
@@ -496,14 +521,40 @@ export function buildTotals(
 }
 
 /**
+ * The four facts `buildGridVsFinish` needs about one race, and nothing else.
+ *
+ * A `DriverRace` satisfies it structurally, and so does `queries/compare.ts`'s
+ * `CollapsedRace`. That is the whole point of the interface: **the career lens and the
+ * driver profile must publish the same `gridVsFinish` for one driver**, and the way to
+ * guarantee that is one builder rather than two that agree today. Widening the parameter
+ * was cheaper than moving the function, and it stops the builder from ever reaching for a
+ * field only one of its two callers has.
+ */
+export interface GridVsFinishRace {
+  /** Null for a pit-lane start (trap 9) and for an unknown grid; `gridStatus` says which. */
+  gridPosition: number | null;
+  gridStatus: GridStatus;
+  position: number | null;
+  isClassified: boolean;
+  /** `grid - position`, or null where the metric does not apply. See `positionsGained`. */
+  positionsGained: number | null;
+}
+
+/**
  * DR-4's career figure, with the excluded races counted rather than dropped.
  *
  * `unclassified` and `pitLaneStarts` are not overlapping categories here: a race is tested
  * for a classified position first, so a pit-lane start that ended in retirement is counted
  * once, as unclassified. That makes the three exclusion counts plus `racesCounted` sum to
  * the number of races, which is the property that makes them readable as a caption.
+ *
+ * ⚠ **The `unclassified` test is `isClassified`, never `position === null`** (trap 27). It
+ * was the NULL check until 2026-08-23, which is a branch the data can never reach, so this
+ * counter read **0 for all 818 drivers with a race** — and `DriverProgress` renders it in a
+ * sentence, so every driver page stated "Excludes 0 races that ended without a classified
+ * finish" while the mean beside it was computed over every retirement in the career.
  */
-export function buildGridVsFinish(races: readonly DriverRace[]): GridVsFinish {
+export function buildGridVsFinish(races: readonly GridVsFinishRace[]): GridVsFinish {
   let total = 0;
   let counted = 0;
   let gained = 0;
@@ -518,7 +569,7 @@ export function buildGridVsFinish(races: readonly DriverRace[]): GridVsFinish {
   for (const race of races) {
     const delta = race.positionsGained;
     if (delta === null) {
-      if (race.position === null) unclassified += 1;
+      if (!race.isClassified) unclassified += 1;
       else if (race.gridStatus === 'pitLane') pitLaneStarts += 1;
       else unknownGrid += 1;
       continue;
@@ -550,6 +601,14 @@ export function buildGridVsFinish(races: readonly DriverRace[]): GridVsFinish {
  * Deliberately **not** the same metric as `buildGridVsFinish`: the grid is where the car
  * started after any penalty, the qualifying classification is what the driver earned, and
  * the two disagree exactly when a grid drop was applied.
+ *
+ * ⚠ **`meanDelta` counts only a classified finish** — trap 27, the same defect
+ * `positionsGained` carried and fixed at the same time. The guard here was
+ * `race.position === null`, which is unreachable, so the mean was
+ * `qualifying position - retirement order` on every race the driver did not finish.
+ * `racesWithQualifying` is deliberately **not** gated the same way: it answers "how many of
+ * this career could the question be asked of at all" (trap 23's hole), which is a fact
+ * about the dataset's qualifying coverage and not about how the races ended.
  */
 export function buildQualifyingVsRace(races: readonly DriverRace[]): QualifyingVsRace {
   let counted = 0;
@@ -561,7 +620,7 @@ export function buildQualifyingVsRace(races: readonly DriverRace[]): QualifyingV
     if (race.qualifyingPosition === null) continue;
     withQualifying += 1;
     qualifyingTotal += race.qualifyingPosition;
-    if (race.position === null) continue;
+    if (!race.isClassified || race.position === null) continue;
     counted += 1;
     deltaTotal += race.qualifyingPosition - race.position;
   }
@@ -613,8 +672,20 @@ export function buildSeasons(
     if (!isNonStart(race)) acc.starts += 1;
     if (race.position === 1) acc.wins += 1;
     if (race.position !== null && race.position <= 3) acc.podiums += 1;
-    if (race.position !== null && (acc.bestFinish === null || race.position < acc.bestFinish)) {
-      acc.bestFinish = race.position;
+    /*
+     * **A best finish is a finish** — `isClassified`, not `position !== null` (trap 27).
+     * `position` on a retirement is the order the cars stopped, and it is a small integer:
+     * the minimum across the archive is 5. Counted, **648 driver-seasons** hold a lower
+     * unclassified position than any classified one, so `DriverSeasons.tsx` printed
+     * "P18" for Button's 2017 — a season he was never classified in — where the honest
+     * cell is the em dash it already renders for null.
+     *
+     * The podium and win tests above do not need the same guard and are left alone: 5 is
+     * the lowest position any unclassified row carries, so `<= 3` and `=== 1` are
+     * unreachable from one. Verified by query and pinned in `drivers.test.ts`.
+     */
+    if (race.isClassified && race.position !== null) {
+      if (acc.bestFinish === null || race.position < acc.bestFinish) acc.bestFinish = race.position;
     }
 
     const team = acc.teams.get(race.teamRef);

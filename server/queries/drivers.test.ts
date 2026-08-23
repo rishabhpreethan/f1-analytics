@@ -57,23 +57,33 @@ describe('ageYears — calendar arithmetic on the strings, never a Date', () => 
 
 describe('positionsGained — §5.1, and null is not zero', () => {
   it('is grid minus position', () => {
-    expect(positionsGained(6, 2)).toBe(4);
-    expect(positionsGained(2, 6)).toBe(-4);
+    expect(positionsGained(6, 2, true)).toBe(4);
+    expect(positionsGained(2, 6, true)).toBe(-4);
   });
 
   it('is 0 only when the car finished exactly where it started', () => {
-    expect(positionsGained(5, 5)).toBe(0);
+    expect(positionsGained(5, 5, true)).toBe(0);
   });
 
   /**
    * Three exclusions, one representation. A pit-lane start arrives here as a null
-   * `gridPosition` (trap 9, `toGrid`), a retirement as a null position — and returning 0
-   * for either would put a false measurement into the career mean.
+   * `gridPosition` (trap 9, `toGrid`), a retirement as `isClassified: false` — and
+   * returning 0 for either would put a false measurement into the career mean.
    */
   it('is null — never 0 — when the driver did not finish or did not start from the grid', () => {
-    expect(positionsGained(null, 2)).toBeNull();
-    expect(positionsGained(6, null)).toBeNull();
-    expect(positionsGained(null, null)).toBeNull();
+    expect(positionsGained(null, 2, true)).toBeNull();
+    expect(positionsGained(6, null, true)).toBeNull();
+    expect(positionsGained(null, null, true)).toBeNull();
+  });
+
+  /**
+   * **Trap 27, and the regression this function shipped.** A retirement carries a real
+   * `position` — the order the cars stopped, minimum 5 across the archive — so the shape
+   * below is what the database actually hands over for a car that started 3rd and retired
+   * 18th. The old two-argument form returned `-15` for it and put that in a career mean.
+   */
+  it('is null for an unclassified finish even though `position` is a real number', () => {
+    expect(positionsGained(3, 18, false)).toBeNull();
   });
 });
 
@@ -215,7 +225,16 @@ describe('collapseRaces — trap 17, one race gives one result', () => {
   });
 });
 
-/** A minimal, hand-built career: a win, a DNS, a retirement and a pit-lane start. */
+/**
+ * A minimal, hand-built career: a win, a DNS, a retirement and a pit-lane start.
+ *
+ * ⚠ **The default row is a retirement with `position: 18`, not `position: null`** — trap 27.
+ * It used to be null, which is a row shape `session_entry` has never held: the column is
+ * non-NULL on all 26,093 race rows and carries the order the cars stopped on the 9,683
+ * unclassified ones. That single fixture value is what let `positionsGained` ship
+ * `grid - retirement order` with a green suite, so the fixture is now the shape the
+ * database actually produces and the tests below are the ones that would have caught it.
+ */
 function race(overrides: Partial<DriverRaceRow> & { round: number }): DriverRaceRow {
   return {
     year: 2000,
@@ -226,7 +245,7 @@ function race(overrides: Partial<DriverRaceRow> & { round: number }): DriverRace
     teamRef: 'alpha',
     teamName: 'Alpha',
     carNumber: 1,
-    position: null,
+    position: 18,
     grid: 5,
     points: 0,
     status: 11,
@@ -244,8 +263,10 @@ describe('buildTotals — DR-2', () => {
   const rows: DriverRaceRow[] = [
     race({ round: 1, position: 1, grid: 1, points: 10, status: 0, isClassified: 1 }),
     race({ round: 2, position: 3, grid: 4, points: 4, status: 0, isClassified: 1 }),
-    race({ round: 3, position: null, status: 30, detail: 'Withdrew' }),
-    race({ round: 4, position: null, status: 10, detail: 'Accident' }),
+    /* A withdrawal and an accident, both carrying the position the database gives them —
+     * 22nd and 19th are retirement order, not results (trap 27). */
+    race({ round: 3, position: 22, status: 30, detail: 'Withdrew' }),
+    race({ round: 4, position: 19, status: 10, detail: 'Accident' }),
     race({ round: 5, position: 12, grid: 0, status: 1, isClassified: 1, detail: '+2 Laps' }),
   ];
   const totals = buildTotals(collapseRaces(rows, []), rows.length, 1);
@@ -268,7 +289,7 @@ describe('buildTotals — DR-2', () => {
     expect(totals.pointsFinishes).toBe(2);
   });
 
-  it('counts a retirement by `status`, never by a null position (trap 3)', () => {
+  it('counts a retirement by `status`, never by a null position (traps 3 and 27)', () => {
     expect(totals.dnfs).toBe(1);
     expect(totals.accidentDnfs).toBe(1);
     expect(totals.mechanicalDnfs).toBe(0);
@@ -297,7 +318,13 @@ describe('buildGridVsFinish — DR-4, with its exclusions counted', () => {
       race({ round: 1, position: 1, grid: 5, status: 0, isClassified: 1 }),
       race({ round: 2, position: 8, grid: 3, status: 1, isClassified: 1 }),
       race({ round: 3, position: 6, grid: 6, status: 0, isClassified: 1 }),
-      race({ round: 4, position: null, status: 11 }),
+      /*
+       * The trap 27 row. It started 4th and stopped 14th, and `14` is not a result — it is
+       * where this car came to rest in the retirement order. The two-argument
+       * `positionsGained` scored it `-10` and dropped it into the career mean; the test
+       * below now asserts it is excluded and *counted* as excluded instead.
+       */
+      race({ round: 4, position: 14, grid: 4, status: 11, isClassified: 0 }),
       race({ round: 5, position: 9, grid: 0, status: 0, isClassified: 1 }),
       race({ round: 6, position: 7, grid: null, status: 0, isClassified: 1 }),
     ],
@@ -329,11 +356,39 @@ describe('buildGridVsFinish — DR-4, with its exclusions counted', () => {
     expect(summary.worstLoss).toBe(-5);
   });
 
+  /**
+   * **The regression test for the defect this metric shipped** (trap 27). Every row here is
+   * a retirement carrying a real `position`, which is the only shape the database produces
+   * for one. The old implementation measured all three and reported a mean of −7; the
+   * honest answer is that there is nothing to measure and that three races are the reason.
+   */
+  it('measures nothing at all from a career of retirements, and says how many', () => {
+    const retirements = buildGridVsFinish(
+      collapseRaces(
+        [
+          race({ round: 1, position: 12, grid: 2, status: 11, isClassified: 0 }),
+          race({ round: 2, position: 18, grid: 9, status: 10, isClassified: 0 }),
+          race({ round: 3, position: 15, grid: 7, status: 11, isClassified: 0 }),
+        ],
+        [],
+      ),
+    );
+    expect(retirements.racesCounted).toBe(0);
+    expect(retirements.meanPositionsGained).toBeNull();
+    expect(retirements.excluded.unclassified).toBe(3);
+    expect(retirements.gained + retirements.lost + retirements.held).toBe(0);
+  });
+
   it('is null rather than 0 for a career with nothing to measure', () => {
     const empty = buildGridVsFinish([]);
     expect(empty.meanPositionsGained).toBeNull();
     expect(empty.bestGain).toBeNull();
     expect(empty.worstLoss).toBeNull();
+  });
+
+  /** `gained + lost + held === racesCounted` is the invariant the surface captions with. */
+  it('splits the counted races by sign with nothing left over', () => {
+    expect(summary.gained + summary.lost + summary.held).toBe(summary.racesCounted);
   });
 });
 
@@ -342,7 +397,8 @@ describe('buildQualifyingVsRace — DR-5', () => {
     [
       race({ round: 1, position: 1, grid: 1, status: 0, isClassified: 1 }),
       race({ round: 2, position: 5, grid: 3, status: 0, isClassified: 1 }),
-      race({ round: 3, position: null, status: 11 }),
+      /* Qualified 4th, retired 16th — trap 27, so the delta is excluded, not −12. */
+      race({ round: 3, position: 16, status: 11, isClassified: 0 }),
     ],
     [
       { year: 2000, round: 1, sessionType: 'Q3', position: 3 },
@@ -352,7 +408,7 @@ describe('buildQualifyingVsRace — DR-5', () => {
   );
   const summary = buildQualifyingVsRace(races);
 
-  it('measures only races with both a qualifying position and a finish', () => {
+  it('measures only races with both a qualifying position and a classified finish', () => {
     expect(summary.racesCounted).toBe(2);
     expect(summary.meanDelta).toBeCloseTo((3 - 1 + (2 - 5)) / 2, 10);
   });
@@ -558,6 +614,92 @@ describe.skipIf(!hasDatabase)('driver queries against the live database', () => 
       expect((totals?.starts ?? 0) + (totals?.nonStarts ?? 0)).toBe(totals?.races);
     },
   );
+
+  /**
+   * ================================================================== trap 27, at the source
+   *
+   * The fact the whole defect rests on, asserted against the archive rather than assumed:
+   * **`session_entry.position` is never NULL on a race row**, so every `position === null`
+   * guard in this module was dead code, and the value on an unclassified row is a
+   * retirement order whose minimum is 5 — low enough to be plausible, high enough that a
+   * `<= 3` podium test can never see it.
+   *
+   * If a refresh ever introduces a NULL, or an unclassified row inside the top three, this
+   * fails and the guards above have to be revisited together.
+   */
+  it('holds no race row with a null position, and none unclassified inside the top three', () => {
+    const db = getDb();
+    const counts = db
+      .prepare(
+        `SELECT sum(se.position IS NULL) AS nulls,
+                sum(se.is_classified = 0 AND se.position <= 3) AS unclassifiedPodiums,
+                min(CASE WHEN se.is_classified = 0 THEN se.position END) AS lowestRetirement
+         FROM session_entry se
+         JOIN session ses ON ses.id = se.session_id AND ses.type = 'R'
+         JOIN round r ON r.id = ses.round_id AND r.number IS NOT NULL`,
+      )
+      .get() as { nulls: number; unclassifiedPodiums: number; lowestRetirement: number };
+    expect(counts.nulls).toBe(0);
+    expect(counts.unclassifiedPodiums).toBe(0);
+    expect(counts.lowestRetirement).toBe(5);
+  });
+
+  /**
+   * The corrected DR-4 figures, against the historical record.
+   *
+   * Every one of these was wrong before 2026-08-23 — Verstappen read **−0.62** and Senna
+   * **−4.99**, because the mean included `grid - retirement order` for every race that
+   * ended early. `racesCounted + unclassified` is the driver's whole race count on all four,
+   * which is the partition the caption depends on.
+   */
+  it.each([
+    ['max_verstappen', { racesCounted: 210, unclassified: 33, mean: 1.2238, races: 243 }],
+    ['hamilton', { racesCounted: 358, unclassified: 32, mean: 0.7626, races: 390 }],
+    ['senna', { racesCounted: 108, unclassified: 53, mean: -0.2963, races: 161 }],
+    ['fangio', { racesCounted: 41, unclassified: 10, mean: 0.4878, races: 51 }],
+  ])('%s gains places over classified finishes only', (ref, expected) => {
+    const driver = readDriver(ref);
+    const summary = driver?.gridVsFinish;
+    expect(summary?.racesCounted).toBe(expected.racesCounted);
+    expect(summary?.excluded.unclassified).toBe(expected.unclassified);
+    expect(summary?.meanPositionsGained).toBeCloseTo(expected.mean, 4);
+    expect(
+      (summary?.racesCounted ?? 0) +
+        (summary?.excluded.unclassified ?? 0) +
+        (summary?.excluded.pitLaneStarts ?? 0) +
+        (summary?.excluded.unknownGrid ?? 0),
+    ).toBe(expected.races);
+    expect((summary?.gained ?? 0) + (summary?.lost ?? 0) + (summary?.held ?? 0)).toBe(
+      expected.racesCounted,
+    );
+  });
+
+  /**
+   * A retirement reaches the per-race row as `positionsGained: null` **while carrying a
+   * finishing position**, which is the shape that made the defect invisible. Verstappen's
+   * 2015 R6 is the case in one row: started 9th, out on lap 63 in the barrier at Sainte
+   * Dévote, `position` 18 — and the old code published "9 places lost" for it.
+   */
+  it('publishes no place change for a race that ended in the barrier', () => {
+    const race = readDriver('max_verstappen')?.races.find(
+      (row) => row.year === 2015 && row.round === 6,
+    );
+    expect(race?.isClassified).toBe(false);
+    expect(race?.gridPosition).toBe(9);
+    expect(race?.position).toBe(18);
+    expect(race?.positionsGained).toBeNull();
+  });
+
+  /**
+   * `bestFinish` is a **finish**, not the lowest number in the season's `position` column.
+   * Button entered one race in 2017, at Monaco, and was not classified in it; the season row
+   * read "P18" until this was corrected. 648 driver-seasons in the archive have the shape.
+   */
+  it('reports no best finish for a season the driver was never classified in', () => {
+    const season = readDriver('button')?.seasons.find((row) => row.year === 2017);
+    expect(season?.starts).toBe(1);
+    expect(season?.bestFinish).toBeNull();
+  });
 
   /**
    * The measured coverage hole, asserted so it cannot be forgotten by whoever renders

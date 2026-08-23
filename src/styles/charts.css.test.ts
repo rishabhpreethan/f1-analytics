@@ -70,3 +70,56 @@ describe('§6.4a — the other seat draws lighter', () => {
     expect(Number(factor)).toBeLessThan(1);
   });
 });
+
+describe('§6.3a — the outcome ramp is a mix of the entity colour, not a second palette', () => {
+  it('derives both intermediate steps from --series, so identity survives the ramp', () => {
+    /*
+     * The whole claim of §6.3a. If either step ever became a literal colour or a neutral token,
+     * a driver's bar would stop being his colour halfway along and the row would read as several
+     * entities — which is the mistake the mode exists to prevent, and it is invisible in jsdom
+     * because a custom property resolves to `''` here and `color-mix()` is never computed.
+     */
+    for (const tone of ['podium', 'classified']) {
+      const rule = body(`.chart-span[data-tone='${tone}']`);
+      expect(rule, tone).toMatch(/color-mix\(in oklab, var\(--series\)/);
+      expect(rule, tone).toMatch(/var\(--tone-mix-/);
+    }
+  });
+
+  it('mixes toward --surface-sunken, the surface the mark is actually drawn on', () => {
+    /*
+     * Not `--surface-raised`, which is the panel *around* the plot: a step mixed toward a surface
+     * it does not sit on lands at the wrong lightness, and V-38's 1.27:1 floor for the faintest
+     * step against the plot area would be measuring a background that is not there.
+     */
+    for (const tone of ['podium', 'classified']) {
+      expect(body(`.chart-span[data-tone='${tone}']`), tone).toContain('var(--surface-sunken)');
+    }
+  });
+
+  it('gives the fourth step no entity colour at all', () => {
+    // The absence of colour IS the meaning: no result. A tinted step 4 would say "a weak finish".
+    const rule = body(".chart-span[data-tone='unclassified']");
+    expect(rule).toContain('var(--surface-raised)');
+    expect(rule).not.toContain('--series');
+  });
+
+  it('has no rule for the win step, because the win step is the base rule', () => {
+    // A `[data-tone='win']` override would be a second place the strongest step could drift from
+    // `.chart-span`'s own `fill: var(--series)`.
+    expect(CSS).not.toContain("data-tone='win'");
+  });
+
+  it('steps the step-4 hatch up to --border-strong', () => {
+    /*
+     * On `--surface-raised` the hatch is the only thing separating a not-classified segment from
+     * the panel it is painted on. `--border-subtle` measures 1.24:1 there; `--border-strong` is
+     * 1.90:1, which is what V-38 G-38d gates at 1.2.
+     */
+    expect(body(".chart-hatch-line[data-weight='strong']")).toContain('var(--border-strong)');
+  });
+
+  it('draws the legend keys in a neutral, never in an entity colour', () => {
+    expect(body('.chart-tone-legend')).toMatch(/--series:\s*var\(--ink-secondary\)/);
+  });
+});

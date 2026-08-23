@@ -160,7 +160,16 @@ export function RateRailBoard({ entities, channels }: RateRailBoardProps) {
                     </span>
 
                     <span className="rate-track">
-                      {value.value !== null && (
+                      {/*
+                       * ⚠ **A rate of zero draws no bar** _(2026-08-23)_. `min-width: 3px` keeps a
+                       * near-zero rate visible, which is right for a driver who won 1 of 390 and
+                       * wrong for one who never won at all — the floor was painting a mark for
+                       * *nothing* on every zero, and 702 of 818 drivers have never won a Grand
+                       * Prix. `null` and `0` stay different states: `null` is "he never started,
+                       * so there is no rate", `0` is "there is a rate and it is zero", and both
+                       * are said in the figure column where they are text.
+                       */}
+                      {value.value !== null && value.value > 0 && (
                         <span
                           className="rate-bar"
                           data-motion={TIER_BAR_ATTR}

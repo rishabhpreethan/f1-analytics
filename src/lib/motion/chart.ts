@@ -230,6 +230,52 @@ export function useRibbonMount<T extends HTMLElement = HTMLDivElement>(
   });
 }
 
+/* ------------------------------------------------------ G-33, the finishing strip (F7) */
+
+/** The mark G-33 brings in. Written by `FinishStrip`, queried here from the same constant. */
+export const STRIP_DOT_ATTR = 'strip-dot';
+export const STRIP_DOT = `[data-motion="${STRIP_DOT_ATTR}"]`;
+
+/**
+ * **G-33 — the finishing strip** (`DESIGN_SYSTEM.md` §4.6.2, §6.6.6.14 D).
+ *
+ * Neither G-27 nor G-28 fits, and the reason is worth stating because it is the test for whether a
+ * new motion is warranted at all. **G-27 grows a mark from an axis**, which needs a mark with an
+ * extent; a dot has none, and scaling one along an axis would invent a length the datum does not
+ * have. **G-28 wipes a clip rect across a plot**, which is right for a continuous mark whose shape
+ * is the reading; here the reading is a *scatter*, and a wipe would say the marks are one object.
+ *
+ * So: each dot arrives on its own, `scale: 0 → 1` about **its own centre** — which encodes nothing,
+ * because a dot's size is not a value and its position never moves — staggered left to right, so
+ * the season plays out in the order it was raced. `dur.fast` rather than `dur.chart`: twenty-two
+ * marks at 400ms each would still be arriving after the eye had finished reading the row.
+ *
+ * Authored as `from` (MR-2), so under `reduce` no tween exists and every dot is at full size in the
+ * DOM from the first frame.
+ */
+export function useStripMount<T extends HTMLElement = HTMLDivElement>(
+  deps: React.DependencyList,
+): MotionHandle<T> {
+  return useMotion<T>({
+    deps,
+    animate: ({ q, tl }) => {
+      const dots = q(STRIP_DOT);
+      if (dots.length === 0) return undefined;
+      tl.from(dots, {
+        scale: 0,
+        duration: dur.fast,
+        ease: ease.enter,
+        stagger: {
+          each: stagger.bar.each,
+          from: stagger.bar.from,
+          amount: staggerAmount(dots.length, stagger.bar.each),
+        },
+      });
+      return undefined;
+    },
+  });
+}
+
 /* ------------------------------------------------------- G-32, the lineage chain (F7) */
 
 /** The three marks G-32 moves. Written by `LineageChain`, queried here from the same constants. */

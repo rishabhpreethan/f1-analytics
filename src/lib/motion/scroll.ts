@@ -269,6 +269,23 @@ export const TIER_BAR = `[data-motion="${TIER_BAR_ATTR}"]`;
 export const ERA_BAR_ATTR = 'era-bar';
 export const ERA_BAR = `[data-motion="${ERA_BAR_ATTR}"]`;
 
+/**
+ * **The diverging bar** (§6.6.6.14 C). G-27's growth, with the anchor read from the mark rather
+ * than fixed to `'left'`.
+ *
+ * That is not a special case; it is what G-27 already means. *"Axis-anchored"* is the rule and the
+ * left edge is only where the axis happens to be on a magnitude bar. On a diverging bar the axis is
+ * **zero**, in the middle of the track, so a bar pointing backwards has to grow from its right
+ * edge. Growing every bar from the left would animate the negative ones sliding across the zero
+ * line they are measured from — a mark whose *start* moves, which is the one thing §6.6.3 forbids
+ * a composition segment and forbids here for the same reason.
+ *
+ * The origin comes from `data-origin` on the element, so the component that decides the sign is
+ * the thing that states the anchor, and the two cannot fall out of step.
+ */
+export const GAIN_BAR_ATTR = 'gain-bar';
+export const GAIN_BAR = `[data-motion="${GAIN_BAR_ATTR}"]`;
+
 export function usePopulationMount<T extends HTMLElement = HTMLElement>(
   deps: React.DependencyList,
 ): MotionHandle<T> {
@@ -277,7 +294,8 @@ export function usePopulationMount<T extends HTMLElement = HTMLElement>(
     animate: ({ q, tl }) => {
       const tiers = q(TIER_BAR);
       const eras = q(ERA_BAR);
-      if (tiers.length === 0 && eras.length === 0) return undefined;
+      const gains = q(GAIN_BAR);
+      if (tiers.length === 0 && eras.length === 0 && gains.length === 0) return undefined;
 
       if (tiers.length > 0) {
         tl.from(tiers, {
@@ -308,6 +326,28 @@ export function usePopulationMount<T extends HTMLElement = HTMLElement>(
             },
           },
           tiers.length > 0 ? '-=0.2' : 0,
+        );
+      }
+
+      if (gains.length > 0) {
+        tl.from(
+          gains,
+          {
+            scaleX: 0,
+            /* Per target, from the mark's own `data-origin`: `'right'` for a bar pointing back
+             * from zero, `'left'` for one pointing forward. A fixed `'left'` would slide every
+             * negative bar across the axis it is measured from. */
+            transformOrigin: (_index: number, target: Element) =>
+              target instanceof HTMLElement ? (target.dataset['origin'] ?? 'left') : 'left',
+            duration: dur.chart,
+            ease: ease.mech,
+            stagger: {
+              each: stagger.bar.each,
+              from: stagger.bar.from,
+              amount: staggerAmount(gains.length, stagger.bar.each),
+            },
+          },
+          tiers.length > 0 || eras.length > 0 ? '-=0.2' : 0,
         );
       }
 

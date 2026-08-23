@@ -54,7 +54,7 @@ Full detail lives in the docs named; this is the index, not the content.
 
 | | |
 |---|---|
-| **Data traps** | `docs/DATABASE.md` §7 — **25 of them**, and the count grows; read §7 for the current list, never a number quoted elsewhere. Points are not summable across eras. `has_time_data` is unreliable. Practice data is empty. Lap data 1996+, pit stops 2011+, qualifying 1994+. Every `lap` query bounded. |
+| **Data traps** | `docs/DATABASE.md` §7 — **27 of them**, and the count grows; read §7 for the current list, never a number quoted elsewhere. Points are not summable across eras. `has_time_data` is unreliable. Practice data is empty. Lap data 1996+, pit stops 2011+, qualifying 1994+. Every `lap` query bounded. |
 | **Charts** | `docs/DESIGN_SYSTEM.md` §3.2 — brand colours **fail** as a categorical palette (measured). Never a dual-axis chart. Comparison caps at 4. Purple/green/yellow are reserved timing semantics. |
 | **Security** | `docs/ARCHITECTURE.md` §7. Read-only, no auth, no mutations, no third-party calls. The builder self-checks **S-4** input validation, **S-6** error hygiene, **S-7** `npm audit`, **S-10** query bounds. |
 | **Database** | `data/f1.db` is gitignored, opened read-only, never committed. A fresh clone must fail with a clear actionable error. |

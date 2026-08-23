@@ -18,7 +18,19 @@
  * **Nothing here carries a colour.** An entity carries `colorTeamRef` and nothing else;
  * `src/lib/entityColor.ts` turns a `team.reference` into a token name and no hex crosses this
  * boundary (§3.3a.3).
+ *
+ * ---
+ *
+ * ⚠ **Where a field is also a schema's, this file IMPORTS it rather than restating it** _(added
+ * 2026-08-23)_. Restating drifted twice while nobody noticed — `championshipPositionIsFinal` was
+ * missing from `CompareSeason`, and `Ledger.tied`'s comment described a constraint the data had
+ * already disproved. A restated shape does not fail a typecheck when the schema moves; it simply
+ * stops describing what arrives, and the surface silently cannot see a field that is on the wire.
+ * `GridVsFinish` is therefore imported from `@schemas/entity`, which is the same path
+ * `src/features/driver` already uses for the identical object.
  */
+
+import type { GridVsFinish } from '@schemas/entity';
 
 /** A driver's identity. `code` is null for 774 of 881 drivers and is never derived from a surname. */
 export interface CompareIdentity {
@@ -44,7 +56,16 @@ export interface Ledger {
   pool: number;
   a: number;
   b: number;
-  /** Dead heats. Only reachable on the grid ledger — 9 races carry two `grid = 1` rows. */
+  /**
+   * Dead heats.
+   *
+   * ⚠ **Not grid-only, which is what this comment used to say.** 9 races carry two `grid = 1`
+   * rows, so a tie was assumed to be a qualifying artefact — but the schema measured **85 same-team
+   * pairings where both drivers were classified in the same finishing position**, all of them
+   * 1950s shared drives, where two men drove one car and were classified together. So the race
+   * ledger ties too, and a surface that treated `tied > 0` as impossible there would be wrong 85
+   * times.
+   */
   tied: number;
 }
 
@@ -78,6 +99,24 @@ export interface CompareEntity {
     race: Ledger;
     grid: Ledger;
   };
+  /**
+   * **Places gained from the grid** — the same object `GET /api/drivers/:reference` publishes, from
+   * the same builder, so the two pages cannot disagree about a driver's career.
+   *
+   * Three properties of it decide how it may be drawn (§6.6.6.14 C):
+   *
+   * 1. `meanPositionsGained` is **null for 155 of the 818 drivers with a race** — never classified
+   *    in one they started from a grid slot. All are pickable. A zero-length bar at the origin
+   *    would say "started and finished level every time", which is a different and false claim, so
+   *    the null needs a real no-measurement state.
+   * 2. **`gained`/`lost`/`held` can disagree with the mean's sign**, and the disagreement is the
+   *    honest part: a handful of large losses against many small gains. They are drawn beside the
+   *    bar for that reason and not as decoration.
+   * 3. `excluded.unclassified` is the caption. A mean over the races where the metric applies is a
+   *    different claim from a mean over every race, and the reader can only tell which they are
+   *    looking at if the gap is printed.
+   */
+  gridVsFinish: GridVsFinish;
   seasons: CompareSeason[];
 }
 
@@ -90,6 +129,15 @@ export interface CompareSeason {
   dnfs: number;
   /** Final championship placing. Null means unranked, never last (`season.ts`). */
   championshipPosition: number | null;
+  /**
+   * `false` while the season is still being run, so the placing above is where the driver stood
+   * after the last round held rather than where he finished. 2026 is 10 of 22 rounds in.
+   *
+   * The career arc draws it as an ordinary point — it is the honest current standing — and names it
+   * in a note, because a line whose last point is provisional and unlabelled invites a reader to
+   * treat a mid-season position as a career result.
+   */
+  championshipPositionIsFinal: boolean;
 }
 
 /**

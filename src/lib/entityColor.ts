@@ -15,8 +15,10 @@
  * ⚠ **There is no longer a third role.** The teammate *shade pair* was withdrawn on 2026-08-23
  * (§6.4a, "the seat, not the shade"): colour identifies the machinery, and the seat inside it is
  * carried by the **dash**, which is a reserved semantic channel exactly as purple/green/yellow are
- * reserved in colour. `shadePair()` is retained below and is called by nothing — the generated
- * `--*-plot-deep` / `-bright` tokens are retired from use, not yet deleted (§6.4a, follow-up).
+ * reserved in colour. `shadePair()` and the 84 `--*-plot-deep` / `-bright` declarations it named
+ * were **deleted** on 2026-08-23 (§9.2.8) — a measured 0.61 KB of the 25 KB render-blocking CSS
+ * budget, spent on the four comparison charts. `PLOT_TOKENS` went from 64 entries to 22, so every
+ * `COLLISION_MASKS` index moved; the two are generated together and can only move together.
  *
  * **The ramp is 94% of the data, not a fallback.** 214 teams exist and 12 carry a brand colour
  * (queried). A team with no brand colour — and Haas and Cadillac, whose greys would be confusable
@@ -35,7 +37,6 @@ import {
   PLOT_TEAMS,
   PLOT_TOKENS,
   RAMP_SIZE,
-  SHADE_PAIR_TEAMS,
 } from './entityColorData';
 
 /** Every colour a chart mark may take. A union of the 64 generated token names. */
@@ -63,7 +64,6 @@ function token(name: string): PlotToken {
 
 const HAS_IDENTITY = new Set<string>(IDENTITY_TEAMS);
 const HAS_PLOT = new Set<string>(PLOT_TEAMS);
-const HAS_SHADE_PAIR = new Set<string>(SHADE_PAIR_TEAMS);
 
 /**
  * FNV-1a, 32-bit. Chosen for three properties this specific use needs and nothing more: it is
@@ -125,36 +125,6 @@ export function plotToken(teamReference: string): PlotToken {
   return HAS_PLOT.has(teamReference)
     ? token(`--team-${teamReference}-plot`)
     : rampPlot(rampSlot(teamReference));
-}
-
-/**
- * ⚠ **RETIRED FROM USE, 2026-08-23 (§6.4a).** Nothing calls this. It is kept because the tokens it
- * names are still generated and still validated (§9.2.3 V-27, G-27a–e), and deleting the function
- * without deleting the emitter would leave the palette claiming a role no code could reach. The
- * deletion of both is a queued follow-up with a measured CSS saving, recorded in §6.4a.
- *
- * The symmetric shade pair for a team, or `null` when the palette has none for it.
- *
- * `null` is not an error state and must not be treated as one. Sauber's brand hue sits inside the
- * reserved green timing band; in light mode exactly one lightness in the whole plotting band clears
- * ΔE 15 from `--timing-green-ink`, so no pair exists, and the dark-mode pair that *does* exist is
- * deliberately withheld — an encoding that changed at sunset would have to be unlearned. §6.4a's
- * marker, dash and direct-label channels are mandatory for **every** team precisely so that this
- * team's teammate comparison is no worse off than any other's.
- */
-export function shadePair(teamReference: string): { deep: PlotToken; bright: PlotToken } | null {
-  if (HAS_SHADE_PAIR.has(teamReference)) {
-    return {
-      deep: token(`--team-${teamReference}-plot-deep`),
-      bright: token(`--team-${teamReference}-plot-bright`),
-    };
-  }
-  if (HAS_PLOT.has(teamReference)) return null; // a brand team whose hue has no admissible pair
-  const slot = rampSlot(teamReference);
-  return {
-    deep: token(`--ramp-${String(slot)}-plot-deep`),
-    bright: token(`--ramp-${String(slot)}-plot-bright`),
-  };
 }
 
 /**

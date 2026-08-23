@@ -281,10 +281,50 @@
     fill: var(--series);
   }
 
+  /*
+   * §6.3a — **the outcome ramp.** Four ordinal steps inside ONE entity's colour: identity is held
+   * across the row and the ramp carries the order, which is the opposite job to the shade pair
+   * §6.4a deleted (that spent lightness on identity and asked a reader to learn that two colours
+   * were one team). Step 1 needs no rule — it is the rule above.
+   *
+   * Mixed over `--surface-sunken`, the plot area, so each step fades toward the background it is
+   * actually drawn on and the ramp is theme-correct with no second set of values. Gated by V-38
+   * for all 22 plotting tokens in both themes.
+   */
+  .chart-span[data-tone='podium'] {
+    fill: color-mix(in oklab, var(--series) var(--tone-mix-podium), var(--surface-sunken));
+  }
+
+  .chart-span[data-tone='classified'] {
+    fill: color-mix(in oklab, var(--series) var(--tone-mix-classified), var(--surface-sunken));
+  }
+
+  /* Step 4 carries **no entity colour at all**, because the absence of colour is the meaning: no
+   * result. The raised panel over the sunken plot, plus rung 4's hatch over it. */
+  .chart-span[data-tone='unclassified'] {
+    fill: var(--surface-raised);
+  }
+
+  /* The legend draws the ramp in a NEUTRAL, not in the first driver's colour: every row applies
+   * the same four steps to its own hue, so the thing to be learned is the order, and a coloured
+   * key would teach the order while implying the legend was about that one driver. */
+  .chart-tone-legend {
+    --series: var(--ink-secondary);
+  }
+
+  .chart-tone-key {
+    flex: none;
+  }
+
   /* The in-span label wears TEXT tokens on an entity fill, so it needs the inverse ink rather than
-   * `--ink-primary` (§3.3a.4's computed on-colour rule). `--ink-inverse` is the one value that
-   * clears 4.5:1 against every plotting token, all of which sit in the mid-lightness band by
-   * construction (§9.1). */
+   * `--ink-primary` (§3.3a.4's computed on-colour rule).
+   *
+   * ⚠ **This rule's original comment claimed `--ink-inverse` "clears 4.5:1 against every plotting
+   * token". Measured 2026-08-23 (V-38), it does not**: McLaren's light plotting variant `#DD6B02`
+   * is **3.40:1**, and it is the only fill in the set that fails. Recorded rather than fixed in the
+   * same change, because the fix — a `paint-order: stroke` halo in the surface colour — changes how
+   * a shipped page looks and nothing here could verify it. §6.3a's ramp sidesteps it by drawing no
+   * text on a tone at all. */
   .chart-span-label {
     fill: var(--ink-inverse);
     font-family: var(--font-mono);
@@ -365,6 +405,13 @@
   .chart-hatch-line {
     stroke: var(--border-subtle);
     stroke-width: 1;
+  }
+
+  /* §6.3a step 4. Over `--surface-raised` the hatch is the ONLY thing separating a not-classified
+   * segment from the panel it is painted on, so it steps up a border: `--border-subtle` measures
+   * 1.24:1 there and `--border-strong` 1.90:1 (V-38 G-38d, floor 1.2). */
+  .chart-hatch-line[data-weight='strong'] {
+    stroke: var(--border-strong);
   }
 
   /* ------------------------------------------------ the rank chart (§6.5.4a) */

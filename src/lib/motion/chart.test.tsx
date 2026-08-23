@@ -23,7 +23,7 @@ vi.hoisted(() => {
 });
 
 import { gsap } from './gsap';
-import { chartReadout, crossFadeMarks, fadeTooltipIn, useChartMount } from './chart';
+import { chartReadout, crossFadeMarks, fadeTooltipIn, useChartMount, useStripMount } from './chart';
 import { dur, ease, stagger } from './tokens';
 
 /**
@@ -189,5 +189,60 @@ describe('the stagger stays inside its stated budget', () => {
     // 12 × 60 + 400 = 1120ms — outside the 400ms interaction ceiling, and legal only because a
     // chart mount is not an interaction path (§4.6.2 G-27).
     expect(stagger.cap * stagger.bar.each + dur.chart).toBeCloseTo(1.12, 6);
+  });
+});
+
+/** Three dots on one row, which is what G-33 animates. */
+function Strip() {
+  const { scope } = useStripMount<HTMLDivElement>(['2021']);
+  return (
+    <div ref={scope}>
+      <span data-motion="strip-dot" />
+      <span data-motion="strip-dot" />
+      <span data-motion="strip-dot" />
+    </div>
+  );
+}
+
+describe('G-33 — the finishing strip’s dots', () => {
+  it('creates no tween at all under prefers-reduced-motion: reduce', () => {
+    stubMedia('reduce');
+    const before = gsap.globalTimeline.getChildren(true, true, true).length;
+    render(<Strip />);
+    expect(gsap.globalTimeline.getChildren(true, true, true).length).toBe(before);
+  });
+
+  it('scales a dot about its own centre and moves nothing else', () => {
+    /*
+     * A dot has no extent, so there is no axis to grow from and G-27 does not apply: scaling one
+     * along an axis would invent a length the datum does not have. Scaling about its own centre
+     * encodes nothing — a dot's size is not a value and its position never moves — which is what
+     * makes it admissible at all. Anything touching `x`, `y` or `left` here would be animating the
+     * reading.
+     */
+    render(<Strip />);
+    const tweens = gsap.globalTimeline.getChildren(true, true, false);
+    const tween = tweens.at(-1);
+    expect(tween).toBeDefined();
+    const vars = Object.keys(tween?.vars ?? {});
+    expect(vars).toContain('scale');
+    expect(vars).not.toContain('x');
+    expect(vars).not.toContain('y');
+    expect(vars).not.toContain('left');
+  });
+
+  it('arrives at dur.fast, not dur.chart', () => {
+    // Twenty-two marks at 400ms each would still be landing after the eye had read the row.
+    render(<Strip />);
+    const tween = gsap.globalTimeline.getChildren(true, true, false).at(-1);
+    expect(tween?.vars.duration).toBe(dur.fast);
+    expect(tween?.vars.ease).toBe(ease.enter);
+  });
+
+  it('staggers from the start, so the season arrives in the order it was raced', () => {
+    render(<Strip />);
+    const tween = gsap.globalTimeline.getChildren(true, true, false).at(-1);
+    const staggerVars = tween?.vars.stagger as { from?: string } | undefined;
+    expect(staggerVars?.from).toBe(stagger.bar.from);
   });
 });

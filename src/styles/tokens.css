@@ -491,6 +491,16 @@
   --size-swatch: 10px; /* the identity chip (§3.3a.4) */
   --size-leader: 12px; /* §6.5.2's direct-label leader line */
   --size-hatch: 6px; /* rung 4's 45° hatch pitch */
+  /* §6.3a — the outcome ramp. How much of the entity's plotting colour survives at each ordinal
+   * step, mixed in OkLab over `--surface-sunken` (the plot area, so a step fades toward its own
+   * background rather than toward a panel it is not on). Step 1 is 100% and needs no token; step 4
+   * carries no entity colour at all. **These two numbers are the encoding**, and V-38 gates what
+   * they produce for all 22 plotting tokens in both themes: at 60/30 the worst adjacent separation
+   * is ΔE 13.17 and 10.11 against a floor of 8, and the faintest step still clears 1.27:1 against
+   * the plot surface. Moving either without re-running `validate:palette tones` is how a step
+   * silently merges into its neighbour or into the background. */
+  --tone-mix-podium: 60%;
+  --tone-mix-classified: 30%;
   /* §6.5.1's tooltip. **A fixed width, in px, and NOT a `min-width`** — the flip-at-the-midpoint
    * arithmetic in `LineChart` subtracts this exact figure to place the tooltip on the left of the
    * crosshair, so a box wider than the constant overhangs the plot. It was `min-width: 8rem` and

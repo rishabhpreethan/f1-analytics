@@ -1168,7 +1168,7 @@ The audit that follows from rule 2: on `/`, `HeroSection` correctly has no G-15 
 correctly has one. `CapabilityGrid` sits at the fold boundary and is left as it is, because its
 content is static — there is no query and therefore no skeleton, so rule 1 cannot bite it.
 
-#### 4.6.2 Chart motion — G-27 … G-32 _(specified 2026-08-07; G-32 added 2026-08-23)_
+#### 4.6.2 Chart motion — G-27 … G-33 _(specified 2026-08-07; G-32 and G-33 added 2026-08-23)_
 
 This replaced a one-line forward reference that said chart entry was *"axis-anchored growth for bars,
 left-to-right `strokeDasharray` draw for lines"* and deferred the rest. The dasharray half of that
@@ -1183,6 +1183,16 @@ sentence has been **withdrawn** — see G-28.
 | **G-31** | **Population board — the ladder and the decade columns** | `gsap.timeline` + `gsap.from` with `stagger`, Eases | index-page mount, once per dataset | one timeline. Ladder bars `scaleX: 0 → 1`, `transformOrigin: 'left'`; decade columns `scaleY: 0 → 1`, `transformOrigin: 'bottom'`, overlapped at `-=0.2` so the board reads as one gesture rather than two lists queueing. Both `dur.chart` / `ease.mech`, `stagger.bar` through `staggerAmount`. **Each origin is that mark's own axis** — §6.1 — and they differ from `useAxisAnchoredBars`' `'right'` deliberately: a coverage window is anchored at *now* and grows into the past, while a population count is anchored at zero. **No `ScrollTrigger`**, for G-23's reason: the board is the first thing under the masthead, so a trigger would make the trigger load-bearing for the content being visible at all. Deps identify the **dataset**, never the selection — clicking a rung filters the list and must not re-grow the chart being read (G-29) | **not created.** Authored `from` (MR-2), so every bar rests at its full, correct extent. The CSS hover and pressed transitions on the same elements are separately removed by a `prefers-reduced-motion` block in `entity-index.css` — the hook has no say over those |
 
 | **G-32** | **The lineage chain walks itself back through the archive** | `gsap.timeline` + `gsap.from` with `stagger`, Eases | compare-page mount, once per chain | one timeline, three tracks. Link capsules `scaleX: 0 → 1`, `transformOrigin: 'right'`, `dur.chart` / `ease.mech`, `stagger.bar` through `staggerAmount`; connector **drops** `scaleY: 0 → 1` from `'top'` and connector **runs** `scaleX: 0 → 1` from `'right'`, both `dur.fast` / `ease.enter`, both **offset by half a stagger step** so each handoff lands between two capsules rather than all three tracks firing in lockstep. **`'right'` is the direction of travel, not a preference**: the chain reads from the present into the past, and a capsule growing left-to-right would run against the direction its connector arrives from — G-27's "the origin is the axis, never the mark's own centre" applied to a mark whose axis is time. **No `ScrollTrigger`** (§4.6.1 rule 2): the chain is often the first thing under the verdict band, so a trigger would make the trigger load-bearing for the content being visible. Deps identify the **chain**, never the hovered row (G-29) | **not created.** Authored `from` (MR-2), so every capsule, drop and run rests at its full, correct extent — the chain is simply *drawn* rather than walked, which is a legitimate still image rather than a broken one. The CSS hover transitions on the same surface are separately removed by a `prefers-reduced-motion` block in `compare.css`, which the hook has no say over |
+
+| **G-33** | **The finishing strip's dots arrive in race order** | `gsap.from` + `stagger`, Eases | season-lens mount, once per season | each dot `scale: 0 → 1` **about its own centre**, `dur.fast` / `ease.enter`, `stagger.bar` through `staggerAmount`, from `'start'` — so the season plays out in the order it was raced. **Neither G-27 nor G-28 fits, and the reason is the test for whether a new ID is warranted at all:** G-27 grows a mark from an axis and needs a mark with an *extent*, which a dot has none of — scaling one along an axis would invent a length the datum does not have. G-28 wipes a clip rect across a plot, which is right for a continuous mark whose shape is the reading and wrong for a scatter, where it would say the marks are one object. Scaling about its own centre is admissible **because it encodes nothing**: a dot's size is not a value and its position never moves. `dur.fast` rather than `dur.chart` because twenty-two marks at 400ms each would still be landing after the eye had read the row. Centring is done with **negative margins, never a base `translate`** — GSAP owns `transform` here and a base transform is one more thing the tween has to parse and preserve | **not created.** Authored `from` (MR-2), so every dot is at full size in the DOM from frame one |
+
+> **G-27's anchor is the axis, and a diverging bar's axis is zero** _(added 2026-08-23, §6.6.6.14 C)_.
+> `usePopulationMount` now resolves `transformOrigin` **per target** from the mark's own
+> `data-origin`: `'left'` for a bar pointing forward from zero, `'right'` for one pointing back. This
+> is not a new motion and does not get an ID — it is G-27's own rule applied where the axis is not the
+> left edge. A fixed `'left'` would animate every negative bar sliding *across* the line it is
+> measured from, which is the moving-start defect §6.6.3 forbids a composition segment for the same
+> reason. `src/lib/motion/scroll.test.tsx` asserts the resolver, including its fallback.
 
 **Why not `DrawSVG`, and why not `strokeDashoffset`.** `DrawSVG` is 9.7 KB gzipped and is not
 installed (§4.1). `strokeDashoffset` would need `getTotalLength()` per path and reveals at constant
@@ -1629,6 +1639,142 @@ what legitimately re-mounts a chart. **`src/components/charts/charts.motion.test
 motion enabled and counts timelines**; a chart test suite that never creates a tween is not testing
 the charts' motion.
 
+### 6.3b A minimum mark size is for a small value, never for a zero _(added 2026-08-23, measured)_
+
+**Four marks in this system carry `min-width: 3px`** — the rate rail, the diverging bar, the chain
+capsule and the population ladder — and the reason is good: a rung of 3 against a rung of 571, or a
+one-season pairing against a 77-year domain, is a real quantity that would otherwise be a mark
+nobody can see. **The floor was silently doing a second job it must not do.**
+
+> **A floor is right for a small non-zero value and wrong for a true zero. They are different cases
+> and the code has to say which it is in.**
+
+**Found on the live page, not reasoned out.** Jos Verstappen has 0 wins, and the result mix drew a
+**1px** win segment. The fill path is degenerate and paints nothing; the **hit rect floors its width
+at 1** for pointer safety, so the row carried a 1px hover target popping *"Won — 0 races — 0%"*. On
+a chart whose whole premise is *no axis, read the proportions*, a mark for a category the entity
+never entered is the one thing that cannot ship — **the reader has nothing to check it against.** It
+reaches **702 of 818 drivers** on the win band alone.
+
+The audit that followed found the same shape in two more places and cleared two:
+
+| Mark | Zero reachable? | |
+|---|---|---|
+| `.chart-span` (result mix) | **yes** — 0 wins | fixed: the segment is not rendered at all, and neither is its hit target |
+| `.rate-bar` (rate board) | **yes** — a rate of `0` is not `null`, so 0 of 51 wins drew 3px | fixed: the bar renders only above zero. `null` and `0` stay different states and both are said in the figure column, where they are text |
+| `.tier-bar` (population ladder) | **yes** — an empty stratum | fixed. The row already knew — it is `disabled`, because a rung that filters to nothing is not a control — so the bar was the last part claiming otherwise |
+| `.gain-bar` (diverging bar) | **no** — `direction: 'held'` covers `mean === 0` exactly | already correct; now asserted so it stays that way |
+| `.chain-link` (staircase) | **no** — a capsule spans `[firstYear, lastYear + 1)`, so at least one season | no change |
+| `.strip-dot` (finishing strip) | **no** — a finishing position is never 0, and a dot is drawn only for a classified one | no change |
+
+**Two corollaries, both of which cost something and are worth it.**
+
+1. **The rounded ends of a segmented row belong to the first and last *drawn* segment**, not to index
+   0 and index n−1. Skipping a zero-width leader without this leaves the row's left edge square and
+   its right edge round — a defect the fix would otherwise have introduced, visible instantly and
+   invisible to every test, because `useChartSize` reports 0 in jsdom and `spanPath` drops its arcs
+   at zero width anyway.
+2. **A suppressed mark is never a suppressed fact.** The zero stays in the table view, in the
+   printed figure and in the accessible name, where it is text and cannot be misread. What is
+   removed is only the *mark* — the one channel a reader cannot check.
+
+**And the inverse, for the same reason:** the result mix has **no** minimum segment width, unlike
+the three boards. On a shared track *length is the encoding*, so a floor would overstate a small
+share at the expense of the neighbour it is measured against. A bar that stands alone with its
+figure printed beside it can afford a floor; a segment sharing one track with three others cannot.
+
+**A figure must not contradict its own mark either.** A mean is `k / n`, so one place gained over
+358 races is `+0.0028` and `toFixed(2)` prints `+0.00` — exactly level, beside a 3px bar claiming
+movement. The diverging bar prints `+<0.01` instead: the sign survives, the size is honest, and the
+true zero still prints bare and draws nothing.
+
+### 6.3a Outcome tones — an ordinal ramp **inside** one entity's colour _(added 2026-08-23)_
+
+Every encoding in §6.3 answers *which entity is this*. This one answers *how good was this*, and
+the two must not be built the same way.
+
+**The case that forced it.** The result mix — of a driver's starts, how many were wins, podiums,
+ordinary finishes, and not classified — is a composition whose parts are **outcomes, not entities**.
+`ShareChart` coloured a row's segments with `assignEntityColours`, which is right for a team's
+intra-team points split and says something false here: four colours on one row reads as four
+drivers. Four *neutral* greys would be worse, because the row would stop being anybody's.
+
+**The ramp.** Four ordinal steps, applied to whatever plotting token the row already carries. Mixed
+in OkLab over `--surface-sunken` — **the plot area**, so each step fades toward the background it
+is actually drawn on and the ramp is theme-correct with no second set of values.
+
+| Step | Meaning | Fill | Token |
+|---|---|---|---|
+| 1 `win` | the best available result | the plot token, unmixed | — (it is `.chart-span`'s base rule) |
+| 2 `podium` | a podium that is not a win | `color-mix(in oklab, <plot> 60%, --surface-sunken)` | `--tone-mix-podium` |
+| 3 `classified` | a finish that is not a podium | `color-mix(… 30% …)` | `--tone-mix-classified` |
+| 4 `unclassified` | no result at all | `--surface-raised` + a 45° `--border-strong` hatch | — |
+
+**Step 4 carries no entity colour, and that is the design rather than a shortcut.** The absence of
+colour *is* the meaning. A tinted fourth step would say "a weak finish"; what happened is that there
+was no finish. Rung 4's hatch (§6.4) carries it, stepped up from `--border-subtle` to
+`--border-strong` because on `--surface-raised` the hatch is the only thing separating the segment
+from the panel — 1.24:1 against 1.90:1, gated at 1.2 (V-38 G-38d).
+
+> ⚠ **`color-mix()` is new to this product — this is its first use — and the build emits a
+> fallback that collapses the ramp.** Lightning CSS cannot statically resolve a `var()` inside
+> `color-mix()`, so it precedes each rule with `fill: var(--series)`. On any browser in the target
+> set the second rule wins and the ramp is correct; **below the target, steps 1–3 all paint at full
+> strength and only the hatched fourth remains distinct.** That is a graceful degradation rather
+> than a break — the row still sums to the driver's starts, the legend still names the order, and
+> the table still carries every figure — but it is a real difference and it is recorded here rather
+> than discovered. `color-mix` has been available in every evergreen browser since mid-2023, which
+> is inside the range Tailwind v4 already targets, so nothing in the supported set sees it.
+
+#### Why this is not the shade pair returning
+
+§6.4a deleted the two-shade teammate pair on the same day this ramp was added, and both spend
+**lightness**. The difference is what they spend it *on*:
+
+| | The shade pair (deleted) | The outcome ramp |
+|---|---|---|
+| What the steps mean | two **identities** — two people | one **order** — better to worse |
+| Identity across the steps | changes | **constant**: one row, one entity, one hue |
+| What the reader must learn | that two colours are one team | that stronger is better, left to right |
+| Ceiling | 2 in light mode, measured (§9.2.3 V-27) | 4, because the steps are ordered and adjacent |
+
+Lightness is the wrong channel for identity and the right one for order. That is the whole of it,
+and it is why one of these was deleted and the other added in the same change.
+
+#### The five rules
+
+1. **The mode is read from the data, never passed as a flag.** A segment carries `tone`; a chart is
+   in outcome mode only when **every segment of every row** carries one. A partially-toned chart
+   falls back to entity colour rather than mixing two encodings on one axis.
+2. **The order is fixed and the same on every row** — strongest to weakest, left to right, always.
+   That is what lets a reader compare two rows at a boundary instead of decoding two palettes.
+3. **A legend is mandatory and it is drawn in a neutral** (`--series: --ink-secondary`), because
+   every row applies the same ramp to its own hue: what has to be learned is the order, and a
+   legend in the first driver's colour would teach the order while implying it was about him.
+4. ⚠ **No text is ever drawn inside a toned segment.** Measured, not tasteful: the ramp sweeps from
+   a mid-lightness entity colour to the surface, so it passes through every lightness on the way and
+   **neither ink clears the 4.5:1 text floor across all 44 fills** — `--ink-inverse` bottoms out at
+   3.40:1 and `--ink-primary` at 4.23:1 (V-38). The counts go in the tooltip, the legend and the
+   table view. `ShareChart` enforces this and ignores a `shortLabel` in outcome mode, because a
+   caller passing one is not doing anything unreasonable; the rule belongs to the encoding.
+5. **Any change to either mix ratio re-runs `npm run validate:palette`.** The two numbers are the
+   encoding. 55/22 was the first proposal and it **failed**: the faintest step measured 1.16:1
+   against the plot surface. 62/38 failed the other way, at ΔE 7.85 between steps 2 and 3. 60/30 is
+   the measured compromise, not a preference.
+
+#### The CVD residual, stated
+
+Worst adjacent-step separation under the CVD models is **ΔE 3.65** (ramp #10, light), against the
+palette's categorical floor of 8. It is **reported and not gated**, which is the same posture §3.4.2
+takes toward the one timing-colour residual, and for the same reason: the mitigation is structural
+rather than hopeful.
+
+What carries the encoding when the tones do not: the segments are separated by a **drawn 2px gap of
+the plot surface**, so every boundary is visible whatever the fills do; the **order is fixed**; the
+legend names the four in that order; and the table view carries every figure as text. A reader who
+cannot see the difference between step 2 and step 3 can still read the bar — which is not true of a
+categorical palette, and is why the floor that applies to one does not apply to the other.
+
 ### 6.4 Runtime collision detection and the differentiator ladder
 
 Given the entities the user selected, compute pairwise perceptual distance on **the colours actually
@@ -1790,14 +1936,17 @@ the wrong direction. Revisit only with a capture.
 **The collision ladder is therefore three rungs, not four** (§6.4): direct label, marker shape,
 texture. Dash left it.
 
-**The shade-pair tokens are retired from use, not yet deleted.** `--*-plot-deep` / `-bright` are
-still generated into `src/styles/entity.css` (88 declarations), still listed in `PLOT_TOKENS`, and
-still gated by §9.2.3's V-27 and G-27a–e. `shadePair()` survives and is called by nothing; a test
-asserts the tokens it names remain well-formed and separated. **Deleting them is a queued
-follow-up** and it is not free: it means gutting V-27 and G-27a–e from a 2,795-line validator,
-regenerating `entityColorData.ts` (the collision masks are indexed over `PLOT_TOKENS`, so dropping
-32 of the 64 tokens re-indexes every mask) and rewriting `entity.css.test.ts`. The prize is CSS
-budget, which is the binding budget at 81.3% — **the measured saving is 0.61 KB gzipped, recorded in §9.2.7.**
+**The shade-pair tokens are ~~retired from use, not yet deleted~~ DELETED — 2026-08-23, §9.2.8.**
+The follow-up this paragraph queued has been taken, and the figure §9.2.7 projected held exactly:
+render-blocking CSS **20.77 → 20.16 KB**, a **0.61 KB** saving and 2.4 points of a 25 KB budget,
+spent on the four comparison charts in §6.6.6.14. What went with it: 84 declarations from
+`src/styles/entity.css`, `shadePair()` from `entityColor.ts`, `SHADE_PAIR_TEAMS` from
+`entityColorData.ts`, and V-27 plus G-27a–e from the validator. **`PLOT_TOKENS` went from 64 entries
+to 22**, so every `COLLISION_MASKS` index moved — the two are emitted by the same function in the
+same pass and can only move together, which is the property that made a 32-token deletion safe.
+`entity.css.test.ts` now asserts the **absence**, because reappearance is what a later change can
+actually cause: an emitter regenerated from an older revision puts them back, the stylesheet still
+parses, and the budget silently loses the 2.4 points again.
 
 **Cross-era normalisation is made visible, never applied silently.** When a team-mate comparison
 spans a regulation change or a scoring change, the chart carries a `--status-info` note above the
@@ -3588,7 +3737,12 @@ jsdom performs no layout and no compositing, and CR-006 removed the visual gate.
 invisible to `scrollWidth`, and visible in the first second to a human. **Add "the container's own
 margins and padding" to what a surface names as unverified**, not just what is inside it.
 
-##### 6.6.6.12 Proposed and not built — with the figures that would justify each
+##### 6.6.6.12 ~~Proposed and not built~~ — **all four were built on 2026-08-23, see §6.6.6.14**
+
+_Kept as written, because the figures it proposed were partly wrong and the corrections are the
+useful part: the result mix's denominator was a raw count (trap 17) and Fangio's places-gained
+figure was measured against retirement order. §6.6.6.14 carries both._
+
 
 Offered in the brief, weighed, and deliberately left out of this change so that the picker and the
 lens could be built properly. Each is cheap and each has its number already:
@@ -3609,6 +3763,211 @@ lens could be built properly. Each is cheap and each has its number already:
    a thin chart; it earns its place at four entities, not at two.
 4. **Finishing position per round as a dot strip**, in the season lens. `SeasonEntrant.finish` is
    already published for it.
+
+##### 6.6.6.14 The four simple charts — built _(2026-08-23)_
+
+§6.6.6.12 proposed four and held them on the CSS ceiling. The ceiling moved: §9.2.8's deletion of
+the retired shade-pair tokens reclaimed **0.61 KB** and the four were built into the room it freed.
+Rishabh's brief for them is one sentence and it is the acceptance criterion:
+
+> *"comparison which can be represented using simple charts that anyone can read and understand."*
+
+**Which reads as a rule, not a mood.** An honesty caption stays — it is what the chart is *for* in a
+cross-era product. An explanatory caption means the **form is wrong**: if a reader needs a paragraph
+before the picture makes sense, a different picture was available.
+
+###### A — Result mix, as a 100% stacked bar
+
+*Job*: **composition**. *Form*: `ShareChart`, one row per driver, four segments.
+*Marks*: full band height, 2px surface gaps, 4px radius on the row's outer ends only.
+*Interaction*: per-segment tooltip. *Colour*: §6.3a's outcome ramp — last, and it is the reason the
+ramp exists. *Accessibility*: legend, table view, every count as text in both.
+
+| | |
+|---|---|
+| The four parts | wins · podiums that were not wins · finishes that were not podiums · starts with no classification |
+| Why it needs no caveat | **the denominator is the driver's own starts.** Nothing from anyone else's era is in the bar. This is the only cross-era instrument on the page that needs no normalisation argument at all |
+| What it throws away | the size. A 100% bar is comparable *because* it discards the denominator, so the two denominators are printed in the caption — *"Fangio 51, Verstappen 243 and Hamilton 390"* — generated from the same totals the bars are |
+| Row order | the selection order, never a value sort (§6.2, and §6.6.6.5's correction) |
+
+⚠ **The figures in §6.6.6.12 were raw and are corrected here.** It recorded Fangio at
+**24/11/9/14 of 58**; the payload's `totals.starts` is **51**, which is what the driver index shows,
+and the mix is **24/11/6/10**. 58 is a count of classification rows and 40 races between 1950 and
+1964 classify one driver two or three times (**trap 17**). A chart that disagreed with the rest of
+the product about how many races a man started would be a defect however readable it was.
+
+⚠ **Every part is a subtraction from the next-widest total**, so the four sum to `starts` exactly.
+Not decoration: `ShareChart` normalises whatever it is handed, so a row summing to 0.94 of the
+starts would render as a full bar and overstate every part in it with nothing on screen looking
+wrong. `model.test.ts` asserts the sum for every fixture driver.
+
+⚠ **The fourth band is "not classified", not "retired", and the two are different numbers.**
+Hamilton: **34** retirements against **32** unclassified starts — a car that has covered enough of
+the race distance is still given a finishing position when it stops. `totals.dnfs` would break the
+sum *and* mislabel the band, so the subtraction is the value and `dnfs` travels beside it. The note
+appears **only for a driver whose two figures differ**, with both figures in it, rather than as a
+standing disclaimer.
+
+**Zero-start drivers** — 91 in the archive entered a Grand Prix and started none — get
+`ShareChart`'s labelled empty band: *"Entered a Grand Prix but never started one."*
+
+⚠ **A zero draws nothing — found on the live page and now a system rule, §6.3b.** Jos Verstappen
+has 0 wins and the win segment rendered a 1px hover target popping *"Won — 0 races — 0%"*. The
+audit it triggered found the same floor firing on a zero in the rate board and the population
+ladder, and cleared it in three other marks. The zero stays in the table and in the printed figure;
+only the mark goes.
+
+**Motion** is G-28's clip wipe, unchanged and not re-specified: the segments do not grow from the
+axis, because a segment that starts at 62% must not animate its own start.
+
+###### B — The career-relative arc
+
+*Job*: change over time. *Form*: `RankChart` — §6.5.4a's one permitted many-series line, and the
+right one because the measure is a **placing**: inverted, P1 at the top, labels at both ends.
+*Marks*: 2px line, no markers at this density. *Interaction*: one crosshair, one tooltip, every
+series. *Colour*: last, per §6.4a. *Accessibility*: both-end direct labels, a table view, and an
+axis that states each rank.
+
+**x is the season of a career, not the calendar year.** 1 is the debut season, whenever it happened,
+so Fangio's 1950 and Verstappen's 2015 are the same column. **The axis is itself the normaliser** —
+which makes this the only cross-era device on the page that costs a reader nothing to understand.
+No index, no rate, no denominator; just a different thing along the bottom.
+
+**Why a placing and not a count.** A win count per season is a season-length measure before it is a
+driver measure (8.4 rounds against 21.9), and a rate over an eight-round year is too noisy to draw
+as a line. A placing means roughly the same thing in every season: first is champion.
+
+**Roughly — and the honesty caption says so, with a queried figure.** A championship has ranked
+between **16 and 29 drivers** across the 77 seasons (16 in 1965, 1996 and 2000; 29 in 1989), so a
+fifth place is not a fixed fraction of the field. It limits the chart rather than explaining it,
+which is the test §6.6.6.14 opens with.
+
+⚠ **Every year of the span emits a point, and a year with no season emits `null`.** `d3-shape`'s
+`defined` breaks at a null and joins straight through a *missing* array entry, so omitting a
+sabbatical would draw one unbroken line across it and state that the driver raced. Asserted.
+
+⚠ **A break has two causes and the chart cannot tell them apart** — a season not raced, and a season
+raced without a championship ranking (`championshipPosition: null` means unranked, never last). The
+model returns the two sets separately and the notes name which is which, per driver, with the years
+in them.
+
+###### C — Places gained from the grid
+
+*Job*: **polarity and magnitude** — a signed quantity around a true zero. *Form*: a diverging bar,
+one row per driver, the zero line drawn on every track. *Marks*: the rate board's 8px track and
+`--radius-xs` bar, `min-width: 3px`, anchored at **zero** rather than at the left edge.
+*Interaction*: none, and none is needed — every figure is printed. *Colour*: the entity's plot
+token, and **the sign is carried by direction alone**. *Accessibility*: the ladder's marker glyph in
+the gutter, the figure beside every bar, and the split counted in words.
+
+**A diverging bar, where §6.6.6.3 argued against one.** That argument was about a *head-to-head
+split* — two counts of one whole, where a diverging form pushes the imbalance to the ends and makes
+it hardest to compare where it matters. This is the other case: a genuinely signed quantity with a
+real zero in the middle of its range, where the sign is the first thing the reader wants. **The
+forms differ because the quantities do**, and both rules stand.
+
+**Never a second colour for the sign.** Green is a reserved timing semantic (§3.4) and a red/green
+pair is the commonest CVD failure in charting; `compare.css.test.ts` asserts that neither a status
+nor a timing token appears on the mark.
+
+**Three properties of the measure decide how it may be drawn**, and each is asserted:
+
+| | |
+|---|---|
+| **A null mean is a state, not a zero** | 155 of the 818 drivers with a race were never classified in one they started from a grid slot, and all are pickable. A zero-length bar at the origin says *"started and finished level every time"* — a different and false claim, §1.0's failure mode exactly. The row prints `—` and *"no measured race"*, and a note explains it |
+| **The split can disagree with the mean's sign** | one race lost by fifteen places outweighs ten gained by one, so a driver can be ahead in far more races than he is behind and still average a loss. `gained`/`lost`/`held` are printed beside the bar for that reason, not as decoration |
+| **The denominator is not his race count** | a race that ended without a classification has no place change to measure and is excluded rather than counted as no movement — 33 of Verstappen's 243. Printed per row and named in a note |
+
+**The scale is symmetric and shared, floored at one whole place.** Symmetric because the zero line
+must sit at the centre of every track or two rows cannot be compared by eye; shared because every
+row is the same measure, unlike the rate board's five; floored so four drivers who all hover near
++0.2 do not draw one of them at full width and imply a rout.
+
+⚠ **The figures moved twice before they were right, and both moves are worth keeping.** The first
+relay gave Fangio **0.00 over 44 races**; 44 was an un-collapsed `session_entry` count and 41 is the
+collapsed one (**trap 17** — he is the only one of the four with shared drives), and the mean is
+**+0.49**. Separately, the engineer found that `session_entry.position` is **non-NULL on all 26,093
+race rows** including the 9,683 unclassified ones, where it holds the order cars *stopped* — so the
+old guard was dead code and *grid − retirement order* was in the mean. Senna's driver page said
+**−4.99** places lost per race; the honest figure is **−0.30**. **Both were wrong in a way no test
+could see and no screenshot could show.** The fixture is now generated by calling
+`buildGridVsFinish` itself, so it cannot drift from the endpoint again.
+
+**Motion is G-27 through `usePopulationMount`, with the anchor read per mark from `data-origin`.**
+That is not a special case: *axis-anchored* is what G-27 says, and the left edge is only where the
+axis happens to be on a magnitude bar. Here the axis is zero, so a backward bar grows from its right
+edge — a fixed `'left'` would animate every negative bar sliding across the line it is measured
+from, which is the moving-start defect §6.6.3 forbids a composition segment for the same reason.
+
+###### D — The finishing strip, in the season lens
+
+*Job*: **distribution over a sequence** — not change over time, which the points chart above already
+answers. *Form*: a dot strip, one row per driver, **explicitly not a line**: a line between two race
+results claims something continuous happened in between and nothing did. *Marks*: an 8px dot per
+classified finish; a hollow `--border-strong` ring in the lane **below** the axis for a start with no
+classification; **nothing at all** for a round he did not start. *Interaction*: each mark carries its
+round, its Grand Prix and its result. *Colour*: the car's plot token; the vertical position is the
+measure and colour carries identity only. *Accessibility*: the name is on the row, so identity never
+depends on telling two colours apart — which matters, because two team-mates take one car's colour
+and this form has no dash channel.
+
+**Why it earns a place beside two line charts.** The points chart is the title fight and the gap
+chart is the car. Neither can show that a season was three wins and a lot of nothing rather than
+fifteen quiet fourths, because a cumulative total smooths exactly that away.
+
+⚠ **Three states per round, not two.** `SeasonEntrant.finish` is null for both *started and not
+classified* and *was not there*, and `teamAt` is the only thing that separates them — it is null
+exactly where the driver did not start. Drawing both the same would put a driver who was out of the
+sport that weekend into the retirement lane, which is a claim about him rather than about the
+calendar.
+
+**A retirement is not a position, so it is not on the position axis.** The ring sits under the axis
+line, not at the bottom of it: the bottom of the axis is last place, and a car that stopped on lap
+three did not come last, it came nowhere.
+
+**The axis never runs shallower than P10.** Four front-runners whose worst result is fourth would
+otherwise spread P1–P4 over the full height and draw a one-place difference as the height of the
+chart. Ten is a round number and **carries no claim about points** — the points-paying positions
+have changed many times and this axis is not about them.
+
+**Every offset is a percentage computed in `seasonModel.finishStrip`.** Not a convenience: jsdom
+measures nothing, so a geometry the browser computes is a geometry no test can reach. Computed in
+the model, `--x` and `--y` are readable off the element and every position is asserted.
+
+**Motion is G-33**, and the table view is load-bearing rather than a courtesy — the marks carry no
+text at all, so the table is the only place a finishing position appears as a number. `NC` for a
+start with no classification, an em dash for a round not started: the same three states, in the same
+order.
+
+###### What the four charts do not verify
+
+jsdom performs no layout and no compositing, and there is no visual gate (CR-006). Named explicitly,
+because none of it should be reported as working:
+
+- **Every position, size and gap in all four.** Percentages and band scales are asserted; where they
+  land on a screen is not.
+- **Whether the four outcome tones read as four steps of one colour** at a 10px band height, and
+  whether the hatch on the fourth is legible at that size. The colours themselves are gated
+  numerically by V-38; how they *look* against each other in a real row is not.
+- **Whether the result mix's row labels crowd the plot at 390px**, where the gutter is sized from
+  the longest surname.
+- **Whether four career arcs of very different lengths read as four arcs**, and whether `RankChart`'s
+  both-end labels collide when two careers end at the same placing.
+- **Whether a 3px minimum diverging bar is visible**, whether the zero line reads as an axis rather
+  than as a divider, and whether the split column wraps or overflows at 768.
+- **Whether 22 dots at 8px are distinguishable on one strip row at 390px**, whether the podium rule
+  reads as a rule rather than as a mark, and whether the out-lane reads as being *below* the axis
+  rather than as its last row.
+- **The container's own margins and padding** — §6.6.6.11's addition, and the four new sections
+  inherit `.compare`'s flex column, which no test can measure.
+- **G-33 as a picture.** Its tween object is asserted; its appearance is not.
+- **That the row's rounded end actually moved to the first drawn segment** (§6.3b corollary 1). The
+  flag is proved load-bearing — `spanPath` emits four arcs against two — and that the component
+  passes `firstDrawn` rather than `0` is type-checked and not seen. At zero width, which is all
+  jsdom offers, both branches produce the same path.
+- **The population ladder and the rate board after the zero-bar fix.** Both are shipped surfaces
+  this change edited without being able to look at either; what is asserted is that the element is
+  gone at zero and present above it.
 
 ##### 6.6.6.13 Four defects found on the live page, and what each one teaches _(2026-08-23)_
 
@@ -4740,6 +5099,84 @@ the encoding reversal**: the tokens are indexed into `COLLISION_MASKS` by their 
 G-27a–e in a 2,795-line validator exist only to gate them. Queued as its own change, with this
 figure as its justification.
 
+✅ **Taken 2026-08-23 — see §9.2.8. The projection was exact.**
+
+#### 9.2.8 M-2 — the deletion, executed 2026-08-23
+
+The same method as §9.2.7, run for real rather than as a probe: the declarations are gone from the
+tree, not stubbed out for a measurement.
+
+| Render-blocking CSS | Figure | % of the 25 KB budget |
+|---|---|---|
+| Before (`main` at `34a4c9f`) | **20.77 KB** | 83.1% |
+| After the deletion | **20.16 KB** | 80.7% |
+| **Reclaimed** | **0.61 KB** | **2.4 points** |
+
+**§9.2.7's probe measured 20.35 → 19.74 and this run measured 20.77 → 20.16.** Both baselines are
+correct: the probe ran before the F7 season lens and picker landed, which added 0.42 KB of
+`compare.css` between them. **The saving is the invariant, not the baseline** — which is the reason
+§9.2.7 recorded a delta and not just a target figure.
+
+**What was deleted, in one change:** 84 declarations across both theme blocks of
+`src/styles/entity.css`; `shadePair()` and `HAS_SHADE_PAIR` from `src/lib/entityColor.ts`;
+`SHADE_PAIR_TEAMS` and 42 of the 64 `PLOT_TOKENS` from `src/lib/entityColorData.ts`, with all 22
+remaining `COLLISION_MASKS` regenerated (**87 of 231 pairs collide**, against 663 of 2016 before —
+a *rate* of 37.7% against 32.9%, and the rise is not a regression: what remains is exactly the set
+of colours the product actually assigns, and better than a third of its pairs still need the ladder.
+The old denominator was inflated by pairs no two entities could ever have been given); and
+`plottableShades`,
+`shadePair`, `pairBothThemes`, `shadePairIgnoringTiming`, V-27 and G-27a–e from
+`scripts/validate-palette.mjs`, which is 226 lines lighter and still exits 0 with no FAIL.
+
+**`validate:palette` prints a V-27 tombstone rather than skipping the number.** A validator that
+silently stops reporting a check reads identically to one whose check passed. The tombstone names
+what was measured, where the figures live (§9.2.3 V-27, G-27d's Sauber attribution) and why the
+gate is gone rather than failing.
+
+
+#### 9.2.9 V-38 — the outcome ramp, 2026-08-23
+
+A **new gate**, added with §6.3a and run by `npm run validate:palette` (or on its own,
+`node scripts/validate-palette.mjs tones`). It measures what the browser will actually compute: the
+same OkLab mix CSS `color-mix(in oklab, …)` performs, over all **22 plotting tokens × 2 themes = 44
+ramps**.
+
+| Gate | What it holds | Floor | Worst measured | |
+|---|---|---|---|---|
+| **G-38a** | step 1 → 2, normal ΔE | 8 | **13.17** — RB light `#5D87ED` → `#95B3F3` | ✅ |
+| **G-38b** | step 2 → 3, normal ΔE | 8 | **10.11** — Alpine light `#7DB9E3` → `#B7D5ED` | ✅ |
+| **G-38c** | step 3 → 4, normal ΔE | 8 | **10.24** — Red Bull dark `#1A2940` → `#1A1C20` | ✅ |
+| **G-38d** | the step-4 hatch against its own fill | 1.2:1 | **1.90:1** — `--border-strong` on light `--surface-raised` | ✅ |
+| **G-38e** | step 3 against the plot surface under it | 1.2:1 | **1.27:1** — ramp #6 dark `#3A1535` on `#08090C` | ✅ |
+| — | worst adjacent step under CVD | reported | **3.65** — ramp #10 light | see §6.3a |
+| — | `--ink-inverse` on step 1, if it carried text | reported | **3.40:1** — McLaren light `#DD6B02` | see below |
+| — | `--ink-primary` on steps 2–4, if they did | reported | **4.23:1** — ramp #10 dark podium `#906E6A` | see below |
+
+**Why the separation floor is 8 and not 15.** ΔE 15 is this system's **categorical** floor: two
+colours a reader must tell apart with nothing else to go on. These four steps are ordinal, adjacent,
+separated by a drawn 2px gap, in a fixed left-to-right order, under a legend that names them in that
+order. 8 is the floor the palette already uses for "separable when something else is helping", which
+is exactly the situation. Below it two steps read as one block.
+
+**The two reported ink figures are the reason §6.3a rule 4 exists** — no text on a tone, ever. They
+also contain a **correction to a claim already in the tree**: `charts.css` states that
+`--ink-inverse` "clears 4.5:1 against every plotting token". It does not. McLaren's light plotting
+variant is **3.40:1**, and it is the only one of the 22 that fails. So `.chart-span-label` — the
+in-segment code on the team page's intra-team split (§6.6.3) — is below the text floor on one fill
+today.
+
+**Recorded rather than fixed, deliberately.** The fix is a `paint-order: stroke` halo in the surface
+colour, which changes how a shipped page looks, and nothing in this environment can verify that
+(CR-006 removed the visual gate; jsdom composites nothing). Fixing it blind inside a change about
+something else is how a second defect gets introduced next to a first. **Open, and it belongs to
+whoever next touches §6.6.3.**
+
+**Two ratios were rejected by measurement before 60/30 was chosen**, and both are recorded because
+the failures are the argument for the numbers: at **55/22** the faintest step measured **1.16:1**
+against the plot surface (G-38e, floor 1.2) — an ordinary-finish segment reading as a hole in its
+own bar; at **62/38** step 2 → 3 fell to **ΔE 7.85** (G-38b, floor 8). The ramp is bounded on both
+sides, and 60/30 sits between them with margin at each end.
+
 
 ## 10. Theming mechanics
 
@@ -4796,3 +5233,5 @@ figure as its justification.
 | 2026-08-23 | **§7.16 `EntityPicker`** — the search-and-add control `/compare` shipped without. `/drivers`' field reused class for class and `indexModel.ts`'s `normalise` imported literally; ARIA 1.2 combobox, results in flow so nothing needs a z-index, cap drawn at four, 818 drivers rather than 881. The pending bay is specified with it | designer |
 | 2026-08-23 | **§6.6.6.10–12 the season lens** — one season, round by round, on `/compare` rather than a second route. Records why points are legitimately comparable within a season and never across; the shadow as a **seat** rather than a person, with the four consequences drawn; the two charts through §6.1's six steps; six designed states with their copy; and §6.6.6.11, five behaviours no test in this project can reach. §6.6.6.12 records the four charts proposed and not built, each with the figures that would justify it | designer |
 | 2026-08-23 | **Four live-page defects fixed and generalised, §6.6.6.13.** (1) `/compare` measured **left gutter 96px, right gutter 0** — three branches carried the container as a literal and the fourth carried none; the width, centring and inline padding now live once in `.compare`, asserted in `compare.css.test.ts`, because **jsdom computes no box and no DOM test can measure a gutter**. §6.6.6.11's untested list is corrected: it named five things about motion and legibility and nothing about the page's own box. (2) `ComparePage` takes `selected` / `onSelect`, so the picker writes to `?e=` — with `placeholderData: keepPreviousData`, without which changing the selection unmounts the page and loses the picker, the pending bay and the chosen lens. (3) §6.6.6.1 gains a fourth headline, **"Same season, never the same race"**, for a `contemporary` pair who shared no race — Senna R1–3 of 1994, Coulthard R5–13; the matrix tier now comes from `verdict()` so a cell cannot disagree with the band. (4) The route's link-correction card moves into a `notice` slot under the masthead, so an `h2` no longer precedes the `h1` | designer |
+| 2026-08-23 | **The four simple charts, built — new §6.6.6.14, new §6.3a, new §9.2.8 and §9.2.9.** Rishabh: *"comparison which can be represented using simple charts that anyone can read and understand."* **(a) The budget was reclaimed before it was spent.** §9.2.7 had measured the retired shade-pair tokens at **0.61 KB gzipped**; §9.2.8 deleted them — 84 declarations, `shadePair()`, `SHADE_PAIR_TEAMS`, 42 of 64 `PLOT_TOKENS` with every `COLLISION_MASKS` entry regenerated (**87 of 231 pairs collide**, against 663 of 2016), and V-27 plus G-27a–e from the validator, replaced by a tombstone because *a validator that stops printing a number reads exactly like one whose check passed*. **20.77 → 20.16 KB**, the projected delta exactly. **(b) New §6.3a, the outcome ramp** — four ordinal steps inside ONE entity's colour, which is the opposite job to the shade pair deleted the same day: that spent lightness on *identity*, this spends it on an *order* inside a row that is already one entity. **New gate V-38** over all 22 plotting tokens × 2 themes chose the two mix ratios by measurement: **55/22 failed** at 1.16:1 against the plot surface and **62/38 failed** at ΔE 7.85 between steps 2 and 3; **60/30** clears both (13.17 / 10.11 / 10.24 against a floor of 8, and 1.27:1). Two residuals are **reported, not buried**: CVD bottoms out at ΔE 3.65, mitigated structurally by the drawn 2px gap, the fixed order, the legend and the table; and **no text may ever be drawn on a tone**, because neither ink clears 4.5:1 across all 44 fills. That second figure is a **correction to a claim already in the tree** — `charts.css` says `--ink-inverse` clears 4.5:1 against every plotting token and McLaren light is **3.40:1**, so `.chart-span-label` is below the text floor on the team page today; recorded and left open rather than fixed blind. **(c) Four charts.** *Result mix* — 100% stacked, and the only cross-era instrument here needing no normalisation argument, because the denominator is the driver's own starts; ⚠ §6.6.6.12's figures were raw and are corrected, Fangio **24/11/6/10 of 51** not 24/11/9/14 of 58 (**trap 17**), and the fourth band is *not classified*, not *retired* — Hamilton 34 against 32. *Career-relative arc* — x is the season of a career, so the axis is its own normaliser; every year emits a point and a missing one emits `null`, because `defined` joins straight through an absent entry and would draw a line across a sabbatical. *Places gained* — a diverging bar where §6.6.6.3 argued against one, because that was a head-to-head split and this is a signed quantity with a real zero; a null mean is a state and never a zero bar (155 of 818 drivers). *Finishing strip* — three states per round, not two, and a retirement is drawn **below** the axis because it is not a position. **(d) `types.ts` now imports `GridVsFinish` from `@schemas/entity`** instead of restating it, takes `championshipPositionIsFinal`, and `Ledger.tied`'s comment is corrected — it claimed grid-only ties and the schema measured **85** same-team race ties, all 1950s shared drives. **(e) New G-33**, and G-27's anchor is generalised: *axis-anchored* means zero on a diverging bar, resolved per target. **Measured cost: render-blocking CSS 20.77 → 20.72 KB / 25 (82.9%) — the four charts and the tone ramp cost 0.56 KB and the reclaim paid for all of it; initial JS 162.35 → 162.42 KB / 250 (65.0%).** Suite **2464 tests across 104 files, 3 consecutive green runs** — a figure that also contains the engineer's parallel work on the same branch, so it is not all this change's. **Untested by construction and listed in full in §6.6.6.14**: every position, whether four tones read as four steps, whether 22 dots resolve at 390px, and G-33 as a picture | designer |
+| 2026-08-23 | **New §6.3b — a minimum mark size is for a small value, never for a zero.** Measured on the live result mix: Jos Verstappen has **0 wins** and the win segment rendered a **1px** mark — the fill path is degenerate and paints nothing, but the hit rect floors its width at 1 for pointer safety, so the row carried a 1px hover target popping *"Won — 0 races — 0%"*. On a chart whose premise is *no axis, read the proportions*, a mark for a category the entity never entered is the one thing that cannot ship, and it reaches **702 of 818 drivers** on the win band alone. The audit found the same floor firing on a zero in **`.rate-bar`** (a rate of `0` is not `null`, so 0 of 51 wins drew 3px) and **`.tier-bar`** (an empty stratum — the row was already `disabled`, so the bar was the last part claiming otherwise), and cleared three: `.gain-bar` (`direction: 'held'` covers `mean === 0`), `.chain-link` and `.strip-dot`. **Two corollaries**: the rounded ends of a segmented row belong to the first and last **drawn** segment, or skipping a zero leader leaves the row square at one end and round at the other; and **a suppressed mark is never a suppressed fact** — the zero stays in the table, the figure and the accessible name, where it is text. **And the inverse**: the result mix has *no* minimum segment width, because on a shared track length is the encoding and a floor would overstate a small share at the expense of its neighbour. Also fixed the same family in the figure column: a mean of `1/358` printed `+0.00` beside a 3px bar, and now prints `+<0.01`. Coordinator's measurement also **closed four of the five open questions on the result mix** — the bands render at **75px**, not the ~10px assumed, the tones and the hatch read unambiguously, 390 is clean at zero overflow, and the neutral legend was confirmed correct and left alone | designer |

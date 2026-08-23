@@ -1418,142 +1418,19 @@ function maxClique(N, adj, score) {
 }
 
 /**
- * **Every lightness at (hue, chroma) that is admissible as a plotting colour in this system.**
+ * ⚠ **The teammate shade-pair search was deleted here on 2026-08-23**, with the tokens it produced.
  *
- * The gate set is deliberately the *same* one every other plotting colour carries, and stating it
- * in one place is the point: a teammate shade is not a special kind of colour with relaxed rules,
- * it is an ordinary series colour that happens to share a hue with another series colour.
+ * `plottableShades`, `shadePair`, `pairBothThemes` and `shadePairIgnoringTiming` lived at this
+ * point in the file and emitted `--*-plot-deep` / `-bright`. §6.4a reversed the encoding — colour
+ * is the car, the dash is the seat — so nothing consumed them, and §9.2.8 deleted the 84 dead
+ * declarations for a measured 0.61 KB of the 25 KB render-blocking CSS budget.
  *
- *   chroma  >= 0.05                          — below it, it reads as grey (§9.1 step 5)
- *   L inside the theme's plotting band       — §9.1 step 6
- *   >= 3:1 on `--surface-raised` AND `--surface-sunken`
- *   >= dE 15 from all three reserved timing inks (§3.4) — a series that reads as the
- *           personal-best green is a defect no legend fixes
- *   >= dE 15 from the achromatic chart furniture (§6.2)
- *
- * Returns the admitted shades plus a **blocking census**, because when a hue has too few
- * admissible shades the useful question is not "how many" but "what took them".
+ * Their figures are recorded in `DESIGN_SYSTEM.md` §9.2.3 V-27 and are not re-derivable from this
+ * file. The finding worth keeping is the ceiling: **one hue supplies at most two mutually separated
+ * plotting shades in light mode**, and Sauber's brand hue supplied none, which is why marker shape,
+ * dash and the direct label are mandatory for every teammate pair rather than a rescue for the
+ * unlucky team.
  */
-function plottableShades(theme, h, C) {
-  const S = SURF[theme];
-  const [lo, hi] = PLOT_BAND[theme];
-  const shades = [];
-  const blocked = { chroma: 0, contrast: 0, timing: 0, furniture: 0 };
-  let considered = 0;
-  for (let L = lo; L <= hi + 1e-9; L += 0.002) {
-    considered += 1;
-    const { hex, C: Cg } = lch2hex(L, C, h);
-    if (Cg < 0.05) {
-      blocked.chroma += 1;
-      continue;
-    }
-    if (contrast(hex, S.raised) < 3 || contrast(hex, S.sunken) < 3) {
-      blocked.contrast += 1;
-      continue;
-    }
-    if (Object.values(TIMING[theme]).some((ink) => dE(hex, ink) < 15)) {
-      blocked.timing += 1;
-      continue;
-    }
-    if (Object.values(FURNITURE[theme]).some((fx) => dE(hex, fx) < 15)) {
-      blocked.furniture += 1;
-      continue;
-    }
-    shades.push({ hex, C: Cg, L });
-  }
-  return { shades, blocked, considered };
-}
-
-/**
- * **The teammate shade pair** (§6.4a): two admissible plotting shades of the *same* OkLCh hue and
- * chroma, so a teammate pair reads as one colour family in two shades — which is exactly what
- * "same team, two drivers" should look like.
- *
- * **Lightness is the channel, and that is not a stylistic preference.** It is the one channel every
- * dichromat keeps in full, so a split built on it survives colour-vision deficiency where a split
- * built on hue or chroma does not. The measured consequence is visible in the run: the worst CVD
- * figure across all 22 entities is nearly twice the CVD floor.
- *
- * **The pair is symmetric — neither driver "gets the team colour".** An earlier version of this
- * function anchored one driver on the team's own plotting variant and derived the other from it,
- * and that was wrong in two separate ways. Measurably: the anchor sits mid-band for several
- * entities, so the reach to the far end fell short of the ΔE floor even though the band's own
- * extremes clear it by 10 points — Williams light reached 14.70 against a span ceiling of 27.07,
- * and ramp #9 light reached 13.63 against 28.62. Editorially: painting one driver in the true team
- * colour and the other in a derivative implies a number-one/number-two hierarchy the data does not
- * support. Placing both on the pair fixes both faults at once.
- *
- * Returns `null` when fewer than two admissible shades exist — a real case, see the Sauber record
- * in V-27 — never a near-miss dressed as a pass.
- */
-function shadePair(theme, h, C) {
-  const { shades, blocked, considered } = plottableShades(theme, h, C);
-  if (shades.length < 2) return { pair: null, shades, blocked, considered };
-  let best = null;
-  for (let i = 0; i < shades.length; i++) {
-    for (let j = i + 1; j < shades.length; j++) {
-      const dn = dE(shades[i].hex, shades[j].hex);
-      // The margin is scored against BOTH floors at once, normalised, and the weaker of the two
-      // is what is maximised — so the search cannot buy a comfortable normal-vision figure with
-      // a CVD figure that scrapes the floor.
-      //
-      // The skip is only safe once a *passing* pair is in hand (m >= 1): below the normal floor a
-      // pair's margin is capped at dn/15 < 1, so it cannot beat one. Skipping unconditionally
-      // would corrupt the failing case, which is precisely the case whose figure must be honest.
-      if (best && best.m >= 1 && dn < 15) continue;
-      const dc = minCVD(shades[i].hex, shades[j].hex);
-      const m = Math.min(dn / 15, dc / 8);
-      if (!best || m > best.m) best = { m, dn, dc, deep: shades[i], bright: shades[j] };
-    }
-  }
-  return { pair: best, shades, blocked, considered };
-}
-
-/**
- * **A shade pair is an entity property, not a per-theme one** — so it exists only when BOTH themes
- * yield an admissible pair, and otherwise it exists in neither.
- *
- * This was found by `entity.css.test.ts`, not reasoned out in advance, and it is worth recording why
- * the test was right. Sauber has an admissible pair in dark mode and none in light. Emitting what
- * each theme could manage would mean a user switching theme watched the *encoding* change: two
- * shades plus markers in dark, one shade plus markers in light. A reader who has learned that two
- * lines of the same colour are one team would have to unlearn it at sunset. The channels a chart
- * uses have to be a property of the data, and the theme is allowed to change how they look and
- * nothing else.
- *
- * Returns `{ light, dark }` when both exist, otherwise `null` for both.
- */
-function pairBothThemes(h, C) {
-  const light = shadePair('light', h, C).pair;
-  const dark = shadePair('dark', h, C).pair;
-  const ok = (p) => p !== null && p.dn >= 15 && p.dc >= 8;
-  return ok(light) && ok(dark) ? { light, dark } : { light: null, dark: null };
-}
-
-/**
- * The same search with the timing gate lifted. Its only job is **attribution**: when a hue has no
- * admissible pair, this says whether the reserved timing convention is what removed it — a
- * constraint the product did not choose and cannot move — or whether the cause is something in
- * this design system's own gift, which would be a finding rather than a fact of the sport.
- */
-function shadePairIgnoringTiming(theme, h, C) {
-  const S = SURF[theme];
-  const [lo, hi] = PLOT_BAND[theme];
-  const shades = [];
-  for (let L = lo; L <= hi + 1e-9; L += 0.002) {
-    const { hex, C: Cg } = lch2hex(L, C, h);
-    if (Cg < 0.05) continue;
-    if (contrast(hex, S.raised) < 3 || contrast(hex, S.sunken) < 3) continue;
-    shades.push(hex);
-  }
-  let best = null;
-  for (let i = 0; i < shades.length; i++)
-    for (let j = i + 1; j < shades.length; j++) {
-      const dn = dE(shades[i], shades[j]);
-      if (!best || dn > best.dn) best = { dn, dc: minCVD(shades[i], shades[j]) };
-    }
-  return best;
-}
 
 /**
  * **The ramp selection, extracted so the validator and the token emitter cannot disagree.**
@@ -1810,232 +1687,22 @@ function catramp() {
     );
   }
 
-  /* ---- V-27: the teammate shade pair ---- */
+  /* ---- V-27: RETIRED 2026-08-23, with the tokens it gated ---- */
   console.log(
-    '\n=== V-27  TEAMMATE SHADE PAIR (§6.4a) — two admissible shades of one hue, and the one case\n' +
-      '           where colour provably cannot separate two teammates at all ===',
+    '\n=== V-27  TEAMMATE SHADE PAIR — RETIRED. The `--*-plot-deep` / `-bright` tokens it gated no\n' +
+      '           longer exist ===',
   );
-
-  /**
-   * Every entity that can be plotted, with the chroma policy each one plots under.
-   *
-   * A branded team holds its **brand chroma**: chroma is part of the identity, and a Ferrari that
-   * gained saturation would stop being Ferrari's colour. A ramp entry requests 0.4 and takes the
-   * maximum the gamut allows at that lightness — the same policy `plotAt` used to build it, so the
-   * pair and the entry are made of the same material.
-   */
-  const plotEntities = [];
-  for (const [team, hex] of Object.entries(BRAND)) {
-    const o = oklch(hex);
-    if (o.C < 0.05) continue; // achromatic: plots from the ramp, so it splits from the ramp
-    plotEntities.push({ name: team, kind: 'brand', h: o.h, C: o.C });
-  }
-  entries.forEach((e, i) =>
-    plotEntities.push({ name: `ramp#${i + 1}`, kind: 'ramp', h: e.h, C: 0.4 }),
+  console.log(
+    '  §6.4a reversed the encoding on 2026-08-23: colour identifies the CAR and the dash identifies\n' +
+      '  the SEAT, so a second shade of one team was withdrawn from use. The 84 declarations were then\n' +
+      '  deleted outright (§9.2.8), which is why V-27 and G-27a-e are gone rather than failing: a gate\n' +
+      '  on a token nobody emits is a gate that can only ever produce a false alarm.\n' +
+      '  The measurements stand and are not re-derivable from this file — read §9.2.3 V-27 for the\n' +
+      '  shade-pair figures, G-27d for the Sauber attribution (its brand hue sits in the reserved green\n' +
+      '  timing band, so light mode admitted no pair at all), and §9.2.7 for the 0.61 KB the deletion\n' +
+      '  reclaimed. That argument is the reason the marker, dash and direct-label channels are MANDATORY\n' +
+      '  for every teammate pair and were never a fallback for the unlucky team.',
   );
-
-  const paired = [];
-  const unavailable = [];
-  for (const ent of plotEntities) {
-    const row = [];
-    for (const theme of ['light', 'dark']) {
-      const r = shadePair(theme, ent.h, ent.C);
-      if (!r.pair) {
-        unavailable.push({ ...ent, theme, ...r });
-        row.push(`${theme} NO PAIR (${r.shades.length} admissible shade(s))`);
-        continue;
-      }
-      paired.push({ ...ent, theme, ...r.pair });
-      row.push(
-        `${theme} ${r.pair.deep.hex}/${r.pair.bright.hex} n ${n(r.pair.dn).padStart(6)} c ${n(r.pair.dc).padStart(6)} ${r.pair.dn >= 15 && r.pair.dc >= 8 ? 'OK  ' : 'FAIL'}`,
-      );
-    }
-    console.log(`  ${ent.name.padEnd(13)} h ${n(ent.h, 0).padStart(3)}  ${row.join('   ')}`);
-  }
-  for (const [team, hex] of Object.entries(BRAND)) {
-    if (oklch(hex).C >= 0.05) continue;
-    console.log(
-      `  ${team.padEnd(13)} ${hex} achromatic — plots from the ramp (§3.3a), so it splits from the ramp.`,
-    );
-  }
-
-  /* G-27a — the gate that the previous construction failed. */
-  {
-    let wn = Infinity;
-    let wc = Infinity;
-    let wnw = '';
-    let wcw = '';
-    for (const p of paired) {
-      if (p.dn < wn) {
-        wn = p.dn;
-        wnw = `${p.name} ${p.theme}`;
-      }
-      if (p.dc < wc) {
-        wc = p.dc;
-        wcw = `${p.name} ${p.theme}`;
-      }
-    }
-    console.log(
-      `\n  G-27a  wherever two admissible shades exist, the CHOSEN pair clears both floors.\n` +
-        `         ${paired.length} pairs. worst normal dE ${n(wn)} (${wnw}, floor 15) ${V(wn >= 15)}` +
-        `   worst CVD dE ${n(wc)} (${wcw}, floor 8) ${V(wc >= 8)}`,
-    );
-  }
-
-  /* The ladder ceiling — REPORTED, because it sets the cap in §3.3a and must not be assumed. */
-  {
-    const ladderMax = (theme, h, C) => {
-      const { shades } = plottableShades(theme, h, C);
-      const s = shades.filter((_, i) => i % 2 === 0); // 0.004 steps: enough resolution, 4x faster
-      let best = Math.min(s.length, 1);
-      for (let i = 0; i < s.length; i++)
-        for (let j = i + 1; j < s.length; j++) {
-          if (dE(s[i].hex, s[j].hex) < 15 || minCVD(s[i].hex, s[j].hex) < 8) continue;
-          best = Math.max(best, 2);
-          for (let k = j + 1; k < s.length; k++) {
-            if (dE(s[i].hex, s[k].hex) < 15 || minCVD(s[i].hex, s[k].hex) < 8) continue;
-            if (dE(s[j].hex, s[k].hex) < 15 || minCVD(s[j].hex, s[k].hex) < 8) continue;
-            return 3;
-          }
-        }
-      return best;
-    };
-    const per = plotEntities.map((e) => ({
-      name: e.name,
-      light: ladderMax('light', e.h, e.C),
-      dark: ladderMax('dark', e.h, e.C),
-    }));
-    const maxLight = Math.max(...per.map((p) => p.light));
-    const maxDark = Math.max(...per.map((p) => p.dark));
-    console.log(
-      `  ---    LADDER CEILING (reported) — how many mutually separated shades ONE hue can supply:\n` +
-        `         light mode max ${maxLight} across all ${per.length} entities; dark mode max ${maxDark}.\n` +
-        `         **The cap is 2, and light mode sets it.** Light's plotting band is nominally as wide as\n` +
-        `         dark's, but its usable top is cut by the 3:1-against-white requirement, so a third shade\n` +
-        `         cannot be fitted at the floor. Dark mode reaching ${maxDark} is not usable: a colour\n` +
-        `         assignment whose *count* changed with the theme would be incoherent.\n` +
-        `         Design consequence, stated in §3.3a: beyond TWO drivers of one team in one plot, colour\n` +
-        `         is exhausted and the marker/dash/label channels carry the distinction alone.`,
-    );
-  }
-
-  /* G-27b — the ramp is ours to choose, so every entry must be splittable in both themes. */
-  {
-    const rampPaired = paired.filter((p) => p.kind === 'ramp');
-    const rampUnavail = unavailable.filter((p) => p.kind === 'ramp');
-    console.log(
-      `  G-27b  every ramp entry is shade-pair-available in BOTH themes: ${rampPaired.length} of ${entries.length * 2} ` +
-        `theme-slots paired, ${rampUnavail.length} unavailable ${V(rampUnavail.length === 0)}\n` +
-        `         This one is gated rather than reported because the ramp's hues are this design's own\n` +
-        `         choice: 41 of the 60 hues on the wheel are splittable, so shipping an entry that\n` +
-        `         cannot split would be a self-inflicted limitation, not a fact of the sport.`,
-    );
-  }
-
-  /* G-27c — construction claims rot; assert the shades independently. */
-  {
-    let worstC = Infinity;
-    let worstCtr = Infinity;
-    let worstTim = Infinity;
-    let worstFurn = Infinity;
-    let worstTimW = '';
-    let worstStatus = Infinity;
-    let worstStatusW = '';
-    for (const p of paired) {
-      for (const s of [p.deep, p.bright]) {
-        worstC = Math.min(worstC, oklch(s.hex).C);
-        for (const surf of ['raised', 'sunken'])
-          worstCtr = Math.min(worstCtr, contrast(s.hex, SURF[p.theme][surf]));
-        for (const [nm, ink] of Object.entries(TIMING[p.theme])) {
-          const d = dE(s.hex, ink);
-          if (d < worstTim) {
-            worstTim = d;
-            worstTimW = `${p.name} ${p.theme} ${s.hex} <-> ${nm}`;
-          }
-        }
-        for (const fx of Object.values(FURNITURE[p.theme]))
-          worstFurn = Math.min(worstFurn, dE(s.hex, fx));
-        for (const [nm, ink] of Object.entries(STATUS[p.theme])) {
-          const d = dE(s.hex, ink);
-          if (d < worstStatus) {
-            worstStatus = d;
-            worstStatusW = `${p.name} ${p.theme} ${s.hex} <-> ${nm}`;
-          }
-        }
-      }
-    }
-    console.log(
-      `  G-27c  every shade in every pair independently clears the full plotting gate set:\n` +
-        `         chroma ${n(worstC, 3)} (floor 0.05) ${V(worstC >= 0.05)}` +
-        `   contrast ${n(worstCtr)}:1 (floor 3) ${V(worstCtr >= 3)}\n` +
-        `         vs timing ink dE ${n(worstTim)} (floor 15) ${V(worstTim >= 15)}  worst ${worstTimW}\n` +
-        `         vs chart furniture dE ${n(worstFurn)} (floor 15) ${V(worstFurn >= 15)}\n` +
-        `         vs status ink dE ${n(worstStatus)} REPORTED (§3.4.3 posture: a status colour never\n` +
-        `         appears without an icon and a label, so it is not a floor a series is held to)  worst ${worstStatusW}`,
-    );
-  }
-
-  /* G-27e — the pair is an entity property, so it must be available in both themes or in neither. */
-  {
-    const byName = new Map();
-    for (const p of paired) byName.set(p.name, (byName.get(p.name) ?? 0) + 1);
-    const lopsided = [...byName].filter(([, count]) => count === 1).map(([nm]) => nm);
-    // Gated on what the EMITTER will actually ship, not on the raw search. `pairBothThemes` is the
-    // function that has to hold the line; flipping its AND to an OR must fail here.
-    const shipsLopsided = plotEntities.filter((e) => {
-      const both = pairBothThemes(e.h, e.C);
-      return (both.light === null) !== (both.dark === null);
-    });
-    console.log(
-      `  G-27e  the shade pair is an ENTITY property, not a per-theme one — available in both themes\n` +
-        `         or withheld from both. Raw search splits in exactly one theme: ` +
-        `${lopsided.length ? lopsided.join(', ') : 'none'}.\n` +
-        `         What pairBothThemes() ships lopsided: ${shipsLopsided.length} ${V(shipsLopsided.length === 0)}\n` +
-        `         Found by entity.css.test.ts, not reasoned out in advance: Sauber has an admissible pair\n` +
-        `         in dark and none in light, and emitting what each theme could manage would mean a reader\n` +
-        `         watched the ENCODING change at sunset — two shades plus markers in dark, one shade plus\n` +
-        `         markers in light. The channels a chart uses are a property of the data; the theme is\n` +
-        `         allowed to change how they look and nothing else. Sauber's dark pair is therefore\n` +
-        `         withheld, which is what the emitter now does.`,
-    );
-  }
-
-  /* G-27d — attribution. An impossibility is only acceptable if we did not cause it. */
-  {
-    console.log(
-      `\n  G-27d  ATTRIBUTION — ${unavailable.length} entity/theme slot(s) have no admissible shade pair.\n` +
-        `         Gated: each one must be caused by the reserved timing convention, which F1 fixed and this\n` +
-        `         product cannot move. A slot that lost its pair to a contrast, gamut or chroma limit would\n` +
-        `         be OUR defect and must fail here rather than be absorbed into a footnote.`,
-    );
-    let attributed = 0;
-    for (const u of unavailable) {
-      const nt = shadePairIgnoringTiming(u.theme, u.h, u.C);
-      const causedByTiming = nt !== null && nt.dn >= 15 && nt.dc >= 8;
-      if (causedByTiming) attributed += 1;
-      console.log(
-        `         ${u.name} ${u.theme}: ${u.shades.length} admissible shade(s)` +
-          `${u.shades.length ? ` (${u.shades.map((s) => s.hex).join(', ')})` : ''}.\n` +
-          `           of ${u.considered} candidate lightnesses — ${u.blocked.timing} blocked by a timing ink, ` +
-          `${u.blocked.contrast} by contrast, ${u.blocked.chroma} by the chroma floor, ${u.blocked.furniture} by furniture.\n` +
-          `           with the timing gate lifted the pair reaches normal dE ${nt ? n(nt.dn) : 'n/a'} / CVD dE ${nt ? n(nt.dc) : 'n/a'}` +
-          ` -> caused by the timing convention: ${causedByTiming ? 'YES' : 'NO'}`,
-      );
-    }
-    console.log(
-      `         ${attributed} of ${unavailable.length} attributable to the reserved timing hues ${V(attributed === unavailable.length)}`,
-    );
-    console.log(
-      `\n         WHAT THIS MEANS FOR THE DESIGN, and it is the whole reason V-27 exists:\n` +
-        `         because at least one real team on the current grid provably cannot be split by colour,\n` +
-        `         colour is NOT the teammate channel. §6.4a therefore makes marker shape, dash and the\n` +
-        `         direct label MANDATORY for every teammate pair — always, not as a fallback — and the\n` +
-        `         shade pair is the redundant fourth channel that most teams also get. Presenting one\n` +
-        `         team differently from the rest because its hue is unlucky would make the reader learn\n` +
-        `         two conventions; making the non-colour channels universal makes the unlucky team\n` +
-        `         indistinguishable in TREATMENT from every other, which is the point.`,
-    );
-  }
 
   /* ---- V-28: identity swatches on identity surfaces ---- */
   console.log(
@@ -2089,7 +1756,6 @@ function emitTokens() {
   const p = (s = '') => out.push(s.replace(/#[0-9A-F]{6}\b/g, (h) => h.toLowerCase()));
 
   const brandPlot = {};
-  const brandPair = {};
   for (const [team, hex] of Object.entries(BRAND)) {
     const o = oklch(hex);
     if (o.C < 0.05) continue;
@@ -2097,9 +1763,7 @@ function emitTokens() {
       light: brandChartVariant('light', hex),
       dark: brandChartVariant('dark', hex),
     };
-    brandPair[team] = pairBothThemes(o.h, o.C);
   }
-  const rampPair = entries.map((e) => pairBothThemes(e.h, 0.4));
 
   p('/*');
   p(' * ENTITY COLOUR — generated. Do not hand-edit.');
@@ -2117,11 +1781,25 @@ function emitTokens() {
   p(
     ' *                            bars, header bands — always beside a name (§3.3). Never a chart mark.',
   );
-  p(' *   `--*-plot`               The entity plotting colour: one series, one entity.');
   p(
-    ' *   `--*-plot-deep`          The teammate shade pair (§6.4a). Two drivers of one team, ordered by',
+    ' *   `--*-plot`               The entity plotting colour: one series, ONE CAR. Every driver of a',
   );
-  p(' *   `--*-plot-bright`        `driver.reference` ascending: lower takes `deep`.');
+  p(
+    ' *                            team takes the same one — the seat inside it is the dash (§6.4a).',
+  );
+  p(' *');
+  p(
+    ' * There is NO `--*-plot-deep` / `-bright` shade pair. It was withdrawn from use by §6.4a and the',
+  );
+  p(
+    ' * 84 declarations deleted on 2026-08-23 (§9.2.8), which is measured at 0.61 KB gzipped of a 25 KB',
+  );
+  p(
+    ' * render-blocking CSS budget. Do not reinstate it: two shades of one team say "two teams, similar',
+  );
+  p(
+    ' * colours", and light mode could only ever supply two of them anyway (§9.2.3 V-27\'s ceiling).',
+  );
   p(' *');
   p(
     ' * Haas and Cadillac have an identity colour and NO plotting colour: both are below the OkLCh',
@@ -2141,46 +1819,16 @@ function emitTokens() {
     p('  /* ---- brand plotting variants: hue and chroma held, lightness moved the minimum');
     p("   * distance into this theme's plotting band (§3.3 rule 6). */");
     for (const [team, v] of Object.entries(brandPlot)) {
-      const pair = brandPair[team][theme];
       p(`  --team-${team}-plot: ${v[theme].hex};`);
-      if (pair) {
-        p(`  --team-${team}-plot-deep: ${pair.deep.hex};`);
-        p(`  --team-${team}-plot-bright: ${pair.bright.hex};`);
-      } else {
-        p(
-          `  /* --team-${team}-plot-deep / -bright: DELIBERATELY ABSENT, in both themes. Brand hue`,
-        );
-        p(
-          `   * ${n(oklch(BRAND[team]).h, 0)} sits inside the reserved timing green band, and in LIGHT mode exactly one`,
-        );
-        p(
-          `   * lightness in the whole plotting band clears dE 15 from --timing-green-ink, so a pair is`,
-        );
-        p(
-          `   * impossible there. A pair is available in dark mode and is withheld anyway: the shade pair`,
-        );
-        p(
-          `   * is an entity property, not a per-theme one, and an encoding that changed with the theme`,
-        );
-        p(
-          `   * would make a reader unlearn it at sunset. §6.4a's marker, dash and direct-label channels`,
-        );
-        p(
-          `   * carry this team's teammate comparison alone — which is why they are mandatory for every`,
-        );
-        p(`   * team rather than a fallback for this one. See §9.2.3 V-27 G-27d. */`);
-      }
     }
     p();
     p('  /* ---- the fallback ramp: 12 slots for the 202 of 214 teams with no brand colour.');
     p('   * Tier A (1-6) is separated by colour alone for every viewer; tier B (7-12) clears the');
     p('   * normal-vision floor and hands its CVD pairs to the runtime ladder (§6.4). */');
-    rampPair.forEach((pair, i) => {
+    entries.forEach((entry, i) => {
       p(
-        `  --ramp-${i + 1}-plot: ${entries[i][theme]}; /* tier ${i < tierA.length ? 'A' : 'B'}, OkLCh hue ${entries[i].h} */`,
+        `  --ramp-${i + 1}-plot: ${entry[theme]}; /* tier ${i < tierA.length ? 'A' : 'B'}, OkLCh hue ${entry.h} */`,
       );
-      p(`  --ramp-${i + 1}-plot-deep: ${pair[theme].deep.hex};`);
-      p(`  --ramp-${i + 1}-plot-bright: ${pair[theme].bright.hex};`);
     });
     p('}');
   };
@@ -2220,46 +1868,20 @@ function emitEntityData() {
   const tokens = [];
   const identityTeams = Object.keys(BRAND);
   const plotTeams = [];
-  const shadePairTeams = [];
 
   for (const [team, hex] of Object.entries(BRAND)) {
     const o = oklch(hex);
     if (o.C < 0.05) continue; // Haas, Cadillac: identity only, they plot from the ramp (§3.3a.1)
     plotTeams.push(team);
-    const pair = pairBothThemes(o.h, o.C);
     tokens.push({
       name: `--team-${team}-plot`,
       light: brandChartVariant('light', hex).hex,
       dark: brandChartVariant('dark', hex).hex,
     });
-    if (pair.light && pair.dark) {
-      shadePairTeams.push(team);
-      tokens.push({
-        name: `--team-${team}-plot-deep`,
-        light: pair.light.deep.hex,
-        dark: pair.dark.deep.hex,
-      });
-      tokens.push({
-        name: `--team-${team}-plot-bright`,
-        light: pair.light.bright.hex,
-        dark: pair.dark.bright.hex,
-      });
-    }
   }
 
   entries.forEach((e, i) => {
-    const pair = pairBothThemes(e.h, 0.4);
     tokens.push({ name: `--ramp-${i + 1}-plot`, light: e.light, dark: e.dark });
-    tokens.push({
-      name: `--ramp-${i + 1}-plot-deep`,
-      light: pair.light.deep.hex,
-      dark: pair.dark.deep.hex,
-    });
-    tokens.push({
-      name: `--ramp-${i + 1}-plot-bright`,
-      light: pair.light.bright.hex,
-      dark: pair.dark.bright.hex,
-    });
   });
 
   /* ---- pairwise, both themes, both CVD models. Symmetric by construction. */
@@ -2337,23 +1959,6 @@ function emitEntityData() {
       ' */',
     ],
     plotTeams,
-  );
-
-  list(
-    'SHADE_PAIR_TEAMS',
-    [
-      '/**',
-      ' * The team references carrying `--team-<ref>-plot-deep` and `-bright` — the symmetric teammate',
-      ' * shade pair (§6.4a). Sauber is absent: its brand hue sits inside the reserved green timing',
-      ' * band, and in light mode exactly one lightness in the whole plotting band clears dE 15 from',
-      ' * `--timing-green-ink`, so no pair exists there. A pair exists in dark mode and is withheld,',
-      ' * because an encoding that changed with the theme would be unlearned at sunset.',
-      ' *',
-      ' * This is why marker shape, dash and direct label are MANDATORY for every team rather than a',
-      ' * fallback for this one: the shade pair is a redundant fourth channel, never the channel.',
-      ' */',
-    ],
-    shadePairTeams,
   );
 
   p('/** Fallback ramp slots (§3.3a.2): tier A is 1-' + tierA.length + ', tier B is the rest. */');
@@ -2516,6 +2121,170 @@ function map() {
   return failures;
 }
 if (mode === 'map' || mode === 'all') map();
+
+/* ================================================================ V-38  OUTCOME TONES
+ * `DESIGN_SYSTEM.md` §6.3a — the four-step ordinal ramp inside ONE entity's colour, built for the
+ * result-mix bar (§6.6.6.14). Every step is a `color-mix(in oklab, <plot> N%, --surface-sunken)`
+ * resolved by the browser, so what is measured here is the same arithmetic the renderer does.
+ *
+ * **Why this is not the shade pair coming back** (§6.4a deleted that on the same day): the pair
+ * spent lightness on IDENTITY — two shades meant two people, and a reader had to learn that two
+ * colours were one team. These steps spend lightness on an ORDER inside one row that is already
+ * one entity, which is the job lightness is actually good at and the one channel every dichromat
+ * keeps in full. Identity is constant across the row; the reader is never asked to tell two
+ * entities apart by shade.
+ */
+const TONE_MIX = { win: 1, podium: 0.6, classified: 0.3 };
+
+/** `--border-strong`, the hatch stroke that carries step 4. Both themes, from `tokens.css`. */
+const BORDER_STRONG = { light: '#B9BCC3', dark: '#4F535A' };
+
+/** Mix two hexes in OkLab at `t` of the first — the arithmetic behind CSS `color-mix(in oklab)`. */
+function mixOklab(hexA, hexB, t) {
+  const A = oklch(hexA);
+  const B = oklch(hexB);
+  const ab = (o) => [o.C * Math.cos((o.h * Math.PI) / 180), o.C * Math.sin((o.h * Math.PI) / 180)];
+  const [a1, b1] = ab(A);
+  const [a2, b2] = ab(B);
+  const L = A.L * t + B.L * (1 - t);
+  const a = a1 * t + a2 * (1 - t);
+  const b = b1 * t + b2 * (1 - t);
+  let h = (Math.atan2(b, a) * 180) / Math.PI;
+  if (h < 0) h += 360;
+  return lch2hex(L, Math.hypot(a, b), h).hex;
+}
+
+function tones() {
+  console.log(
+    '\n=== V-38  OUTCOME TONES (§6.3a) — four ordinal steps inside one entity colour, over the\n' +
+      '           plot surface, for all 22 plotting tokens in both themes ===',
+  );
+  let failures = 0;
+  const F = (ok) => {
+    if (!ok) failures += 1;
+    return ok ? 'PASS' : 'FAIL';
+  };
+
+  /* The 22 tokens the palette actually emits, built exactly as `emitEntityData` builds them. */
+  const { entries } = selectRamp();
+  const tokens = [];
+  for (const [team, hex] of Object.entries(BRAND)) {
+    if (oklch(hex).C < 0.05) continue;
+    tokens.push({
+      name: `--team-${team}-plot`,
+      light: brandChartVariant('light', hex).hex,
+      dark: brandChartVariant('dark', hex).hex,
+    });
+  }
+  entries.forEach((e, i) => {
+    tokens.push({ name: `--ramp-${i + 1}-plot`, light: e.light, dark: e.dark });
+  });
+
+  const worst = {};
+  const keep = (slot, value, what) => {
+    if (worst[slot] === undefined || value < worst[slot].v) worst[slot] = { v: value, what };
+  };
+
+  for (const theme of ['light', 'dark']) {
+    const S = SURF[theme];
+    /* Step 4 carries NO entity colour: the absence of colour is the meaning of "no result". It is
+     * the raised panel over the sunken plot, plus rung 4's hatch — texture, never a hue (§6.3). */
+    const unclassified = S.raised;
+    keep(
+      'hatch',
+      contrast(BORDER_STRONG[theme], unclassified),
+      `${theme} border-strong ${BORDER_STRONG[theme]} on raised ${unclassified}`,
+    );
+    for (const token of tokens) {
+      const t1 = token[theme];
+      const t2 = mixOklab(t1, S.sunken, TONE_MIX.podium);
+      const t3 = mixOklab(t1, S.sunken, TONE_MIX.classified);
+      const where = `${token.name} ${theme}`;
+      keep('step12', dE(t1, t2), `${where} ${t1} -> ${t2}`);
+      keep('step23', dE(t2, t3), `${where} ${t2} -> ${t3}`);
+      keep('step34', dE(t3, unclassified), `${where} ${t3} -> ${unclassified}`);
+      keep('cvd', Math.min(minCVD(t1, t2), minCVD(t2, t3)), where);
+      keep('inkWin', contrast(S.inkInverse, t1), `${where} ink-inverse on the win step ${t1}`);
+      for (const [tone, fill] of [
+        ['podium', t2],
+        ['classified', t3],
+        ['unclassified', unclassified],
+      ]) {
+        keep('inkRest', contrast(S.inkPrimary, fill), `${where} ${tone}: ink-primary on ${fill}`);
+      }
+      /* The faintest coloured step must still read as a FILL against the plot area it sits on, or
+       * a driver's ordinary finishes become a hole in his own bar rather than a segment of it. */
+      keep('onSurface', contrast(t3, S.sunken), `${where} finished ${t3} on plot ${S.sunken}`);
+    }
+  }
+
+  const row = (label, slot, floor, unit = '') =>
+    console.log(
+      `  ${label.padEnd(48)} ${n(worst[slot].v).padStart(6)}${unit} (floor ${String(floor)}) ${F(worst[slot].v >= floor)}\n` +
+        `           worst: ${worst[slot].what}`,
+    );
+  const report = (label, slot, unit = '') =>
+    console.log(
+      `  ${label.padEnd(48)} ${n(worst[slot].v).padStart(6)}${unit} REPORTED\n` +
+        `           worst: ${worst[slot].what}`,
+    );
+
+  console.log(
+    `  Mixes: podium ${String(TONE_MIX.podium * 100)}% of the plot token, finished ` +
+      `${String(TONE_MIX.classified * 100)}%, both over --surface-sunken (the plot area).\n` +
+      `  Step 4 is --surface-raised plus a 45-degree --border-strong hatch: no entity colour at all.\n` +
+      `  ${String(tokens.length)} tokens x 2 themes = ${String(tokens.length * 2)} ramps.\n`,
+  );
+
+  /*
+   * **Floor 8, not 15, and the reason is the encoding's job.** dE 15 is this system's CATEGORICAL
+   * floor: two colours a reader has to tell apart with nothing else to go on. These four steps are
+   * ordinal, adjacent, share a drawn 2px gap, and appear in a FIXED left-to-right order under a
+   * legend that names them. 8 is the floor this palette already uses for "separable when something
+   * else is helping", which is exactly the situation. Below it two steps read as one block.
+   */
+  row('G-38a  step 1 -> 2 (won -> podium), normal dE', 'step12', 8);
+  row('G-38b  step 2 -> 3 (podium -> finished), normal dE', 'step23', 8);
+  row('G-38c  step 3 -> 4 (finished -> unclassified), dE', 'step34', 8);
+  row('G-38d  the step-4 hatch against its own fill', 'hatch', 1.2, ':1');
+  row('G-38e  step 3 against the plot surface under it', 'onSurface', 1.2, ':1');
+
+  /*
+   * **CVD is reported, not gated, and the mitigation is structural** — the same posture §3.4.2
+   * takes with the one residual it cannot remove. A lightness ramp is the best available choice for
+   * a dichromat and it is still not a categorical separation: ramp #10's hue is one the CVD models
+   * collapse hardest.
+   *
+   * What carries the encoding when the tones do not: the segments are separated by a **drawn 2px
+   * gap of the plot surface**, so the boundary is visible whatever the fills do; the **order is
+   * fixed** — won, podium, finished, unclassified, left to right, on every row, always; the legend
+   * names the four in that order; and the table view carries every figure. A reader who cannot see
+   * the difference between step 2 and step 3 can still read the bar. That is why this is a residual
+   * and not a defect — but it is a residual, and it is printed rather than buried.
+   */
+  report('  ---  worst adjacent step under CVD (see the note)', 'cvd');
+
+  /*
+   * **This is why no number is ever drawn inside an outcome-tone segment.** Neither ink clears
+   * 4.5:1 across all 44 fills, and no third ink can: the ramp deliberately sweeps from a
+   * mid-lightness entity colour to the surface, so it passes through every lightness on the way.
+   * The counts go in the legend, the tooltip and the table view instead (§6.3a rule 4).
+   *
+   * The first figure is also a **correction to a claim already in the tree**: `charts.css` says
+   * `--ink-inverse` "clears 4.5:1 against every plotting token". Measured today it does not —
+   * McLaren's light plotting variant is 3.40:1 — so `.chart-span-label` on the team page's share
+   * chart (§6.6.3) is below the text floor on at least one fill. Recorded here rather than fixed
+   * blind: it is a shipped surface nothing in this change touches, and the fix (a
+   * `paint-order: stroke` halo in the surface colour) changes how that page looks.
+   */
+  report('  ---  ink-inverse on step 1, if it ever carried text', 'inkWin', ':1');
+  report('  ---  ink-primary on steps 2-4, if they ever did', 'inkRest', ':1');
+
+  console.log(`\n  ${failures === 0 ? 'V-38 PASS' : `V-38 FAIL — ${String(failures)} check(s)`}\n`);
+  if (failures > 0) process.exitCode = 1;
+  return failures;
+}
+if (mode === 'tones' || mode === 'all') tones();
 
 if (mode === 'calibrate' || mode === 'all') calibration();
 if (mode === 'mono' || mode === 'all') mono();

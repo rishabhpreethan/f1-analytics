@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entityRoundRefSchema, qualifyingSessionSchema } from './entity';
+import { entityRoundRefSchema, gridVsFinishSchema, qualifyingSessionSchema } from './entity';
 import { gridStatusSchema, raceOutcomeSchema } from './race';
 import { isoDateSchema, seasonYearSchema } from './meta';
 import {
@@ -323,39 +323,19 @@ export const driverRaceSchema = z.strictObject({
    * position, the car started from the pit lane (`grid = 0` — 267 race entries), or the
    * grid is unknown. A 0 here means the car finished exactly where it started, and
    * nothing else.
+   *
+   * ⚠ **The first condition is `is_classified = 0`, not `position IS NULL`** (trap 27).
+   * `position` is non-NULL on all 26,093 race rows and holds the *retirement order* on the
+   * 9,683 unclassified ones — minimum 5, so it never looks wrong. Until 2026-08-23 this
+   * field carried `grid - retirement order` for every race a driver failed to finish.
    */
   positionsGained: z.number().int().nullable(),
 });
 
 /* -------------------------------------------------------------------------- aggregates */
 
-/**
- * DR-4's career figure, with **its own exclusions counted**.
- *
- * A mean over "the races where the metric applies" is only honest if the reader can see
- * how many races that was and why the others left. `excluded` is not diagnostics — it is
- * the caption: 61 of Senna's 161 races ended in a retirement, so a mean position change
- * computed over the remaining 100 is a different claim from one over 161.
- */
-export const gridVsFinishSchema = z.strictObject({
-  racesCounted: z.number().int().nonnegative(),
-  /** Mean of `positionsGained` over the counted races. Null when none qualify. */
-  meanPositionsGained: z.number().nullable(),
-  /** The single best gain and worst loss, as signed place counts. */
-  bestGain: z.number().int().nullable(),
-  worstLoss: z.number().int().nullable(),
-  gained: z.number().int().nonnegative(),
-  lost: z.number().int().nonnegative(),
-  held: z.number().int().nonnegative(),
-  excluded: z.strictObject({
-    /** Ended without a classified finishing position — the largest group. */
-    unclassified: z.number().int().nonnegative(),
-    /** `grid = 0`, a pit-lane start (trap 9). */
-    pitLaneStarts: z.number().int().nonnegative(),
-    /** `grid` is NULL. Zero on the present data; the case exists so it cannot be silent. */
-    unknownGrid: z.number().int().nonnegative(),
-  }),
-});
+/* `gridVsFinishSchema` lives in `./entity` — it is no longer only the driver profile's.
+ * Re-exported below as the `GridVsFinish` type so existing consumers are unaffected. */
 
 /**
  * DR-5's career figure. `qualifyingPosition - position`, positive when places were gained
@@ -365,8 +345,13 @@ export const gridVsFinishSchema = z.strictObject({
  * actually started from **after penalties**, and the qualifying classification is what
  * the driver earned. On a weekend with a grid drop the two differ, and the difference is
  * the point of having both.
+ *
+ * ⚠ `meanDelta` carried trap 27's defect too and was corrected with it on 2026-08-23: the
+ * unclassified guard was `position === null`, so the mean was measured against a
+ * retirement order on every race the driver did not finish.
  */
 export const qualifyingVsRaceSchema = z.strictObject({
+  /** Races with a qualifying classification **and** a classified finish. */
   racesCounted: z.number().int().nonnegative(),
   meanDelta: z.number().nullable(),
   /** Races where the driver has a qualifying classification, whatever the race outcome. */
@@ -394,6 +379,6 @@ export type DriverCareerSpan = z.infer<typeof driverCareerSpanSchema>;
 export type DriverTotals = z.infer<typeof driverTotalsSchema>;
 export type DriverSeason = z.infer<typeof driverSeasonSchema>;
 export type DriverRace = z.infer<typeof driverRaceSchema>;
-export type GridVsFinish = z.infer<typeof gridVsFinishSchema>;
+export type { GridVsFinish } from './entity';
 export type QualifyingVsRace = z.infer<typeof qualifyingVsRaceSchema>;
 export type Driver = z.infer<typeof driverSchema>;

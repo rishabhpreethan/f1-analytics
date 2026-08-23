@@ -37,6 +37,30 @@ export interface SeriesInput {
   role?: SeriesRole;
 }
 
+/**
+ * **§6.3a — the four ordinal steps of a result**, strongest first.
+ *
+ * A *tone* is not a colour. It is a position in a ramp applied to whatever plotting colour the row
+ * already carries, so identity is constant across the row and the ramp carries the **order**. That
+ * is the opposite job to §6.4a's deleted shade pair, which spent the same channel — lightness — on
+ * identity and asked a reader to learn that two colours were one team.
+ *
+ * The four are exhaustive and mutually exclusive over a driver's starts: a start is a win, or a
+ * podium that is not a win, or a classified finish that is not a podium, or not classified at all.
+ *
+ * It lives here rather than in `ShareChart.tsx` because it is the kit's contract and not one
+ * component's — and because a component module that also exports a constant loses fast refresh.
+ */
+export type OutcomeTone = 'win' | 'podium' | 'classified' | 'unclassified';
+
+/** The ramp, strongest to weakest. Left to right on every row, always (§6.3a rule 2). */
+export const OUTCOME_TONES: readonly OutcomeTone[] = [
+  'win',
+  'podium',
+  'classified',
+  'unclassified',
+];
+
 /** One categorical bar. */
 export interface BarDatum {
   /** Stable key — the reference where the bar is an entity, the category key otherwise. */

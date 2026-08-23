@@ -1,3 +1,4 @@
+import type { OutcomeTone } from '@/components/charts';
 import type {
   ArchiveSeason,
   Chain,
@@ -432,5 +433,242 @@ export function verdict(
     tier: 'Never met',
     headline: 'Never on the same grid.',
     lead: `${String(pair.yearsApart)} years separate ${earlier.identity.surname}'s last Grand Prix in ${String(earlier.lastSeason)} from ${later.identity.surname}'s first in ${String(later.firstSeason)}. There is no race, no car and no points system the two of them share, so nothing on this page is a direct result — and the rates below are indexed to opportunity, not summed.`,
+  };
+}
+
+/* --------------------------------------------------------------------------- the result mix */
+
+/** One ordinal step of one driver's career, in ramp order (§6.3a). */
+export interface ResultMixPart {
+  tone: OutcomeTone;
+  label: string;
+  value: number;
+}
+
+/** One driver's starts, split four ways. The four always sum to `starts`. */
+export interface ResultMixRow {
+  ref: string;
+  surname: string;
+  teamRef: string;
+  starts: number;
+  parts: ResultMixPart[];
+  /**
+   * Retirements, which is **not** the same number as the unclassified part and is carried so the
+   * surface can say so when they differ. Hamilton: 34 retirements, 32 unclassified starts.
+   */
+  dnfs: number;
+}
+
+/**
+ * **The result mix** — of every race a driver started, how many were wins, podiums that were not
+ * wins, finishes that were not podiums, and starts with no classification at all.
+ *
+ * `DESIGN_SYSTEM.md` §6.6.6.14. It is the most readable comparison this payload supports and it
+ * needs no normalisation argument: **a share of a driver's own starts is era-honest by
+ * construction**, because the denominator is his and nobody else's. No points system, no season
+ * length, no scoring era enters it.
+ *
+ * ---
+ *
+ * **Every part is a subtraction from the next-widest total, and that is not an arbitrary choice of
+ * arithmetic.** It is what makes the four sum to `starts` exactly, for every driver, with no
+ * residual and no possibility of a bar that does not fill its track. A `ShareChart` normalises
+ * whatever it is given, so a row that summed to 0.94 of the starts would render as a full bar and
+ * silently overstate every part in it.
+ *
+ * ⚠ **`starts`, never a raw count of classification rows** (trap 17). 40 races between 1950 and
+ * 1964 classify the same driver two or three times, so a raw count gives Fangio **58** where the
+ * driver index gives **51**. The payload's `totals.starts` is already collapsed and agrees with the
+ * index; the figures §6.6.6.12 recorded when this chart was proposed — 24/11/9/14 of 58 — were the
+ * raw ones, and are corrected here to **24/11/6/10 of 51**. A chart that disagreed with the rest of
+ * the product about how many races a man started would be a defect however pretty it was.
+ *
+ * ⚠ **The fourth part is "not classified", NOT "retired", and the two are genuinely different
+ * numbers.** Hamilton has **34** retirements against **32** unclassified starts, because a car that
+ * covers enough of the race distance is still given a finishing position when it stops. Using
+ * `totals.dnfs` for the fourth part would break the sum *and* mislabel it, so the subtraction is
+ * the value and `dnfs` travels beside it for the surface to explain the gap.
+ */
+export function resultMix(entities: readonly CompareEntity[]): ResultMixRow[] {
+  return entities.map((entity) => {
+    const { starts, wins, podiums, classifiedFinishes, dnfs } = entity.totals;
+    /* Clamped at zero apiece. The payload's four totals are nested by construction — a win is a
+     * podium is a classified finish is a start — but a clamp is what keeps a future selector's
+     * disagreement from emitting a negative width instead of a visible oddity. */
+    const podiumOnly = Math.max(0, podiums - wins);
+    const classifiedOnly = Math.max(0, classifiedFinishes - podiums);
+    const unclassified = Math.max(0, starts - classifiedFinishes);
+    return {
+      ref: entity.identity.ref,
+      surname: entity.identity.surname,
+      teamRef: entity.colorTeamRef,
+      starts,
+      dnfs,
+      parts: [
+        { tone: 'win', label: 'Won', value: Math.max(0, wins) },
+        { tone: 'podium', label: 'Podium, not a win', value: podiumOnly },
+        { tone: 'classified', label: 'Finished, off the podium', value: classifiedOnly },
+        { tone: 'unclassified', label: 'Not classified', value: unclassified },
+      ],
+    };
+  });
+}
+
+/* -------------------------------------------------------------------- the career-relative arc */
+
+/** One driver's championship placings, on an axis that starts at his own debut. */
+export interface CareerArcSeries {
+  reference: string;
+  teamReference: string;
+  label: string;
+  /** `driver.code`, which is null for 774 of 881 drivers. Never derived from a surname. */
+  shortLabel: string | null;
+  points: { x: number; y: number | null }[];
+}
+
+/** A break in a line, and which of the two things caused it. */
+export interface CareerArcGap {
+  ref: string;
+  surname: string;
+  years: number[];
+}
+
+export interface CareerArc {
+  series: CareerArcSeries[];
+  /** Years inside a career with no entry at all — a sabbatical, or a year out of the sport. */
+  absences: CareerArcGap[];
+  /** Years entered but not ranked in the championship. A different fact, and the same gap. */
+  unranked: CareerArcGap[];
+}
+
+/**
+ * **The career-relative arc.** `DESIGN_SYSTEM.md` §6.6.6.14 B.
+ *
+ * x is **the season of a career**, not the calendar year: 1 is the debut season, whenever it
+ * happened. That single substitution is what lets Fangio's eight seasons and Hamilton's twenty
+ * share one chart honestly — **the axis is itself the normaliser**, so unlike almost everything
+ * else on this page it needs no caveat about what is being held constant.
+ *
+ * ⚠ **Every year of the span emits a point, including the ones with no season.** A missing year
+ * must be a `null` reading and not an absent one: `d3-shape`'s `defined` breaks a line at a null
+ * and joins straight through a gap in the array, so omitting Räikkönen's 2010 and 2011 would draw
+ * one continuous line from 2009 to 2012 and state that he raced through a sabbatical.
+ *
+ * **A break has two causes and they are not the same fact**, so both are returned separately for
+ * the surface to name: a year he did not race, and a year he raced without being ranked. The chart
+ * cannot distinguish them — a gap is a gap — so the copy does, per driver, with the years in it.
+ */
+export function careerArc(entities: readonly CompareEntity[]): CareerArc {
+  const series: CareerArcSeries[] = [];
+  const absences: CareerArcGap[] = [];
+  const unranked: CareerArcGap[] = [];
+
+  for (const entity of entities) {
+    if (entity.seasons.length === 0) continue;
+    const byYear = new Map(entity.seasons.map((season) => [season.year, season]));
+    const years = [...byYear.keys()].sort((a, b) => a - b);
+    const first = years[0] ?? entity.firstSeason;
+    const last = years.at(-1) ?? entity.lastSeason;
+
+    const points: { x: number; y: number | null }[] = [];
+    const missing: number[] = [];
+    const placeless: number[] = [];
+    for (let year = first; year <= last; year += 1) {
+      const season = byYear.get(year);
+      if (season === undefined) missing.push(year);
+      else if (season.championshipPosition === null) placeless.push(year);
+      points.push({ x: year - first + 1, y: season?.championshipPosition ?? null });
+    }
+
+    series.push({
+      reference: entity.identity.ref,
+      teamReference: entity.colorTeamRef,
+      label: entity.identity.surname,
+      shortLabel: entity.identity.code,
+      points,
+    });
+    const surname = entity.identity.surname;
+    if (missing.length > 0) absences.push({ ref: entity.identity.ref, surname, years: missing });
+    if (placeless.length > 0)
+      unranked.push({ ref: entity.identity.ref, surname, years: placeless });
+  }
+
+  return { series, absences, unranked };
+}
+
+/* ---------------------------------------------------------------------------- places gained */
+
+/** One driver's grid-to-finish record, laid out for a diverging bar. */
+export interface GainRow {
+  ref: string;
+  surname: string;
+  /** Mean places gained per counted race. **Null is a state, not a zero** (§6.6.6.14 C). */
+  mean: number | null;
+  racesCounted: number;
+  gained: number;
+  lost: number;
+  held: number;
+  /** Races with no place change to measure, because they ended without a classification. */
+  excluded: number;
+  /** `|mean| / scale`, 0–1. The bar's length as a fraction of **half** the track. */
+  extent: number;
+  /** Which way it points. `'held'` when the mean is exactly zero — a real result, not an absence. */
+  direction: 'forward' | 'back' | 'held';
+}
+
+export interface PlacesGained {
+  rows: GainRow[];
+  /** The larger of the two half-axes, so the zero line stays in the middle of the track. */
+  scale: number;
+}
+
+/**
+ * **Places gained from the grid.** `DESIGN_SYSTEM.md` §6.6.6.14 C.
+ *
+ * The one instrument here that needed new data, published by `GET /api/compare` from the same
+ * `buildGridVsFinish` the driver page uses — so the two pages cannot disagree about a career.
+ *
+ * **The scale is symmetric and shared**, computed from the selection's own largest absolute mean
+ * and floored at one whole place. Symmetric because the zero line has to sit in the middle of every
+ * track or a reader cannot compare two rows by eye; shared because the measure is the same on every
+ * row, unlike the rate board's five, where each measure keeps its own ceiling. Floored at 1 so a
+ * selection of four drivers who all hover around +0.2 does not draw one of them at the full width
+ * of the track and imply a rout.
+ *
+ * ⚠ **A null mean is a state and never a zero.** 155 of the 818 drivers with a race were never
+ * classified in one they started from a grid slot, and all of them are pickable. A zero-length bar
+ * at the origin says "started and finished level every time", which is a different and false claim
+ * — §1.0's failure mode exactly, absent given the meaning of present.
+ *
+ * ⚠ **`gained`/`lost`/`held` travel with the mean because the two can disagree in sign**, and the
+ * disagreement is the honest part rather than an anomaly: a handful of large losses outweighs many
+ * small gains, and a bar drawn on the mean alone puts such a driver on the side of zero a reader
+ * counting races would not expect.
+ */
+export function placesGained(entities: readonly CompareEntity[]): PlacesGained {
+  const means = entities
+    .map((entity) => entity.gridVsFinish.meanPositionsGained)
+    .filter((mean): mean is number => mean !== null)
+    .map(Math.abs);
+  const scale = Math.max(1, ...means);
+
+  return {
+    scale,
+    rows: entities.map((entity) => {
+      const gvf = entity.gridVsFinish;
+      const mean = gvf.meanPositionsGained;
+      return {
+        ref: entity.identity.ref,
+        surname: entity.identity.surname,
+        mean,
+        racesCounted: gvf.racesCounted,
+        gained: gvf.gained,
+        lost: gvf.lost,
+        held: gvf.held,
+        excluded: gvf.excluded.unclassified + gvf.excluded.pitLaneStarts + gvf.excluded.unknownGrid,
+        extent: mean === null ? 0 : Math.min(1, Math.abs(mean) / scale),
+        direction: mean === null || mean === 0 ? 'held' : mean > 0 ? 'forward' : 'back',
+      };
+    }),
   };
 }

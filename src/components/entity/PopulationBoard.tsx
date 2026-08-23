@@ -134,7 +134,15 @@ export function PopulationBoard({
                     {stratum.count}
                   </span>
                   <span className="tier-track" aria-hidden="true">
-                    <span className="tier-bar" data-motion={TIER_BAR_ATTR} />
+                    {/*
+                     * ⚠ **A stratum of zero draws no bar** _(2026-08-23, the same finding as
+                     * §6.6.6.14's zero segment)_. `min-width: 3px` keeps a rung of 3 visible
+                     * against a rung of 571, which is what the floor is for; on a count of 0 it
+                     * paints a mark for a group with no members. The row already knows — it is
+                     * `disabled`, because a rung that filters to nothing is not a control — so the
+                     * bar was the only part still claiming otherwise. The count beside it stays.
+                     */}
+                    {stratum.count > 0 && <span className="tier-bar" data-motion={TIER_BAR_ATTR} />}
                   </span>
                   <span className="tier-sub" aria-hidden="true">
                     {stratum.sublabel}
