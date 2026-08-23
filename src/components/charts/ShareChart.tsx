@@ -158,13 +158,17 @@ export function ShareChart({
     const shares = normaliseShareRow(row.segments);
     /*
      * Colour is assigned **per row**, over that row's own members. On a team page every member
-     * shares a `teamReference`, so `assignEntityColours` sees a team-mate group and hands back the
-     * §6.4a shade pair — or reports `colourExhausted` at three or more drivers, which is a real
-     * season (a mid-season replacement) and not an edge case.
+     * shares a `teamReference`, so under §6.4a (2026-08-23) they all take the **same** colour —
+     * one car, one colour — and the seat is what has to be drawn.
+     *
+     * **A fill has no dash, so the seat is carried by texture here.** Rung 4's 45° hatch is the
+     * fill-shaped equivalent of the line chart's dash: seat 0 is a plain fill, every odd seat is
+     * hatched. That is a stronger encoding than the shade pair it replaces, not a weaker one —
+     * the pair was withheld entirely for Sauber (§9.2.3 G-27d) and capped at two, where the hatch
+     * works for every team and alternates for as many seats as a row has.
      */
     const colours = assignEntityColours(row.segments);
-    const exhausted = colours.some((colour) => colour.colourExhausted);
-    return { row, shares, colours, exhausted };
+    return { row, shares, colours };
   });
 
   const { scope: motionScope } = useChartMount<HTMLDivElement>({
@@ -241,7 +245,7 @@ export function ShareChart({
                   height={height}
                 />
               </clipPath>
-              {/* Rung 4's 45° hatch, used here only where colour is exhausted (§6.4a property 4). */}
+              {/* Rung 4's 45° hatch, carrying the SEAT within one car (§6.4a). */}
               <pattern
                 id={hatchId}
                 width="6"
@@ -312,7 +316,7 @@ export function ShareChart({
               data-dimmed={activeKey !== null}
               clipPath={`url(#${clipId})`}
             >
-              {laid.map(({ row, shares, colours, exhausted }) => {
+              {laid.map(({ row, shares, colours }) => {
                 const y = plot.top + (band(row.key) ?? 0);
 
                 /*
@@ -365,11 +369,14 @@ export function ShareChart({
                         style={{ '--series': cssVar(colour.plot) } as CSSProperties}
                       />
                       {/*
-                       * §6.4a property 4 — beyond two drivers of one team colour is exhausted
-                       * outright, so the alternating segments take rung 4's hatch. It is drawn over
-                       * the fill rather than instead of it, so the team is still recognisable.
+                       * §6.4a — every driver of one car shares its colour, so the **seat** is what
+                       * the second channel has to carry, and in a fill that channel is rung 4's
+                       * hatch. Keyed on `seat` and not on the segment's position, so a row mixing
+                       * two teams hatches the second seat of each car rather than every other
+                       * segment. Drawn over the fill rather than instead of it, so the car is
+                       * still recognisable underneath.
                        */}
-                      {exhausted && index % 2 === 1 && (
+                      {colour.seat % 2 === 1 && (
                         <path
                           d={spanPath(x, y, segWidth, band.bandwidth(), 4, {
                             leading: index === 0,

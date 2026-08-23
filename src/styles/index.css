@@ -29,6 +29,7 @@
  * reuses that file's `.entity-name` and `.portrait` and `season.css`'s panel, eyebrow and chip: an
  * index is the front door to a profile, not a second surface. */
 @import './entity-index.css';
+@import './compare.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so

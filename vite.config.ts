@@ -140,6 +140,34 @@ export default defineConfig({
      * and set-equality or no-duplicate assertions pass vacuously. Each of the stylesheet tests
      * therefore opens by asserting its own input is non-empty.
      */
-    css: { include: [/tokens\.css/, /motion\.css/, /backdrop\.css/, /index\.css/, /entity\.css/] },
+    /*
+     * `compare.css` added 2026-08-23 with F7 (`DESIGN_SYSTEM.md` §6.6.6). Its assertions are the
+     * ones this project keeps getting wrong and cannot see: that the chain, the era strip and every
+     * career band consume **one** `--axis-inset` rather than three literals — the CR-007 defect that
+     * put a chart axis 130px out of line — and that the balance bar's 50% reference and the
+     * capsule's 3px floor were not tidied away as redundant.
+     *
+     * ⚠ `entity-index.css` is matched by `/index\.css/` **by accident**, not by intent. A future
+     * stylesheet whose name does not happen to contain one of these substrings gets `''` and every
+     * assertion on it passes vacuously, which is why each of these tests opens by checking its own
+     * input is non-empty.
+     *
+     * `charts.css` added 2026-08-23 with §6.4a's seat encoding. It is the kit's whole visual
+     * language and had **no source test at all** until now, which is how it came to carry the one
+     * rule that decides whether a principal and the seat beside it read as a pair: a shadow line
+     * draws at three-quarters of the mark stroke. jsdom applies no CSS, so the component test can
+     * only assert the `data-role` attribute — the declaration itself is assertable nowhere else.
+     */
+    css: {
+      include: [
+        /tokens\.css/,
+        /motion\.css/,
+        /backdrop\.css/,
+        /index\.css/,
+        /entity\.css/,
+        /compare\.css/,
+        /charts\.css/,
+      ],
+    },
   },
 });

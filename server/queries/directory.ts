@@ -146,7 +146,9 @@ import { readSeasonCompleteness } from './seasons';
 export const SQL_DRIVER_INDEX = `
 WITH driver_race AS (
   SELECT td.driver_id AS driver_id,
+         td.team_id   AS team_id,
          s.year       AS year,
+         r.number     AS round_number,
          r.id         AS round_id,
          se.position  AS position,
          se.status    AS status
@@ -156,6 +158,22 @@ WITH driver_race AS (
   JOIN season s       ON s.id = r.season_id
   JOIN round_entry re ON re.id = se.round_entry_id
   JOIN team_driver td ON td.id = re.team_driver_id
+),
+driver_team AS (
+  SELECT driver_id, team_id,
+         count(DISTINCT CASE WHEN status NOT IN (30, 40) THEN round_id END) AS starts,
+         count(DISTINCT round_id)                    AS races,
+         max(year * 100 + round_number)              AS last_key
+  FROM driver_race
+  GROUP BY driver_id, team_id
+),
+colour_team AS (
+  SELECT driver_id, team_id,
+         row_number() OVER (
+           PARTITION BY driver_id
+           ORDER BY starts DESC, races DESC, last_key DESC, team_id
+         ) AS rn
+  FROM driver_team
 ),
 agg AS (
   SELECT driver_id,
@@ -179,9 +197,12 @@ SELECT d.reference    AS ref,
        coalesce(a.wins, 0)    AS wins,
        coalesce(a.podiums, 0) AS podiums,
        a.firstSeason  AS firstSeason,
-       a.lastSeason   AS lastSeason
+       a.lastSeason   AS lastSeason,
+       ct.reference   AS colorTeamRef
 FROM driver d
 LEFT JOIN agg a ON a.driver_id = d.id
+LEFT JOIN colour_team c ON c.driver_id = d.id AND c.rn = 1
+LEFT JOIN team ct ON ct.id = c.team_id
 ORDER BY d.surname, d.forename, d.reference`;
 
 /**
@@ -368,6 +389,7 @@ export interface DriverIndexRow {
   podiums: number;
   firstSeason: number | null;
   lastSeason: number | null;
+  colorTeamRef: string | null;
 }
 
 export interface TeamIndexRow {
@@ -497,6 +519,7 @@ export function buildDriverIndexItem(
     bestChampionshipPosition: championship.bestChampionshipPosition,
     firstSeason: row.firstSeason,
     lastSeason: row.lastSeason,
+    colorTeamRef: row.colorTeamRef,
   };
 }
 

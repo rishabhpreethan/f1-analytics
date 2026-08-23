@@ -229,3 +229,100 @@ export function useRibbonMount<T extends HTMLElement = HTMLDivElement>(
     },
   });
 }
+
+/* ------------------------------------------------------- G-32, the lineage chain (F7) */
+
+/** The three marks G-32 moves. Written by `LineageChain`, queried here from the same constants. */
+export const CHAIN_LINK_ATTR = 'chain-link';
+export const CHAIN_LINK = `[data-motion="${CHAIN_LINK_ATTR}"]`;
+export const CHAIN_DROP_ATTR = 'chain-drop';
+export const CHAIN_DROP = `[data-motion="${CHAIN_DROP_ATTR}"]`;
+export const CHAIN_RUN_ATTR = 'chain-run';
+export const CHAIN_RUN = `[data-motion="${CHAIN_RUN_ATTR}"]`;
+
+/**
+ * **G-32 — the lineage chain walks itself back through the archive** (`DESIGN_SYSTEM.md` §6.6.6.4).
+ *
+ * One timeline, three tracks, and every origin is the direction of travel rather than a mark's own
+ * centre — G-27's rule applied to a mark that happens to be a span of years:
+ *
+ * - **Link capsules** grow `scaleX 0→1` from `transformOrigin: 'right'`. Right, not left: the
+ *   chain reads from the present into the past, so each pairing extends *backwards* out of the one
+ *   above it. A capsule growing left-to-right would run against the direction the connector
+ *   arrives from and the staircase would stop reading as a walk.
+ * - **Connector drops** grow `scaleY 0→1` from `'top'` — they leave the row above and land on this
+ *   one.
+ * - **Connector runs** grow `scaleX 0→1` from `'right'`, matching the capsule they lead into.
+ *
+ * The drops and runs are offset by **half a stagger step**, which is what interleaves them between
+ * consecutive capsules: capsule *i* lands at `each × i`, and the connector into row *i* is the
+ * `(i − 1)`-th element of its own array, so `each × (i − 1) + each / 2` puts it squarely between
+ * the two. Without the offset all three tracks fire in lockstep and the chain arrives as a block.
+ *
+ * `dur.chart` / `ease.mech` for the capsules — the mechanical curve every data mark in this
+ * product grows on — and `dur.fast` / `ease.enter` for the connectors, which are furniture rather
+ * than data and should not compete with the marks for attention.
+ *
+ * **Not a `ScrollTrigger`.** §4.6.1 rule 2: a chain that is on screen at first paint would make
+ * the trigger load-bearing for the content being visible at all. The chain is the page's centre,
+ * so it is often the first thing under the verdict band.
+ *
+ * **Deps identify the chain, never the hovered link.** Hovering a link must not re-walk the chain
+ * (G-29).
+ *
+ * Authored `from` (MR-2): under reduced motion no tween is created, and every capsule, drop and
+ * run rests at its full, correct extent — the chain is simply *drawn* rather than walked.
+ */
+export function useChainWalk<T extends HTMLElement = HTMLElement>(
+  deps: React.DependencyList,
+): MotionHandle<T> {
+  return useMotion<T>({
+    deps,
+    animate: ({ q, tl }) => {
+      const links = q(CHAIN_LINK);
+      if (links.length === 0) return undefined;
+      const drops = q(CHAIN_DROP);
+      const runs = q(CHAIN_RUN);
+      const each = stagger.bar.each;
+      const half = each / 2;
+
+      tl.from(links, {
+        scaleX: 0,
+        transformOrigin: 'right',
+        duration: dur.chart,
+        ease: ease.mech,
+        stagger: { each, from: stagger.bar.from, amount: staggerAmount(links.length, each) },
+      });
+
+      if (drops.length > 0) {
+        tl.from(
+          drops,
+          {
+            scaleY: 0,
+            transformOrigin: 'top',
+            duration: dur.fast,
+            ease: ease.enter,
+            stagger: { each, from: stagger.bar.from, amount: staggerAmount(drops.length, each) },
+          },
+          half,
+        );
+      }
+
+      if (runs.length > 0) {
+        tl.from(
+          runs,
+          {
+            scaleX: 0,
+            transformOrigin: 'right',
+            duration: dur.fast,
+            ease: ease.enter,
+            stagger: { each, from: stagger.bar.from, amount: staggerAmount(runs.length, each) },
+          },
+          half,
+        );
+      }
+
+      return undefined;
+    },
+  });
+}

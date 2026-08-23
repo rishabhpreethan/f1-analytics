@@ -255,14 +255,28 @@ export function useListReveal<T extends HTMLElement = HTMLElement>(
  * Authored `from` (MR-2), so under reduced motion — where no tween is created at all — every bar is
  * simply at its full, correct extent.
  */
+/**
+ * The two marks `usePopulationMount` grows, as constants rather than as literals typed twice.
+ *
+ * They were literals until F7 reused this hook for the compare page's rate board. A hand-typed pair
+ * that drifts is a chart whose mount motion silently never runs, and that is not hypothetical here:
+ * the rate board's first build wrote `data-motion="chart-bar"` and called no hook at all, so those
+ * bars never animated while the markup claimed they did — CR-007's "a motion nothing implemented",
+ * shipped again. Exporting the selector is what makes the pair impossible to mistype.
+ */
+export const TIER_BAR_ATTR = 'tier-bar';
+export const TIER_BAR = `[data-motion="${TIER_BAR_ATTR}"]`;
+export const ERA_BAR_ATTR = 'era-bar';
+export const ERA_BAR = `[data-motion="${ERA_BAR_ATTR}"]`;
+
 export function usePopulationMount<T extends HTMLElement = HTMLElement>(
   deps: React.DependencyList,
 ): MotionHandle<T> {
   return useMotion<T>({
     deps,
     animate: ({ q, tl }) => {
-      const tiers = q('[data-motion="tier-bar"]');
-      const eras = q('[data-motion="era-bar"]');
+      const tiers = q(TIER_BAR);
+      const eras = q(ERA_BAR);
       if (tiers.length === 0 && eras.length === 0) return undefined;
 
       if (tiers.length > 0) {

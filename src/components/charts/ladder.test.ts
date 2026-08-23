@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { assignEntityColours, collides, plotToken, type ChartEntity } from '@/lib/entityColor';
 import { assignLadder, COMPARISON_CAP, DASH_ARRAY, DASH_PATTERNS } from './ladder';
 
-const entity = (reference: string, teamReference: string): ChartEntity => ({
-  reference,
-  teamReference,
-});
+const entity = (
+  reference: string,
+  teamReference: string,
+  role: ChartEntity['role'] = 'principal',
+): ChartEntity => ({ reference, teamReference, role });
 
 const ladder = (entities: ChartEntity[], options?: Parameters<typeof assignLadder>[1]) =>
   assignLadder(assignEntityColours(entities), options);
@@ -36,7 +37,7 @@ describe('the measured premise these tests rest on', () => {
 describe('§6.4 — the ladder fires on collision and stays off otherwise', () => {
   it('leaves every rung off when nothing collides', () => {
     const { state, series } = ladder(SEPARATED);
-    expect(state).toEqual({ marker: false, dash: false, texture: false });
+    expect(state).toEqual({ marker: false, texture: false });
     expect(series.map((s) => s.marker)).toEqual(['circle', 'circle', 'circle']);
     expect(series.map((s) => s.dash)).toEqual(['solid', 'solid', 'solid']);
   });
@@ -47,10 +48,15 @@ describe('§6.4 — the ladder fires on collision and stays off otherwise', () =
     expect(series.map((s) => s.marker)).toEqual(['circle', 'square']);
   });
 
-  it('does not escalate to dash for a collision, because four shapes separate four series', () => {
-    // Rung 3 exists for the teammate case (§6.4a), where it is mandatory rather than escalated.
-    const { state } = ladder([entity('a', 'ferrari'), entity('b', 'mclaren')]);
-    expect(state.dash).toBe(false);
+  it('never escalates to a dash, because a dash now MEANS something (§6.4a, 2026-08-23)', () => {
+    /*
+     * The dash left the collision ladder. Two colliding drivers of two different teams are two
+     * different cars, so both are seat 0 and both draw solid — if a collision could dash one of
+     * them, a reader who had learned "dashed = the other seat in that car" would be lied to by a
+     * palette accident.
+     */
+    const { series } = ladder([entity('a', 'ferrari'), entity('b', 'mclaren')]);
+    expect(series.map((s) => s.dash)).toEqual(['solid', 'solid']);
   });
 
   it('separates every series once a rung fires, not only the colliding pair', () => {
@@ -77,71 +83,112 @@ describe('§6.4 — the ladder fires on collision and stays off otherwise', () =
   });
 });
 
-describe('§6.4a — the teammate treatment is mandatory, not escalated', () => {
+describe('§6.4a — colour is the car, the dash is the seat', () => {
   const TEAMMATES = [entity('stroll', 'aston_martin'), entity('alonso', 'aston_martin')];
 
-  it('switches on BOTH marker and dash for a teammate pair, for every team', () => {
-    const { state } = ladder(TEAMMATES);
-    expect(state.marker).toBe(true);
-    expect(state.dash).toBe(true);
-  });
-
-  it('gives the lower driver reference circle and solid, whatever order the caller passed', () => {
+  it('paints both drivers of one car in ONE colour, and separates them on the dash', () => {
     const { series } = ladder(TEAMMATES);
-    const alonso = series.find((s) => s.reference === 'alonso');
-    const stroll = series.find((s) => s.reference === 'stroll');
-    expect(alonso?.marker).toBe('circle');
-    expect(alonso?.dash).toBe('solid');
-    expect(stroll?.marker).toBe('square');
-    expect(stroll?.dash).toBe('long');
+    expect(new Set(series.map((s) => s.plot)).size).toBe(1);
+    expect(new Set(series.map((s) => s.dash)).size).toBe(2);
   });
 
-  it('fires for Sauber too, where the shade pair does not exist at all', () => {
+  it('gives one car ONE marker shape, so a pair reads as a pair', () => {
     /*
-     * The team that settles the argument. Both drivers carry the identical plotting colour, so
-     * marker and dash are the only things separating them — which is the whole reason §6.4a makes
-     * them mandatory for every team rather than a fallback for this one.
+     * The single most load-bearing assertion of the 2026-08-23 change. If the two series of one
+     * car took different shapes, eight series across four cars would read as eight lines rather
+     * than four pairs — which is the composition problem the season lens is built around.
      */
-    const { state, series } = ladder([entity('a', 'sauber'), entity('b', 'sauber')]);
+    const { state, series } = ladder(TEAMMATES);
+    expect(state.marker).toBe(true);
+    expect(new Set(series.map((s) => s.marker)).size).toBe(1);
+  });
+
+  it('gives the lower driver reference the solid line, whatever order the caller passed', () => {
+    const { series } = ladder(TEAMMATES);
+    expect(series.find((s) => s.reference === 'alonso')?.dash).toBe('solid');
+    expect(series.find((s) => s.reference === 'stroll')?.dash).toBe('long');
+  });
+
+  it('never dashes a principal while the shadow beside it is solid', () => {
+    /*
+     * `reference` order alone would do exactly that here: `alonso` < `stroll`, so a pure
+     * alphabetical seat order hands the *shadow* the solid line and the driver the reader chose
+     * the dash — inverting the sentence the encoding makes.
+     */
+    const { series } = ladder([
+      entity('stroll', 'aston_martin', 'principal'),
+      entity('alonso', 'aston_martin', 'shadow'),
+    ]);
+    expect(series.find((s) => s.reference === 'stroll')?.dash).toBe('solid');
+    expect(series.find((s) => s.reference === 'alonso')?.dash).toBe('long');
+  });
+
+  it('works for Sauber too, where no shade pair ever existed', () => {
+    /*
+     * The team that settled the old argument and is now unremarkable: its brand hue sits in the
+     * reserved green timing band and light mode admits exactly one plotting shade, so a two-shade
+     * split was impossible. Under the seat rule nothing about Sauber is special — one colour, one
+     * shape, two dashes, exactly as for every other car.
+     */
+    const { series } = ladder([entity('a', 'sauber'), entity('b', 'sauber')]);
     expect(series[0]?.plot).toBe(series[1]?.plot);
-    expect(series.every((s) => s.colourExhausted)).toBe(true);
-    expect(state.marker && state.dash).toBe(true);
-    expect(series.map((s) => s.marker)).toEqual(['circle', 'square']);
     expect(series.map((s) => s.dash)).toEqual(['solid', 'long']);
+    expect(series.some((s) => s.colourExhausted)).toBe(false);
   });
 
-  it('keeps all four channels distinct when two teammate pairs share one chart', () => {
-    /*
-     * §6.4a is written for one pair and says "circle and square, in driver order". Applied
-     * literally to two pairs it would hand two series the same shape *and* the same dash, leaving
-     * colour as their only separator — the exact thing this module exists to avoid. The indices a
-     * team's group holds are kept and redistributed inside the group instead.
-     */
+  it('keeps two pairs on one chart distinct: two shapes, two dashes, four combinations', () => {
     const { series } = ladder([
       entity('russell', 'mercedes'),
       entity('antonelli', 'mercedes'),
       entity('sainz', 'williams'),
       entity('albon', 'williams'),
     ]);
-    expect(new Set(series.map((s) => s.marker)).size).toBe(4);
-    expect(new Set(series.map((s) => s.dash)).size).toBe(4);
-    // and inside each team, the lower reference still takes the earlier rung
+    expect(new Set(series.map((s) => s.marker)).size).toBe(2);
+    expect(new Set(series.map((s) => s.dash)).size).toBe(2);
+    expect(new Set(series.map((s) => `${s.marker}/${s.dash}`)).size).toBe(4);
+    // and inside each car, the lower reference still takes the solid line
     const index = (reference: string) =>
       DASH_PATTERNS.indexOf(series.find((s) => s.reference === reference)?.dash ?? 'solid');
     expect(index('antonelli')).toBeLessThan(index('russell'));
     expect(index('albon')).toBeLessThan(index('sainz'));
   });
 
-  it('still separates three drivers of one team, where colour is exhausted outright', () => {
-    // A mid-season replacement. Rungs 1–3 carry the whole distinction (§6.4a property 4).
+  it('separates three drivers of one car, which the two-shade pair never could', () => {
+    // A mid-season replacement. The old shade pair reported colour exhausted at three; the dash
+    // ladder is four deep, which is the second reason the pair was withdrawn.
     const { series } = ladder([
       entity('a', 'ferrari'),
       entity('b', 'ferrari'),
       entity('c', 'ferrari'),
     ]);
     expect(new Set(series.map((s) => s.plot)).size).toBe(1);
-    expect(new Set(series.map((s) => s.marker)).size).toBe(3);
-    expect(new Set(series.map((s) => s.dash)).size).toBe(3);
+    expect(new Set(series.map((s) => s.marker)).size).toBe(1);
+    expect(series.map((s) => s.dash)).toEqual(['solid', 'long', 'short']);
+    expect(series.some((s) => s.colourExhausted)).toBe(false);
+  });
+
+  it('reports the dash ladder exhausted past four seats — 1957 Maserati entered thirteen', () => {
+    const five = ['a', 'b', 'c', 'd', 'e'].map((ref) => entity(ref, 'maserati'));
+    const { series } = ladder(five);
+    expect(series.every((s) => s.colourExhausted)).toBe(true);
+    expect(series[4]?.dash).toBe(series[0]?.dash);
+  });
+
+  it('counts the cap in CARS, so eight series across four cars is not over it', () => {
+    /*
+     * Eight series is the season lens at full stretch: four principals, each carrying the other
+     * seat in its car. Four shapes and two dashes separate all eight, so the cap is not breached —
+     * counting series would have reported it breached and pushed the surface to small multiples
+     * for a chart the ladder handles.
+     */
+    const pairs = ['ferrari', 'mercedes', 'williams', 'alpine'].flatMap((team) => [
+      entity(`${team}-1`, team, 'principal'),
+      entity(`${team}-2`, team, 'shadow'),
+    ]);
+    const result = ladder(pairs);
+    expect(result.series).toHaveLength(8);
+    expect(result.exceedsCap).toBe(false);
+    expect(new Set(result.series.map((s) => `${s.marker}/${s.dash}`)).size).toBe(8);
   });
 });
 
@@ -156,7 +203,7 @@ describe('§6.5.6 — rung 4 is a control, not an escalation', () => {
     expect(series.every((s) => s.texture)).toBe(true);
   });
 
-  it('is withdrawable, unlike rungs 2 and 3 — it is the reader’s own choice', () => {
+  it('is withdrawable, unlike rung 2 — it is the reader’s own choice', () => {
     expect(ladder(SEPARATED, { patterns: false, sticky: { texture: true } }).state.texture).toBe(
       false,
     );

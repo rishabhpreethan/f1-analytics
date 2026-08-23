@@ -10,8 +10,13 @@
  * | Role | Token | Where |
  * |---|---|---|
  * | identity | `--team-<ref>` or a ramp slot | a swatch, a 3px accent bar, a header band — always beside a name |
- * | plot | `--*-plot` | one series, one entity |
- * | shade pair | `--*-plot-deep` / `-bright` | two drivers of one team in one plot area (§6.4a) |
+ * | plot | `--*-plot` | one series, **one car** — every driver of one team takes the same one |
+ *
+ * ⚠ **There is no longer a third role.** The teammate *shade pair* was withdrawn on 2026-08-23
+ * (§6.4a, "the seat, not the shade"): colour identifies the machinery, and the seat inside it is
+ * carried by the **dash**, which is a reserved semantic channel exactly as purple/green/yellow are
+ * reserved in colour. `shadePair()` is retained below and is called by nothing — the generated
+ * `--*-plot-deep` / `-bright` tokens are retired from use, not yet deleted (§6.4a, follow-up).
  *
  * **The ramp is 94% of the data, not a fallback.** 214 teams exist and 12 carry a brand colour
  * (queried). A team with no brand colour — and Haas and Cadillac, whose greys would be confusable
@@ -123,6 +128,11 @@ export function plotToken(teamReference: string): PlotToken {
 }
 
 /**
+ * ⚠ **RETIRED FROM USE, 2026-08-23 (§6.4a).** Nothing calls this. It is kept because the tokens it
+ * names are still generated and still validated (§9.2.3 V-27, G-27a–e), and deleting the function
+ * without deleting the emitter would leave the palette claiming a role no code could reach. The
+ * deletion of both is a queued follow-up with a measured CSS saving, recorded in §6.4a.
+ *
  * The symmetric shade pair for a team, or `null` when the palette has none for it.
  *
  * `null` is not an error state and must not be treated as one. Sauber's brand hue sits inside the
@@ -184,43 +194,73 @@ export interface ChartEntity {
   reference: string;
   /** The team this entity plots as. For a team entity, its own `reference`. */
   teamReference: string;
+  /**
+   * §6.4a. **`'principal'` is a driver the reader chose; `'shadow'` is the other seat in that
+   * principal's car**, added by the surface and not by the reader. It changes exactly one thing
+   * here — seat order within a team, so a principal is never dashed while a shadow beside it is
+   * solid — and nothing about colour. Defaults to `'principal'`.
+   */
+  role?: SeriesRole;
 }
+
+/** §6.4a. A chosen entity, or the other seat in a chosen entity's car. */
+export type SeriesRole = 'principal' | 'shadow';
 
 export interface EntityColour {
   reference: string;
   teamReference: string;
-  /** The token the mark is painted with. */
+  role: SeriesRole;
+  /**
+   * The token the mark is painted with. **Every driver of one team takes the same one** — colour
+   * identifies the car, and the seat inside it is the dash's job (§6.4a).
+   */
   plot: PlotToken;
   /** The token the swatch beside the name is painted with. Never the same role as `plot`. */
   identity: IdentityToken;
   /**
    * `true` when this entity shares its team with another entity in the same selection — the case
    * §6.4a calls the most valuable comparison in the sport and the one where colour is weakest.
-   * A consumer must read this and apply the mandatory marker and dash channels; the shade pair,
-   * when there is one, is a redundant fourth channel and never the channel.
+   * A consumer must read this and switch on the marker rung; the dash is applied unconditionally
+   * from `seat`, because a dash now *means* something whether or not anything collides.
    */
   teammate: boolean;
   /**
-   * `true` when the pair was exhausted rather than applied — a team with no admissible pair, or
-   * three or more drivers of one team in one plot area (a mid-season replacement, which happens
-   * for real). Both entities then carry the team's single plot colour and rungs 1–3 carry the whole
-   * distinction. A designed state, not an edge case.
+   * **Which seat of this car the entity is**, 0-based, within the current selection (§6.4a).
+   *
+   * Principals come first in `reference` order, then shadows in `reference` order, so a chosen
+   * driver is never dashed while the seat beside him is solid. `0` for a lone entity, which is
+   * the overwhelmingly common case and draws solid.
+   */
+  seat: number;
+  /**
+   * `true` when the **dash ladder** is exhausted rather than applied — more than four drivers of
+   * one team in one plot area. That is not hypothetical: 1957's Maserati fielded thirteen cars in
+   * one Grand Prix. Beyond four the fifth seat wraps to `solid` and the surface must fall back to
+   * a different form (§6.5.4, small multiples) or stop drawing seats.
+   *
+   * It replaces the shade pair's exhaustion flag, which fired at **three** — the dash ladder is
+   * strictly deeper than the two shades light mode could supply, which is the second reason the
+   * pair was withdrawn.
    */
   colourExhausted: boolean;
 }
 
 /**
- * Colour a whole selection at once, because the teammate case cannot be decided one entity at a
- * time: a shade pair only exists relative to its other member.
+ * Colour a whole selection at once, because the seat cannot be decided one entity at a time: a
+ * seat index only exists relative to the other occupants of the same car.
  *
- * **The one permitted repaint, and it is named rather than hidden** (§6.2). Adding or removing a
- * teammate re-shades that team's pair. It is a change in entity *relationship*, not in rank; it is
- * always the result of a deliberate action in the compare tray; and it is the single case §4.2
- * allows a chart to re-animate. Nothing else in this function depends on the selection: remove a
- * driver from a different team and every survivor keeps its exact token.
+ * **Colour identifies the car. The dash identifies the seat** (§6.4a, ruled 2026-08-23). Every
+ * driver of one team therefore takes the **same** plotting token, and what this function computes
+ * for a team group is an *order*, not a second colour. That reverses the earlier shade pair, and
+ * the reversal is the whole point: a reader who sees one colour is being told "same machinery",
+ * which is the claim a teammate comparison actually rests on.
+ *
+ * **§6.2's one permitted repaint is now gone entirely.** Adding or removing a team-mate used to
+ * re-shade that team's pair. It no longer changes any colour at all — only a `seat` index, and only
+ * for the team the change touched. Nothing in a selection change repaints anything.
  *
  * Order in equals order out, so a caller's stable entity order is preserved for the ladder, which
- * assigns rungs by that order (§6.4 rule 1).
+ * assigns marker rungs by that order (§6.4 rule 1).
  */
 export function assignEntityColours(entities: readonly ChartEntity[]): EntityColour[] {
   const byTeam = new Map<string, ChartEntity[]>();
@@ -230,56 +270,48 @@ export function assignEntityColours(entities: readonly ChartEntity[]): EntityCol
     else group.push(entity);
   }
 
+  /*
+   * Seat order within a car: **principals first, then shadows, each by `reference` ascending**.
+   *
+   * Two rules in one comparator, and both matter. Role first, because a shadow is by definition
+   * "the other seat" and drawing it solid while the driver the reader chose is dashed inverts the
+   * sentence the encoding is making. `reference` second, because it is the only driver identifier
+   * with 100% coverage (`permanent_car_number` covers 63 of 881, `abbreviation` 107 of 881,
+   * queried) and because §6.4 rule 1 requires the assignment to be stable across renders — an
+   * order taken from the tray would change when the tray did.
+   */
+  const seatOf = new Map<ChartEntity, number>();
+  for (const group of byTeam.values()) {
+    [...group]
+      .sort((a, b) => {
+        const ra = a.role ?? 'principal';
+        const rb = b.role ?? 'principal';
+        if (ra !== rb) return ra === 'principal' ? -1 : 1;
+        return a.reference < b.reference ? -1 : 1;
+      })
+      .forEach((entity, seat) => seatOf.set(entity, seat));
+  }
+
   return entities.map((entity) => {
     const group = byTeam.get(entity.teamReference) ?? [entity];
-    const identity = identityToken(entity.teamReference);
-    const single = plotToken(entity.teamReference);
-
-    if (group.length < 2) {
-      return {
-        reference: entity.reference,
-        teamReference: entity.teamReference,
-        plot: single,
-        identity,
-        teammate: false,
-        colourExhausted: false,
-      };
-    }
-
-    /*
-     * Two drivers of one team take the pair; three or more exhaust it. §6.4a property 4: one hue
-     * supplies at most two mutually separated shades, and **light mode sets that cap** because its
-     * band has its usable top cut by the 3:1-against-white requirement. Taking the dark-mode third
-     * shade would make the encoding theme-dependent, which property 3 forbids.
-     */
-    const pair = group.length === 2 ? shadePair(entity.teamReference) : null;
-    if (pair === null) {
-      return {
-        reference: entity.reference,
-        teamReference: entity.teamReference,
-        plot: single,
-        identity,
-        teammate: true,
-        colourExhausted: true,
-      };
-    }
-
-    /*
-     * Driver order is `reference` ascending among the selected drivers of that team, and the lower
-     * takes `deep` (§6.4a). Symmetric on purpose: neither driver "gets the team colour". An earlier
-     * draft anchored one driver on the team's plotting variant and derived the other, which implies
-     * a number-one/number-two hierarchy the data does not support — and could not reach the ΔE
-     * floor either.
-     */
-    const ordered = [...group].sort((a, b) => (a.reference < b.reference ? -1 : 1));
-    const first = ordered[0]?.reference === entity.reference;
     return {
       reference: entity.reference,
       teamReference: entity.teamReference,
-      plot: first ? pair.deep : pair.bright,
-      identity,
-      teammate: true,
-      colourExhausted: false,
+      role: entity.role ?? 'principal',
+      plot: plotToken(entity.teamReference),
+      identity: identityToken(entity.teamReference),
+      teammate: group.length > 1,
+      seat: seatOf.get(entity) ?? 0,
+      colourExhausted: group.length > DASH_SEATS,
     };
   });
 }
+
+/**
+ * How many seats of one car the dash ladder can tell apart — the length of `DASH_PATTERNS`,
+ * restated here because `ladder.ts` imports *from* this module and not the other way round.
+ *
+ * Four, and it is a real ceiling rather than a theoretical one: a 1950s works team entered as many
+ * as thirteen cars in a single Grand Prix.
+ */
+export const DASH_SEATS = 4;

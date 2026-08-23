@@ -240,6 +240,20 @@
     stroke-linejoin: round;
   }
 
+  /*
+   * §6.4a — **the other seat draws lighter.** A principal and the shadow beside it share a colour
+   * and a marker shape, so the only two things separating them are the dash and this: three
+   * quarters of the mark stroke, which gives the pair a foreground without touching colour.
+   *
+   * Weight and never opacity. An opacity drop changes the mark's measured contrast against the
+   * surface, and §6.3's plotting band is gated at 3:1 — a 0.6-opacity line would quietly fall
+   * under it for six of the eleven brand colours in light mode (§9.2 V-8). A thinner stroke is the
+   * same colour, still gated, still 1.5px against a 1px hairline grid.
+   */
+  .chart-line[data-role='shadow'] {
+    stroke-width: calc(var(--size-mark-stroke) * 0.75);
+  }
+
   .chart-area {
     fill: var(--series);
     fill-opacity: 0.16;

@@ -189,17 +189,17 @@ describe('structure', () => {
     }
   });
 
-  it('gives two team-mates two different plotting tokens — §6.4a’s shade pair', () => {
+  it('gives two team-mates the SAME plotting token — one car, one colour (§6.4a)', () => {
     const { container } = renderShare();
     const styles = [...container.querySelectorAll('.chart-span')]
       .slice(0, 2)
       .map((mark) => mark.getAttribute('style'));
-    expect(styles[0]).not.toEqual(styles[1]);
+    expect(styles[0]).toEqual(styles[1]);
   });
 
-  it('hatches the alternating segments only when colour is exhausted at three or more drivers', () => {
-    // §6.4a property 4 — one hue supplies at most two mutually separated shades, and a third driver
-    // of one team is a real season (a mid-season replacement), not an edge case.
+  it('hatches the odd seat of every car, because a fill has no dash to carry the seat', () => {
+    // §6.4a, 2026-08-23. The line chart separates two seats of one car with a dash; a share
+    // chart's mark is a fill, so the same distinction is carried by rung 4's 45° hatch.
     const three: ShareRow = {
       key: '2020',
       label: '2020',
@@ -218,11 +218,14 @@ describe('structure', () => {
         valueTitle="Points"
       />,
     );
+    // Three seats: seats 0 and 2 plain, seat 1 hatched.
     expect(container.querySelectorAll('path[fill^="url(#"]')).toHaveLength(1);
     cleanup();
 
+    // Two rows of two seats each: seat 1 of each car hatched, so two. Under the shade pair these
+    // rows carried no hatch at all and their segments were told apart by colour alone.
     const { container: pair } = renderShare();
-    expect(pair.querySelectorAll('path[fill^="url(#"]')).toHaveLength(0);
+    expect(pair.querySelectorAll('path[fill^="url(#"]')).toHaveLength(2);
   });
 });
 

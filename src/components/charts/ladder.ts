@@ -3,17 +3,18 @@
  * make the palette safe to ship.
  *
  * Tier B of the entity ramp clears the normal-vision floor and hands its CVD pairs to this module;
- * every cross-source collision lands here too; and a teammate comparison arrives here *always*,
- * because two drivers of one team is the case where colour is weakest and the most valuable
- * comparison in the sport. Sauber settles the argument on its own: its brand hue sits in the
- * reserved green timing band and no two-shade split exists in light mode, so **marker shape, dash
- * and direct label are mandatory for every team** and the shade pair is a redundant fourth channel.
+ * every cross-source collision lands here too.
+ *
+ * ⚠ **The dash left the ladder on 2026-08-23** (§6.4a). It is no longer a rung that a collision can
+ * switch on: a dash now *means* **the other seat in this car**, unconditionally, in the same way
+ * purple means session fastest. So this module assigns it from `EntityColour.seat` and never from a
+ * collision, and the collision ladder is three rungs — direct label, marker shape, texture.
  *
  * Nothing here is colour. Nothing here reads a colour. It takes the tokens `entityColor.ts`
  * assigned and answers one question: which non-colour channels does this chart have to switch on.
  */
 
-import { collides, type EntityColour } from '@/lib/entityColor';
+import { collides, DASH_SEATS, type EntityColour } from '@/lib/entityColor';
 
 /** §6.4 rung 3. Comparison is capped here so the ladder cannot run out: four rungs, four entities. */
 export const COMPARISON_CAP = 4;
@@ -22,7 +23,10 @@ export const COMPARISON_CAP = 4;
 export const MARKER_SHAPES = ['circle', 'square', 'triangle', 'diamond'] as const;
 export type MarkerShape = (typeof MARKER_SHAPES)[number];
 
-/** §6.4 rung 3, in the fixed order. */
+/**
+ * §6.4a's **seat** patterns, in the fixed order: seat 0 solid, seat 1 `6 3`, seat 2 `2 3`, seat 3
+ * `9 3 2 3`. Not a collision rung — a semantic channel, and the order *is* the assignment.
+ */
 export const DASH_PATTERNS = ['solid', 'long', 'short', 'dash-dot'] as const;
 export type DashPattern = (typeof DASH_PATTERNS)[number];
 
@@ -47,11 +51,9 @@ export const DASH_ARRAY: Record<DashPattern, string | undefined> = {
 
 /** Which rungs are switched on for the chart as a whole, and why. */
 export interface LadderState {
-  /** Rung 2 — distinct marker shapes. */
+  /** Rung 2 — distinct marker shapes, one per **car**. */
   marker: boolean;
-  /** Rung 3 — distinct dash patterns. */
-  dash: boolean;
-  /** Rung 4 — the 45° hatch. A user control and the print/CVD affordance (§6.5.6), never automatic. */
+  /** Rung 3 — the 45° hatch. A user control and the print/CVD affordance (§6.5.6), never automatic. */
   texture: boolean;
 }
 
@@ -87,17 +89,24 @@ export interface LadderOptions {
 /**
  * Rung activation is **chart-wide**; the channel *value* is per series.
  *
- * §6.4 describes the ladder pairwise — "a colliding pair takes the lowest rung not already used by
- * either member" — and that is how the escalation is decided below. What is deliberately not done
- * is applying the resulting channel to the colliding pair alone. A chart where two of four series
- * carry a marker shape and two do not reads as an accident rather than as an encoding, the legend
- * has to explain a distinction that applies to half the rows, and §6.5.6's Patterns toggle already
- * sets the precedent that a rung is a property of the chart. So when a rung fires, every series
- * takes its value from that rung's fixed order.
+ * §6.4 describes the collision ladder pairwise — "a colliding pair takes the lowest rung not
+ * already used by either member" — and that is how the escalation is decided below. What is
+ * deliberately not done is applying the resulting channel to the colliding pair **alone**: a chart
+ * where two of four series carry a marker shape and two do not reads as an accident rather than as
+ * an encoding, and the legend then has to explain a distinction that applies to half its rows.
+ * §6.5.6's Patterns toggle already sets the precedent that a rung is a property of the chart.
  *
- * One consequence worth stating: at ≤ 4 series, rung 2 alone separates every pair, because four
- * distinct shapes is four distinct series. Rung 3 therefore only ever fires because a **teammate**
- * comparison is present, where §6.4a makes both marker and dash mandatory rather than escalated.
+ * **Two channels, two rules, and they are not the same rule** (§6.4a, 2026-08-23):
+ *
+ * | Channel | Fires | Value |
+ * |---|---|---|
+ * | **marker** | on collision, or whenever any car carries more than one series | one shape **per car**, by the car's position in the stable order |
+ * | **dash** | **always** | the entity's `seat` within its car |
+ *
+ * The marker being per *car* rather than per *series* is what makes eight series read as four
+ * pairs: a principal and the seat beside him share a colour and a shape, and differ only in the
+ * dash. It also keeps two team-mate pairs on one chart fully distinct — pair A is circle, pair B is
+ * square, and each pair is solid-then-dashed inside itself.
  */
 export function assignLadder(
   entities: readonly EntityColour[],
@@ -108,28 +117,27 @@ export function assignLadder(
 
   const state: LadderState = {
     marker: (options.sticky?.marker ?? false) || hasCollision || hasTeammate,
-    dash: (options.sticky?.dash ?? false) || hasTeammate,
     texture: options.patterns ?? options.sticky?.texture ?? false,
   };
 
-  const rungIndex = assignRungIndices(entities);
+  const carIndex = assignCarIndices(entities);
 
   return {
     state,
-    exceedsCap: entities.length > COMPARISON_CAP,
+    exceedsCap: carIndex.cars > COMPARISON_CAP,
     series: entities.map((entity, i) => {
-      const index = (rungIndex[i] ?? i) % MARKER_SHAPES.length;
+      const index = (carIndex.of[i] ?? i) % MARKER_SHAPES.length;
       return {
         ...entity,
         marker: state.marker ? (MARKER_SHAPES[index] ?? 'circle') : 'circle',
-        dash: state.dash ? (DASH_PATTERNS[index] ?? 'solid') : 'solid',
+        dash: DASH_PATTERNS[entity.seat % DASH_SEATS] ?? 'solid',
         texture: state.texture,
       };
     }),
   };
 }
 
-/** Any pair the palette never promised to separate. Teammates are handled separately and always. */
+/** Any pair the palette never promised to separate. One car's own seats are the dash's business. */
 function anyCollision(entities: readonly EntityColour[]): boolean {
   for (let i = 0; i < entities.length; i += 1) {
     for (let j = i + 1; j < entities.length; j += 1) {
@@ -144,40 +152,29 @@ function anyCollision(entities: readonly EntityColour[]): boolean {
 }
 
 /**
- * The rung index each series takes, which is its position in the **stable entity order** — §6.4
- * rule 1: two entities that collide today must get the same two rungs tomorrow, so the index can
- * never come from rank, z-order, or the order a query happened to return.
+ * The marker index each series takes: **its car's position in the stable entity order**, so every
+ * series of one car gets the same shape and two cars never share one.
  *
- * With one exception, and it is §6.4a's: **within one team, the indices are redistributed by
- * `driver.reference` ascending.** The set of indices the group holds does not change — so every
- * series in the chart still has a distinct one — but which member holds which does, so the lower
- * reference takes circle and solid regardless of the order the compare tray passed them in. That
- * is what makes "the team's two drivers take circle and square, in driver order" true without
- * duplicating a shape when a second team's pair is on the same chart.
+ * Keyed on the car and not on the series because §6.4a's whole claim is that colour and shape
+ * together say *"this machinery"* while the dash says *"which seat"*. Indexing per series would
+ * hand a principal a circle and the seat beside him a square, and the pair would stop reading as a
+ * pair — the exact failure the eight-series season lens exists to avoid.
  *
- * `reference` is used because it is the only driver identifier with 100% coverage:
- * `permanent_car_number` covers 63 of 881 and `abbreviation` 107 of 881 (queried).
+ * §6.4 rule 1 still holds: the index comes from the order the caller passed, never from rank or
+ * z-order, so a car that is a triangle today is a triangle tomorrow for the same selection.
+ *
+ * `exceedsCap` is reported on the **car** count rather than the series count for the same reason:
+ * eight series across four cars is four shapes and four dashes, which is exactly what the ladder
+ * promises to separate. Nine series across five cars is not.
  */
-function assignRungIndices(entities: readonly EntityColour[]): number[] {
-  const out = entities.map((_, i) => i);
-
-  const groups = new Map<string, number[]>();
-  entities.forEach((entity, i) => {
-    const group = groups.get(entity.teamReference);
-    if (group === undefined) groups.set(entity.teamReference, [i]);
-    else group.push(i);
+function assignCarIndices(entities: readonly EntityColour[]): { of: number[]; cars: number } {
+  const order = new Map<string, number>();
+  const of = entities.map((entity) => {
+    const seen = order.get(entity.teamReference);
+    if (seen !== undefined) return seen;
+    const next = order.size;
+    order.set(entity.teamReference, next);
+    return next;
   });
-
-  for (const positions of groups.values()) {
-    if (positions.length < 2) continue;
-    const indices = [...positions].sort((a, b) => a - b);
-    const byReference = [...positions].sort((a, b) =>
-      (entities[a]?.reference ?? '') < (entities[b]?.reference ?? '') ? -1 : 1,
-    );
-    byReference.forEach((position, rank) => {
-      out[position] = indices[rank] ?? position;
-    });
-  }
-
-  return out;
+  return { of, cars: order.size };
 }

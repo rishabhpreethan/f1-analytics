@@ -32,7 +32,10 @@ function bodies(css: string, selector: string): string[] {
   const needle = new RegExp(`(^|[},])\\s*${escaped}\\s*\\{`, 'g');
   let match: RegExpExecArray | null;
   while ((match = needle.exec(css)) !== null) {
-    const open = css.indexOf('{', match.index);
+    /* From the END of the match: the prefix group swallows the preceding brace, so on the first
+     * rule inside an `@layer` this would open at the layer's brace and return the whole layer.
+     * `match[0]` ends with the selector's own `{`. (Found in `compare.css.test.ts`, 2026-08-23.) */
+    const open = match.index + match[0].length - 1;
     let depth = 0;
     for (let i = open; i < css.length; i += 1) {
       if (css[i] === '{') depth += 1;
