@@ -282,6 +282,139 @@ describe('the span rail — §7.12', () => {
   });
 });
 
+describe('the population board — §6.6.5.1', () => {
+  /**
+   * The board sits on `--surface-sunken` and every mark on it sits on `--surface-raised`. Both
+   * halves matter and neither is decoration: the step down separates the instrument from the list
+   * panel below it, and the step back up is what gives a track and a map plate an edge to be seen
+   * against. Flatten either and the board becomes one grey rectangle with numbers on it.
+   */
+  it('recesses the board and raises every plate on it', () => {
+    expect(bodies(CSS, '.pop-board')[0] ?? '').toMatch(
+      /background-color:\s*var\(--surface-sunken\)/,
+    );
+    for (const selector of ['.tier-track', '.era-track']) {
+      expect(bodies(CSS, selector)[0] ?? '').toMatch(/background-color:\s*var\(--surface-raised\)/);
+    }
+  });
+
+  /**
+   * A stratum of one — Madring joining the calendar — must be a visible mark. Without the floor
+   * its bar rounds to zero pixels and *measured as one* renders identically to *nobody at all*,
+   * which is §1.0's collapse moved into a chart.
+   */
+  it('gives the smallest bar and the shortest column a visible floor', () => {
+    const tier = bodies(CSS, '.tier-bar')[0] ?? '';
+    expect(tier).toMatch(/width:\s*var\(--tier-extent,\s*0%\)/);
+    expect(tier).toMatch(/min-width:\s*3px/);
+
+    const era = bodies(CSS, '.era-bar')[0] ?? '';
+    expect(era).toMatch(/height:\s*var\(--era-extent,\s*0%\)/);
+    expect(era).toMatch(/min-height:\s*3px/);
+  });
+
+  /**
+   * §6.1 — a magnitude mark grows off its own axis. The decade column is anchored at the bottom of
+   * its track, which is where G-30's `scaleY` origin also is; anchor it at the top and the tween
+   * would grow it downwards out of the baseline.
+   */
+  it('anchors the decade column to the baseline, not to the top of its track', () => {
+    const era = bodies(CSS, '.era-bar')[0] ?? '';
+    expect(era).toMatch(/bottom:\s*0/);
+    expect(era).not.toMatch(/\btop:\s*0/);
+    // Rounded at the two ends that are *not* on the axis, so the bar reads as sitting on it.
+    expect(era).toMatch(/border-radius:\s*var\(--radius-xs\) var\(--radius-xs\) 0 0/);
+  });
+
+  /**
+   * The ladder's opacity is driven by a per-row custom property so it can run **rarest-loudest**.
+   * A hard-coded opacity here would silently flatten the whole device — 35 champions and 571
+   * starters would read as equally important marks.
+   */
+  it('drives the ladder’s emphasis from the row, not from a fixed value', () => {
+    expect(bodies(CSS, '.tier-bar')[0] ?? '').toMatch(/opacity:\s*var\(--tier-emphasis,\s*1\)/);
+  });
+
+  /**
+   * §3.5.1a — a pressed control carries three channels, because a fill alone inverts between the
+   * themes and leaves dark mode with pressed and unpressed reading the same weight.
+   */
+  it('gives a pressed rung a fill, a boundary and an ink-plus-weight step', () => {
+    const pressed = bodies(CSS, ".tier-row[aria-pressed='true']")[0] ?? '';
+    expect(pressed).toMatch(/background-color:\s*var\(--accent-wash\)/);
+    expect(pressed).toMatch(/border-color:\s*var\(--accent-border\)/);
+
+    const label = bodies(CSS, ".tier-row[aria-pressed='true'] .tier-label")[0] ?? '';
+    expect(label).toMatch(/color:\s*var\(--accent-wash-ink\)/);
+    expect(label).toMatch(/font-weight:\s*600/);
+  });
+
+  it('gives a pressed decade column the same three channels', () => {
+    const pressed = bodies(CSS, ".era-col[aria-pressed='true']")[0] ?? '';
+    expect(pressed).toMatch(/background-color:\s*var\(--accent-wash\)/);
+    expect(pressed).toMatch(/border-color:\s*var\(--accent-border\)/);
+    // Joined, not `[0]`: the ink step is shared with `:hover` in a grouped selector and the
+    // weight step is its own rule, so the pressed value's declarations live in two bodies.
+    const value = bodies(CSS, ".era-col[aria-pressed='true'] .era-value").join('\n');
+    expect(value).toMatch(/color:\s*var\(--ink-primary\)/);
+    expect(value).toMatch(/font-weight:\s*600/);
+  });
+
+  /**
+   * The unfinished decade is hatched as well as short. Texture rather than colour, per §6.3's
+   * CVD-and-print rule, and the caption says the same thing in words — three channels for a fact
+   * that would otherwise read as "the sport shrank again this year".
+   */
+  it('hatches the decade the record has not finished', () => {
+    const partial = bodies(CSS, ".era-col[data-partial='true'] .era-bar")[0] ?? '';
+    expect(partial).toMatch(/repeating-linear-gradient/);
+  });
+
+  /** A disabled rung stays readable — §3.5.2 forbids fading a control whose reason must be read. */
+  it('keeps a rung nobody is in fully opaque', () => {
+    expect(bodies(CSS, '.tier-row:disabled')[0] ?? '').toMatch(/opacity:\s*1/);
+  });
+});
+
+describe('the circuit atlas — §6.6.5.3', () => {
+  /**
+   * `.locator-frame` fills `--surface-sunken`, which is the board's own surface. Inherited
+   * unchanged the map would be an invisible rectangle — the one rule this component adds, and the
+   * one that a tidy-up would most plausibly delete as redundant.
+   */
+  it('raises the map plate off the sunken board', () => {
+    expect(bodies(CSS, '.atlas-map .locator-frame')[0] ?? '').toMatch(
+      /fill:\s*var\(--surface-raised\)/,
+    );
+  });
+
+  /**
+   * §3.4.2 — never colour alone. A current venue and a retired one differ in fill, in stroke
+   * weight and in opacity, and their radii differ in the markup as well.
+   */
+  it('separates a current pip from a retired one on more than fill', () => {
+    const current = bodies(CSS, ".atlas-pip[data-current='true']")[0] ?? '';
+    const retired = bodies(CSS, ".atlas-pip[data-current='false']")[0] ?? '';
+    expect(current).toMatch(/fill:\s*var\(--accent-mark\)/);
+    expect(retired).toMatch(/fill:\s*var\(--ink-tertiary\)/);
+    expect(retired).toMatch(/opacity:\s*0\.7/);
+    expect(current).toMatch(/stroke-width:\s*1\.5/);
+    expect(retired).toMatch(/stroke-width:\s*1/);
+  });
+
+  /**
+   * §6.3's surface ring. On a single-pip locator it is belt-and-braces; with 78 pips on one
+   * graticule the European cluster is a single blob without it.
+   */
+  it('rings every pip in the surface behind it', () => {
+    for (const state of ['true', 'false']) {
+      expect(bodies(CSS, `.atlas-pip[data-current='${state}']`)[0] ?? '').toMatch(
+        /stroke:\s*var\(--surface-raised\)/,
+      );
+    }
+  });
+});
+
 describe('reduced motion is genuinely stopped', () => {
   const reduce = mediaBlocks(CSS, '@media (prefers-reduced-motion: reduce)');
 
@@ -291,6 +424,14 @@ describe('reduced motion is genuinely stopped', () => {
 
   it('suppresses the chevron nudge, and does not merely slow it', () => {
     expect(reduce).toMatch(/\.index-row:hover \.index-arrow[\s\S]*?transform:\s*none/);
+  });
+
+  it('stops every board transition, so a hovered bar changes state instantly', () => {
+    // G-30 itself never exists under reduce — `useMotion` builds no tween — but these are CSS
+    // transitions on hover and pressed, which the hook has no say over.
+    for (const selector of ['.tier-bar', '.era-bar', '.tier-label', '.era-value']) {
+      expect(reduce).toContain(selector);
+    }
   });
 
   it('never uses a duration or an ease that is not a token', () => {
@@ -316,8 +457,19 @@ describe('the system, not a second one', () => {
   });
 
   it('uses no radius and no z-index off the scale', () => {
+    /*
+     * Each corner is a `--radius-*` token or a literal `0`, and a shorthand of those is allowed.
+     * The decade bar rounds its **top two corners only** (`var(--radius-xs) var(--radius-xs) 0 0`)
+     * because §6.1 asks for rounded data-ends *anchored to the baseline* — a bar rounded at the
+     * bottom would lift off the axis it grows from. The rule this test exists to hold is "no px
+     * literal", and that is what it still holds.
+     */
     const radii = [...CSS.matchAll(/border-radius:\s*([^;]+);/g)].map((match) => match[1]?.trim());
-    for (const radius of radii) expect(radius).toMatch(/^var\(--radius-[a-z0-9]+\)$/);
+    for (const radius of radii) {
+      for (const corner of (radius ?? '').split(/\s+/)) {
+        expect(corner).toMatch(/^(?:var\(--radius-[a-z0-9]+\)|0)$/);
+      }
+    }
 
     const zIndexes = [...CSS.matchAll(/z-index:\s*([^;]+);/g)].map((match) => match[1]?.trim());
     for (const value of zIndexes) expect(value).toMatch(/^var\(--z-[a-z]+\)$/);

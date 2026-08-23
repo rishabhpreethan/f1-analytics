@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NO_SEASON_GROUP,
   buildHaystack,
+  compareRank,
   driverSortKey,
   filterItems,
   groupItems,
@@ -37,6 +38,10 @@ function item(overrides: Partial<IndexItem> & Pick<IndexItem, 'ref'>): IndexItem
     chip: null,
     figures: [],
     ariaLabel: overrides.ref,
+    tier: 'starter',
+    band: 'starts-1',
+    rank: [],
+    titles: null,
     ...overrides,
   };
 }
@@ -168,6 +173,111 @@ describe('sortItems', () => {
     const items = [item({ ref: 'a', sortKey: 'a', figures: [] })];
     expect(sortItems(items, winsSort).map((row) => row.ref)).toEqual(['a']);
   });
+
+  /* ------------------------------------------------- §6.6.5 the achievement lens */
+
+  const tierSort: SortOption = {
+    id: 'tier',
+    label: 'Achievement',
+    figure: 1,
+    by: 'tier',
+    group: 'tier',
+    headings: [
+      { key: 'champion', label: 'Champions' },
+      { key: 'winner', label: 'Race winners' },
+      { key: 'starter', label: 'Grand Prix starters' },
+    ],
+  };
+
+  it('orders the groups as the page declared them, not alphabetically by key', () => {
+    // `champion` < `starter` < `winner` as strings, which is the wrong ladder. The order is
+    // editorial and comes from `headings`; no comparator could derive it.
+    const items = [
+      item({ ref: 's', sortKey: 's', tier: 'starter', rank: [0, 0] }),
+      item({ ref: 'w', sortKey: 'w', tier: 'winner', rank: [0, 5] }),
+      item({ ref: 'c', sortKey: 'c', tier: 'champion', rank: [7, 105] }),
+    ];
+    expect(sortItems(items, tierSort).map((row) => row.ref)).toEqual(['c', 'w', 's']);
+  });
+
+  it('orders inside a group by merit, so /drivers opens on Hamilton and not on Abate', () => {
+    // The one behaviour the redesign exists for: the default view's first row is the most
+    // decorated driver in the payload, not the first surname in it.
+    const items = [
+      item({ ref: 'abate', sortKey: 'abate,carlo', tier: 'champion', rank: [1, 2, 4] }),
+      item({ ref: 'hamilton', sortKey: 'hamilton,lewis', tier: 'champion', rank: [7, 105, 202] }),
+    ];
+    expect(sortItems(items, tierSort).map((row) => row.ref)).toEqual(['hamilton', 'abate']);
+  });
+
+  it('walks the whole merit vector, so a podium count breaks a wins tie', () => {
+    const items = [
+      item({ ref: 'fewer', sortKey: 'a', tier: 'winner', rank: [0, 11, 40] }),
+      item({ ref: 'more', sortKey: 'b', tier: 'winner', rank: [0, 11, 68] }),
+    ];
+    expect(sortItems(items, tierSort).map((row) => row.ref)).toEqual(['more', 'fewer']);
+  });
+
+  it('falls back to the name once merit ties completely', () => {
+    const items = [
+      item({ ref: 'z', sortKey: 'z', tier: 'starter', rank: [0, 0, 0] }),
+      item({ ref: 'a', sortKey: 'a', tier: 'starter', rank: [0, 0, 0] }),
+    ];
+    expect(sortItems(items, tierSort).map((row) => row.ref)).toEqual(['a', 'z']);
+  });
+
+  it('puts an undeclared group LAST, so a forgotten tier is visible rather than promoted', () => {
+    const items = [
+      item({ ref: 'ghost', sortKey: 'ghost', tier: 'mystery', rank: [99] }),
+      item({ ref: 'known', sortKey: 'known', tier: 'starter', rank: [0] }),
+    ];
+    expect(sortItems(items, tierSort).map((row) => row.ref)).toEqual(['known', 'ghost']);
+  });
+
+  it('sorts a band lens by the declared band order too', () => {
+    const bandSort: SortOption = {
+      id: 'career',
+      label: 'Career',
+      figure: 0,
+      by: 'band',
+      group: 'band',
+      headings: [
+        { key: 'starts-150', label: '150 starts or more' },
+        { key: 'starts-1', label: 'A single start' },
+      ],
+    };
+    const items = [
+      item({ ref: 'one', sortKey: 'one', band: 'starts-1', rank: [0, 0, 0, -1, 1] }),
+      item({ ref: 'many', sortKey: 'many', band: 'starts-150', rank: [0, 0, 0, -1, 322] }),
+    ];
+    expect(sortItems(items, bandSort).map((row) => row.ref)).toEqual(['many', 'one']);
+  });
+});
+
+describe('compareRank', () => {
+  it('is descending — a bigger figure comes first', () => {
+    expect(compareRank([7], [2])).toBeLessThan(0);
+    expect(compareRank([2], [7])).toBeGreaterThan(0);
+  });
+
+  it('moves to the next element only on a tie', () => {
+    expect(compareRank([1, 21], [1, 11])).toBeLessThan(0);
+    expect(compareRank([1, 21, 103], [1, 21, 103])).toBe(0);
+  });
+
+  /*
+   * The one case that could silently invert the whole list: `bestChampionshipPosition` is a rank,
+   * so 1 beats 20, and `championshipMerit` inverts it before it reaches here. A missing element
+   * compares below a measured zero — absence is not a low score (§1.0); here it is lower still.
+   */
+  it('treats a missing element as below a measured zero', () => {
+    expect(compareRank([0], [])).toBeLessThan(0);
+    expect(compareRank([], [0])).toBeGreaterThan(0);
+  });
+
+  it('compares vectors of different lengths without throwing', () => {
+    expect(compareRank([1, 2, 3], [1])).toBeLessThan(0);
+  });
 });
 
 describe('groupItems', () => {
@@ -219,6 +329,35 @@ describe('groupItems', () => {
       '2000s',
       '2020s',
     ]);
+  });
+
+  it('labels a tier bucket from the page’s headings, not from the raw key', () => {
+    const items = [
+      item({ ref: 'a', sortKey: 'a', tier: 'champion' }),
+      item({ ref: 'b', sortKey: 'b', tier: 'winner' }),
+    ];
+    const groups = groupItems(items, 'tier', [
+      { key: 'champion', label: 'Champions' },
+      { key: 'winner', label: 'Race winners' },
+    ]);
+    expect(groups.map((group) => [group.label, group.count])).toEqual([
+      ['Champions', 1],
+      ['Race winners', 1],
+    ]);
+  });
+
+  it('labels a band bucket the same way', () => {
+    const groups = groupItems([item({ ref: 'a', sortKey: 'a', band: 'starts-150' })], 'band', [
+      { key: 'starts-150', label: '150 starts or more' },
+    ]);
+    expect(groups[0]?.label).toBe('150 starts or more');
+  });
+
+  it('falls back to the raw key when a heading is missing, so the mistake is visible', () => {
+    // A blank header would be indistinguishable from the unlabelled group a metric lens makes,
+    // which would hide an undeclared tier instead of showing it.
+    const groups = groupItems([item({ ref: 'a', sortKey: 'a', tier: 'mystery' })], 'tier', []);
+    expect(groups[0]?.label).toBe('mystery');
   });
 
   it('returns exactly one unlabelled group for a metric sort, and none for an empty list', () => {

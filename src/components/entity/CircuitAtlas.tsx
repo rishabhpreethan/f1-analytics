@@ -1,0 +1,159 @@
+import type { CircuitListItem } from '@schemas/directory';
+
+/**
+ * **`CircuitAtlas`** — 78 venues on one graticule. `DESIGN_SYSTEM.md` §6.6.5.3, §7.11.
+ *
+ * `server/schemas/directory.ts` publishes `latitude` and `longitude` on the index payload with an
+ * explicit reason: *"a circuit index is a **map**, and a map is the one design a list of 78 venues
+ * actually wants."* This is that map, and it is **`CircuitLocator` with the pip repeated** — same
+ * equirectangular projection, same graticule, same reference parallels, same CSS classes. One
+ * venue's position and seventy-eight venues' positions are the same drawing at two scales, and
+ * building a second map language for the second one is how a product starts looking assembled.
+ *
+ * ---
+ *
+ * **Still no coastline, and still no track outline.** The projection is the identity map —
+ * `x = longitude + 180`, `y = 90 − latitude` — so there is no projection arithmetic to get wrong.
+ * A landmass would need a topojson asset costing more than the whole chart kit, and the `circuit`
+ * table holds a name, a locality, a country and three numbers, so a track shape would be
+ * fabrication. §7.11 already ruled both and this inherits the ruling rather than relitigating it.
+ *
+ * **`role="img"` with one accessible name, and not 78 links.** This is `SeasonDial`'s decision on a
+ * bigger mark: seventy-eight tab stops between the console and the list would make the map a
+ * keyboard obstacle in front of the thing it introduces, and announcing seventy-eight pips one at a
+ * time is worse than useless. The list below is the navigable surface; the map is the picture of
+ * what is in it. The summary sentence carries the whole reading.
+ *
+ * **Two pip classes, and the difference is not colour alone.** A venue on the current calendar is
+ * `--accent-mark` at r=3.2 with a surface ring; a retired one is `--ink-tertiary` at r=2 and
+ * translucent. Size, opacity and hue all move together (§3.4.2), and the ladder beside it states
+ * both counts in words.
+ *
+ * **Drawn in one pass, retired first.** SVG has no z-index, so paint order *is* stacking: the 22
+ * current venues are appended last so that Monza's pip is never hidden under a venue that closed in
+ * 1958. That is the one thing about this component that is easy to get wrong and invisible in a
+ * test.
+ */
+
+export interface CircuitAtlasProps {
+  circuits: readonly CircuitListItem[];
+  /** The calendar's latest year — `max(lastScheduledYear)`, computed by the page. */
+  latest: number | null;
+}
+
+/** The reference parallels, verbatim from `CircuitLocator` so the two maps cannot drift. */
+const PARALLELS = [
+  { lat: 66.5635, label: 'Arctic Circle' },
+  { lat: 23.4365, label: 'Tropic of Cancer' },
+  { lat: 0, label: 'Equator' },
+  { lat: -23.4365, label: 'Tropic of Capricorn' },
+  { lat: -66.5635, label: 'Antarctic Circle' },
+] as const;
+
+const MERIDIANS = [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150] as const;
+
+export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
+  const placed = circuits.filter(
+    (circuit): circuit is CircuitListItem & { latitude: number; longitude: number } =>
+      circuit.latitude !== null && circuit.longitude !== null,
+  );
+
+  const isCurrent = (circuit: CircuitListItem) =>
+    latest !== null && circuit.lastScheduledYear !== null && circuit.lastScheduledYear >= latest;
+
+  const current = placed.filter(isCurrent);
+  const retired = placed.filter((circuit) => !isCurrent(circuit));
+
+  /*
+   * Counted, never written. `placed.length` rather than `circuits.length` because a venue with no
+   * coordinates is not on this map and the sentence must not claim it is — all 78 carry them today,
+   * and the schema makes both fields nullable anyway.
+   */
+  const summary =
+    latest === null
+      ? `${String(placed.length)} Formula 1 venues, plotted by latitude and longitude.`
+      : `${String(placed.length)} Formula 1 venues, plotted by latitude and longitude: ${String(current.length)} on the ${String(latest)} calendar, ${String(retired.length)} no longer used.`;
+
+  return (
+    <div className="atlas">
+      <svg
+        className="locator-map atlas-map"
+        viewBox="0 0 360 180"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={summary}
+      >
+        <rect className="locator-frame" x="0.5" y="0.5" width="359" height="179" />
+
+        {MERIDIANS.map((lon) => (
+          <line
+            key={`m${String(lon)}`}
+            className={lon === 0 ? 'locator-prime' : 'locator-graticule'}
+            x1={lon + 180}
+            x2={lon + 180}
+            y1={0}
+            y2={180}
+          />
+        ))}
+
+        {PARALLELS.map((parallel) => (
+          <line
+            key={parallel.label}
+            className={parallel.lat === 0 ? 'locator-prime' : 'locator-graticule'}
+            x1={0}
+            x2={360}
+            y1={90 - parallel.lat}
+            y2={90 - parallel.lat}
+          />
+        ))}
+
+        {/*
+         * The parallels are unlabelled here and labelled on `CircuitLocator`. There, the labels are
+         * the readout — a single pip is located by reading it off the grid. Here the grid is
+         * context for a distribution, and five captions across 78 marks would be five more things
+         * to read past.
+         */}
+
+        {retired.map((circuit) => (
+          <circle
+            key={circuit.ref}
+            className="atlas-pip"
+            data-current="false"
+            cx={circuit.longitude + 180}
+            cy={90 - circuit.latitude}
+            r={2}
+          />
+        ))}
+
+        {current.map((circuit) => (
+          <circle
+            key={circuit.ref}
+            className="atlas-pip"
+            data-current="true"
+            cx={circuit.longitude + 180}
+            cy={90 - circuit.latitude}
+            r={3.2}
+          />
+        ))}
+      </svg>
+
+      {/*
+       * The key is text, not a colour swatch: §3.4.2 wants a second channel and the second channel
+       * here is the word. Both counts also appear on the ladder to the left, which is the map's
+       * table view.
+       */}
+      <p className="atlas-key">
+        <span className="atlas-key-item">
+          <span className="atlas-key-pip" data-current="true" aria-hidden="true" />
+          {latest === null ? 'On the calendar' : `On the ${String(latest)} calendar`}
+          <b className="t-mono">{current.length}</b>
+        </span>
+        <span className="atlas-key-item">
+          <span className="atlas-key-pip" data-current="false" aria-hidden="true" />
+          No longer used
+          <b className="t-mono">{retired.length}</b>
+        </span>
+      </p>
+    </div>
+  );
+}

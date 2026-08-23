@@ -37,6 +37,14 @@ export interface IndexConsoleProps {
   countLabel: string;
   /** The `id` of the list the field controls, for `aria-controls`. */
   listId: string;
+  /**
+   * The chips for whatever the population board currently has selected, or `null`.
+   *
+   * They live **in the console rather than beside the board** because the console is the sticky
+   * element: a reader 400 rows down has to be able to see that a filter is on and release it
+   * without scrolling back up to the mark that set it.
+   */
+  filters?: React.ReactNode;
 }
 
 export function IndexConsole({
@@ -49,6 +57,7 @@ export function IndexConsole({
   onSortChange,
   countLabel,
   listId,
+  filters = null,
 }: IndexConsoleProps) {
   const fieldId = useId();
   const countId = useId();
@@ -110,7 +119,13 @@ export function IndexConsole({
 
       <div className="index-console-row">
         <fieldset className="index-sort">
-          <legend className="sr-only">Sort by</legend>
+          {/*
+           * `Group and order the list by`, not `Sort by`. The control stopped being only a sort
+           * when the lens started deciding the group headers too (§6.6.5.2) — the visible
+           * segments read `Achievement · Era · Career · A–Z`, and a legend announcing them as a
+           * sort would understate what pressing one does.
+           */}
+          <legend className="sr-only">Group and order the list by</legend>
           {sorts.map((sort) => (
             <label className="index-sort-option" key={sort.id}>
               <input
@@ -135,6 +150,8 @@ export function IndexConsole({
           {countLabel}
         </p>
       </div>
+
+      {filters}
     </div>
   );
 }

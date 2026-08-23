@@ -232,6 +232,77 @@ export function useListReveal<T extends HTMLElement = HTMLElement>(
 }
 
 /**
+ * **G-30 — the population board's two marks** (`DESIGN_SYSTEM.md` §6.6.5.1, §4.6 G-30).
+ *
+ * Both grow from their own axis, which is §6.1's rule and the only honest direction for either:
+ *
+ * - **Ladder bars** — `scaleX 0→1` from `transformOrigin: 'left'`. They are anchored at the label,
+ *   and a bar that grew from the right would animate its *start* moving, which is what a coverage
+ *   window does (`useAxisAnchoredBars`) and what a population count emphatically does not.
+ * - **Decade columns** — `scaleY 0→1` from `transformOrigin: 'bottom'`, growing off the baseline.
+ *
+ * One timeline, ladder first and columns overlapped at `-=0.2` so the board reads as one gesture
+ * rather than two lists queueing. `dur.chart` / `ease.mech` — the mechanical curve every data mark
+ * in this product grows on — and `stagger.bar`, capped through `staggerAmount`.
+ *
+ * **No `ScrollTrigger`**, for G-23's reason: the board is the first thing under the masthead and is
+ * on screen at first paint, so a scroll trigger would make the trigger load-bearing for the content
+ * being visible at all (§4.6.1 rule 2).
+ *
+ * **Deps identify the dataset, never the selection.** Clicking a bar filters the list; it must not
+ * re-grow the chart the reader is looking at (§4.6.1, G-29).
+ *
+ * Authored `from` (MR-2), so under reduced motion — where no tween is created at all — every bar is
+ * simply at its full, correct extent.
+ */
+export function usePopulationMount<T extends HTMLElement = HTMLElement>(
+  deps: React.DependencyList,
+): MotionHandle<T> {
+  return useMotion<T>({
+    deps,
+    animate: ({ q, tl }) => {
+      const tiers = q('[data-motion="tier-bar"]');
+      const eras = q('[data-motion="era-bar"]');
+      if (tiers.length === 0 && eras.length === 0) return undefined;
+
+      if (tiers.length > 0) {
+        tl.from(tiers, {
+          scaleX: 0,
+          transformOrigin: 'left',
+          duration: dur.chart,
+          ease: ease.mech,
+          stagger: {
+            each: stagger.bar.each,
+            from: stagger.bar.from,
+            amount: staggerAmount(tiers.length, stagger.bar.each),
+          },
+        });
+      }
+
+      if (eras.length > 0) {
+        tl.from(
+          eras,
+          {
+            scaleY: 0,
+            transformOrigin: 'bottom',
+            duration: dur.chart,
+            ease: ease.mech,
+            stagger: {
+              each: stagger.bar.each,
+              from: stagger.bar.from,
+              amount: staggerAmount(eras.length, stagger.bar.each),
+            },
+          },
+          tiers.length > 0 ? '-=0.2' : 0,
+        );
+      }
+
+      return undefined;
+    },
+  });
+}
+
+/**
  * The `stagger.cap` rule, expressed the way GSAP wants it. `amount` distributes a *total* delay
  * across the targets, so capping the total at `cap × each` gives items past the cap a shrinking
  * share rather than a growing queue — which is what keeps a long list inside the budget.
