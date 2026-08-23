@@ -61,6 +61,31 @@ export interface IndexItem {
   figures: readonly (number | null)[];
   /** The link's accessible name. One sentence, not eight fragments — see `EntityIndex`. */
   ariaLabel: string;
+
+  /* ------------------------------------------------- §6.6.5, the population layer */
+
+  /**
+   * Which stratum of the population this row belongs to — `champion`, `winner`, `podium`,
+   * `starter`, `none` for a driver or a team; `current`, `joining`, `retired` for a circuit.
+   *
+   * **Disjoint by construction**: a champion is not also counted as a winner, because a ladder bar
+   * that reads 116 and filters to 80 rows is a page arguing with itself (`strata.ts`).
+   */
+  tier: string;
+  /** Which longevity band — `150 or more starts`. Assigned by `bandOf` from the page's own bands. */
+  band: string;
+  /**
+   * The page's merit vector, **descending significance**: `[titles, wins, podiums, races]` for a
+   * driver or a team, `[grands prix, rounds]` for a circuit. What the achievement and longevity
+   * lenses order by, so `sortItems` never has to know which entity it is holding.
+   */
+  rank: readonly number[];
+  /**
+   * Drivers' / Constructors' titles, where the payload carries them. `null` means **the field is
+   * not on this payload**, never zero — the accolade mark is suppressed rather than rendered as
+   * `0 titles`, which would be a claim (§1.0).
+   */
+  titles: number | null;
 }
 
 /** How a column of figures is labelled and when it survives a narrowing viewport. */
@@ -75,17 +100,41 @@ export interface FigureColumn {
   priority: 1 | 2 | 3 | 4;
 }
 
-export type GroupMode = 'letter' | 'decade' | 'none';
+export type GroupMode = 'letter' | 'decade' | 'tier' | 'band' | 'none';
 
+/** A group header that a `tier` or `band` grouping produces, declared with its order and wording. */
+export interface GroupHeading {
+  key: string;
+  /** `Champions`, `50–149 starts`. */
+  label: string;
+}
+
+/**
+ * **A lens** — one way of reading the whole population. It orders the list *and* decides what the
+ * group headers are, which is the device that makes 881 rows browsable rather than merely
+ * searchable (§6.6.5.2).
+ *
+ * The type is still named `SortOption` because that is what it is to the DOM — a radio in a
+ * `<fieldset>` — but it stopped being only a sort when the default view stopped being alphabetical.
+ */
 export interface SortOption {
   id: string;
   /** The segment's visible text. */
   label: string;
   /** `null` sorts alphabetically; otherwise the index into `IndexItem.figures`. */
   figure: number | null;
-  /** `'debut'` sorts by `firstSeason` ascending. */
-  by: 'name' | 'debut' | 'figure';
+  /**
+   * `'debut'` sorts by `firstSeason` ascending; `'tier'` and `'band'` sort by the position of the
+   * item's group in `headings`, then by `IndexItem.rank` descending.
+   */
+  by: 'name' | 'debut' | 'figure' | 'tier' | 'band';
   group: GroupMode;
+  /**
+   * Required for `group: 'tier' | 'band'`, and it carries **both** the order and the wording — a
+   * grouping that reads its labels from one place and its order from another is a grouping that
+   * eventually disagrees with itself.
+   */
+  headings?: readonly GroupHeading[];
 }
 
 export interface IndexGroup {
@@ -152,6 +201,28 @@ function compareNullable(a: number | null, b: number | null, direction: 1 | -1):
 }
 
 /**
+ * Compare two merit vectors, **descending**, element by element.
+ *
+ * `IndexItem.rank` is the page's own ordering of what *further* means — `[titles, wins, podiums,
+ * races]` for a driver or a team, `[grands prix, rounds]` for a circuit — so the achievement and
+ * longevity lenses sort correctly without this module knowing which entity it is holding. It is
+ * here rather than in `strata.ts` only to keep the two modules acyclic.
+ *
+ * A **missing** element compares as `-1`, below a genuine `0`. That matters on the day a payload
+ * ships wins for some rows and not others: a row whose merit is unknown sorts below a row measured
+ * at zero, rather than tying with it. Absence is not a low score (§1.0) — here it is lower.
+ */
+export function compareRank(a: readonly number[], b: readonly number[]): number {
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    const left = a[index] ?? -1;
+    const right = b[index] ?? -1;
+    if (left !== right) return right - left;
+  }
+  return 0;
+}
+
+/**
  * Order the list. **Never mutates the input** — the source array is the query cache's, and sorting
  * it in place would reorder every other reader of the same object.
  *
@@ -162,9 +233,38 @@ function compareNullable(a: number | null, b: number | null, direction: 1 | -1):
  */
 export function sortItems(items: readonly IndexItem[], option: SortOption): readonly IndexItem[] {
   const sorted = [...items];
+  const byName = (a: IndexItem, b: IndexItem) =>
+    a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0;
 
   if (option.by === 'name') {
-    sorted.sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0));
+    sorted.sort(byName);
+    return sorted;
+  }
+
+  /*
+   * **A group lens sorts by the group's declared position, then by merit, then by name.**
+   *
+   * The position comes from `headings`, not from an alphabetical or numeric property of the key,
+   * which is the whole reason `headings` carries the order: `champion` before `winner` is an
+   * editorial ranking that no comparator could derive. A key with no heading sorts **last** rather
+   * than first, so a tier the page forgot to declare is visible at the bottom of the list instead
+   * of hijacking the top of it.
+   */
+  if (option.by === 'tier' || option.by === 'band') {
+    const order = new Map<string, number>();
+    (option.headings ?? []).forEach((heading, position) => {
+      order.set(heading.key, position);
+    });
+    const positionOf = (item: IndexItem) =>
+      order.get(option.by === 'tier' ? item.tier : item.band) ?? order.size;
+
+    sorted.sort((a, b) => {
+      const byGroup = positionOf(a) - positionOf(b);
+      if (byGroup !== 0) return byGroup;
+      const byMerit = compareRank(a.rank, b.rank);
+      if (byMerit !== 0) return byMerit;
+      return byName(a, b);
+    });
     return sorted;
   }
 
@@ -222,27 +322,41 @@ function letterOf(sortKey: string): string {
  * `A, B, C…` under a name sort and `1950s, 1960s…` under a debut sort — with no second sort of the
  * keys, which is where an alphabetical `1950s, 1960s, … 2020s` would have gone wrong at `2000s`.
  */
-export function groupItems(items: readonly IndexItem[], mode: GroupMode): readonly IndexGroup[] {
+export function groupItems(
+  items: readonly IndexItem[],
+  mode: GroupMode,
+  headings: readonly GroupHeading[] = [],
+): readonly IndexGroup[] {
   if (mode === 'none') {
     return items.length === 0 ? [] : [{ key: 'all', label: '', count: items.length, items }];
   }
 
+  const keyOf = (item: IndexItem): string => {
+    if (mode === 'letter') return letterOf(item.sortKey);
+    if (mode === 'tier') return item.tier;
+    if (mode === 'band') return item.band;
+    return item.firstSeason === null ? NO_SEASON_GROUP : decadeOf(item.firstSeason);
+  };
+
   const buckets = new Map<string, IndexItem[]>();
   for (const item of items) {
-    const key =
-      mode === 'letter'
-        ? letterOf(item.sortKey)
-        : item.firstSeason === null
-          ? NO_SEASON_GROUP
-          : decadeOf(item.firstSeason);
+    const key = keyOf(item);
     const bucket = buckets.get(key);
     if (bucket === undefined) buckets.set(key, [item]);
     else bucket.push(item);
   }
 
+  /*
+   * A `tier` / `band` key is a slug — `champion`, `starts-150` — and its heading is editorial. The
+   * lookup falls back to the key itself rather than to an empty string, because an undeclared
+   * group must be *visible* as a mistake; a blank header would read as the unlabelled group a
+   * metric lens produces and hide it.
+   */
+  const labels = new Map(headings.map((heading) => [heading.key, heading.label]));
+
   return [...buckets].map(([key, bucket]) => ({
     key,
-    label: key,
+    label: labels.get(key) ?? key,
     count: bucket.length,
     items: bucket,
   }));

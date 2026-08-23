@@ -27,8 +27,8 @@ import { type ApiRequestError, apiGet, isTerminalApiError } from '@/lib/api';
  *
  * `gcTime` is deliberately **longer** than `staleTime` here, which is the one place this
  * differs from the profile hooks. A reader browses the index, opens a profile, comes back,
- * opens another — and a 139 KB payload dropped from the cache in between would be
- * re-fetched on every return. Keeping it for the session costs ~180 KB of memory for all
+ * opens another — and a 209 KB payload dropped from the cache in between would be
+ * re-fetched on every return. Keeping it for the session costs ~270 KB of memory for all
  * three lists together, which is less than one lap payload.
  *
  * ================================================================================ retries

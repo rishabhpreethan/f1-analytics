@@ -64,8 +64,10 @@ import { teamSchema } from '../schemas/team';
  * produce is fixed by the archive: 438 races for the deepest driver career, 2,500 entries
  * for Ferrari, 1,732 for Monza. Each index returns the whole of one dimension — 881, 214
  * and 78 rows — and takes no parameter, so **no request can make one larger**; the bound
- * is structural rather than validated. `queries/directory.ts` carries the measurements and
- * its tests assert the plans.
+ * is structural rather than validated. The two championship-standings statements the
+ * driver and team indexes added in F7 are the same posture: whole-relation reads of
+ * `driver_championship` and `team_championship`, no parameter, 1,664 and 712 rows out.
+ * `queries/directory.ts` carries the measurements and its tests assert the plans.
  *
  * ---------------------------------------------------------- memoised, and which are not
  *
@@ -74,7 +76,8 @@ import { teamSchema } from '../schemas/team';
  *
  * **The three index payloads are all three of those**, so they are memoised in
  * `queries/directory.ts` — no parameter means a key space of exactly one per endpoint, and
- * the whole retained cost is ~180 KB against 20 ms of aggregation per request.
+ * the whole retained cost is ~270 KB against 22.4 ms / 15.6 ms / 0.9 ms of aggregation
+ * on the first request of the hour.
  *
  * **The three profile payloads are none of them** and are not memoised: the key space is
  * 881 drivers, 214 teams and 78 circuits. `Cache-Control` covers the repeat visit, which
@@ -84,7 +87,7 @@ import { teamSchema } from '../schemas/team';
  * ------------------------------------------------------------------- no sort parameter
  *
  * The index routes could have taken `?sort=` and `?nationality=`. They deliberately do
- * not, on measurement rather than principle: the largest payload is **18.7 KB gzipped**,
+ * not, on measurement rather than principle: the largest payload is **22.6 KB gzipped**,
  * it is immutable between database refreshes, and it is cached for an hour — so the client
  * holds the whole directory and sorts or filters it in memory with no round-trip.
  *

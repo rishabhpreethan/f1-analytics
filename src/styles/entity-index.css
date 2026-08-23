@@ -715,21 +715,12 @@
 
   /* ---------------------------------------------------------------- notices and states */
 
-  .index-notice {
-    display: flex;
-    gap: calc(var(--spacing) * 3);
-    padding: calc(var(--spacing) * 4);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background-color: var(--surface-sunken);
-    color: var(--ink-secondary);
-    font-size: var(--text-sm);
-  }
-
-  .index-notice svg {
-    flex: none;
-    color: var(--ink-tertiary);
-  }
+  /*
+   * `.index-notice` used to live here — a filled panel above the list, carrying the
+   * never-raced sentence. It is **removed rather than left unused**: the notice moved below the
+   * list as `.index-aside` (§6.6.5.4), and a class that nothing renders is a rule the next reader
+   * has to prove is dead before they can touch anything near it.
+   */
 
   .index-empty {
     display: flex;
@@ -771,6 +762,665 @@
     display: block;
     width: 3ch;
     height: var(--text-sm--line-height);
+    border-radius: var(--radius-sm);
+  }
+
+  /* ==================================================== §6.6.5 the population board */
+
+  /*
+   * **The board is `--surface-sunken`, and the list panel below it stays `--surface-raised`.**
+   * That is §3.5's own assignment — sunken is where chart plot areas live — and it is doing real
+   * work here: two panels of the same colour stacked 24px apart read as one long card that
+   * happens to have a rule across it. A step down in surface says *this is an instrument, and the
+   * thing under it is the data*.
+   *
+   * `--size-era-track` is declared here, not in `tokens.css`, for `--size-index-rail`'s reason:
+   * it is the one dimension in this block that steps at a breakpoint. It is the decade track's
+   * **floor**, not its height — the track grows to fill the board's second column (see
+   * `.era-bars`), and this is the height it holds when there is nothing to grow into.
+   */
+  .pop-board {
+    --size-era-track: 84px;
+    padding: calc(var(--spacing) * 5);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-sunken);
+  }
+
+  @media (min-width: 48rem) {
+    .pop-board {
+      --size-era-track: 104px;
+      padding: calc(var(--spacing) * 7);
+    }
+  }
+
+  .pop-grid {
+    display: grid;
+    gap: calc(var(--spacing) * 6);
+  }
+
+  @media (min-width: 64rem) {
+    .pop-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: calc(var(--spacing) * 10);
+    }
+  }
+
+  .pop-col {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 4);
+    min-width: 0;
+  }
+
+  /*
+   * The divider between the two marks turns with the layout: a horizontal rule while they are
+   * stacked, a vertical one once they sit side by side. One element would have needed a
+   * `writing-mode` trick; a border on the second column is the same line for free.
+   */
+  .pop-col + .pop-col {
+    padding-block-start: calc(var(--spacing) * 6);
+    border-block-start: 1px solid var(--border-subtle);
+  }
+
+  @media (min-width: 64rem) {
+    .pop-col + .pop-col {
+      padding-block-start: 0;
+      padding-inline-start: calc(var(--spacing) * 10);
+      border-block-start: none;
+      border-inline-start: 1px solid var(--border-subtle);
+    }
+  }
+
+  .pop-caption {
+    margin: 0;
+    max-width: 62ch;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+  }
+
+  .pop-caption-note {
+    color: var(--ink-secondary);
+  }
+
+  /* ---------------------------------------------------------------- the ladder */
+
+  .tier-ladder {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+  }
+
+  /*
+   * Three grid rows rather than one: the label and the count share a baseline, the bar gets the
+   * full width beneath them, and the sublabel closes the row. Putting the bar on the label's line
+   * would leave `Podium finishers` and a four-digit count fighting a track for the same 400px —
+   * and the track is the mark, so it is the thing that must not be squeezed.
+   */
+  .tier-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label count'
+      'track track'
+      'sub   sub';
+    align-items: baseline;
+    column-gap: calc(var(--spacing) * 3);
+    row-gap: calc(var(--spacing) * 1.5);
+    width: 100%;
+    margin: 0;
+    padding: calc(var(--spacing) * 2.5) calc(var(--spacing) * 3);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background-color: transparent;
+    text-align: start;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      border-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .tier-row[data-skeleton='true'] {
+    cursor: default;
+  }
+
+  .tier-label {
+    grid-area: label;
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    transition: color var(--dur-instant) var(--ease-enter);
+  }
+
+  /*
+   * `--text-display-xs` (20px) is a **size** from §2.3's ramp applied to `--font-mono`, which §2.4
+   * requires for any figure in a tabular context. It is deliberately the largest thing in the
+   * board: the counts are the facts, and everything else on the row exists to say what they count.
+   */
+  .tier-count {
+    grid-area: count;
+    color: var(--ink-primary);
+    font-size: var(--text-display-xs);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .tier-track {
+    grid-area: track;
+    display: block;
+    height: 8px;
+    border-radius: var(--radius-xs);
+    background-color: var(--surface-raised);
+  }
+
+  /*
+   * `min-width` so a stratum of one — Madring, joining the calendar — is a visible mark rather
+   * than nothing. A bar that rounds to zero pixels is the §1.0 collapse in a chart: absent and
+   * measured-as-tiny render identically.
+   *
+   * **Opacity runs rarest-loudest**, set per row from `--tier-emphasis`. That is the opposite of a
+   * magnitude ramp and it is the point of the ladder: 36 champions should be the strongest mark on
+   * the page, not the faintest. It is never the only channel — every bar prints its own count.
+   */
+  .tier-bar {
+    display: block;
+    width: var(--tier-extent, 0%);
+    min-width: 3px;
+    height: 100%;
+    border-radius: var(--radius-xs);
+    background-color: var(--accent-mark);
+    opacity: var(--tier-emphasis, 1);
+    transition: opacity var(--dur-fast) var(--ease-enter);
+  }
+
+  .tier-sub {
+    grid-area: sub;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  .tier-row:hover:not(:disabled),
+  .tier-row:focus-visible {
+    background-color: var(--accent-wash);
+  }
+
+  .tier-row:hover:not(:disabled) .tier-label {
+    color: var(--ink-primary);
+  }
+
+  .tier-row:hover:not(:disabled) .tier-bar {
+    opacity: 1;
+  }
+
+  /*
+   * §3.5.1a — a pressed control carries **three** channels, never a fill alone, because a fill
+   * inverts between the themes and leaves dark mode with pressed and unpressed reading the same
+   * weight. Here: the wash, the accent boundary, and the label's ink-plus-weight step.
+   */
+  .tier-row[aria-pressed='true'] {
+    border-color: var(--accent-border);
+    background-color: var(--accent-wash);
+  }
+
+  .tier-row[aria-pressed='true'] .tier-label {
+    color: var(--accent-wash-ink);
+    font-weight: 600;
+  }
+
+  .tier-row[aria-pressed='true'] .tier-bar {
+    opacity: 1;
+  }
+
+  /* A stratum the payload put nobody in. Readable, never faded — §3.5.2's disabled rule. */
+  .tier-row:disabled {
+    cursor: not-allowed;
+    opacity: 1;
+  }
+
+  .tier-row:disabled .tier-label,
+  .tier-row:disabled .tier-count {
+    color: var(--ink-tertiary);
+  }
+
+  /* ---------------------------------------------------------------- the decade columns */
+
+  /*
+   * **The chart fills its half of the board, and that is a layout fix rather than a taste one.**
+   *
+   * Measured at 1440×900: the ladder ran the column's full 517px while the decade block stopped at
+   * 264px, leaving **253px — 49% of the column — empty**. A two-column grid stretches its tracks to
+   * the taller row, so the board rendered as a tall panel with a tall hole in it. `/circuits` never
+   * showed it, because the atlas fills its column, and that is exactly the shape of the fix:
+   * **the mark grows to the space, the space is not left around the mark.**
+   *
+   * So `.era-bars` grows, `.era-track` grows inside each column, and `--size-era-track` becomes the
+   * **floor** rather than the height — the value that holds when the ladder beside it is short. The
+   * caption stays pinned under the bars, level with the ladder's own.
+   *
+   * `align-items: stretch`, not `end`: the columns now share the row's height and the bar inside
+   * each is what is bottom-anchored, which is where the baseline was always meant to be.
+   */
+  .era-bars {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: calc(var(--spacing) * 1);
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: var(--size-era-track);
+  }
+
+  /*
+   * The top padding reserves one line for the value, which is **absolutely positioned on its own
+   * bar** rather than sitting in the flow above the column. See `.era-value`: growing the track to
+   * fill the board created the problem this solves, so the two changes belong together.
+   */
+  .era-col {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1.5);
+    min-width: 0;
+    margin: 0;
+    padding: calc(var(--text-xs--line-height) + var(--spacing)) calc(var(--spacing) * 0.5)
+      calc(var(--spacing) * 1.5);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background-color: transparent;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-instant) var(--ease-enter),
+      border-color var(--dur-instant) var(--ease-enter);
+  }
+
+  /*
+   * The skeleton column reserves the two text lines it is not drawing, so the board's height is
+   * the same before and after the payload lands and the console below it does not jump. The track
+   * is left as an empty well rather than pulsed — a chart with no bars is already legible as
+   * *nothing plotted yet*, and eight pulsing columns would read as eight separate loads.
+   */
+  .era-col[data-skeleton='true'] {
+    cursor: default;
+  }
+
+  .era-col[data-skeleton='true'] .era-label {
+    height: var(--text-2xs--line-height);
+  }
+
+  /*
+   * **The value rides its own bar, and that is a consequence of the track growing.**
+   *
+   * At the original 104px it could sit in the flow at the top of the column and still read as that
+   * bar's label. At the ~360px the filled column now gives it, the 2020s figure — 40 against the
+   * 1950s' 313 — would float roughly 300px above the mark it names, which is a direct label that
+   * has stopped being direct. So it is anchored at `bottom: var(--era-extent)`, the bar's own top
+   * edge, and lifted clear by 3px.
+   *
+   * `.era-track` therefore cannot clip: at 100% extent the label sits above the track, in the top
+   * padding `.era-col` reserves for it. The bar needs no clipping anyway — it can never exceed the
+   * track it is measured against.
+   */
+  .era-value {
+    position: absolute;
+    inset-inline: 0;
+    bottom: var(--era-extent, 0%);
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    transform: translateY(-3px);
+    transition: color var(--dur-instant) var(--ease-enter);
+  }
+
+  /*
+   * **`height` *and* `flex`, and dropping the `height` would be the subtle way to break this.**
+   *
+   * `.era-bar` is absolutely positioned with `height: var(--era-extent)` — a **percentage**, which
+   * resolves against this element's containing block. With `flex: 1 1 auto` alone, `flex-basis`
+   * resolves from a `height` of `auto`, and a percentage against an `auto`-height ancestor is the
+   * one corner of flexbox where engines have historically disagreed. Keeping the explicit `height`
+   * makes the basis definite at every width — the track is 104px when there is nothing to grow
+   * into, and `flex-grow` takes it the rest of the way when there is. Same rendered result, no
+   * indefinite-height question anywhere in the chain.
+   */
+  .era-track {
+    position: relative;
+    display: block;
+    height: var(--size-era-track);
+    flex: 1 1 auto;
+    border-radius: var(--radius-xs);
+    background-color: var(--surface-raised);
+  }
+
+  /*
+   * Anchored to the **bottom** — the baseline of a magnitude chart is where zero is, and G-31
+   * grows it from there. `min-height` for the same reason the ladder's bar has `min-width`.
+   */
+  .era-bar {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: var(--era-extent, 0%);
+    min-height: 3px;
+    border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+    background-color: var(--accent-mark);
+    opacity: 0.55;
+    transition: opacity var(--dur-fast) var(--ease-enter);
+  }
+
+  /*
+   * A decade the archive has not finished — the 2020s are seven seasons in — is **hatched**, so the
+   * shortest column does not read as a further collapse. Texture, not colour, exactly as §6.3 asks
+   * for the CVD and print case; the caption states the same thing in words.
+   */
+  .era-col[data-partial='true'] .era-bar {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 3px,
+      var(--surface-raised) 3px 4px
+    );
+  }
+
+  .era-label {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .era-col:hover,
+  .era-col:focus-visible {
+    background-color: var(--accent-wash);
+  }
+
+  .era-col:hover .era-bar,
+  .era-col[aria-pressed='true'] .era-bar {
+    opacity: 1;
+  }
+
+  .era-col:hover .era-value,
+  .era-col[aria-pressed='true'] .era-value {
+    color: var(--ink-primary);
+  }
+
+  .era-col[aria-pressed='true'] {
+    border-color: var(--accent-border);
+    background-color: var(--accent-wash);
+  }
+
+  .era-col[aria-pressed='true'] .era-value {
+    font-weight: 600;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tier-row,
+    .tier-label,
+    .tier-bar,
+    .era-col,
+    .era-value,
+    .era-bar {
+      transition: none;
+    }
+  }
+
+  /* ---------------------------------------------------------------- §6.6.5.3 the atlas */
+
+  .atlas {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+  }
+
+  /*
+   * `.locator-frame` fills `--surface-sunken`, which is also the board's own surface — on a profile
+   * page it sits on `--surface-raised` and reads as a recessed plate, and here it would vanish. So
+   * the map's plate is raised instead, which is the same step the ladder's tracks take on the same
+   * board. **One override, not a second map stylesheet**: everything else — graticule, prime
+   * meridian, frame stroke — is `CircuitLocator`'s verbatim.
+   */
+  .atlas-map .locator-frame {
+    fill: var(--surface-raised);
+    /*
+     * **Stroke suppressed here and restated by `.atlas-neatline` at the end of the drawing.**
+     * The coastline reaches x = 0, x = 360 and y = 180 — Eurasia runs off both edges at
+     * Chukotka and Antarctica now fills to the pole — and anything painted after the frame
+     * paints *over* its border. A frame drawn first would ship with its left, right and bottom
+     * edges eaten by land. A neatline drawn last is also what an atlas does, so this is the
+     * convention rather than a workaround.
+     */
+    stroke: none;
+  }
+
+  /*
+   * The coastline. Natural Earth 1:110m, Visvalingam–Whyatt at 1 square degree, 0.1° grid, in
+   * the atlas's own coordinate space — §6.6.5.3 for the cost and the three rejected shapes.
+   *
+   * ⚠ **No `fill-rule` is set, and setting one is a defect.** SVG's default is `nonzero`, the
+   * Caspian is the single hole in the dataset, and it winds against its outer ring — so
+   * `nonzero` punches it out. `evenodd` would work here *by accident* and break on a source
+   * bump that added a second hole with matching winding. Verified by computing the winding
+   * number at (51°E, 42°N) rather than by looking: it is 0.
+   *
+   * `vector-effect: non-scaling-stroke` because the map is `width: 100%` and the viewBox is
+   * 360 units wide, so a user-space stroke would be 1.44 px at the 517 px board column and
+   * 0.95 px on a phone. A coastline is a hairline at every size or it is furry at one of them.
+   */
+  .atlas-land {
+    fill: var(--map-land);
+    stroke: var(--map-coast);
+    stroke-width: 1;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /*
+   * The neatline — the frame's border, restated over everything except nothing. It is also what
+   * hides the four artificial edges the generator introduces at the viewBox boundary: the clip
+   * of Eurasia at both antimeridian edges, and Antarctica's pole line along y = 180. Those are
+   * not coastline and must not be stroked where a reader would take them for one.
+   */
+  .atlas-neatline {
+    fill: none;
+    stroke: var(--border-subtle);
+    stroke-width: 1;
+  }
+
+  /*
+   * Two pip classes, three channels apart: radius, fill and opacity all move together, so the
+   * distinction survives a monochrome print and every CVD model (§3.4.2). The 1.5px ring is
+   * §6.3's, and it matters far more here than on a single-pip locator — 78 marks on one graticule
+   * overlap constantly, and without the ring the European cluster is one blob.
+   */
+  .atlas-pip[data-current='true'] {
+    fill: var(--accent-mark);
+    stroke: var(--surface-raised);
+    stroke-width: 1.5;
+  }
+
+  .atlas-pip[data-current='false'] {
+    fill: var(--ink-tertiary);
+    stroke: var(--surface-raised);
+    stroke-width: 1;
+    opacity: 0.7;
+  }
+
+  .atlas-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 5);
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  .atlas-key-item {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .atlas-key-item b {
+    color: var(--ink-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  .atlas-key-pip {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+  }
+
+  .atlas-key-pip[data-current='true'] {
+    background-color: var(--accent-mark);
+  }
+
+  .atlas-key-pip[data-current='false'] {
+    background-color: var(--ink-tertiary);
+    opacity: 0.7;
+  }
+
+  /* ---------------------------------------------------------------- the active filters */
+
+  .index-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
+
+  .index-filters-legend {
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    text-transform: uppercase;
+  }
+
+  /*
+   * The chip is a **button that removes itself**, so it carries the accent boundary a pressed
+   * control carries and an × that says what pressing it does. It is not a `.season-chip`: that one
+   * is a static badge and giving it a pointer would be two meanings on one class.
+   */
+  .index-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    padding: calc(var(--spacing) * 1) calc(var(--spacing) * 1.5) calc(var(--spacing) * 1)
+      calc(var(--spacing) * 2.5);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-full);
+    background-color: var(--accent-wash);
+    color: var(--accent-wash-ink);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--dur-instant) var(--ease-enter);
+  }
+
+  .index-filter-chip:hover {
+    background-color: var(--surface-raised);
+  }
+
+  .index-filter-chip svg {
+    flex: none;
+    color: var(--ink-tertiary);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .index-filter-chip {
+      transition: none;
+    }
+  }
+
+  /* ---------------------------------------------------------------- the accolade mark */
+
+  /*
+   * A title mark beside the name. **Never the only channel** — the row sits in the Champions
+   * group, its accessible name says *seven-time world champion* in words, and the wins column
+   * carries the number. This is the redundant reinforcement §3.4.2 reserves for colour, done with
+   * a glyph instead.
+   */
+  .index-accolade {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 0.5);
+    color: var(--ink-primary);
+    font-size: var(--text-2xs);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .index-accolade svg {
+    flex: none;
+  }
+
+  /* The one row-level promotion the ladder earns: a champion's name is set at 600. */
+  .index-row[data-tier='champion'] .index-title {
+    font-weight: 600;
+  }
+
+  /* ---------------------------------------------------------------- the footnote */
+
+  /*
+   * **Under the list, not over it.** The first build put this above the rows, which gave the 63
+   * people the record holds nothing for the most prominent paragraph on a page about the 818 who
+   * raced. Dashed rather than filled, because it is an annotation on the list and not another
+   * panel of content.
+   */
+  .index-aside {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 4);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--ink-secondary);
+    font-size: var(--text-sm);
+  }
+
+  .index-aside svg {
+    flex: none;
+    color: var(--ink-tertiary);
+  }
+
+  .index-aside-copy {
+    margin: 0;
+    max-width: 68ch;
+  }
+
+  .index-aside .btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  /* ---------------------------------------------------------------- board skeletons (§7.5) */
+
+  .skeleton-tier-label {
+    display: block;
+    grid-area: label;
+    width: 12ch;
+    height: var(--text-sm--line-height);
+    border-radius: var(--radius-sm);
+  }
+
+  .skeleton-tier-count {
+    display: block;
+    grid-area: count;
+    width: 3ch;
+    height: var(--text-display-xs);
+    border-radius: var(--radius-sm);
+  }
+
+  .skeleton-tier-sub {
+    display: block;
+    grid-area: sub;
+    width: 20ch;
+    height: var(--text-xs--line-height);
     border-radius: var(--radius-sm);
   }
 }

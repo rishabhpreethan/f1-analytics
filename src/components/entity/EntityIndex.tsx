@@ -1,13 +1,14 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { ChevronRight } from '@/components/ui/icons';
+import { ChevronRight, Info, Trophy, X } from '@/components/ui/icons';
 import { cssVar, identityToken } from '@/lib/entityColor';
 import { useListReveal } from '@/lib/motion/scroll';
 import { EntityPortrait } from './EntityPortrait';
 import { IndexConsole } from './IndexConsole';
+import { PopulationBoard } from './PopulationBoard';
 import { SpanRail } from './SpanRail';
 import {
   filterItems,
@@ -19,41 +20,57 @@ import {
   type IndexItem,
   type SortOption,
 } from './indexModel';
+import {
+  applySelection,
+  asideCount,
+  buildStrata,
+  eraBuckets,
+  type StratumDefinition,
+} from './strata';
 
 /**
  * **`EntityIndex`** — the one surface behind `/drivers`, `/teams` and `/circuits`.
- * `DESIGN_SYSTEM.md` §6.6.4.
+ * `DESIGN_SYSTEM.md` §6.6.4, §6.6.5.
  *
  * ---
  *
- * **Why it exists: the three profile pages had no front door.** F4–F6 built
- * `/drivers/:ref`, `/teams/:ref` and `/circuits/:ref` and nothing at the bare paths, so the dock's
- * "Drivers" item — the primary navigation, on every screen — led to an F0 placeholder. §6.6.2.9
- * audited the seams *between* surfaces and found none missing; it never asked whether the surfaces
- * had an entrance. A link in the primary nav is a seam too.
+ * **Why it was rebuilt.** The first version was a search field over an alphabetical list, and
+ * Rishabh rejected it: *"i dont want a basic search bar page, please design it in a meaningful way
+ * based on the data … i really like the way you have designed the seasons page, like its different,
+ * it has meaningful data, its intuitive"*.
  *
- * **One component, three pages, for §6.6.2's reason.** The risk is not that one index is wrong, it
- * is that three indexes look like three products. What differs between them is a column set and a
- * noun; everything else — the masthead, the console, the panel, the rail, the row grid, the states
- * — is this file.
+ * The season hub works because a season **has a shape** and the page draws it. An index has a shape
+ * too — F1 is a pyramid and the field collapsed eight-fold since the 1950s — and the first build
+ * threw all of it away, because the alphabet is not a fact about Formula 1. **The three sorts
+ * `A–Z / Debut / Races` were three ways to reorder one undifferentiated wall.**
  *
- * **The signature is the `SpanRail` (§7.12)**: every row plots its entity against the same fixed
- * domain, so scrolling 881 drivers is scrolling the sport's history rather than reading 881 names.
+ * So the page now opens on `PopulationBoard`: the ladder of how far they got, and the decade
+ * columns of how many there were. Both are filters. **The default view is not alphabetical** — it
+ * is the achievement ladder, so `/drivers` opens on Schumacher and Hamilton rather than on Carlo
+ * Abate, and the reader who does not yet know which driver they want still learns something.
  *
  * ---
  *
- * **Three decisions that are easy to get wrong and are made here once.**
+ * **Five decisions that are easy to get wrong and are made here once.**
  *
- * 1. **The whole row is the link.** This page's entire job is navigation, so a row that names an
- *    entity and does not go there has failed its only purpose. That rules out a `<table>` — an
- *    `<a>` cannot wrap `<td>`s — so it is an `<ul>` of `<li><Link>`, exactly as `SeasonCalendar`
+ * 1. **The whole row is the link.** This page's job is navigation, so a row that names an entity
+ *    and does not go there has failed its only purpose. That rules out a `<table>` — an `<a>`
+ *    cannot wrap `<td>`s — so it is an `<ul>` of `<li><Link>`, exactly as `SeasonCalendar`
  *    resolved the same tension.
- * 2. **The accessible name is one sentence, not eight fragments.** A per-cell `sr-only` label would
- *    be four extra nodes on every one of 881 rows, and would read as
- *    *"Hamilton British 2007 2026 19 372 105 7"*. `ariaLabel` is built by the page from the same
- *    values the cells show.
- * 3. **Nothing animates on a filter or a sort.** G-23 fires once per dataset; re-staggering 881
- *    rows on the fifth keystroke is G-29's defect moved from a chart to a list.
+ * 2. **The accessible name is one sentence, not eight fragments.** A per-cell `sr-only` label
+ *    would be four extra nodes on every one of 881 rows. `ariaLabel` is built by the presenter
+ *    from the same values the cells show.
+ * 3. **Nothing animates on a filter, a sort or a lens change.** G-23 and G-31 fire once per
+ *    dataset; re-staggering 881 rows on the fifth keystroke is G-29's defect moved to a list.
+ * 4. **The board's counts are of the whole payload, never of the current view** — the same rule
+ *    the rail's domain follows. A ladder that rescaled as you filtered would make the same
+ *    stratum say something different depending on what else was selected, which is the one thing
+ *    a fixed reference exists to prevent. The console's live count carries the intersection.
+ * 5. **The never-raced entities are reachable but not in the default browse.** 63 drivers and 9
+ *    teams entered and never made a grid. The API serves them deliberately — the index must not
+ *    disagree with the profile endpoint about who exists — so they sit behind a footnote that
+ *    states the number and reveals them on demand, which is the move the coverage ruler already
+ *    makes for a boundary the reader should know about but not trip over.
  */
 
 export interface EntityIndexProps {
@@ -61,7 +78,7 @@ export interface EntityIndexProps {
   title: string;
   /** `The archive`. */
   eyebrow: string;
-  /** The masthead's fact line, already worded. Figures are set in mono by the caller's `mono` flag. */
+  /** The masthead's fact line, already worded. */
   facts: readonly { label: string; value: string; mono?: boolean }[];
   /** `driver` / `team` / `circuit` — drives the row grid and the plural noun in the copy. */
   kind: 'driver' | 'team' | 'circuit';
@@ -72,8 +89,27 @@ export interface EntityIndexProps {
   items: readonly IndexItem[] | null;
   columns: readonly FigureColumn[];
   sorts: readonly SortOption[];
-  /** Rendered above the list, once, when the payload holds entities with nothing to plot. */
-  notice?: ReactNode;
+  /** The ladder's rows, in order. */
+  strata: readonly StratumDefinition[];
+  board: {
+    strataHeading: string;
+    strataCaption: string;
+    eraHeading: string;
+    eraCaption: string;
+  };
+  /** The footnote's copy, or null when nothing is held back. */
+  aside: { count: number; total: number; headline: string; explain: string } | null;
+  /**
+   * What fills the board's second column instead of the decade chart.
+   *
+   * Only `/circuits` passes one: 78 venues with coordinates want a **map**, and a bar chart of
+   * venues per decade is the least interesting thing that page knows — it runs 19 → 30 and barely
+   * moves, while the names underneath change completely. The board's *form* is unchanged, which is
+   * what keeps the three pages one product; only the right-hand mark differs.
+   */
+  boardAside?: React.ReactNode;
+  /** `meta.latestSeason.year` equivalent, derived from the payload. For the partial-decade flag. */
+  latest: number | null;
   pending: boolean;
   error: { code: string } | null;
   onRetry: () => void;
@@ -91,29 +127,46 @@ export function EntityIndex({
   items,
   columns,
   sorts,
-  notice,
+  strata,
+  board,
+  aside,
+  boardAside = null,
+  latest,
   pending,
   error,
   onRetry,
 }: EntityIndexProps) {
   const [query, setQuery] = useState('');
   const [sortId, setSortId] = useState(sorts[0]?.id ?? '');
+  const [tier, setTier] = useState<string | null>(null);
+  const [decade, setDecade] = useState<number | null>(null);
+  const [showAside, setShowAside] = useState(false);
 
   const sort = sorts.find((option) => option.id === sortId) ?? sorts[0];
   const source = items ?? EMPTY;
 
+  /* Rule 4 in the header: both marks are measured against the whole payload. */
+  const ladder = useMemo(() => buildStrata(source, strata), [source, strata]);
+  const eras = useMemo(() => eraBuckets(source, latest), [source, latest]);
+  const held = useMemo(() => asideCount(source, strata), [source, strata]);
+
   /*
-   * Filter, then sort, then group — and memoised on the three things that can change it. 881 rows
-   * through three passes is cheap; doing it on every render while React re-renders the input on
-   * every keystroke is not.
+   * Select, then filter, then sort, then group — memoised on the things that can change each.
+   * 881 rows through four passes is cheap; doing it on every render while React re-renders the
+   * input on every keystroke is not.
    */
-  const visible = useMemo(() => filterItems(source, query), [source, query]);
+  const selection = useMemo(() => ({ tier, decade, showAside }), [tier, decade, showAside]);
+  const selected = useMemo(
+    () => applySelection(source, selection, strata),
+    [source, selection, strata],
+  );
+  const visible = useMemo(() => filterItems(selected, query), [selected, query]);
   const ordered = useMemo(
     () => (sort === undefined ? visible : sortItems(visible, sort)),
     [visible, sort],
   );
   const groups = useMemo(
-    () => (sort === undefined ? [] : groupItems(ordered, sort.group)),
+    () => (sort === undefined ? [] : groupItems(ordered, sort.group, sort.headings)),
     [ordered, sort],
   );
 
@@ -125,13 +178,23 @@ export function EntityIndex({
    */
   const domain = useMemo(() => railDomain(source), [source]);
 
-  /* G-23 keyed on the dataset, deliberately not on the query or the sort (see the header). */
+  /* G-23 keyed on the dataset, deliberately not on the query, the lens or the selection. */
   const { scope } = useListReveal<HTMLDivElement>([source.length, kind]);
 
   const filtering = query.trim() !== '';
-  const countLabel = filtering
+  const narrowed = filtering || tier !== null || decade !== null;
+  const countLabel = narrowed
     ? `${String(ordered.length)} of ${String(source.length)} ${noun}`
     : `${String(source.length)} ${noun}`;
+
+  const tierLabel = ladder.find((stratum) => stratum.key === tier)?.label ?? null;
+  const decadeLabel = eras.find((era) => era.decade === decade)?.longLabel ?? null;
+
+  const clearAll = () => {
+    setTier(null);
+    setDecade(null);
+    setQuery('');
+  };
 
   if (error !== null) {
     return (
@@ -151,13 +214,26 @@ export function EntityIndex({
     <div className="shell-container entity-index px-4 md:px-6 xl:px-8">
       <IndexMasthead eyebrow={eyebrow} title={title} facts={facts} pending={pending} />
 
+      <PopulationBoard
+        strata={ladder}
+        eras={eras}
+        strataHeading={board.strataHeading}
+        strataCaption={board.strataCaption}
+        eraHeading={board.eraHeading}
+        eraCaption={board.eraCaption}
+        noun={noun}
+        activeTier={tier}
+        activeDecade={decade}
+        onTierChange={setTier}
+        onDecadeChange={setDecade}
+        pending={pending}
+      >
+        {boardAside}
+      </PopulationBoard>
+
       <IndexConsole
         label={`Search ${noun}`}
-        placeholder={
-          kind === 'circuit'
-            ? 'Search a circuit, a country or a city'
-            : `Search a name, a code or a nationality`
-        }
+        placeholder={SEARCH_PLACEHOLDER[kind]}
         query={query}
         onQueryChange={setQuery}
         sorts={sorts}
@@ -165,9 +241,21 @@ export function EntityIndex({
         onSortChange={setSortId}
         countLabel={pending ? `Loading ${noun}` : countLabel}
         listId={LIST_ID}
+        filters={
+          tier === null && decade === null ? null : (
+            <ActiveFilters
+              tierLabel={tierLabel}
+              decadeLabel={decadeLabel}
+              onClearTier={() => {
+                setTier(null);
+              }}
+              onClearDecade={() => {
+                setDecade(null);
+              }}
+            />
+          )
+        }
       />
-
-      {notice}
 
       {/*
        * `id` on the panel rather than on any one `<ul>`: the console's `aria-controls` has to point
@@ -183,23 +271,26 @@ export function EntityIndex({
           <p className="index-empty t-sm text-ink-tertiary">{`The record holds no ${noun}.`}</p>
         ) : ordered.length === 0 ? (
           <div className="index-empty">
-            <p className="t-base text-ink-primary">{`No ${nounSingular} matches “${query.trim()}”.`}</p>
-            <p className="t-sm text-ink-tertiary">
-              {kind === 'circuit'
-                ? 'Search matches a circuit name, a city, a country or the reference in the URL.'
-                : 'Search matches a name, a three-letter code, a nationality or the reference in the URL.'}
-            </p>
+            {filtering ? (
+              <>
+                <p className="t-base text-ink-primary">{`No ${nounSingular} matches “${query.trim()}”.`}</p>
+                <p className="t-sm text-ink-tertiary">{SEARCH_HELP[kind]}</p>
+              </>
+            ) : (
+              <>
+                <p className="t-base text-ink-primary">{`No ${nounSingular} is in every group you have selected.`}</p>
+                <p className="t-sm text-ink-tertiary">
+                  The ladder and the decades narrow the list together. Release one of them to widen
+                  it.
+                </p>
+              </>
+            )}
             {/*
              * `Show all drivers`, not `Clear search`: the console's own × already carries that
              * exact label, and two controls with one accessible name in one region is ambiguous
              * to a screen-reader user and to anyone driving by voice.
              */}
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setQuery('');
-              }}
-            >
+            <Button variant="secondary" onClick={clearAll}>
               {`Show all ${noun}`}
             </Button>
           </div>
@@ -219,11 +310,112 @@ export function EntityIndex({
           </div>
         )}
       </div>
+
+      {/*
+       * The footnote, **under the list rather than over it**. The first build put this notice above
+       * the rows, which gave the 63 people the record holds nothing for the most prominent
+       * paragraph on a page about the 818 who raced. It is honest either way; it is only correctly
+       * weighted here.
+       *
+       * Suppressed while a stratum is selected: the ladder is already answering the question, and
+       * a second control that silently disagrees with it would be worse than no control.
+       */}
+      {aside !== null && !pending && tier === null && (
+        <div className="index-aside">
+          <Info size={16} />
+          <p className="index-aside-copy">
+            <b>{aside.headline}</b> {aside.explain}
+          </p>
+          <Button
+            variant="secondary"
+            aria-pressed={showAside}
+            onClick={() => {
+              setShowAside((shown) => !shown);
+            }}
+          >
+            {showAside ? 'Hide them' : 'Show them'}
+          </Button>
+          {/* The live region says what the button did, because the change happens 900px above it. */}
+          <span className="sr-only" aria-live="polite">
+            {showAside
+              ? `${String(held)} ${noun} added to the list.`
+              : `${String(held)} ${noun} hidden from the list.`}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
 const EMPTY: readonly IndexItem[] = [];
+
+/**
+ * **A team has no three-letter code, and the copy said it did.** The placeholder and the
+ * empty-search help were branched `circuit` / everything-else, so `/teams` invited a reader to
+ * search by "a code" — a driver concept the sport does not apply to constructors, and a promise the
+ * haystack cannot keep (`teamItems` builds it from name, nationality, country code and the slug).
+ * Caught in Rishabh's capture.
+ *
+ * One record keyed by kind rather than a nested ternary, because that is what stopped the third
+ * case from being written the first time.
+ */
+const SEARCH_PLACEHOLDER: Record<EntityIndexProps['kind'], string> = {
+  driver: 'Search a name, a code or a nationality',
+  team: 'Search a team or a nationality',
+  circuit: 'Search a circuit, a country or a city',
+};
+
+const SEARCH_HELP: Record<EntityIndexProps['kind'], string> = {
+  driver: 'Search matches a name, a three-letter code, a nationality or the reference in the URL.',
+  team: 'Search matches a team name, a nationality or the reference in the URL.',
+  circuit: 'Search matches a circuit name, a city, a country or the reference in the URL.',
+};
+
+/**
+ * The chips for whatever the board currently has selected.
+ *
+ * Inside the console, because the console is sticky: a reader 400 rows down has to be able to see
+ * that a filter is on and release it without scrolling back to the board.
+ */
+function ActiveFilters({
+  tierLabel,
+  decadeLabel,
+  onClearTier,
+  onClearDecade,
+}: {
+  tierLabel: string | null;
+  decadeLabel: string | null;
+  onClearTier: () => void;
+  onClearDecade: () => void;
+}) {
+  return (
+    <div className="index-filters">
+      <span className="index-filters-legend">Showing</span>
+      {tierLabel !== null && (
+        <button
+          type="button"
+          className="index-filter-chip"
+          onClick={onClearTier}
+          aria-label={`Remove the ${tierLabel} filter`}
+        >
+          <span>{tierLabel}</span>
+          <X size={16} />
+        </button>
+      )}
+      {decadeLabel !== null && (
+        <button
+          type="button"
+          className="index-filter-chip"
+          onClick={onClearDecade}
+          aria-label={`Remove the ${decadeLabel} filter`}
+        >
+          <span>{decadeLabel}</span>
+          <X size={16} />
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * The masthead. Deliberately the **same type and the same eyebrow rule** as an entity profile
@@ -369,12 +561,15 @@ function IndexRow({
       ? undefined
       : ({ '--identity': cssVar(identityToken(item.identityRef)) } as CSSProperties);
 
+  const titles = item.titles ?? 0;
+
   return (
     <li>
       <Link
         className="index-row"
         data-kind={kind}
         data-raced={item.raced ? 'true' : 'false'}
+        data-tier={item.tier}
         data-motion="index-row"
         style={identity}
         to={item.href}
@@ -396,6 +591,18 @@ function IndexRow({
             <span className="index-title">{item.title}</span>
             {item.code !== null && item.code !== '' && (
               <span className="index-code t-mono">{item.code}</span>
+            )}
+            {/*
+             * The title mark. `aria-hidden` because `ariaLabel` already says *seven-time world
+             * champion* in words, and a trophy glyph announced beside it would read the same fact
+             * twice, worse. It is never the only channel: the row is in the Champions group, its
+             * accessible name states the count, and the wins column carries the number.
+             */}
+            {titles > 0 && (
+              <span className="index-accolade" aria-hidden="true">
+                <Trophy size={16} />
+                {titles > 1 && <span className="t-mono">{`×${String(titles)}`}</span>}
+              </span>
             )}
             {item.chip !== null && <span className="season-chip">{item.chip}</span>}
           </span>
