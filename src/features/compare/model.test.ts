@@ -11,6 +11,7 @@ import {
   orientLedger,
   pairFor,
   rateRails,
+  resultMix,
   scoreLabel,
   verdict,
   winShare,
@@ -318,5 +319,109 @@ describe('the rate rails', () => {
     const [only] = rateRails([{ ...sample, totals: { ...sample.totals, starts: 0, wins: 0 } }]);
     /* Never `0`, which reads as "never did it" for a driver who never had the chance. */
     expect(only?.values[0]?.value).toBeNull();
+  });
+});
+
+describe('the result mix (§6.6.6.14)', () => {
+  const mix = () => resultMix(COMPARE_FIXTURE.entities);
+  const rowFor = (ref: string) => mix().find((row) => row.ref === ref);
+  const partOf = (ref: string, tone: string) =>
+    rowFor(ref)?.parts.find((part) => part.tone === tone)?.value;
+
+  it('splits every driver into exactly four parts that sum to his OWN starts', () => {
+    /*
+     * The invariant the whole chart rests on. `ShareChart` normalises whatever it is handed, so a
+     * row that summed to 0.94 of the starts would still render as a full bar and would overstate
+     * every part in it by 6% with nothing on screen looking wrong.
+     */
+    for (const row of mix()) {
+      expect(row.parts).toHaveLength(4);
+      const total = row.parts.reduce((sum, part) => sum + part.value, 0);
+      expect(total, `${row.surname} sums to ${String(total)} of ${String(row.starts)}`).toBe(
+        row.starts,
+      );
+    }
+  });
+
+  it('reproduces the three measured mixes, on the payload’s own starts', () => {
+    /*
+     * ⚠ Fangio reads **24/11/6/10 of 51**, not the 24/11/9/14 of 58 §6.6.6.12 recorded when this
+     * chart was proposed. 58 is a raw count of classification rows and 51 is `starts`: 40 races
+     * between 1950 and 1964 classify one driver two or three times (trap 17). The index says 51,
+     * so this says 51 — a chart that disagreed with the rest of the product about how many races a
+     * man started would be a defect however readable it was.
+     */
+    expect(rowFor('fangio')?.parts.map((part) => part.value)).toEqual([24, 11, 6, 10]);
+    expect(rowFor('fangio')?.starts).toBe(51);
+    expect(rowFor('hamilton')?.parts.map((part) => part.value)).toEqual([106, 101, 151, 32]);
+    expect(rowFor('hamilton')?.starts).toBe(390);
+  });
+
+  it('keeps the parts nested — a win is a podium is a classified finish', () => {
+    // Every part after the first is a subtraction, so double-counting a win as a podium too is the
+    // failure this catches. Fangio: 35 podiums of which 24 were wins, so 11 podium-only.
+    expect(partOf('fangio', 'win')).toBe(24);
+    expect(partOf('fangio', 'podium')).toBe(11);
+  });
+
+  it('takes the fourth part from `starts − classified`, never from `dnfs`', () => {
+    /*
+     * They are different numbers and both are right: Hamilton retired from **34** races and has
+     * **32** starts with no classification, because a car that covers enough of the distance is
+     * still given a finishing position when it stops. Using `dnfs` would break the sum by two AND
+     * mislabel the band, so the subtraction is the value and `dnfs` travels beside it for the copy.
+     */
+    expect(partOf('hamilton', 'unclassified')).toBe(32);
+    expect(rowFor('hamilton')?.dnfs).toBe(34);
+  });
+
+  it('is in selection order and is never sorted by any value', () => {
+    // §6.2, and §6.6.6.5's own correction: reading one driver across the page is a vertical scan at
+    // a fixed offset, which a value sort would turn into a search that moves when a bay is added.
+    expect(mix().map((row) => row.ref)).toEqual(
+      COMPARE_FIXTURE.entities.map((entity) => entity.identity.ref),
+    );
+  });
+
+  it('emits the four tones in ramp order, strongest first', () => {
+    expect(rowFor('fangio')?.parts.map((part) => part.tone)).toEqual([
+      'win',
+      'podium',
+      'classified',
+      'unclassified',
+    ]);
+  });
+
+  it('gives a driver who entered and never started four zeroes, not a negative band', () => {
+    /*
+     * 91 drivers in this archive entered a Grand Prix and started none. A share of zero starts is
+     * `0/0`, and the row is a designed state in `ShareChart` rather than a division — but only if
+     * this returns zeroes rather than, say, `starts − classifiedFinishes` going negative on a
+     * payload where the two disagree.
+     */
+    const entered = COMPARE_FIXTURE.entities[0];
+    if (entered === undefined) throw new Error('fixture has no entities');
+    const [row] = resultMix([
+      {
+        ...entered,
+        totals: { ...entered.totals, starts: 0, wins: 0, podiums: 0, classifiedFinishes: 0 },
+      },
+    ]);
+    expect(row?.parts.map((part) => part.value)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('clamps rather than emitting a negative part when totals disagree', () => {
+    const entered = COMPARE_FIXTURE.entities[0];
+    if (entered === undefined) throw new Error('fixture has no entities');
+    const [row] = resultMix([
+      /* A selector that counted more podiums than classified finishes would otherwise draw a
+       * negative width, which SVG renders as nothing at all — absent given the meaning of
+       * present (§1.0). */
+      {
+        ...entered,
+        totals: { ...entered.totals, starts: 10, wins: 2, podiums: 8, classifiedFinishes: 5 },
+      },
+    ]);
+    expect(row?.parts.map((part) => part.value)).toEqual([2, 6, 0, 5]);
   });
 });

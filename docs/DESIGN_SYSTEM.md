@@ -3690,6 +3690,56 @@ lens could be built properly. Each is cheap and each has its number already:
 4. **Finishing position per round as a dot strip**, in the season lens. `SeasonEntrant.finish` is
    already published for it.
 
+##### 6.6.6.14 The four simple charts — built _(2026-08-23)_
+
+§6.6.6.12 proposed four and held them on the CSS ceiling. The ceiling moved: §9.2.8's deletion of
+the retired shade-pair tokens reclaimed **0.61 KB** and the four were built into the room it freed.
+Rishabh's brief for them is one sentence and it is the acceptance criterion:
+
+> *"comparison which can be represented using simple charts that anyone can read and understand."*
+
+**Which reads as a rule, not a mood.** An honesty caption stays — it is what the chart is *for* in a
+cross-era product. An explanatory caption means the **form is wrong**: if a reader needs a paragraph
+before the picture makes sense, a different picture was available.
+
+###### A — Result mix, as a 100% stacked bar
+
+*Job*: **composition**. *Form*: `ShareChart`, one row per driver, four segments.
+*Marks*: full band height, 2px surface gaps, 4px radius on the row's outer ends only.
+*Interaction*: per-segment tooltip. *Colour*: §6.3a's outcome ramp — last, and it is the reason the
+ramp exists. *Accessibility*: legend, table view, every count as text in both.
+
+| | |
+|---|---|
+| The four parts | wins · podiums that were not wins · finishes that were not podiums · starts with no classification |
+| Why it needs no caveat | **the denominator is the driver's own starts.** Nothing from anyone else's era is in the bar. This is the only cross-era instrument on the page that needs no normalisation argument at all |
+| What it throws away | the size. A 100% bar is comparable *because* it discards the denominator, so the two denominators are printed in the caption — *"Fangio 51, Verstappen 243 and Hamilton 390"* — generated from the same totals the bars are |
+| Row order | the selection order, never a value sort (§6.2, and §6.6.6.5's correction) |
+
+⚠ **The figures in §6.6.6.12 were raw and are corrected here.** It recorded Fangio at
+**24/11/9/14 of 58**; the payload's `totals.starts` is **51**, which is what the driver index shows,
+and the mix is **24/11/6/10**. 58 is a count of classification rows and 40 races between 1950 and
+1964 classify one driver two or three times (**trap 17**). A chart that disagreed with the rest of
+the product about how many races a man started would be a defect however readable it was.
+
+⚠ **Every part is a subtraction from the next-widest total**, so the four sum to `starts` exactly.
+Not decoration: `ShareChart` normalises whatever it is handed, so a row summing to 0.94 of the
+starts would render as a full bar and overstate every part in it with nothing on screen looking
+wrong. `model.test.ts` asserts the sum for every fixture driver.
+
+⚠ **The fourth band is "not classified", not "retired", and the two are different numbers.**
+Hamilton: **34** retirements against **32** unclassified starts — a car that has covered enough of
+the race distance is still given a finishing position when it stops. `totals.dnfs` would break the
+sum *and* mislabel the band, so the subtraction is the value and `dnfs` travels beside it. The note
+appears **only for a driver whose two figures differ**, with both figures in it, rather than as a
+standing disclaimer.
+
+**Zero-start drivers** — 91 in the archive entered a Grand Prix and started none — get
+`ShareChart`'s labelled empty band: *"Entered a Grand Prix but never started one."*
+
+**Motion** is G-28's clip wipe, unchanged and not re-specified: the segments do not grow from the
+axis, because a segment that starts at 62% must not animate its own start.
+
 ##### 6.6.6.13 Four defects found on the live page, and what each one teaches _(2026-08-23)_
 
 Rishabh ran `/compare` against the endpoints. Two were blocking; all four are fixed. They are

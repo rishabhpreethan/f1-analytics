@@ -7,6 +7,7 @@ import { EraStrip } from './EraStrip';
 import { LineageChain } from './LineageChain';
 import { RateRailBoard } from './RateRailBoard';
 import { RelationBand } from './RelationBand';
+import { ResultMix } from './ResultMix';
 import { SeasonLens } from './SeasonLens';
 import { archiveDomain, chainFor, orientChain, orientLedger, pairFor, type Domain } from './model';
 import type { CompareCandidate, CompareData, CompareSeasonLens, CompareIdentity } from './types';
@@ -397,6 +398,14 @@ export function ComparePage({
             {chain !== null && active !== null && (
               <LineageChain chain={orientChain(chain, active[0])} domain={domain} people={people} />
             )}
+
+            {/*
+             * **The two readable pictures come before the five rates.** §6.6.6.14: the mix and the
+             * arc are the instruments a reader needs nothing explained to understand, and the rate
+             * board is a table of rates with a denominator under each. Picture, then figures, then
+             * the era strip that says why the figures had to be rates at all.
+             */}
+            <ResultMix entities={entities} />
 
             <RateRailBoard channels={ladder.series} entities={entities} />
 

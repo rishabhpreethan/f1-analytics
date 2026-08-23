@@ -1,3 +1,4 @@
+import type { OutcomeTone } from '@/components/charts';
 import type {
   ArchiveSeason,
   Chain,
@@ -433,4 +434,82 @@ export function verdict(
     headline: 'Never on the same grid.',
     lead: `${String(pair.yearsApart)} years separate ${earlier.identity.surname}'s last Grand Prix in ${String(earlier.lastSeason)} from ${later.identity.surname}'s first in ${String(later.firstSeason)}. There is no race, no car and no points system the two of them share, so nothing on this page is a direct result — and the rates below are indexed to opportunity, not summed.`,
   };
+}
+
+/* --------------------------------------------------------------------------- the result mix */
+
+/** One ordinal step of one driver's career, in ramp order (§6.3a). */
+export interface ResultMixPart {
+  tone: OutcomeTone;
+  label: string;
+  value: number;
+}
+
+/** One driver's starts, split four ways. The four always sum to `starts`. */
+export interface ResultMixRow {
+  ref: string;
+  surname: string;
+  teamRef: string;
+  starts: number;
+  parts: ResultMixPart[];
+  /**
+   * Retirements, which is **not** the same number as the unclassified part and is carried so the
+   * surface can say so when they differ. Hamilton: 34 retirements, 32 unclassified starts.
+   */
+  dnfs: number;
+}
+
+/**
+ * **The result mix** — of every race a driver started, how many were wins, podiums that were not
+ * wins, finishes that were not podiums, and starts with no classification at all.
+ *
+ * `DESIGN_SYSTEM.md` §6.6.6.14. It is the most readable comparison this payload supports and it
+ * needs no normalisation argument: **a share of a driver's own starts is era-honest by
+ * construction**, because the denominator is his and nobody else's. No points system, no season
+ * length, no scoring era enters it.
+ *
+ * ---
+ *
+ * **Every part is a subtraction from the next-widest total, and that is not an arbitrary choice of
+ * arithmetic.** It is what makes the four sum to `starts` exactly, for every driver, with no
+ * residual and no possibility of a bar that does not fill its track. A `ShareChart` normalises
+ * whatever it is given, so a row that summed to 0.94 of the starts would render as a full bar and
+ * silently overstate every part in it.
+ *
+ * ⚠ **`starts`, never a raw count of classification rows** (trap 17). 40 races between 1950 and
+ * 1964 classify the same driver two or three times, so a raw count gives Fangio **58** where the
+ * driver index gives **51**. The payload's `totals.starts` is already collapsed and agrees with the
+ * index; the figures §6.6.6.12 recorded when this chart was proposed — 24/11/9/14 of 58 — were the
+ * raw ones, and are corrected here to **24/11/6/10 of 51**. A chart that disagreed with the rest of
+ * the product about how many races a man started would be a defect however pretty it was.
+ *
+ * ⚠ **The fourth part is "not classified", NOT "retired", and the two are genuinely different
+ * numbers.** Hamilton has **34** retirements against **32** unclassified starts, because a car that
+ * covers enough of the race distance is still given a finishing position when it stops. Using
+ * `totals.dnfs` for the fourth part would break the sum *and* mislabel it, so the subtraction is
+ * the value and `dnfs` travels beside it for the surface to explain the gap.
+ */
+export function resultMix(entities: readonly CompareEntity[]): ResultMixRow[] {
+  return entities.map((entity) => {
+    const { starts, wins, podiums, classifiedFinishes, dnfs } = entity.totals;
+    /* Clamped at zero apiece. The payload's four totals are nested by construction — a win is a
+     * podium is a classified finish is a start — but a clamp is what keeps a future selector's
+     * disagreement from emitting a negative width instead of a visible oddity. */
+    const podiumOnly = Math.max(0, podiums - wins);
+    const classifiedOnly = Math.max(0, classifiedFinishes - podiums);
+    const unclassified = Math.max(0, starts - classifiedFinishes);
+    return {
+      ref: entity.identity.ref,
+      surname: entity.identity.surname,
+      teamRef: entity.colorTeamRef,
+      starts,
+      dnfs,
+      parts: [
+        { tone: 'win', label: 'Won', value: Math.max(0, wins) },
+        { tone: 'podium', label: 'Podium, not a win', value: podiumOnly },
+        { tone: 'classified', label: 'Finished, off the podium', value: classifiedOnly },
+        { tone: 'unclassified', label: 'Not classified', value: unclassified },
+      ],
+    };
+  });
 }

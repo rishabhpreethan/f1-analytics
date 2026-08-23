@@ -121,10 +121,19 @@ describe('the matrix', () => {
     render_();
     /* Four entities, six relationships, and a relationship is symmetric — so six cells, not
      * twelve, and never a diagonal. */
-    const cells = screen.getAllByRole('button', { pressed: false });
-    const matrix = cells.filter((cell) => cell.className === 'relation-cell');
-    expect(matrix).toHaveLength(5);
-    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(1);
+    const pressed = (state: boolean) =>
+      screen
+        .getAllByRole('button', { pressed: state })
+        .filter((cell) => cell.className === 'relation-cell');
+    expect(pressed(false)).toHaveLength(5);
+    /*
+     * Scoped to `.relation-cell`, and the scope is the assertion's whole point: every `ChartFrame`
+     * on the page carries an `aria-pressed` view toggle of its own, so a page-wide count of pressed
+     * buttons measures how many charts are rendered rather than how many pairs are selected. It
+     * counted 1 until §6.6.6.14 added a chart, and then failed for a reason that had nothing to do
+     * with the matrix.
+     */
+    expect(pressed(true)).toHaveLength(1);
   });
 });
 
@@ -482,5 +491,50 @@ describe('the notice slot keeps the document outline in order', () => {
   it('renders nothing at all when there is no notice', () => {
     render(<ComparePage available={COMPARE_DIRECTORY} data={COMPARE_FIXTURE} />);
     expect(screen.queryByText('Part of that link could not be read')).toBeNull();
+  });
+});
+
+describe('the result mix (§6.6.6.14)', () => {
+  it('draws one four-step row per selected driver, in selection order', () => {
+    const { container } = render_();
+    const marks = [...container.querySelectorAll('.chart-marks .chart-span')];
+    expect(marks).toHaveLength(COMPARE_FIXTURE.entities.length * 4);
+    expect(marks.slice(0, 4).map((mark) => mark.getAttribute('data-tone'))).toEqual([
+      'win',
+      'podium',
+      'classified',
+      'unclassified',
+    ]);
+  });
+
+  it('prints the denominators the shares throw away', () => {
+    /*
+     * A 100% bar is comparable *because* it discards the size, which also makes it incomplete: a
+     * reader cannot tell Fangio's 51 races from Hamilton's 390 by looking at two full-width bars.
+     * The caption is where that difference lives, and it is generated from the same totals the
+     * bars are, so it cannot drift from them.
+     */
+    render_();
+    expect(screen.getByText(/Fangio 51/)).toBeTruthy();
+    expect(screen.getByText(/Hamilton 390/)).toBeTruthy();
+  });
+
+  it('explains a retirement count that differs from the unclassified count', () => {
+    // Hamilton: 34 retirements, 32 unclassified starts. The note appears because they differ, with
+    // both figures in it — not as a standing disclaimer on every comparison.
+    render_();
+    expect(
+      screen.getByText(/Hamilton retired from 34 races and has 32 starts with no classification/),
+    ).toBeTruthy();
+  });
+
+  it('never draws a number inside a tone, whatever the fills resolve to', () => {
+    /*
+     * V-38: neither ink clears 4.5:1 across all 44 fills. The rule is enforced in `ShareChart`, and
+     * this asserts the page actually gets it — a future caller adding a `shortLabel` for
+     * "readability" is exactly the change that would put 3.40:1 text on a McLaren bar.
+     */
+    const { container } = render_();
+    expect(container.querySelectorAll('.chart-span-label')).toHaveLength(0);
   });
 });
