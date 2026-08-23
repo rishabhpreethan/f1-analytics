@@ -2922,15 +2922,18 @@ classes. One venue's position and seventy-eight venues' positions are the same d
 | **Plate** | `.atlas-map .locator-frame` fills **`--surface-raised`**, overriding the locator's `--surface-sunken`. One override, not a second map stylesheet — on a profile the plate is recessed against a raised panel; on the board that fill *is* the board and the map would be an invisible rectangle |
 | **Current pip** | r **3.2**, `--accent-mark`, 1.5px `--surface-raised` ring |
 | **Retired pip** | r **2**, `--ink-tertiary`, 1px ring, `opacity: 0.7` |
-| **Paint order** | retired first, current last. SVG has no z-index, so paint order *is* stacking, and Monza must never sit under a venue that closed in 1958 |
+| **Paint order** | plate → coastline → graticule → **retired pips → current pips** → neatline. SVG has no z-index, so paint order *is* stacking: Monza must never sit under a venue that closed in 1958, and no pip may sit under a continent. Full table in §7.15 |
 | **Ring** | §6.3's surface ring, and it matters far more here than on a single pip: 78 marks overlap constantly and without it the European cluster is one blob |
 | **Key** | text, not a swatch alone — a pip, a phrase and a mono count. ⚠ **The complement is worded `Not on it`, never `No longer used`.** A map is a **two-way** split; the ladder 200px to its left is a **three-way** one, and the first build reused the ladder's phrase for the legend's complement, so one board carried *"No longer used"* against **53** and **56**. Caught in Rishabh's capture — the same defect as §6.6.5.3's masthead counts, in a second place. A complement is worded as a complement, and it closes: `22 + 56 = 78` |
 | **Parallels** | drawn, **unlabelled**. On the locator the labels *are* the readout; here the grid is context for a distribution and five captions across 78 marks are five more things to read past |
 | **Accessible** | one `role="img"` with one summary name — `SeasonDial`'s decision at a bigger scale. **Not 78 links**: that would put 78 tab stops between the console and the list, and announcing 78 pips one at a time is worse than useless. The list below is the navigable surface |
 
-**Still no track outline.** The `circuit` table holds a name, a locality, a country and three
-numbers, so drawing a circuit's shape would be fabrication — §7.11's ruling, inherited rather than
-relitigated.
+**Still no track outline, and the coastline does not open that door.** §7.11 ruled the two out
+together, and only one of the two rulings survived a measurement. The `circuit` table holds a name, a
+locality, a country and three numbers, so drawing a circuit's shape would be **fabrication** — and no
+budget figure changes that. The landmass was rejected on **cost**, cost is measurable, and it was
+measured. *A ruling made on an estimate is worth re-testing; a ruling made on the absence of data is
+not.*
 
 **The coastline is a different question, and §7.11's ruling on it was made without a number.** That
 section rejected a landmass because *"a topojson asset costs more than the entire chart kit"*, which
@@ -2940,29 +2943,91 @@ than a world map, and the graticule alone doesn't tell a viewer which way is up.
 **measured**, from Natural Earth 110m (`world-atlas` `land-110m`), projected through the atlas's own
 identity map and gzipped at level 9:
 
-| Douglas–Peucker threshold | Coordinate precision | Rings | Raw | **Gzipped** |
-|---|---|---|---|---|
-| none | 0.01° | 126 | 66.7 KB | **26.64 KB** |
-| none | 0.1° | 126 | 56.4 KB | **19.91 KB** |
-| 0.5 | 0.1° | 65 | 19.7 KB | **7.59 KB** |
-| **1.0** | **0.1°** | **55** | **13.4 KB** | **5.31 KB** |
-| 2.0 | 0.1° | 51 | 9.3 KB | **3.75 KB** |
+⚠ **The algorithm is Visvalingam–Whyatt, and this table called it Douglas–Peucker until 2026-08-23.**
+`topojson-simplify`'s `presimplify()` weights each point by the **effective area** of its triangle;
+Douglas–Peucker is a *perpendicular-distance* rule, and at the same numeric threshold the two produce
+visibly different maps, so the names are not synonyms. **Only the label was wrong.** The figures below
+are Visvalingam's and were re-measured within 6% at every row, with the unsimplified ring count of
+126 matching exactly — so the shipped map is the one that was rasterised and signed off. Corrected
+here rather than by changing the algorithm; the reconciliation is `ARCHITECTURE.md` §10 #35, and the
+generator's own header repeats the warning so nobody closes the gap from the other end.
 
-**The naive asset really is unaffordable — 19.9 KB against 30.3 KB of headroom.** A simplified one is
-not: at threshold 1.0 the path is **5.31 KB gzipped, 55 rings, 1,163 points**, which takes initial JS
-from 219.74 KB to ≈225 KB (**90.0%** of the 250 KB budget). Rasterised to a text grid to check it
-still reads, every continent and Antarctica survive at that threshold; at 2.0 it starts to blocken.
-The map is 1.44 px per degree at a 517px column, so 0.1° precision is well below a pixel and buys
-nothing further.
+**Re-measured 2026-08-23 through the corrected pipeline** (see "the three defects" below — the ring
+and point counts moved because the antimeridian fix splits two islands and closes Antarctica over
+the pole), so every row is one method rather than two:
 
-**Not built, pending Rishabh's decision on the 5.3 KB** — and it is **not the designer's call to
-make** in any case: it needs `world-atlas`, `topojson-client` and `topojson-simplify` as
-devDependencies plus a generation script emitting a `.ts` constant, which is build config and the
-engineer's (§2). Two cheaper shapes were considered and are worse: a static SVG in `public/` costs a
-second request and cannot follow the theme token, and a CSS `background-image` would land the same
-5.3 KB in the **render-blocking CSS** budget, which has only 6.9 KB of headroom and would go to
-93.6%. **If it is declined, the caption has to carry what the outline does not** — a bare graticule
-that nobody explains is the same failure as a chart with no axis label.
+| Visvalingam–Whyatt min. effective area | Coordinate precision | Rings | Points | Raw | **Gzipped, standalone** |
+|---|---|---|---|---|---|
+| none | 0.01° | 128 | 5,002 | 63.9 KB | **25.03 KB** |
+| none | 0.1° | 128 | 4,994 | 53.1 KB | **18.65 KB** |
+| 0.5 | 0.1° | 95 | 1,824 | 19.4 KB | **7.38 KB** |
+| **1.0** | **0.1°** | **73** | **1,218** | **13.0 KB** | **5.03 KB** |
+| 2.0 | 0.1° | 52 | 794 | 8.5 KB | **3.37 KB** |
+
+**The naive asset really is unaffordable** — 18.65 KB standalone is ≈22 KB in the bundle by the
+correction below, against 24.24 KB of headroom, which would leave the budget with nothing in it. The
+chosen one is affordable. Rasterised offline to check it still reads: every continent and Antarctica
+survive at threshold 1.0, and at 2.0 it starts to blocken. The map is 1.44 px per degree at a 517px
+column, so 0.1° precision is well below a pixel and buys nothing further.
+
+⚠ **The last column understates what the asset actually costs, and this is the transferable part.**
+Gzipping a string on its own is not what happens to it: it is concatenated into a ~730 KB chunk of
+unrelated code, and a 13 KB run of digits compresses **worse** inside a large mixed window than it
+does alone. Measured both ways at the same commit:
+
+| | Figure |
+|---|---|
+| The string, gzipped by itself at level 9 | **5.03 KB** |
+| Initial JS before | **219.78 KB / 250 (87.9%)** |
+| Initial JS after | **225.76 KB / 250 (90.3%)** |
+| **Real marginal cost** | **+5.98 KB — 19% dearer than the standalone figure** |
+
+**So size an asset by building with it and reading `check:budget`, never by gzipping the candidate on
+its own.** The standalone number is useful for *ranking* the five rows above against each other,
+where the bias is roughly constant; it is not the number to spend a budget against. Render-blocking
+CSS moved 18.09 → **18.20 KB / 25 (72.8%)** for the four new rules.
+
+**Built 2026-08-23.** Two cheaper shapes were considered and are worse: a static SVG in `public/`
+costs a second request and cannot follow the theme token, and a CSS `background-image` would land the
+same payload in the **render-blocking CSS** budget, which has 6.9 KB of headroom and would go to
+93.6%.
+
+###### The three defects the first constant shipped with, and what they cost to find
+
+⚠ **Worth reading before touching the generator, because none of the three is visible in a path
+string, reachable from jsdom, or catchable by any assertion that existed.** All were found by
+rasterising the emitted path offline and computing nonzero winding numbers at known ocean points.
+
+| Defect | What it drew | Cause |
+|---|---|---|
+| **Fiji and Wrangel Island** | a hairline of land across the **entire map** at lat −16.5 and lat 71 — measured winding **1** at (−140°, −16.5°), open ocean 3,000 km from anything | both straddle the antimeridian, and Natural Earth writes their seam vertices at lon **−180** while the bodies sit at **+178.7…+180**. Projected straight through, a 0.6°-wide island unrolls into a 359.4-unit quad |
+| **Afro-Eurasia's seam** | nothing, **until the coastline is stroked** — then a full-width scar at y = 25 | the ring genuinely crosses the antimeridian at Chukotka, so it carries a seam edge from x = 360 to x = 0. That edge is exactly horizontal, crosses no scanline and so bounds no *fill* — which is why it hid until a stroke was added |
+| **Antarctica** | a dead-flat bottom at y ≈ 174.6 with five units of ocean under it, and no pole at all | `world-atlas` clips at 85.6°S and the ring closes with a wrap chord. Simplification had already deleted the two clip corners, because a straight run has near-zero effective area under Visvalingam |
+
+The fix is in the generator, in four ordered steps — **unwrap** each ring's longitudes so no
+consecutive pair jumps 180°; **close over the pole** the one ring that still spans a whole turn;
+**place** each ring in the frame that shows the most of it, with a second copy one turn away for
+Afro-Eurasia's 10.1° of Chukotka; and **clip to the viewBox**, so that every artificial edge this
+introduces lands on x = 0, x = 360 or y = 180, underneath `.atlas-neatline`. Cost: **72 → 73 rings,
+1,214 → 1,218 points, +38 bytes raw.**
+
+Two new generator invariants, both of which would have caught the shipped defect: **no
+non-horizontal edge may span more than half the map** (on a 1:110m coastline the longest legitimate
+segment is a few degrees, so anything near 180 is a seam, a wrap or a chord, never a shore), and
+**exactly one ring may need a polar closure**. Both are asserted in `scripts/world-land.test.mjs` as
+well as in the generator, so they run in the suite and not only at emit time.
+
+**The rule this leaves behind: an identity projection is not the same as a correct one.** `x = lon +
+180` is exact for every point and wrong for the two edges of the world, and no amount of checking the
+arithmetic finds that — only drawing it does.
+
+**Verified numerically rather than by eye:** 30 known land/ocean/lake points, including the Caspian
+(winding **0** — the hole punches out), the South Pole (winding **1**), Wrangel and the trans-
+antimeridian tip of Chukotka; plus a 1440 × 720 grid diff against the **unsimplified** source run
+through the identical pipeline, agreeing on **99.1%** of 1,036,800 samples with every disagreement in
+the 68–78°N archipelago band, which is where Visvalingam at 1 square degree is expected to drop
+islands. **No row of that grid disagrees by more than 14%** — a full-width artefact would show as a
+row near 100%, which is exactly how the original two were found.
 
 ##### 6.6.5.4 The entities that never raced — below the list, not above it
 
@@ -3603,9 +3668,15 @@ there is nothing to get wrong.
 | Motion | **none.** It is a static readout. `prefers-reduced-motion` has nothing to stop |
 
 **It draws no coastline and implies none.** The graticule is stated as a graticule by its own labels;
-a viewer reads latitude and longitude, not a country outline. Adding a landmass would need a
-topojson asset that costs more than the whole chart kit and would be the only decorative geometry in
-the product.
+a viewer reads latitude and longitude, not a country outline.
+
+⚠ **The reason given here was "a topojson asset costs more than the whole chart kit", and that was an
+estimate that turned out to be wrong — but the ruling stands for this component on a different
+ground.** Measured, the asset is **5.98 KB** in the bundle and `CircuitAtlas` (§7.15) now ships it.
+`CircuitLocator` still does not, because a locator is a **readout**: one pip, read off labelled
+parallels, and a landmass behind that competes with the thing being read. §7.15 states the split and
+the chunking cost of revisiting it. **The estimate was replaced with a number before the decision was
+re-made, which is the part worth copying.**
 
 **Altitude is a figure, never a mark on this graphic.** A third dimension on a two-dimensional
 projection is the dual-axis mistake in a different costume.
@@ -3666,12 +3737,49 @@ Full spec in **§6.6.5.1**. Summarised here because the inventory is where a com
 | **Motion** | **G-31** |
 | **Skeleton** | five ladder rows and eight columns at the real geometry, so the console below does not move. Not animated in (§4.6.1 rule 1) |
 
-### 7.15 `CircuitAtlas` — 78 venues on one graticule _(added 2026-08-23)_
+### 7.15 `CircuitAtlas` — 78 venues on one graticule _(added 2026-08-23; coastline 2026-08-23)_
 
 Full spec in **§6.6.5.3**. It is **`CircuitLocator` (§7.11) with the pip repeated** — same
 projection, same graticule, same classes, one `--surface-raised` override on the plate. Two pip
 classes separated on **radius, fill, stroke weight and opacity**; retired painted first so a current
 venue is never hidden under a closed one. One `role="img"` with one summary name, never 78 links.
+
+#### The coastline
+
+| Part | Spec |
+|---|---|
+| **Source** | `WORLD_LAND_PATH` from `src/components/entity/worldLand.ts`, **generated, never hand-edited** (`scripts/generate-world-land.mjs`). Natural Earth 1:110m, Visvalingam–Whyatt at 1 square degree, 0.1° grid, 73 rings, 1,218 points |
+| **Placement** | `<path className="atlas-land" d={WORLD_LAND_PATH} aria-hidden="true" />` — **no transform, no wrapper `<g>`, no reordering of subpaths.** The constant is already in this viewBox's coordinate space, and `CircuitAtlas` plots its pips with the same two additions inline |
+| **Fill** | `--map-land`. ⚠ **`fill-rule` is never set, in the markup or the stylesheet.** SVG's default `nonzero` is correct; `evenodd` gives the same picture *by accident* here and breaks on any source bump that adds a second hole |
+| **Stroke** | `--map-coast`, `stroke-width: 1`, **`vector-effect: non-scaling-stroke`**, `stroke-linejoin: round`. The map is `width: 100%` over 360 units, so a user-space stroke would be 1.44 px on the board and 0.95 px on a phone. A coastline is a hairline at every size or furry at one of them |
+| **Paint order** | plate → **coastline** → graticule → retired pips → current pips → **neatline**. Land after the plate or it is invisible; land before the pips or a venue is buried under the continent it sits on |
+| **Neatline** | `.atlas-neatline`, stroke only, **drawn last**, and `.atlas-map .locator-frame` has its stroke suppressed to make room for it. Land now reaches x = 0, x = 360 and y = 180 — Eurasia runs off both edges at Chukotka, Antarctica fills to the pole — so a border painted first would have three of its four sides eaten. It also covers the four artificial edges the generator's viewBox clip introduces, which are not coastline and must not be stroked where a reader would take them for one |
+| **Antarctica** | **completed to the pole, in the generator rather than as a rect in the component.** `world-atlas` clips at 85.6°S, which is a storage limit and not a shore; everything from there to the pole is continent. The alternative — leaving the dataset's flat cut with five units of ocean beneath it — reads as a rendering bug, and cropping the viewBox would break the map language `CircuitLocator` shares |
+| **The graticule over land** | the dashed subdivisions are **absorbed** by the landmass (measured **1.07:1** light, **1.04:1** dark), and the prime meridian and equator stay **continuous** across it (**1.53:1** / **1.74:1**). That hierarchy is the design: the grid describes the empty part of the map and its two anchors carry across the whole of it. Recorded as figures in §9.2.6 so it reads as a decision and not a miss |
+| **Motion** | **none.** The coastline is not animated on mount, on theme change or on filter. G-31 animates the board's ladder and columns; a map that redraws itself while someone is reading a distribution is §4.6.2 G-29's case exactly |
+| **Reduced motion** | nothing to disable — the surface is static in both states, which is the strongest form of the §4.4 clause and is stated rather than left implied |
+| **Accessible** | `aria-hidden="true"` on the path. Redundant under the figure's `role="img"` and written anyway: the summary sentence is the whole accessible reading, and a 13 KB path is the single most likely element to acquire an accidental name later |
+
+**Two new tokens, and no new colour.** `--map-land` and `--map-coast` are values the neutral ramp
+already ships (`--accent-wash` and `--border-strong` in each theme), given their own names because a
+landmass is not an accent wash and a map that changed shade when the selected-state tint was retuned
+would be a coupling nobody would look for. **The direction is the same in both themes: land steps one
+place toward the ink from the plate it sits on** — darker in light mode, lighter in dark, nothing
+about the encoding inverts.
+
+⚠ **`--map-land` must never equal `--surface-raised`.** Every `.atlas-pip` carries a ring in
+`--surface-raised`, and on water that ring is invisible and unnecessary; on land it is the only thing
+separating two of the twenty-odd European venues inside four degrees of each other. Asserted in
+`entity-index.css.test.ts` in both themes.
+
+**`CircuitLocator` does not get the coastline, and that is deliberate.** A profile page's locator
+answers *where is this one circuit*, and it answers it by reading a labelled pip off labelled
+parallels — a landmass behind that is decoration competing with a readout. The atlas answers *how is
+the sport distributed*, which is a question about geography itself, so the geography has to be
+visible. The two maps still share one projection, one graticule and one set of classes; what differs
+is one layer, for a stated reason, rather than by drift. **If this is revisited, note the cost is not
+free twice**: the two surfaces are separate route chunks, so the constant would either duplicate or
+hoist into a shared chunk that both pay for.
 
 ---
 
@@ -3930,6 +4038,42 @@ future proposal to "fix" a brand colour meets the decision rather than the surpr
 inks at ΔE ≥ 15 / CVD ≥ 8 as a HARD check (§9.1 item 3) — which is exactly why Sauber has no
 admissible shade pair in light mode (§9.2.3 G-27d). Nothing in this entry weakens that.
 
+#### 9.2.6 V-37 — the map plate, 2026-08-23
+
+`CircuitAtlas`'s coastline (§7.15) is a **new painted surface**, so it carries new contrast
+obligations even though it introduces no new colour: `--map-land` and `--map-coast` are values the
+neutral ramp already ships. Nothing here can fail on hue; everything here can fail on **stacking** — a
+mark on land, a hairline between land and water, and a ring whose job is to separate two overlapping
+pips while sitting on the land they are both on.
+
+```
+npm run validate:palette          # V-37 runs inside `all`
+node scripts/validate-palette.mjs map
+```
+
+| Check | Floor | Light | Dark |
+|---|---|---|---|
+| land vs the map plate — **the landmass is visible at all** | 1.06 | **1.24** ✅ | **1.27** ✅ |
+| the pip's `--surface-raised` ring against land | 1.06 | **1.24** ✅ | **1.27** ✅ |
+| current pip `--accent-mark` on land | 3.0 | **16.07** ✅ | **13.42** ✅ |
+| **retired pip `--ink-tertiary` on land** | 3.0 | **4.18** ✅ | **3.83** ✅ |
+| coast on water | 1.2 | **1.90** ✅ | **2.21** ✅ |
+| coast on land | 1.2 | **1.53** ✅ | **1.74** ✅ |
+| prime meridian / equator on land — *recorded* | — | 1.53 | 1.74 |
+| dashed graticule on land — *recorded, absorbed by design* | — | 1.07 | 1.04 |
+| neatline vs the sunken board outside it — *recorded* | — | 1.17 | 1.55 |
+| land OkLCh chroma — *recorded, must read as neutral* | — | 0.01 | 0.01 |
+
+**V-37 PASS. Full run `npm run validate:palette`: exit 0, zero FAILs across 430 lines** — no existing
+figure moved, because no existing token did.
+
+**The row that mattered is the retired pip.** A grey mark on grey land is the case the monochrome
+palette makes real rather than theoretical, and the dense European cluster is where it would bite.
+**4.18:1 and 3.83:1 against a floor of 3.0** — it clears, and it clears in the worse theme too. The
+three *recorded* rows are recorded rather than gated on purpose: the graticule being absorbed by the
+land is the design (§7.15), and a decision written as a number is the only kind that survives someone
+later looking at the screen and calling it a bug.
+
 ---
 
 ## 10. Theming mechanics
@@ -3979,3 +4123,4 @@ admissible shade pair in light mode (§9.2.3 G-27d). Nothing in this entry weake
 | 2026-08-08 | **The three entity indexes — `/drivers`, `/teams`, `/circuits`, specified and built.** (a) **New §6.6.4.** The three profile pages had no front door: F4–F6 routed them at a slug and left the bare paths on an F0 `RoutePlaceholder`, so the dock's own "Drivers" item — the primary navigation, on every screen — led nowhere. §6.6.2.9 audited the seams *between* surfaces and never asked whether a surface had an **entrance**, so §1.0a earns a fourth clause: **a link in the primary nav is a seam too**. One component behind all three, for §6.6.2's reason. (b) **New §7.12 `SpanRail`** — the signature, and the answer to 881 rows. Every row plots its entity against the same fixed 1950→2026 baseline, so scrolling the list is scrolling the sport's history. **A bracket, never a fill**: a career has gaps — Räikkönen raced 2001–2009 and 2012–2021 — and a solid bar would state that he raced in 2010, so it is two end ticks joined by a rule, which reads *from … to* and cannot be read as *throughout*. Separated by **form**, the same device §3.3a.5 uses for an identity swatch beside a timing colour. `spanRailGeometry` returns **`null`, never `{0,0}`**, when there is nothing to plot — a zero-width bracket at the origin is indistinguishable from a 1950 debut, which is §1.0's collapse. (c) **New §7.13 `IndexConsole`.** Sticky, glass, `--z-content` and **never `--z-header`** (§5.2a — the dock's fault 4 on a different element). The sort is a real `<fieldset>` of radios, clipped rather than `display: none`, so arrow-key roving and `:checked` come from the platform instead of from thirty lines of keyboard code. (d) **The sort decides the grouping**, which is what makes 881 rows browsable rather than merely searchable: letters under `A–Z`, decades under `Debut`, none under a metric — and the sorted column is promoted to `--ink-primary` 600, which is the whole indication of what you are sorted by. **Absence sorts last in both directions**: `null < 1` is `true` in JavaScript, so a naive descending sort by races opens the driver index with the 63 people who never raced, presented as the most raced. (e) **§6.6.4.3, the state this feature exists to get right.** Queried: **63 of 881 drivers, 9 of 214 teams and 1 of 78 circuits** never contested a race. Four channels carry it — a chip, an empty rail, a demoted portrait rule and one panel notice — and the figure rule is **two rules, not one**: the season columns read `—` because `firstSeason` is null *exactly* when `races` is 0 and printing `0` would state a season that never happened, while the races column reads its **measured `0`**, because replacing a measurement with a dash is the same collapse pointing the other way. Madring reads **`Not yet raced`**, never `Never raced` — a venue joining the calendar is not a gap (`SeasonCalendar`'s rule). (f) **§6.6.4.6 — density is `content-visibility: auto` + `contain-intrinsic-size`, no virtualisation library and no scroll handler**, the same "let the compositor do it" position §7.7 takes on the background. Its one honest cost is recorded rather than discovered later: **Safari does not reveal skipped content to find-in-page**, accepted because this page ships a search that is better than ⌘F. (g) **Four spec rows were wrong when written and the payload corrected them the same day, recorded rather than edited silently.** `server/schemas/directory.ts` rules that these endpoints are a **directory and not a dashboard**, so there is no `wins`, no `championships`, no `seasonsEntered` and no `teamRef`: the **champion** marker on the rail became a **current** marker (an entity still going in the latest season — available for free as `lastSeason === max(lastSeason)`, and **redundantly encoded**, because that bracket is also the one reaching the end of the rail), the wins and titles sorts are gone, the count-versus-span column is gone, and **the driver index carries no identity colour** — team rows keep theirs, since a team's reference *is* its identity. One `teamRef` is ⚑ open with the engineer, as is a discriminator for §6.6.4.3's two raceless groups. (h) **One regression, caught by a test rather than by reading**: the team index was headed `Constructors` — the sport's word, and the team profile's eyebrow — while the dock's item reads `Teams`. `RootLayout.test.tsx`'s route table failed on it. **On a directory the nav wins**, and the sport's word stays on the entity. **No colour token moved → `validate:palette` re-run anyway: PASS, unchanged.** Six new `--size-index-*` / `--size-span-*` tokens; one new Lucide glyph (`search`, geometry copied verbatim). **Measured cost: initial JS 209.15 → 214.59 KB / 250 (85.8%, first WARN band), render-blocking CSS 15.61 → 16.98 KB / 25 (67.9%)** — both figures include the engineer's directory schemas, queries, routes and hooks landing in the same session. Suite **1693 → 1878 tests across 85 files, 3 consecutive green runs**; 84 of the new tests are this work's. **Untested by construction and named as such: every position, size and composition on all three pages** — jsdom performs no layout, so where the rail's bracket lands, whether the console sticks under the header, whether `content-visibility` skips anything, how 881 rows scroll, and what an identity bar resolves to are all unverified and need Rishabh's capture | designer |
 | 2026-08-23 | **The index pages were rejected and rebuilt — new §6.6.5.** Rishabh: *"i dont want a basic search bar page, please design it in a meaningful way based on the data … that list has alot of drivers/teams that havent raced … i really like the way you have designed the seasons page, like its different, it has meaningful data, its intuitive"*. (a) **Half of it was the payload's, and that is the transferable finding.** §6.6.4.7 recorded the *directory, not a dashboard* ruling, which left the rows carrying `races`, `firstSeason` and `lastSeason` — **nothing to stratify by, so a search box was the only design that payload allowed.** `server/schemas/directory.ts` reversed itself the same day (*"a directory with no achievement in it cannot be designed, only listed"*) and now publishes `starts`, `wins`, `podiums`, `championships`, `bestChampionshipPosition`, circuit coordinates and `lastScheduledYear`. **The rule: when a surface can only be designed one way, check whether the payload is the constraint before accepting the design.** §1.0a's seam failure, pointing the other way. (b) **New §7.14 `PopulationBoard`** — a ladder of disjoint strata and eight decade columns, both filters, both measured against the **whole payload** as §7.12 already requires of the rail's domain. Its invariant: **a bar's count is exactly the rows a click produces.** 116 drivers won a Grand Prix; the *Race winners* bar reads **81**, because 35 were champions and champions have their own rung — a bar labelled 116 that filters to 81 is a page arguing with itself, and the nesting goes in the sublabel where it is unambiguous. Bar length is `count / max`, never `count / total` (the largest driver stratum is 571 of 881 and would top out at 65% of its own track). Opacity runs **rarest-loudest** by position, never by count — 35 champions must be the strongest mark on the page, not the faintest. (c) **The decade collapse, drawn**: 1950s **313** → 2020s **40**, verified against `data/f1.db`, and the span-overlap count reproduces the measured distinct-starters-per-decade figure **exactly for all eight decades**. The unfinished decade is **hatched and captioned**, texture not colour (§6.3), because a short 2020s column is a calendar fact and not another collapse. (d) **The default lens is Achievement, not A–Z** — `/drivers` opens on Hamilton, not Carlo Abate. The merit vector is `[championships, wins, podiums, championshipMerit(bestChampionshipPosition), starts]`, and **the fourth element is what stops the bottom of the list being one 571-row tie broken by surname.** It is a *rank*, so it is inverted to `1000 − position` before it reaches the comparator; copying it raw would sort the whole list backwards while still looking ordered. (e) **New §7.15 `CircuitAtlas`** — 78 venues on `CircuitLocator`'s own graticule, replacing the decade columns on `/circuits` because venues-per-decade runs 19 → 30 and says nothing while *where* they are says everything. One `role="img"`, never 78 tab stops in front of the list. **Circuit strata read `lastScheduledYear`, never `lastYear`**: 2026 is 10 of 22 rounds in, so a `lastYear === latest` test files Monza, Spa, Baku and eleven more as retired. Measured **22 · 3 · 53**. (f) **The never-raced entities moved below the list** and are keyed on **`starts`, not `races`** — **28 drivers entered a Grand Prix and started none**, and `races > 0` misses every one of them, so the stratum is 91 drivers rather than 63. Selecting the rung overrides the toggle, because a control that selects a stratum and returns nothing is broken. (g) ⚠ **The championship trap held**: the naive per-round-snapshot count returns **66**; the answer is **35**, and it is the server's — no client surface recomputes a title. (h) **New G-31**, one timeline, ladder `scaleX` from `left` and columns `scaleY` from `bottom` — each mark's own axis, and deliberately not `useAxisAnchoredBars`' `right`, because a coverage window is anchored at *now* while a population count is anchored at zero. Keyed on the dataset, never the selection (G-29). (i) `.index-notice` **deleted** rather than left unused. **No colour token moved → `validate:palette` re-run anyway: PASS, unchanged.** One new `--size-era-track`; one new Lucide glyph reused (`trophy`, already present). **Measured cost: initial JS 214.59 → 219.69 KB / 250 (87.9%, WARN band, +5.10 KB), render-blocking CSS 16.98 → 18.09 KB / 25 (72.4%)**. Suite **1878 → 1972 tests across 86 files, 3 consecutive green runs.** **Untested by construction and named as such: every bar width, every column height, every pip position, the board's two-column layout, the map plate's contrast against the sunken board, the hatch, and the whole of G-31** — jsdom performs no layout, and only a capture can settle any of them | designer |
 | 2026-08-23 | **Three defects from the capture of the redesigned index pages, all measured rather than eyeballed.** (a) **BLOCKING — the board was half empty on `/drivers` and `/teams`.** At 1440×900 the ladder filled the 517px left column and the decade block stopped at 264px, leaving **253px — 49% of the right column — dead**; a two-column grid stretches to the taller row, so the board rendered as a tall panel with a tall hole in it, which is the "grey slab" the whole rebuild existed to avoid. `/circuits` never showed it because the atlas fills its column, and that is what pointed at the fix: **the mark grows to the space, the space is not left around the mark.** `.era-bars` and `.era-track` both `flex: 1 1 auto`, `align-items: stretch`, `--size-era-track` demoted from the track's height to its floor. **The track keeps an explicit `height` as well** — `.era-bar` is a percentage height against it, and a percentage against an `auto`-height ancestor is the one corner of flexbox engines have historically disagreed on, so deleting it as redundant would leave the bars correct in the browser someone tested and missing in another. Asserted, with that reasoning, in `entity-index.css.test.ts`. (b) **BLOCKING — `/circuits` printed one phrase against two numbers.** The ladder's third rung read `No longer used 53`; the atlas legend 200px away read `No longer used 56`. A map is a **two-way** split and the ladder is a **three-way** one, and the legend had borrowed the ladder's own words for its complement. **This is the same defect as `f3be60e`'s masthead counts, in a second place on the same board** — a three-way split rendered as a two-way one — so the rule is now stated where both live: **a complement is worded as a complement, and it closes** (`22 + 56 = 78`). Legend reads `Not on it`. (c) **`/teams` offered to search by "a code".** A team has no three-letter code; that is a driver concept and a promise the haystack cannot keep. The copy was branched `circuit` versus everything-else, which is precisely what stopped the third case from being written — it is now one record keyed by kind. (d) **The coastline was reconsidered, and §7.11's ruling on it turns out to have been made without a number.** It rejected a landmass because "a topojson asset costs more than the entire chart kit"; measured from Natural Earth 110m through the atlas's own identity projection, the naive asset is **19.91 KB gzipped** — genuinely unaffordable against 30.3 KB of headroom — but a Douglas–Peucker simplification at threshold 1.0 / 0.1° is **5.31 KB, 55 rings, 1,163 points**, taking initial JS to ≈225 KB (**90.0%**). Rasterised to a text grid to confirm every continent survives. **Not built** — it is Rishabh's call on the 5.3 KB and the engineer's on the three devDependencies and the generation script (§2). Figures and the two rejected cheaper shapes are in §6.6.5.3. **No colour token moved.** Suite **1972 → 1978 tests, 3 consecutive green runs.** Initial JS **219.74 → 219.79 KB / 250 (87.9%)**. **Still untested by construction: that the second column now actually fills, and that the percentage-height chain resolves in a real engine** — the assertion proves the declarations exist, not that they lay out | designer |
+| 2026-08-23 | **The coastline shipped, and the constant it shipped from was drawing three things that are not there.** Rishabh approved the 5.3 KB and the engineer landed `WORLD_LAND_PATH`; the job was to render it. **Rasterising the emitted path offline — a pure-Node nonzero-winding scanline fill, no browser — found three defects before any of it reached a screen, and none of the eight tests asserting the *text* of the path could have.** (a) **Fiji and Wrangel Island straddle the antimeridian**, and Natural Earth writes their seam vertices at lon −180 while the bodies sit at +178.7…+180, so each 0.6°-wide island unrolled into a **359.4-unit quad spanning the entire map** — a hairline of land across the Pacific, the Atlantic and the Indian Ocean at lat −16.5 and lat 71. Measured winding **1** at (−140°, −16.5°), which is open ocean 3,000 km from anything. (b) **Afro-Eurasia's seam edge at y = 25** drew nothing while the path was only filled, because a horizontal edge crosses no scanline — **and becomes a full-width scar the moment §7.15 strokes the coastline, which it does.** The defect that hides until the next design decision is the worst kind to leave in. (c) **Antarctica closed with a wrap chord at y ≈ 174.6**, giving a dead-flat bottom with five units of ocean beneath it and no pole at all; simplification had already deleted the two clip corners, because a straight run has near-zero effective area under Visvalingam. Fixed in the **generator**, not papered over in the component: unwrap → close over the pole → place in frame → clip to the viewBox, so every artificial edge lands on x = 0, x = 360 or y = 180 under `.atlas-neatline`. **72 → 73 rings, 1,214 → 1,218 points, +38 bytes raw.** Two new invariants that would have caught it — **no non-horizontal edge may span more than half the map**, and **exactly one polar closure** — asserted in the generator *and* in `world-land.test.mjs` so they run in the suite. **The rule: an identity projection is not the same as a correct one.** `x = lon + 180` is exact for every point and wrong for the two edges of the world, and only drawing it finds that. (d) **Design.** Two new tokens, **no new colour** — `--map-land` / `--map-coast` are ramp values under their own names, land stepping one place toward the ink from its plate in both themes. `vector-effect: non-scaling-stroke` so the coastline is a hairline at 517px and on a phone alike. **`.atlas-neatline` drawn last** with the plate's own stroke suppressed, because land now reaches three sides of the frame and would eat the border. `CircuitLocator` deliberately does **not** get the coastline — a locator is a readout, an atlas is a picture of a distribution — and the chunking cost of changing that is stated. (e) **§6.6.5.3's algorithm label corrected: Visvalingam–Whyatt, not Douglas–Peucker.** Only the label was wrong; the numbers were always Visvalingam's. The whole table was **re-measured through the corrected pipeline** so it is one method rather than two. (f) ⚠ **The §6.6.5.3 sizing method was understating marginal cost and is corrected in place.** A 13 KB run of digits gzips *worse* inside a 730 KB chunk than alone: standalone **5.03 KB**, real in-bundle **+5.98 KB — 19% dearer**. **Size an asset by building with it and reading `check:budget`, never by gzipping the candidate on its own.** (g) **New §9.2.6 V-37**, a gate for the new painted surface: **PASS**, worst gated figure the **retired pip on land at 4.18:1 light / 3.83:1 dark** against a floor of 3.0 — the grey-pip-on-grey-land case the monochrome palette makes real. Full `validate:palette` exit 0, zero FAILs, no existing figure moved. **Measured cost: initial JS 219.78 → 225.76 KB / 250 (90.3%, WARN band, +5.98 KB)**; render-blocking CSS 18.09 → **18.20 KB / 25 (72.8%)**. Suite **1987 → 2001 tests across 87 files, 3 consecutive green runs.** **Verified numerically rather than by eye: 30 known land/ocean/lake points (Caspian winding 0, South Pole 1, Chukotka's trans-antimeridian tip 1), and a 1440 × 720 grid diff against the unsimplified source through the identical pipeline agreeing on 99.1% of 1,036,800 samples with no row disagreeing by more than 14%.** **Untested by construction and named as such: everything about how it *looks*** — whether the outline lands in register with the 78 pips on a real screen, whether 1,218 points read smooth or faceted at 517px, how the hairline resolves at 1× and 2× DPR, whether the completed Antarctica reads as intentional, and the theme response of all of it. The offline raster is arithmetic identical to a browser's nonzero fill and is *not* a browser: no antialiasing model, no subpixel positioning, no CSS. Only a capture settles those | designer |
