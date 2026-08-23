@@ -152,6 +152,90 @@ describe('the balance bar', () => {
   });
 });
 
+describe('the rate board — collisions are impossible, not merely avoided', () => {
+  /**
+   * The first build laid four absolutely-positioned labels on one shared rail per measure. Measured
+   * at 1440 it produced **51 real sibling collisions** — `Hamilton` over `Verstappen` by 62px,
+   * rendering as `MARSTAPPEN` — and at 390 it pushed `document.scrollWidth` to **407** against the
+   * viewport, scrolling the whole body sideways. Both symptoms had one cause, and the fix was a
+   * form change rather than a clamp. These four tests are what stop it coming back.
+   */
+
+  const RATE_SELECTORS = [
+    '.rate-measure',
+    '.rate-measure-head',
+    '.rate-rows',
+    '.rate-row',
+    '.rate-who',
+    '.rate-name',
+    '.rate-glyph',
+    '.rate-track',
+    '.rate-bar',
+    '.rate-figure',
+    '.rate-percent',
+    '.rate-of',
+  ];
+
+  it('positions nothing on the board absolutely — every label is a grid cell', () => {
+    for (const selector of RATE_SELECTORS) {
+      expect(`${selector}: ${body(selector)}`).not.toMatch(/position:\s*absolute/);
+    }
+  });
+
+  /**
+   * The figure column is reserved **before** the track is sized, and the track is `minmax(0, 1fr)`
+   * rather than `1fr` — a bare `1fr` has an `auto` minimum, so a long figure would push the grid
+   * wider than its container instead of being contained by it. That is the 17px of page overflow.
+   */
+  it('reserves the figure column and lets the track absorb what is left', () => {
+    const row = body('.rate-row');
+    expect(row).toMatch(/grid-template-columns:[^;]*var\(--size-rate-figure\)/);
+    expect(row).toMatch(/grid-template-columns:[^;]*minmax\(0, 1fr\)/);
+    expect(body('.rails-list')).toMatch(/--size-rate-figure:\s*96px/);
+    expect(CSS).toMatch(/--size-rate-figure:\s*112px/);
+  });
+
+  it('keeps the row on the page spine at desktop, so a rate zero sits at the chain 1950', () => {
+    expect(CSS).toMatch(
+      /grid-template-columns:\s*var\(--axis-inset\) minmax\(0, 1fr\) var\(--size-rate-figure\)/,
+    );
+  });
+
+  it('degrades a long name and a long figure rather than letting either push the grid', () => {
+    expect(body('.rate-name')).toMatch(/text-overflow:\s*ellipsis/);
+    expect(body('.rate-name')).toMatch(/white-space:\s*nowrap/);
+    expect(body('.rate-figure')).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it('anchors the bar at zero and floors it, because a rate is a magnitude', () => {
+    /* The encoding the old marker-on-a-rail did not provide at all: a marker carries position, a
+     * bar from zero carries the quantity §6.1 step 1 says this chart is for. */
+    const bar = body('.rate-bar');
+    expect(bar).toMatch(/width:\s*var\(--rate-extent\)/);
+    expect(bar).toMatch(/min-width:\s*3px/);
+  });
+});
+
+describe('the two surfaces the rate board defect was audited against', () => {
+  /**
+   * Asked for explicitly after the capture. Neither carries absolutely positioned text, so neither
+   * can produce the same collision — but both are asserted so a later change cannot introduce one
+   * quietly.
+   */
+  it('leaves the balance bar with no absolutely positioned text at all', () => {
+    for (const selector of ['.balance-heads', '.balance-head', '.balance-name', '.balance-count']) {
+      expect(`${selector}: ${body(selector)}`).not.toMatch(/position:\s*absolute/);
+    }
+    /* The only absolute elements in the bar are the 1px even mark and the tied hatch, both
+     * `aria-hidden` and both inside an `overflow: hidden` track. */
+    expect(body('.balance-track')).toMatch(/overflow:\s*hidden/);
+  });
+
+  it('reserves the tray remove button its own lane, so a long forename cannot run under it', () => {
+    expect(body('.tray-body')).toMatch(/padding-right:/);
+  });
+});
+
 describe('colour and tokens', () => {
   it('holds no literal colour — every colour is a token, so a theme switch needs no re-render', () => {
     expect(CSS).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
@@ -179,6 +263,8 @@ describe('colour and tokens', () => {
       '--band-offset',
       '--band-length',
       '--column-extent',
+      '--size-rate-figure',
+      '--rate-extent',
       '--balance-a',
       '--balance-b',
       '--balance-a-share',

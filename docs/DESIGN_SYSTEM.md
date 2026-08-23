@@ -3235,29 +3235,90 @@ capsules instead of the three tracks firing in lockstep. **No `ScrollTrigger`** 
 Deps identify the chain, never the hovered row (G-29). Reduced motion: **not created**; authored
 `from` (MR-2), so the chain is simply *drawn*.
 
-##### 6.6.6.5 `RateRailBoard` — five rates, no totals
+##### 6.6.6.5 The rate board — five rates, no totals _(form reversed 2026-08-23, after a measurement)_
 
-*Form*: **one rail per measure with a marker per entity**, not grouped bars. Grouped bars make the
-reader compare across groups by memory; a rail makes the comparison a distance along a line, which
-is the judgement the eye is reliably good at. **Each rail has its own ceiling** — a win rate and a
-beat-your-teammate rate live on different natural scales and one shared track would flatten the
-interesting one — and the ceiling is printed, so the two are never silently compared.
+⚠ **This section previously specified one rail per measure with four markers on it and a floating
+direct label per marker. That form was built, measured and found broken. The specification is
+corrected here rather than defended.**
 
-| Rail | Numerator / denominator |
+**What the capture measured, at 1440×900:**
+
+| | |
 |---|---|
-| Win rate | wins / starts |
-| Podium rate | podiums / starts |
-| Classified finishes | classified / starts — *an era measure as much as a driver one*, and the label says so |
-| Out-qualified a teammate | same-car pairings with both on the grid |
-| Finished ahead of a teammate | same-car pairings both finished — **the one measure normalised by machinery** |
+| **51 real sibling label collisions** (ancestor/descendant pairs excluded) | `Hamilton` over `Verstappen` by **62px**, rendering as `MARSTAPPEN`; `207 of 390` over `130 of 243` by **58px**, rendering as `2020o6.f5983`. Three of the five rows were unreadable |
+| **A structural collision on all five rows** | the axis caption `0 – 47%` overlapped the leading marker's label `47%` by 12px — **because the leader *is* the ceiling**. Not bad luck; it could not not happen |
+| **17px of horizontal page overflow at 390** | `document.scrollWidth` **407** against a 390 viewport. Every offender was one of these labels at x = 400–407, and nothing else on the page overflowed. §1.0b treats a sideways-scrolling body as a defect, not a nuisance |
 
-**Not one total appears on this page.** 24 point systems, six best-N eras, and a season that grew
-from 8.4 rounds to 21.9 mean a career total measures opportunity before it measures a driver
-(`REQUIREMENTS.md` §5.2, trap 4). A win *count* is only marginally better than a points total.
+**The finding is not that the labels needed nudging. The form was wrong for its own stated job**, and
+the old §6.6.6.5 said so without noticing: *"the job — magnitude"*. A rate is a **quantity**, and a
+marker on a shared rail encodes *position* and encodes magnitude not at all. A bar anchored at zero
+encodes it directly. The old build was a 1-D scatter with three lines of text hung off each of four
+points inside a 12px band, and no de-collision arithmetic rescues that at 390, where the whole track
+is ~220px.
 
-Direct labels are mandatory at ≤4 (§6.4 rung 1), so the board has **no legend and no tooltip**:
-every mark is named and every value is printed as `n of d`. That is the same §6.5 discharge §7.14
-records.
+**Generalised, because this is a design-system rule and not an F7 detail:**
+
+> **§6.5's "direct labels at ≤ 4 series" is a threshold, not a behaviour.** It holds only where the
+> marks separate. **Four entities on one shared axis do not separate** — two rates within a label's
+> width of each other is the common case, and the leader always sits at the axis end. A chart that
+> places ≤ 4 direct labels along a single shared axis must either reserve a fixed cell per label or
+> use a different form. **It must not place them at the mark and hope.**
+
+**The corrected form: one row per entity per measure.** This is §7.14's `PopulationBoard` ladder
+anatomy — label and figure on fixed grid columns, track between — and it is what should have been
+reused in the first place.
+
+| Part | Spec |
+|---|---|
+| Row grid, ≥768 | `[--axis-inset] [minmax(0, 1fr)] [--size-rate-figure 112px]` — one line |
+| Row grid, base | `'who figure' / 'track track'`, `[minmax(0,1fr)] [96px]` — two lines, **no truncation**: at 390 an `--axis-inset` gutter would cut "Verstappen" to "Verst…" |
+| Gutter | the ladder's 12px marker glyph plus the surname at `--text-xs`, `--ink-secondary`, ellipsised |
+| Track | 8px, `--radius-xs`, `--surface-raised`, 1px inset `--border-subtle` |
+| Bar | `width: var(--rate-extent)`, **`min-width: 3px`**, `--radius-xs`, the entity's plot token, **anchored at the zero axis** |
+| Figure | fixed column, right-aligned, `nowrap`: the percentage in `--font-mono` `--text-sm`, the `n of d` in `--text-2xs` `--ink-tertiary` |
+| Ceiling | printed in the **measure's header**, never as a mark on the track — as a mark it occupied the same x as the leader's label |
+| Null rate | `—` and *never started*. Never `0`, which reads as "never did it" for a driver who had no chance |
+
+**Three properties this form has that the old one could not:**
+
+1. **Collisions are impossible by construction, not avoided by measurement.** Every piece of text is
+   a grid cell; **nothing on the board is absolutely positioned**; the figure column is reserved
+   *before* the track is sized, and the track is `minmax(0, 1fr)` — a bare `1fr` has an `auto`
+   minimum and would let a long figure push the grid wider than its container, which *is* the 17px.
+   `compare.css.test.ts` asserts all four.
+2. **The direct-label rule is satisfied more strictly** (§6.4 rung 1): the label is adjacent to
+   exactly one mark, instead of to whichever label happened to be nearest.
+3. **The spine holds.** The ≥768 gutter is `--axis-inset`, so a rate row's zero sits at the same x as
+   the chain's 1950 and the era strip's first column.
+
+**The objection the old spec raised against grouped bars, answered.** It argued *"grouped bars make
+the reader compare across groups by memory"*. That is true only when the group order varies. Here
+**the row order is the stable selection order and is identical on all five measures** (§6.2 — order
+follows the entity, never its rank), so reading one driver across the five is a vertical scan at a
+fixed offset. **Sorting these rows by value would break that and is forbidden**; a test asserts the
+five orders are identical.
+
+**The five measures** are unchanged: win rate, podium rate, classified finishes (*an era measure as
+much as a driver one*, and the label says so), out-qualified a teammate, finished ahead of a
+teammate. **Each keeps its own ceiling**, printed — a win rate and a beat-your-teammate rate live on
+different natural scales and one shared track would flatten the interesting one.
+
+**Not one total appears.** 24 point systems, six best-N eras, and a season that grew from 8.4 rounds
+to 21.9: a career total measures opportunity before it measures a driver. A win *count* is only
+marginally better than a points total.
+
+**Motion is G-27 through `usePopulationMount`, reused rather than reimplemented** — the same mark as
+the ladder's bars, so the same `scaleX 0 → 1` from `'left'`, `dur.chart` / `ease.mech`, `stagger.bar`
+through `staggerAmount`, and not created at all under `reduce`.
+
+> ⚠ **A second defect the rebuild uncovered, recorded rather than quietly fixed.** The first build
+> wrote `data-motion="chart-bar"` on the rail track and **called no hook at all**, so those bars
+> never animated while the markup claimed they did. That is CR-007's *"a motion a comment claimed
+> existed but nothing implemented"* — the exact defect `PLAN.md` §3 lists as one of the five the
+> removed review gate used to catch — shipped again by the builder that is now the last gate.
+> **The mitigation is structural, not vigilance:** `TIER_BAR_ATTR` / `ERA_BAR_ATTR` are now exported
+> from `src/lib/motion/scroll.ts` and consumed by the hook *and* by both components, so the
+> hand-typed pair cannot drift. `PopulationBoard` was updated to the constants in the same change.
 
 ##### 6.6.6.6 `EraStrip` — the denominator, drawn
 
@@ -3320,13 +3381,21 @@ Recorded so the gap is visible rather than discovered.
 
 ##### 6.6.6.9 What is untested, by construction
 
-jsdom performs no layout and no compositing. **Unverified, and none of it should be reported as
-working:** the staircase's appearance and whether its connectors meet their capsules; whether a
-one-season capsule reads at 3px; whether the readout column crowds the track at 1024; whether the
-rate rails' direct labels collide when four markers land close together; the tray at 390px; the era
-strip's alignment with the chain above it; every colour, since a custom property resolves to `''` in
-this environment; and the whole of G-32 as a *picture* — its tween objects are asserted, its
-appearance is not.
+jsdom performs no layout and no compositing.
+
+**Measured since, and now settled** (capture 2026-08-23, 1440×900 dark): the verdict band reads as
+the page's thesis; the era strip's decade columns land under the right years; the spine holds — the
+1950 column and the chain track share `--axis-inset`. **And the rate board failed**, which is
+recorded in §6.6.6.5 and is the reason that section was rewritten rather than annotated.
+
+**Still unverified, and none of it should be reported as working:** the staircase's appearance and
+whether its connectors meet their capsules; whether a one-season capsule reads at 3px; whether the
+chain readout column crowds the track at 1024; the tray at 390px; whether the chain and era decade
+ticks — the last absolutely-positioned *text* on the page, 8 labels across a ~254px track at 390 —
+stay clear of one another (they did not appear in the 390 overflow measurement, so they are
+contained, but the margin is small and it has not been looked at); every colour, since a custom
+property resolves to `''` in this environment; and the whole of G-32 as a *picture* — its tween
+objects are asserted, its appearance is not.
 
 The arithmetic behind all of it is unit-tested in `src/features/compare/model.test.ts` (26 cases)
 and the CSS declarations in `src/styles/compare.css.test.ts` (13). Neither is a substitute for a
@@ -4382,3 +4451,4 @@ later looking at the screen and calling it a bug.
 | 2026-08-23 | **Three defects from the capture of the redesigned index pages, all measured rather than eyeballed.** (a) **BLOCKING — the board was half empty on `/drivers` and `/teams`.** At 1440×900 the ladder filled the 517px left column and the decade block stopped at 264px, leaving **253px — 49% of the right column — dead**; a two-column grid stretches to the taller row, so the board rendered as a tall panel with a tall hole in it, which is the "grey slab" the whole rebuild existed to avoid. `/circuits` never showed it because the atlas fills its column, and that is what pointed at the fix: **the mark grows to the space, the space is not left around the mark.** `.era-bars` and `.era-track` both `flex: 1 1 auto`, `align-items: stretch`, `--size-era-track` demoted from the track's height to its floor. **The track keeps an explicit `height` as well** — `.era-bar` is a percentage height against it, and a percentage against an `auto`-height ancestor is the one corner of flexbox engines have historically disagreed on, so deleting it as redundant would leave the bars correct in the browser someone tested and missing in another. Asserted, with that reasoning, in `entity-index.css.test.ts`. (b) **BLOCKING — `/circuits` printed one phrase against two numbers.** The ladder's third rung read `No longer used 53`; the atlas legend 200px away read `No longer used 56`. A map is a **two-way** split and the ladder is a **three-way** one, and the legend had borrowed the ladder's own words for its complement. **This is the same defect as `f3be60e`'s masthead counts, in a second place on the same board** — a three-way split rendered as a two-way one — so the rule is now stated where both live: **a complement is worded as a complement, and it closes** (`22 + 56 = 78`). Legend reads `Not on it`. (c) **`/teams` offered to search by "a code".** A team has no three-letter code; that is a driver concept and a promise the haystack cannot keep. The copy was branched `circuit` versus everything-else, which is precisely what stopped the third case from being written — it is now one record keyed by kind. (d) **The coastline was reconsidered, and §7.11's ruling on it turns out to have been made without a number.** It rejected a landmass because "a topojson asset costs more than the entire chart kit"; measured from Natural Earth 110m through the atlas's own identity projection, the naive asset is **19.91 KB gzipped** — genuinely unaffordable against 30.3 KB of headroom — but a Douglas–Peucker simplification at threshold 1.0 / 0.1° is **5.31 KB, 55 rings, 1,163 points**, taking initial JS to ≈225 KB (**90.0%**). Rasterised to a text grid to confirm every continent survives. **Not built** — it is Rishabh's call on the 5.3 KB and the engineer's on the three devDependencies and the generation script (§2). Figures and the two rejected cheaper shapes are in §6.6.5.3. **No colour token moved.** Suite **1972 → 1978 tests, 3 consecutive green runs.** Initial JS **219.74 → 219.79 KB / 250 (87.9%)**. **Still untested by construction: that the second column now actually fills, and that the percentage-height chain resolves in a real engine** — the assertion proves the declarations exist, not that they lay out | designer |
 | 2026-08-23 | **The coastline shipped, and the constant it shipped from was drawing three things that are not there.** Rishabh approved the 5.3 KB and the engineer landed `WORLD_LAND_PATH`; the job was to render it. **Rasterising the emitted path offline — a pure-Node nonzero-winding scanline fill, no browser — found three defects before any of it reached a screen, and none of the eight tests asserting the *text* of the path could have.** (a) **Fiji and Wrangel Island straddle the antimeridian**, and Natural Earth writes their seam vertices at lon −180 while the bodies sit at +178.7…+180, so each 0.6°-wide island unrolled into a **359.4-unit quad spanning the entire map** — a hairline of land across the Pacific, the Atlantic and the Indian Ocean at lat −16.5 and lat 71. Measured winding **1** at (−140°, −16.5°), which is open ocean 3,000 km from anything. (b) **Afro-Eurasia's seam edge at y = 25** drew nothing while the path was only filled, because a horizontal edge crosses no scanline — **and becomes a full-width scar the moment §7.15 strokes the coastline, which it does.** The defect that hides until the next design decision is the worst kind to leave in. (c) **Antarctica closed with a wrap chord at y ≈ 174.6**, giving a dead-flat bottom with five units of ocean beneath it and no pole at all; simplification had already deleted the two clip corners, because a straight run has near-zero effective area under Visvalingam. Fixed in the **generator**, not papered over in the component: unwrap → close over the pole → place in frame → clip to the viewBox, so every artificial edge lands on x = 0, x = 360 or y = 180 under `.atlas-neatline`. **72 → 73 rings, 1,214 → 1,218 points, +38 bytes raw.** Two new invariants that would have caught it — **no non-horizontal edge may span more than half the map**, and **exactly one polar closure** — asserted in the generator *and* in `world-land.test.mjs` so they run in the suite. **The rule: an identity projection is not the same as a correct one.** `x = lon + 180` is exact for every point and wrong for the two edges of the world, and only drawing it finds that. (d) **Design.** Two new tokens, **no new colour** — `--map-land` / `--map-coast` are ramp values under their own names, land stepping one place toward the ink from its plate in both themes. `vector-effect: non-scaling-stroke` so the coastline is a hairline at 517px and on a phone alike. **`.atlas-neatline` drawn last** with the plate's own stroke suppressed, because land now reaches three sides of the frame and would eat the border. `CircuitLocator` deliberately does **not** get the coastline — a locator is a readout, an atlas is a picture of a distribution — and the chunking cost of changing that is stated. (e) **§6.6.5.3's algorithm label corrected: Visvalingam–Whyatt, not Douglas–Peucker.** Only the label was wrong; the numbers were always Visvalingam's. The whole table was **re-measured through the corrected pipeline** so it is one method rather than two. (f) ⚠ **The §6.6.5.3 sizing method was understating marginal cost and is corrected in place.** A 13 KB run of digits gzips *worse* inside a 730 KB chunk than alone: standalone **5.03 KB**, real in-bundle **+5.98 KB — 19% dearer**. **Size an asset by building with it and reading `check:budget`, never by gzipping the candidate on its own.** (g) **New §9.2.6 V-37**, a gate for the new painted surface: **PASS**, worst gated figure the **retired pip on land at 4.18:1 light / 3.83:1 dark** against a floor of 3.0 — the grey-pip-on-grey-land case the monochrome palette makes real. Full `validate:palette` exit 0, zero FAILs, no existing figure moved. **Measured cost: initial JS 219.78 → 225.76 KB / 250 (90.3%, WARN band, +5.98 KB)**; render-blocking CSS 18.09 → **18.20 KB / 25 (72.8%)**. Suite **1987 → 1997 tests across 87 files, 3 consecutive green runs.** **Verified numerically rather than by eye: 30 known land/ocean/lake points (Caspian winding 0, South Pole 1, Chukotka's trans-antimeridian tip 1), and a 1440 × 720 grid diff against the unsimplified source through the identical pipeline agreeing on 99.1% of 1,036,800 samples with no row disagreeing by more than 14%.** **Untested by construction and named as such: everything about how it *looks*** — whether the outline lands in register with the 78 pips on a real screen, whether 1,218 points read smooth or faceted at 517px, how the hairline resolves at 1× and 2× DPR, whether the completed Antarctica reads as intentional, and the theme response of all of it. The offline raster is arithmetic identical to a browser's nonzero fill and is *not* a browser: no antialiasing model, no subpixel positioning, no CSS. Only a capture settles those | designer |
 | 2026-08-23 | **F7, the comparison workspace — new §6.6.6, and G-32 in §4.6.2.** Designed **in parallel with its endpoint**, which is §6.6.5's rule discharged: the payload requirement (§6.6.6.7) was written by the surface before `GET /api/compare` was schema'd, so the design was not foreclosed by a data decision the way the entity indexes were. Two measurements changed it. **(a) `session_entry.grid` is populated 94–100% in every decade back to 1950** — so a qualifying head-to-head spans the whole archive, not 1994+, and F7 has no era-limited section at all. It is emphatically *not* a licence to count poles from `grid = 1`, which `driver.ts` already rejected on 9 measured multi-`grid = 1` races. **(b) A 1950s constructor entered up to 29 cars in one Grand Prix**, so a career teammate record holds *pairings*, not races — Fangio reads 93 rated pairings against 51 starts — and every surface printing it says so. The organising device is **three computed tiers** (same car / same grid / never met) that decide what evidence the page will show, with no mode control, and the centre is **`LineageChain`**: the teammate graph's 846-node component drawn as a staircase on the archive's own axis, each link a measured head-to-head, the path chosen by **strongest evidence among shortest paths** rather than by an arbitrary BFS, and the transitive reading refused in the page's own voice. Also new: `CompareTray` (four bays, the cap drawn), the balance bar with a mandatory 50% reference, `RateRailBoard` (five rates, no totals, per-rail ceilings) and `EraStrip` (the denominator drawn under the careers it applies to). One `--axis-inset` for every year-bearing track, asserted in `compare.css.test.ts`, which is the CR-007 axis-misalignment class made unexpressible. Cost: **`compare.css` +1.99 KB gzipped**, taking render-blocking CSS from 72.8% to **80.7%** of its 25 KB budget — a WARN, and the CSS budget is now the binding one rather than JS (initial JS is 64.5% after the split) | designer |
+| 2026-08-23 | **The F7 rate board was measured and rebuilt — §6.6.6.5 reversed, and a design-system rule generalised out of it.** The capture found **51 real sibling label collisions at 1440** (`Hamilton` over `Verstappen` by 62px, rendering as `MARSTAPPEN`), a **structural** collision on all five rows because the axis caption and the leading marker's label occupy the same x *by construction* — the leader is the ceiling — and **17px of horizontal page overflow at 390**, `scrollWidth` 407, every offender one of these labels. **The finding was that the form was wrong for its own stated job**: §6.1 step 1 said *magnitude*, and a marker on a shared rail encodes position and encodes magnitude not at all. Rebuilt as **one row per entity per measure** on §7.14's ladder anatomy — label and figure on fixed grid columns, bar anchored at zero — so collisions are impossible by construction rather than avoided by measurement, and the ≥768 gutter is `--axis-inset` so the spine still holds. **The rule this leaves behind, and it is not F7's:** *§6.5's "direct labels at ≤ 4 series" is a threshold, not a behaviour — four entities on one shared axis do not separate, so a chart must reserve a fixed cell per label or change form; it must not place them at the mark and hope.* **A second defect surfaced in the rebuild and is recorded rather than quietly fixed:** the first build wrote `data-motion="chart-bar"` and called **no hook at all**, so those bars never animated while the markup claimed they did — CR-007's *"a motion nothing implemented"*, shipped again by the builder that is now the last gate. `TIER_BAR_ATTR` / `ERA_BAR_ATTR` are now exported from `src/lib/motion/scroll.ts` and consumed by the hook and both components, so the pair cannot drift; `PopulationBoard` moved to the constants in the same change. Audited alongside and clean: the balance bar has **no** absolutely positioned text (its two heads are normal-flow in a `space-between` row and can only push, never overlap) and the tray has no chart at all — its one absolute element, the remove button, now has a reserved lane so a long forename cannot run under it | designer |

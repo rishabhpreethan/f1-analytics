@@ -123,12 +123,18 @@
     background-color: var(--identity);
   }
 
+  /*
+   * `padding-right` reserves the remove button's lane. The button is the one absolutely positioned
+   * thing in a bay, and without the reservation a long forename would run underneath it — the same
+   * class of defect the rate board was rebuilt for, caught by audit rather than by capture.
+   */
   .tray-body {
     display: flex;
     flex: 1;
     flex-direction: column;
     gap: calc(var(--spacing) * 1);
     padding: calc(var(--spacing) * 4);
+    padding-right: calc(var(--spacing) * 10);
     min-width: 0;
   }
 
@@ -477,11 +483,19 @@
     min-width: 0;
   }
 
+  /*
+   * The balance bar's two heads are in **normal flow** inside a `space-between` flex row, so unlike
+   * the rate board's first build they cannot overlap — under pressure they push. The ellipsis is
+   * what makes that pressure degrade a name rather than shove the count off the card.
+   */
   .balance-name {
+    overflow: hidden;
     color: var(--ink-primary);
     font-size: var(--text-sm);
     font-weight: 500;
     line-height: var(--text-sm--line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .balance-count {
@@ -795,7 +809,20 @@
     max-width: 68ch;
   }
 
-  /* ============================================================== the rate rails */
+  /* ============================================================== the rate board
+   *
+   * ⚠ **Rebuilt 2026-08-23 after a measurement.** The first build laid four absolutely-positioned
+   * labels on one shared rail per measure and produced **51 real sibling collisions at 1440** plus
+   * **17px of horizontal page overflow at 390** — the whole body scrolled sideways, and every
+   * offender was one of these labels. See `RateRailBoard.tsx` for why the answer was a form change
+   * rather than a clamp.
+   *
+   * **The invariant this block exists to hold: nothing on this board is absolutely positioned.**
+   * Every piece of text sits in its own grid cell, the figure column is reserved *before* the track
+   * is sized, and the track is `minmax(0, 1fr)` — so no label can collide with another and none can
+   * reach past the panel. A future change that re-introduces `position: absolute` here has
+   * re-introduced both defects.
+   */
 
   .rails,
   .era {
@@ -831,6 +858,12 @@
   }
 
   .rails-list {
+    /*
+     * The reserved figure column. It is a token rather than a literal for `--size-index-rail`'s
+     * reason: the row grid and nothing else may decide it, and a second copy would let the track
+     * and the figure disagree about where one ends.
+     */
+    --size-rate-figure: 96px;
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing) * 8);
@@ -841,27 +874,36 @@
     list-style: none;
   }
 
-  .rail {
+  @media (min-width: 48rem) {
+    .rails-list {
+      --size-rate-figure: 112px;
+    }
+  }
+
+  .rate-measure {
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing) * 2);
   }
 
-  .rail-label {
+  .rate-measure-head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: calc(var(--spacing) * 3);
   }
 
-  .rail-name {
+  .rate-measure-name {
     color: var(--ink-primary);
     font-size: var(--text-sm);
     font-weight: 500;
     line-height: var(--text-sm--line-height);
   }
 
-  .rail-ceiling {
+  /* The measure's own ceiling, printed — so two measures on different natural scales are never
+   * silently compared. It is a caption on the row group, never a mark on the track: as a mark it
+   * occupied the same x as the leader's label, which is the collision that could not not happen. */
+  .rate-measure-ceiling {
     color: var(--ink-tertiary);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
@@ -869,42 +911,100 @@
     line-height: var(--text-2xs--line-height);
   }
 
-  .rail-track {
-    position: relative;
+  .rate-rows {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /*
+   * Base: the name and the figure share the top line, the track spans the full width beneath. Two
+   * lines, and no truncation — at 390 a `--axis-inset` gutter would cut "Verstappen" to "Verst…".
+   */
+  .rate-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--size-rate-figure);
+    grid-template-areas:
+      'who figure'
+      'track track';
+    align-items: center;
+    gap: calc(var(--spacing) * 1) calc(var(--spacing) * 2);
+    padding-block: calc(var(--spacing) * 1);
+  }
+
+  /*
+   * ≥768: one line. The gutter is `--axis-inset`, the page's spine — so a rate row's zero sits at
+   * the same x as the chain's 1950 and the era strip's first column.
+   */
+  @media (min-width: 48rem) {
+    .rate-row {
+      grid-template-columns: var(--axis-inset) minmax(0, 1fr) var(--size-rate-figure);
+      grid-template-areas: 'who track figure';
+      gap: 0 calc(var(--spacing) * 3);
+    }
+  }
+
+  .rate-who {
+    display: flex;
+    grid-area: who;
+    align-items: center;
+    gap: calc(var(--spacing) * 1.5);
+    min-width: 0;
+  }
+
+  .rate-glyph {
+    flex: none;
+  }
+
+  /*
+   * The direct label (§6.4 rung 1), and it is a stricter one than the floating label it replaced:
+   * it is adjacent to exactly one mark instead of to whichever label happened to be nearest.
+   */
+  .rate-name {
+    overflow: hidden;
+    color: var(--ink-secondary);
+    font-size: var(--text-xs);
+    line-height: var(--text-xs--line-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rate-track {
+    display: block;
+    grid-area: track;
     height: 8px;
-    margin-block: calc(var(--spacing) * 8) calc(var(--spacing) * 3);
     border-radius: var(--radius-xs);
     background-color: var(--surface-raised);
     box-shadow: inset 0 0 0 1px var(--border-subtle);
   }
 
-  .rail-mark {
-    position: absolute;
-    top: 50%;
-    left: var(--mark-x);
-    transform: translate(-50%, -50%);
-  }
-
-  .rail-glyph {
-    display: block;
-  }
-
   /*
-   * The direct label. Mandatory at ≤4 series (§6.4 rung 1), which is why this chart needs no
-   * legend and no tooltip: every mark is already named and every value is already printed.
+   * Anchored at the zero axis and growing right — the encoding a *rate* actually needs, and the one
+   * a marker on a shared rail did not provide at all. `min-width` keeps a near-zero rate visible as
+   * a mark rather than as an absence; §7.14 carries the same floor.
    */
-  .rail-value {
-    position: absolute;
-    bottom: calc(100% + var(--spacing) * 2);
-    left: 50%;
+  .rate-bar {
+    display: block;
+    width: var(--rate-extent);
+    min-width: 3px;
+    height: 100%;
+    border-radius: var(--radius-xs);
+    background-color: var(--series);
+  }
+
+  .rate-figure {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    transform: translateX(-50%);
+    grid-area: figure;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: calc(var(--spacing) * 1.5);
     white-space: nowrap;
   }
 
-  .rail-value-figure {
+  .rate-percent {
     color: var(--ink-primary);
     font-family: var(--font-mono);
     font-size: var(--text-sm);
@@ -912,15 +1012,7 @@
     line-height: var(--text-sm--line-height);
   }
 
-  .rail-value-who {
-    color: var(--ink-secondary);
-    font-size: var(--text-2xs);
-    letter-spacing: var(--text-2xs--letter-spacing);
-    line-height: var(--text-2xs--line-height);
-    text-transform: uppercase;
-  }
-
-  .rail-value-of {
+  .rate-of {
     color: var(--ink-tertiary);
     font-family: var(--font-mono);
     font-size: var(--text-2xs);
@@ -928,8 +1020,8 @@
     line-height: var(--text-2xs--line-height);
   }
 
-  .rail-denominator {
-    margin: 0;
+  .rate-denominator {
+    margin: calc(var(--spacing) * 1) 0 0;
     color: var(--ink-tertiary);
     font-size: var(--text-xs);
     line-height: var(--text-xs--line-height);

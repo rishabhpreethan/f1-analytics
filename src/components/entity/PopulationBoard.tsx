@@ -1,6 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import { LoadingState } from '@/components/ui/LoadingState';
-import { usePopulationMount } from '@/lib/motion/scroll';
+import { ERA_BAR_ATTR, TIER_BAR_ATTR, usePopulationMount } from '@/lib/motion/scroll';
 import type { EraBucket, Stratum } from './strata';
 
 /**
@@ -134,7 +134,7 @@ export function PopulationBoard({
                     {stratum.count}
                   </span>
                   <span className="tier-track" aria-hidden="true">
-                    <span className="tier-bar" data-motion="tier-bar" />
+                    <span className="tier-bar" data-motion={TIER_BAR_ATTR} />
                   </span>
                   <span className="tier-sub" aria-hidden="true">
                     {stratum.sublabel}
@@ -228,7 +228,7 @@ function EraBars({
            * this bug, not a loud one.
            */}
           <span className="era-track" aria-hidden="true">
-            <span className="era-bar" data-motion="era-bar" />
+            <span className="era-bar" data-motion={ERA_BAR_ATTR} />
             <span className="era-value t-mono">{era.count}</span>
           </span>
           <span className="era-label" aria-hidden="true">

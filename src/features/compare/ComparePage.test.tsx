@@ -19,6 +19,7 @@ vi.hoisted(() => {
   });
 });
 
+import { TIER_BAR_ATTR } from '@/lib/motion/scroll';
 import { ComparePage } from './ComparePage';
 import { COMPARE_FIXTURE } from './fixture';
 
@@ -154,14 +155,50 @@ describe('the chain', () => {
   });
 });
 
+describe('the rate bars are actually wired to a mount motion', () => {
+  /**
+   * The first build wrote `data-motion="chart-bar"` on the rail track and called **no hook**, so
+   * these marks never animated while the markup said they did — CR-007's "a motion a comment
+   * claimed existed but nothing implemented", shipped a second time.
+   *
+   * The selector is now an exported constant consumed by both the hook and the markup, so the pair
+   * cannot drift. This asserts the markup half; the hook half is `usePopulationMount`'s own test.
+   * **Whether the growth looks right is untested by construction** — jsdom composites nothing.
+   */
+  it('gives every bar the exact attribute the hook queries', () => {
+    render_();
+    const rails = screen.getByRole('region', { name: /Five rates/ });
+    const bars = rails.querySelectorAll('.rate-bar');
+    expect(bars).toHaveLength(20);
+    for (const bar of bars) expect(bar.getAttribute('data-motion')).toBe(TIER_BAR_ATTR);
+  });
+});
+
 describe('the honesty rules the whole surface is built on', () => {
   it('publishes no career total anywhere — five rates, each with its denominator', () => {
     render_();
     const rails = screen.getByRole('region', { name: /Five rates/ });
-    expect(rails.querySelectorAll('.rail')).toHaveLength(5);
+    expect(rails.querySelectorAll('.rate-measure')).toHaveLength(5);
+    /* One row per entity per measure — the form the board was rebuilt to, after four floating
+     * labels on one shared rail collided 51 times at 1440 and overflowed the page at 390. */
+    expect(rails.querySelectorAll('.rate-row')).toHaveLength(20);
     expect(
       within(rails).getByText(/The championship has run under 24 different points systems/),
     ).toBeTruthy();
+  });
+
+  it('keeps the rate rows in selection order on every measure, never sorted by value', () => {
+    /* §6.2 — order follows the entity, never its rank. It is also what makes reading one driver
+     * down the five measures a vertical scan rather than a search, which is the answer to the
+     * "grouped bars need memory" objection the first build was designed around. */
+    render_();
+    const rails = screen.getByRole('region', { name: /Five rates/ });
+    const measures = [...rails.querySelectorAll('.rate-measure')];
+    const orders = measures.map((measure) =>
+      [...measure.querySelectorAll('.rate-name')].map((node) => node.textContent),
+    );
+    expect(orders[0]).toEqual(['Hamilton', 'Rosberg', 'Verstappen', 'Fangio']);
+    for (const order of orders) expect(order).toEqual(orders[0]);
   });
 
   it('warns that a 1950s driver holds more same-car pairings than starts', () => {

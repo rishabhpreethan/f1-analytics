@@ -3,7 +3,7 @@ import type { SeriesChannels } from '@/components/charts/ladder';
 import { MarkerGlyph } from '@/components/charts/MarkerGlyph';
 import { Info } from '@/components/ui/icons';
 import { cssVar } from '@/lib/entityColor';
-import { CHART_BAR_ATTR } from '@/lib/motion/chart';
+import { TIER_BAR_ATTR, usePopulationMount } from '@/lib/motion/scroll';
 import { rateRails } from './model';
 import type { CompareEntity } from './types';
 
@@ -11,41 +11,78 @@ import type { CompareEntity } from './types';
  * **`RateRailBoard`** — `DESIGN_SYSTEM.md` §6.6.6.5. The cross-era comparison, and the only part of
  * this page that compares the selected drivers directly.
  *
- * **As a chart, in §6.1's order.**
+ * ---
  *
- * 1. **The job** — magnitude, on several unrelated measures, for up to four entities. Not change
- *    over time; that is the season trajectory's job.
- * 2. **The form** — one **rail per measure**, with a marker per entity on it. Not a grouped bar
- *    chart: grouped bars put four bars per measure on one axis and make the reader compare across
- *    groups by memory. A rail makes the comparison a distance along a line, which is the one
- *    judgement the eye is reliably good at. It is also the only form that survives a fifth measure
- *    being added without becoming a wall.
- *    **Each rail has its own ceiling**, and that is deliberate: a win rate and a beat-your-teammate
- *    rate live on genuinely different natural scales, and one shared track for both would flatten
- *    the interesting one to nothing. The ceiling is printed on every rail so the two are never
- *    silently compared.
- * 3. **Marks** — an 8px marker, equal *area* across the four shapes (`MarkerGlyph`), with a 1.5px
- *    `--surface-sunken` ring where two land close together. The rail itself is 8px,
- *    `--surface-sunken`, `--radius-xs`.
- * 4. **Interaction** — the whole rail row is the hit target; each marker is direct-labelled with
- *    the driver's surname and the rate, so there is nothing to hover for.
- * 5. **Colour** — last. Entity tokens through `assignEntityColours`, with the ladder's marker
- *    shapes as the mandatory second channel (§6.4). Two Mercedes drivers take the shade pair *and*
- *    circle/square *and* solid/`6 3` — §6.4a makes all three mandatory rather than escalated.
- * 6. **Accessibility** — every value is printed as text beside its mark, which is what a table view
- *    would have added; the discharge is the same one `PopulationBoard` records (§7.14).
+ * ## ⚠ Rebuilt 2026-08-23, after a measurement. Read this before "simplifying" it back
+ *
+ * The first build put **one rail per measure with four markers on it**, each marker carrying a
+ * floating direct label. It was measured at 1440 and it failed, in two ways that turned out to have
+ * one cause:
+ *
+ * - **51 real sibling label collisions.** `Hamilton` over `Verstappen` by **62px**, rendering as
+ *   `MARSTAPPEN`; `207 of 390` over `130 of 243` by 58px, rendering as `2020o6.f5983`. Three of the
+ *   five rows were unreadable.
+ * - **The axis caption collided with the leading marker on all five rows, structurally** — the
+ *   caption reads `0 – 47%` and the leader's label reads `47%`, because **the leader *is* the
+ *   ceiling**. That was not bad luck; it could not not happen.
+ * - **17px of horizontal page overflow at 390.** `document.scrollWidth` 407 against a 390 viewport,
+ *   and every offender was one of these labels reaching x = 400–407.
+ *
+ * **The honest finding is not that the labels needed nudging. It is that the form was wrong for its
+ * own stated job.** §6.1 step 1 asks what the chart is for, and the answer here is **magnitude** — a
+ * rate is a quantity, not a position. A marker on a shared rail encodes *position* and encodes
+ * magnitude not at all; a bar anchored at zero encodes magnitude directly. The old form was a 1-D
+ * scatter with three lines of text hung off each of four points inside a 12px band, and no
+ * de-collision arithmetic makes that legible at 390 where the whole track is ~220px wide.
+ *
+ * **So the board is now one row per entity per measure**, which is the anatomy §7.14's
+ * `PopulationBoard` ladder already uses and which this should have reused in the first place:
+ * label and figure on fixed grid columns, track between them, one mark per row.
+ *
+ * **Collisions are now impossible by construction rather than avoided by measurement.** Every piece
+ * of text sits in its own grid cell; nothing on this board is absolutely positioned; nothing can
+ * reach past the track's right edge because the figure column is reserved before the track is
+ * sized. That is the difference between a fix and a patch, and it is why the answer was a form
+ * change rather than a clamp.
+ *
+ * **What was given up, and the answer to my own earlier objection.** The old spec argued against
+ * grouped bars because *"grouped bars make the reader compare across groups by memory"*. That is
+ * true only when the group order varies. Here **the entity order is the stable selection order and
+ * is identical on all five measures** (§6.2 — colour and order follow the entity, never its rank),
+ * so reading one driver across the five measures is a vertical scan at a fixed offset, not a
+ * recall task. Sorting these rows by value would break that and must not be done.
+ *
+ * **The direct-label rule is satisfied more strictly than before, not less** (§6.4 rung 1). The
+ * label sits in its row's own gutter beside its own marker glyph, adjacent to exactly one mark. The
+ * old floating label was adjacent to whichever label happened to be nearest.
+ *
+ * ---
+ *
+ * **As a chart (§6.1), in order.**
+ *
+ * 1. **The job** — magnitude, on five unrelated measures, for up to four entities.
+ * 2. **The form** — horizontal bars anchored at zero, grouped by measure. Each measure keeps **its
+ *    own ceiling**, printed: a win rate and a beat-your-teammate rate live on genuinely different
+ *    natural scales and one shared track would flatten the interesting one to nothing.
+ * 3. **Marks** — 8px bars, `--radius-xs` data-ends, `min-width: 3px`, anchored at the zero axis.
+ * 4. **Interaction** — none, and none is needed: every value is already printed as text.
+ * 5. **Colour** — last. Entity tokens via `assignEntityColours`, with the ladder's marker shape in
+ *    the row gutter as the mandatory second channel (§6.4). Two Mercedes drivers take the shade
+ *    pair *and* circle/square *and* solid/`6 3` — §6.4a makes all three mandatory.
+ * 6. **Accessibility** — every value is printed beside its own mark, which is what a table view
+ *    would have added; the same §6.5 discharge §7.14 records. Twenty marks, twenty printed numbers.
  *
  * ---
  *
  * **Every rail is a rate and none is a total, and that is correctness rather than taste.** 24 point
- * systems, six best-N eras and a season that grew from 8.4 rounds to 21.9 mean that a career total
+ * systems, six best-N eras and a season that grew from 8.4 rounds to 21.9 mean a career total
  * measures opportunity before it measures a driver (`REQUIREMENTS.md` §5.2, trap 4). A y-axis
  * reading "career points" is a defect in this product, and a win *count* is only marginally better.
  *
- * **The denominator is printed under every rail**, because a rate whose denominator is invisible is
- * not checkable — and two of these have denominators that are genuinely surprising. Fangio's
- * same-car pairings number 93 against 51 starts, because a 1950s constructor could enter as many as
- * 29 cars in one Grand Prix and every same-team pair in a race is one comparison.
+ * **The denominator is printed on every row**, because a rate whose denominator is invisible is not
+ * checkable — and two of these have denominators that are genuinely surprising. Fangio's same-car
+ * pairings number 93 against 51 starts, because a 1950s constructor could enter as many as 29 cars
+ * in one Grand Prix and every same-team pair in a race is one comparison.
  */
 
 export interface RateRailBoardProps {
@@ -59,6 +96,25 @@ export function RateRailBoard({ entities, channels }: RateRailBoardProps) {
     entities.map((entity, index) => [entity.identity.ref, channels[index]]),
   );
 
+  /*
+   * **G-27 through `usePopulationMount`, reused rather than reimplemented.** These are the same
+   * mark as §7.14's ladder bars — a horizontal magnitude anchored at zero — so they take the same
+   * motion: `scaleX 0 → 1` from `transformOrigin: 'left'`, `dur.chart` / `ease.mech`,
+   * `stagger.bar` through `staggerAmount`, and **not created at all** under reduced motion.
+   * Declaring a second hook with the same tokens is exactly the drift §4.3 exists to prevent.
+   *
+   * The first build wrote `data-motion="chart-bar"` on the track and called **no hook at all**, so
+   * these bars have never animated while the markup claimed they did. That is CR-007's "a motion a
+   * comment claimed existed but nothing implemented" defect, shipped again; it is recorded here
+   * rather than quietly corrected.
+   *
+   * Deps identify the **dataset** — which measures, for which entities — never a hover (G-29).
+   */
+  const { scope } = usePopulationMount<HTMLOListElement>([
+    rails.length,
+    entities.map((entity) => entity.identity.ref).join(','),
+  ]);
+
   return (
     <section className="rails" aria-labelledby="rails-heading">
       <header className="rails-header">
@@ -71,52 +127,74 @@ export function RateRailBoard({ entities, channels }: RateRailBoardProps) {
         </h2>
       </header>
 
-      <ol className="rails-list">
+      <ol className="rails-list" ref={scope}>
         {rails.map((rail) => (
-          <li className="rail" key={rail.id}>
-            <div className="rail-label">
-              <span className="rail-name">{rail.label}</span>
-              <span className="rail-ceiling">0 – {Math.round(rail.ceiling * 100)}%</span>
+          <li className="rate-measure" key={rail.id}>
+            <div className="rate-measure-head">
+              <span className="rate-measure-name">{rail.label}</span>
+              <span className="rate-measure-ceiling">0 – {Math.round(rail.ceiling * 100)}%</span>
             </div>
-            <div className="rail-track" data-motion={CHART_BAR_ATTR}>
+
+            <ol className="rate-rows">
               {rail.values.map((value) => {
                 const channel = channelFor.get(value.ref);
                 const entity = entities.find((item) => item.identity.ref === value.ref);
-                if (channel === undefined || entity === undefined || value.value === null) {
-                  return null;
-                }
-                const offset = rail.ceiling > 0 ? Math.min(1, value.value / rail.ceiling) : 0;
+                if (channel === undefined || entity === undefined) return null;
+                const extent =
+                  rail.ceiling > 0 ? Math.min(1, (value.value ?? 0) / rail.ceiling) : 0;
+
                 return (
-                  <span
-                    className="rail-mark"
-                    key={value.ref}
-                    style={{ '--mark-x': `${String(offset * 100)}%` } as CSSProperties}
-                  >
-                    <svg
-                      aria-hidden="true"
-                      className="rail-glyph"
-                      focusable="false"
-                      height={14}
-                      viewBox="-7 -7 14 14"
-                      width={14}
-                    >
-                      <MarkerGlyph shape={channel.marker} token={channel.plot} x={0} y={0} />
-                    </svg>
-                    <span
-                      className="rail-value"
-                      style={{ '--series': cssVar(channel.plot) } as CSSProperties}
-                    >
-                      <span className="rail-value-figure">{Math.round(value.value * 100)}%</span>
-                      <span className="rail-value-who">{entity.identity.surname}</span>
-                      <span className="rail-value-of">
-                        {value.numerator} of {value.denominator}
-                      </span>
+                  <li className="rate-row" key={value.ref}>
+                    <span className="rate-who">
+                      <svg
+                        aria-hidden="true"
+                        className="rate-glyph"
+                        focusable="false"
+                        height={12}
+                        viewBox="-7 -7 14 14"
+                        width={12}
+                      >
+                        <MarkerGlyph shape={channel.marker} token={channel.plot} x={0} y={0} />
+                      </svg>
+                      <span className="rate-name">{entity.identity.surname}</span>
                     </span>
-                  </span>
+
+                    <span className="rate-track">
+                      {value.value !== null && (
+                        <span
+                          className="rate-bar"
+                          data-motion={TIER_BAR_ATTR}
+                          style={
+                            {
+                              '--series': cssVar(channel.plot),
+                              '--rate-extent': `${String(extent * 100)}%`,
+                            } as CSSProperties
+                          }
+                        />
+                      )}
+                    </span>
+
+                    <span className="rate-figure">
+                      {value.value === null ? (
+                        <>
+                          <span className="rate-percent">&mdash;</span>
+                          <span className="rate-of">never started</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="rate-percent">{Math.round(value.value * 100)}%</span>
+                          <span className="rate-of">
+                            {value.numerator} of {value.denominator}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  </li>
                 );
               })}
-            </div>
-            <p className="rail-denominator">{rail.denominatorLabel}</p>
+            </ol>
+
+            <p className="rate-denominator">{rail.denominatorLabel}</p>
           </li>
         ))}
       </ol>
@@ -138,7 +216,15 @@ export function RateRailBoard({ entities, channels }: RateRailBoardProps) {
             <strong>Same-car pairings are not races.</strong> A 1950s constructor could enter more
             than twenty cars in one Grand Prix, and every same-team pair in a race counts once — so
             a driver of that era can hold more pairings than starts. It is the reason the two
-            teammate rails carry their own denominators.
+            teammate rows carry their own denominators.
+          </span>
+        </li>
+        <li className="season-note">
+          <Info size={16} aria-hidden="true" />
+          <span>
+            Each measure is scaled to its own leader, printed beside its name. Rows are in the order
+            you added the drivers, on every measure — so reading one driver down the board is a
+            straight line, not a search.
           </span>
         </li>
       </ul>
