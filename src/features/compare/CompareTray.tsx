@@ -60,14 +60,23 @@ const BAYS_ID = 'compare-tray-bays';
 export function CompareTray({ bays, channels, candidates, onRemove, onAdd }: CompareTrayProps) {
   const empties = Math.max(0, COMPARISON_CAP - bays.length);
 
+  /*
+   * **Channels are looked up by reference, never by bay position.** The ladder is computed over the
+   * entities that have a record; the bays include the pending ones too. So a pending bay sitting
+   * before a ready one shifts every index after it — and because `ReadyBay` returns `null` on a
+   * missing channel, the symptom is a **bay that silently disappears** rather than an error.
+   * `CompareTray.test.tsx` holds the case, and it fails against the index version.
+   */
+  const channelOf = new Map(channels.map((channel) => [channel.reference, channel]));
+
   return (
     <section className="tray" aria-label="Selected drivers">
       <ol className="tray-bays" id={BAYS_ID}>
-        {bays.map((bay, index) =>
+        {bays.map((bay) =>
           bay.kind === 'ready' ? (
             <ReadyBay
               key={bay.entity.identity.ref}
-              channel={channels[index]}
+              channel={channelOf.get(bay.entity.identity.ref)}
               entity={bay.entity}
               onRemove={onRemove}
             />

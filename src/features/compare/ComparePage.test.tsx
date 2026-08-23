@@ -281,12 +281,11 @@ describe('§6.6.6.10 — the season lens', () => {
     render_();
     await openSeasonLens(user);
     const rail = screen.getByRole('group', { name: 'Choose a season' });
-    expect(within(rail).getAllByRole('radio').map((node) => node.getAttribute('value'))).toEqual([
-      '1957',
-      '2016',
-      '2021',
-      '2026',
-    ]);
+    expect(
+      within(rail)
+        .getAllByRole('radio')
+        .map((node) => node.getAttribute('value')),
+    ).toEqual(['1957', '2016', '2021', '2026']);
   });
 
   it('opens on the most recent season it has data for, not blindly on the latest', async () => {
