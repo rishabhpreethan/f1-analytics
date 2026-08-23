@@ -2774,12 +2774,12 @@ that has drifted is recognisable as drift.
 
 | | |
 |---|---|
-| **Drivers** | 881 in the record · **818 started** a Grand Prix · 219 reached a podium · **116 won one** · **35 became champion** |
+| **Drivers** | 881 in the record · 818 **entered** a race · **790 started** one · 219 reached a podium · **116 won** · **35 became champion**. The entered/started gap is 28 people, and it is why the aside is keyed on `starts` |
 | Drivers, on the grid by decade | 1950s **313** · 1960s 214 · 1970s 156 · 1980s 104 · 1990s 97 · 2000s 71 · 2010s 66 · 2020s **40** — an **eight-fold collapse** |
 | Drivers, by career length | **172 started exactly one Grand Prix** · 304 started 2–10 · 189 started 11–49 · 103 started 50–149 · 50 started 150 or more |
 | Drivers, entered and never started | **28** — distinct from the 63 with no race entry at all, and the reason the aside is keyed on `starts` |
 | **Teams** | 214 identities · 205 started · **47 won** · **17 took a Constructors' title** · 11 raced in 2026 |
-| **Circuits** | 78 venues · **22 on the 2026 calendar** · 3 last used in 2025 · **53 gone** |
+| **Circuits** | 78 venues · **22 on the 2026 calendar** · 3 last used in 2025 · **53 gone for two seasons or more**. The masthead prints `22 on the calendar · 56 not on it`, because `22 + 53` leaves three venues unaccounted and a complement always closes |
 
 ⚠ **The championship trap, again.** `driver_championship` holds a **per-round snapshot**, so
 `count(distinct driver_id) where position = 1` returns **66** — drivers who have *led* a championship.

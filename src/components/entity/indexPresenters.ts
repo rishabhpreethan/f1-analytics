@@ -40,11 +40,11 @@ import { asideCount, bandOf, type BandDefinition, type StratumDefinition } from 
  *
  * | | |
  * |---|---|
- * | Drivers | 881 in the record · **818 started** · 219 reached a podium · **116 won** · **35 champions** |
+ * | Drivers | 881 in the record · 818 **entered** a race · **790 started** one · 219 reached a podium · **116 won** · **35 champions** |
  * | Drivers, by decade | 1950s **313** → 2020s **40**, an eight-fold collapse |
  * | Drivers, career length | **172 started exactly one Grand Prix**; 50 started 150 or more |
  * | Teams | 214 identities · 205 started · **47 won** · **17 took a Constructors' title** |
- * | Circuits | 78 venues · **22 on the 2026 calendar** · 3 last used in 2025 · **53 gone** |
+ * | Circuits | 78 venues · **22 on the 2026 calendar** · 3 last used in 2025 · **53 gone for two seasons or more** |
  *
  * **Nothing above is hard-coded below.** Every figure the page prints is counted from the payload
  * it was handed, exactly as the masthead's already was — the table is here so the next reader can
@@ -596,12 +596,22 @@ export function circuitIndexModel(rows: readonly CircuitListItem[]): IndexModel 
       ...(earliest !== null && latest !== null
         ? [fact('Span', `${String(earliest)}–${String(latest)}`)]
         : []),
-      fact('on the calendar', `${String(onCalendar)} on the calendar`),
-      fact('no longer used', `${String(gone)} no longer used`),
+      /*
+       * **`items.length - onCalendar`, never `gone`, and this arithmetic is the whole reason the
+       * clause is worded this way.** The ladder has three rungs — on the calendar, last used last
+       * season, and long gone — so `22 + 53` is 75 and a masthead that printed both would leave a
+       * reader who subtracts three venues short. *Not on it* is the complement of *on it* and
+       * always closes; the three-way split is one line below, on the ladder that owns it.
+       */
+      fact(
+        'on the calendar',
+        `${String(onCalendar)} on the ${String(latest ?? '')} calendar`.trim(),
+      ),
+      fact('not on it', `${String(items.length - onCalendar)} not on it`),
     ],
     board: {
       strataHeading: 'Where they stand',
-      strataCaption: `Formula 1 keeps moving: ${String(gone)} of the ${String(items.length)} venues it has visited are no longer on the calendar.`,
+      strataCaption: `Formula 1 keeps moving: of the ${String(items.length)} venues it has visited, ${String(onCalendar)} are on the current calendar and ${String(items.length - onCalendar)} are not — ${String(gone)} of those have not held a round for two seasons or more.`,
       eraHeading: 'Venues, by decade',
       eraCaption:
         'A circuit is counted in every decade between its first Grand Prix and its most recent.',
