@@ -584,14 +584,14 @@ lap time inflates beyond a threshold, and **label them inferred** — never as f
 
 ## 7. Traps — read before writing any query
 
-**There are 25.** `CLAUDE.md` and `.claude/agents/*.md` still say "the 14 traps"; this table is the
+**There are 25.** `CLAUDE.md` and `PLAN.md` were corrected to 25 on 2026-08-23; `.claude/agents/*.md` may still say "the 14 traps". This table is the
 authority. Trap 16 was found in F2 by querying rather than by reading, **traps 17–21 were found
 in F3**, the first feature to touch `lap` and `pit_stop` in anger, **trap 22 was found by a
 shipped display defect**, **traps 23–24 were found in F4**, the first feature to ask a
-career-length question, and **trap 25 was found in F7**, the first to count titles across the
+career-length question, and **trap 25 was found during the index redesign**, the first work to count titles across the
 whole archive at once — every one of them by running a query rather than by reading this
-document. The count in those other files is stale — flagged rather than edited, because they are not
-this document's to change.
+document. `CLAUDE.md` and `PLAN.md` now agree; the agent definitions may not. **Never trust a trap
+count quoted outside this table** — read §7 itself.
 
 | # | Trap | Rule |
 |---|---|---|

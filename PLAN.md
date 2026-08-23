@@ -54,11 +54,11 @@ Full detail lives in the docs named; this is the index, not the content.
 
 | | |
 |---|---|
-| **Data traps** | `docs/DATABASE.md` §7 — 14 of them. Points are not summable across eras. `has_time_data` is unreliable. Practice data is empty. Lap data 1996+, pit stops 2011+, qualifying 1994+. Every `lap` query bounded. |
+| **Data traps** | `docs/DATABASE.md` §7 — **25 of them**, and the count grows; read §7 for the current list, never a number quoted elsewhere. Points are not summable across eras. `has_time_data` is unreliable. Practice data is empty. Lap data 1996+, pit stops 2011+, qualifying 1994+. Every `lap` query bounded. |
 | **Charts** | `docs/DESIGN_SYSTEM.md` §3.2 — brand colours **fail** as a categorical palette (measured). Never a dual-axis chart. Comparison caps at 4. Purple/green/yellow are reserved timing semantics. |
 | **Security** | `docs/ARCHITECTURE.md` §7. Read-only, no auth, no mutations, no third-party calls. The builder self-checks **S-4** input validation, **S-6** error hygiene, **S-7** `npm audit`, **S-10** query bounds. |
 | **Database** | `data/f1.db` is gitignored, opened read-only, never committed. A fresh clone must fail with a clear actionable error. |
-| **Budget** | Initial chunk **< 250 KB gzipped**, measured. Currently 161.86 KB. |
+| **Budget** | Initial chunk **< 250 KB gzipped**, measured by `npm run check:budget`. Currently **225.76 KB (90.3%) — in the WARN band.** Size an asset by building with it and reading the budget line, never by gzipping the candidate alone: a 12.9 KB string measured 5.03 KB standalone and **5.98 KB in-bundle**, 19% dearer. |
 | **Motion** | GSAP only — `framer-motion` is removed and importing it is a defect. `useGSAP()` never `useEffect`. Reduced motion genuinely **stopped**, not slowed. No raw duration/ease/distance literals. |
 
 ## 5. Commands that matter
@@ -86,16 +86,13 @@ npm run validate:palette # whenever colour moves
 `F6` circuits · `F7` compare · `F8` records. One branch each, `feat/<slug>`. Status lives in
 `TASKS.md`.
 
-**F0 is built and unpushed** on `feat/foundation`: server, `/api/meta`, data layer, 12 routes, landing
-page, `CommandDock`, theme, GSAP motion. **281 tests.** The background replacement, the coverage chip's
-legibility, the capability-card hover and all three rounds of the rail's formatting are landed.
-Outstanding: nothing from Rishabh's run of the CR-007 build. Not yet seen by him: the rail's **third**
-round — `flex: none` on the glyph, after the second round's lane sizing squeezed every collapsed glyph
-to `width: 0` and blanked the rail. `DESIGN_SYSTEM.md` §7.8.0 faults 7–8.
+**Everything through F6 plus the index pages is merged and pushed to `main`** — foundation, design
+system, season hub, race page, driver/team/circuit profiles, and the three index pages. **1997 tests /
+87 files.** No live feature branch; `feat/foundation` is historical.
 
-**A screenshot of the collapsed rail at ≥1024px is the check worth asking for.** Fault 7 was invisible
-to the whole test suite and visible instantly in a screenshot, and its predecessor was reasoned about
-correctly and still regressed.
+**Next is F7 compare**, and **code-splitting should land before it.** Initial JS is at 90.3% of its
+250 KB budget and F7 is the largest feature left. The routes are already separate and nothing is lazy
+yet, so the work is available and cheap — but discovering the ceiling mid-F7 is not.
 
 ## 7. Changes
 

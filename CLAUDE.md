@@ -10,8 +10,8 @@ A Formula 1 analytics web application for enthusiasts — driver/team/race/circu
 comparison across seasons and eras as its centre of gravity. React 19 + TypeScript + Vite, Hono API,
 SQLite read-only, GSAP animation, accurate F1 team colours and timing conventions.
 
-**F0 is built and unpushed** on `feat/foundation` — server, `/api/meta`, data layer, 12 routes, landing
-page, `CommandDock`, theme, GSAP motion, 236 tests. `main` still holds only the original docs.
+**Everything is merged and pushed to `main`** — F0 through the driver/team/circuit index redesign.
+**1997 tests.** No live feature branch. The bundle is at **90.3%** of its 250 KB budget.
 
 ---
 
@@ -114,7 +114,7 @@ deliberate security posture (`ARCHITECTURE.md` §7), not an omission.
 
 ## 5. Data traps that cause silent, shipped bugs
 
-Full list: `docs/DATABASE.md` §7 — **16 traps as of 2026-08-07, and the count grows as the data teaches us things. Read §7 for the current list, never a number quoted elsewhere.** The ones that bite hardest:
+Full list: `docs/DATABASE.md` §7 — **25 traps as of 2026-08-23, and the count grows as the data teaches us things. Read §7 for the current list, never a number quoted elsewhere.** The ones that bite hardest:
 
 | Trap | Rule |
 |---|---|
@@ -173,45 +173,43 @@ not see**, and never report a visual behaviour as working on the strength of a p
 
 ## 8. Where we are right now
 
-*Last updated 2026-08-06. Correct this whenever it drifts — a stale "next action" here has already
+*Last updated 2026-08-23. Correct this whenever it drifts — a stale "next action" here has already
 misled an agent once.*
 
-- `main` — original foundation docs only. **Nothing since has been pushed.**
-- **`feat/foundation` — current branch.** F0 is **built**: server, `/api/meta`, read-only SQLite, data
-  layer, 12 routes, landing page, `CommandDock`, theme, GSAP motion. **236 tests / 29 files**,
-  typecheck / lint / `format:check` / build clean, bundle **161.86 KB gzipped** (65% of the 250 KB
-  budget). Missing-database gives a clear console message and a `503` with no stack trace or path in
-  the body.
+- **`main` holds everything.** F0 through the index redesign are merged and pushed; `d7a3e1b` is the
+  most recent. There is no unpushed work and no live feature branch. `feat/foundation` is historical.
+- **1997 tests / 87 files**, typecheck / lint / `format:check` / `validate:palette` / build all clean.
+- **Bundle 225.76 KB gzipped / 250 (90.3%) — in the WARN band**, which warns from 85%. It was 161.86 KB
+  at F0. **Code-splitting is the next structural task and should land before F7**, which is the largest
+  remaining feature; discovering the ceiling mid-F7 is the failure mode to avoid.
 - **GSAP replaced `framer-motion`.** Importing `framer-motion` is a **defect**. Measured, gzipped:
   core+ScrollTrigger+SplitText **47.7 KB** vs `framer-motion`'s **40.8 KB** — so **+6.9 KB**. The
   earlier "the bundle goes down" claim came from a web search and was **wrong**; the swap was kept on
-  ~90 KB of headroom, not on size.
+  headroom that no longer exists, not on size.
 - **`/` is the landing page; the season hub is `/seasons`**, no redirect either way.
-- **Accent is magenta** — `#D1018A` light / `#FE02A9` dark, hue 350, derived by scanning all 360°
-  against 12 brand + 3 timing + 4 status colours. Purple, green and yellow are **reserved timing
-  semantics** and can never be the accent.
+- **The accent is monochrome** — the pole of the neutral scale, `#08090C` light / `#FFFFFF` dark.
+  Rishabh's call, 2026-08-06: *"no purple accent, i want the accent to be a color of white/black."*
+  The whole hue-350 magenta ramp is deleted from the product; the derivation survives in
+  `DESIGN_SYSTEM.md` §9 V-10…V-17 for the record only. Purple, green and yellow remain **reserved
+  timing semantics** and can never be the accent.
 
-### ➡️ Open work — the three things Rishabh rejected
+### ➡️ Open work
 
-He ran the app and found these himself. All three are the `designer`'s, since it now builds what it
-designs:
+Nothing is rejected and outstanding. The three faults Rishabh found in the F0 shell — the background,
+the dock rail and the coverage chip — are all fixed and pushed, as is the index-page redesign he
+rejected on 2026-08-22.
 
-1. **The background.** He does not like it. Replacement delegated to Claude. The orbs are the prime
-   suspect and were the `designer`'s own predicted risk. A tiled `radial-gradient` dot field is the
-   steer — CSS-composited only, contrast **re-measured** with `scripts/validate-palette.mjs`, and note
-   the contrast plate exists only because text over the orb field fell to 2.64:1.
-2. **The dock rail, both states.** Root cause confirmed: **no rule hides `.dock-label` at
-   `[data-expanded='false']`**, so full-size labels overflow a 64 px `overflow: hidden` box and clip
-   mid-word — `Hor`, `Seas`, `Driv`. Separately, **hovering it did nothing** in a real browser test
-   (before/after screenshots pixel-identical) — undiagnosed. Its vertical geometry is also an accident:
-   a floating box at 235→660 px in a 900 px viewport, neither full-height nor centred.
-3. **The `2026 · R10` coverage chip.** He could not tell what it was. Its accessible name is fine but
-   nothing *visible* carries the meaning — no label, no icon, no hint it opens a popover. Whether the
-   popover is also functionally broken is **unconfirmed**; he may simply never have discovered it was
-   clickable.
-
-A partial background rewrite was **discarded** on 2026-08-06 — it had removed `dist.parallax` while
-`interactions.ts` still used it, leaving typecheck red. The tree is green at HEAD.
+1. **Code-splitting, before F7.** See the budget line above. The routes are already separate; nothing
+   is lazy yet.
+2. **A pre-existing `npm audit` high advisory** — `nanoid` via `vite → postcss`, build-time only, not
+   in `dist/`, present on `main` before any recent work. It needs its own isolated commit so it can be
+   verified independently; do not bundle it into a feature.
+3. **The European pip cluster on `/circuits`** is a blob of overlapping marks at 517 px. Pre-existing
+   and unchanged by the coastline. The only real fix is a different mark or a zoom — a new design, not
+   a defect.
+4. **`scripts/generate-world-land.mjs` was written by the `developer` and then edited by the
+   `designer`** when rasterising caught three defects in its output. Green everywhere, but it crossed
+   an ownership line and is worth knowing about.
 
 ### Assets — Rishabh's, never fabricate
 
