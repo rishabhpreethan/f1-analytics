@@ -12,7 +12,7 @@ import {
   plotArea,
   spanPath,
 } from './geometry';
-import type { PlotState } from './types';
+import { OUTCOME_TONES, type OutcomeTone, type PlotState } from './types';
 import { useChartSize } from './useChartSize';
 
 /**
@@ -33,12 +33,31 @@ import { useChartSize } from './useChartSize';
  * 4. **Interaction**: per-segment tooltip (§6.5.1's bar/dot/cell rule); the hovered segment keeps
  *    full opacity and its siblings drop to 0.4, opacity only.
  * 5. **Colour**: `assignEntityColours` **per row**, so the segments of one row are coloured as a
- *    group. On a team page the group is that season's team-mates, which means the §6.4a shade pair
- *    applies without the caller asking for it.
+ *    group. On a team page the group is that season's team-mates, so under §6.4a they share the
+ *    car's colour and the seat is carried by rung 4's hatch.
  * 6. **Accessibility**: every row labelled in the gutter, every segment directly labelled where it
  *    fits and named in its tooltip, and a table view carrying entity, raw value and share.
  *
  * ---
+ *
+ * ## Two modes, and the data decides which — §6.3a, added 2026-08-23
+ *
+ * | | Segments are… | Colour | Second channel |
+ * |---|---|---|---|
+ * | **entity** (the original) | different people | one plot token per car | the seat's hatch |
+ * | **outcome** | different *results* for one person | ONE plot token, four ordinal tones | the hatch on step 4 |
+ *
+ * The second exists because the result mix — won / podium / finished / not classified — is a
+ * composition whose parts are not entities, and colouring them as entities would say four drivers
+ * were on that row. **The mode is read from the data** (`ShareSegment.tone` on every segment of
+ * every row) rather than passed as a flag, so a row cannot claim one encoding while its neighbour
+ * claims the other.
+ *
+ * Three things follow, and each is enforced here rather than left to the caller: the hatch keys on
+ * the **tone** and not on the seat, because every segment of an outcome row is the same person; the
+ * hatch steps up to `--border-strong`, because on step 4's `--surface-raised` fill it is the only
+ * thing separating the segment from the panel; and **no text is drawn inside a toned segment at
+ * all** — V-38 measured every ink against all 44 fills and neither clears the 4.5:1 text floor.
  *
  * ## Two invariants this component enforces rather than trusts the caller with
  *
@@ -71,6 +90,13 @@ export interface ShareSegment {
   /** Drawn inside the segment when it is wide enough. Terse — a code, or a figure. */
   shortLabel?: string;
   value: number;
+  /**
+   * §6.3a. **Present on every segment of every row, or on none of them.** A chart in which some
+   * rows are outcomes and others are entities would be two encodings on one axis, so the mode is
+   * decided chart-wide from the data and a partially-toned chart falls back to entity colour
+   * rather than mixing the two.
+   */
+  tone?: OutcomeTone;
 }
 
 export interface ShareRow {
@@ -100,7 +126,21 @@ export interface ShareChartProps {
   formatValue?: (value: number) => string;
   /** What a zero-total row says about itself. Stated, never blank. */
   emptyRowLabel?: string;
+  /**
+   * §6.3a. The legend's four names, in ramp order, when the chart is in outcome mode. The tones
+   * themselves are the design system's; **what a tone is called belongs to the surface** — "Won"
+   * on a driver's result mix, and something else the first time this ramp is used for anything
+   * that is not a race result.
+   */
+  toneLabels?: Readonly<Record<OutcomeTone, string>>;
 }
+
+const DEFAULT_TONE_LABELS: Readonly<Record<OutcomeTone, string>> = {
+  win: 'Won',
+  podium: 'Podium, not a win',
+  classified: 'Finished, off the podium',
+  unclassified: 'Not classified',
+};
 
 const identity = (n: number) => String(n);
 
@@ -127,12 +167,26 @@ export function ShareChart({
   categoryTitle = 'Category',
   formatValue = identity,
   emptyRowLabel = 'No value recorded',
+  toneLabels = DEFAULT_TONE_LABELS,
 }: ShareChartProps) {
   const clipId = useId().replace(/:/g, '');
   const hatchId = useId().replace(/:/g, '');
   const { ref, width, height } = useChartSize<HTMLDivElement>();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const titleId = useId();
+
+  /*
+   * **§6.3a's mode, decided from the data and chart-wide.** All of it or none of it: a chart whose
+   * rows disagreed about what a segment means would be two encodings sharing one axis, and the
+   * fallback is the shipped entity behaviour rather than a throw — a mis-shaped row should draw
+   * something honest, not nothing.
+   */
+  const outcomeMode =
+    rows.length > 0 &&
+    rows.every(
+      (row) =>
+        row.segments.length > 0 && row.segments.every((segment) => segment.tone !== undefined),
+    );
 
   /* The gutter holds the row labels, which are the long strings here — the same shape `SpanChart`
    * uses, and the same shape `BarChart` takes when §6.3 rotates it. */
@@ -212,6 +266,7 @@ export function ShareChart({
        * §6.3 gives a category axis that does not fit.
        */
       plotHeight={bandPlotHeight(rows.length, margin)}
+      legend={outcomeMode ? <OutcomeLegend labels={toneLabels} /> : undefined}
       table={
         <ShareTable
           rows={rows}
@@ -245,7 +300,13 @@ export function ShareChart({
                   height={height}
                 />
               </clipPath>
-              {/* Rung 4's 45° hatch, carrying the SEAT within one car (§6.4a). */}
+              {/*
+               * Rung 4's 45° hatch. In entity mode it carries the SEAT within one car (§6.4a); in
+               * outcome mode it carries the fourth tone, and it is drawn at `--border-strong`
+               * because there it is the *only* thing separating a not-classified segment from the
+               * panel it is painted on — `--border-subtle` on `--surface-raised` is 1.24:1 and
+               * V-38 G-38d gates that boundary at 1.2 against `--border-strong`'s 1.90:1.
+               */}
               <pattern
                 id={hatchId}
                 width="6"
@@ -253,8 +314,22 @@ export function ShareChart({
                 patternTransform="rotate(45)"
                 patternUnits="userSpaceOnUse"
               >
-                <line className="chart-hatch-line" x1="0" y1="0" x2="0" y2="6" />
-                <line className="chart-hatch-line" x1="3" y1="0" x2="3" y2="6" />
+                <line
+                  className="chart-hatch-line"
+                  data-weight={outcomeMode ? 'strong' : undefined}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="6"
+                />
+                <line
+                  className="chart-hatch-line"
+                  data-weight={outcomeMode ? 'strong' : undefined}
+                  x1="3"
+                  y1="0"
+                  x2="3"
+                  y2="6"
+                />
               </pattern>
             </defs>
 
@@ -362,6 +437,7 @@ export function ShareChart({
                       <path
                         className="chart-span"
                         data-active={activeKey === key}
+                        data-tone={outcomeMode ? segment.tone : undefined}
                         d={spanPath(x, y, segWidth, band.bandwidth(), 4, {
                           leading: index === 0,
                           trailing: index === row.segments.length - 1,
@@ -375,8 +451,13 @@ export function ShareChart({
                        * two teams hatches the second seat of each car rather than every other
                        * segment. Drawn over the fill rather than instead of it, so the car is
                        * still recognisable underneath.
+                       *
+                       * In outcome mode the seat is meaningless — every segment of a row is the
+                       * same person — and the hatch carries the **fourth tone** instead. Keyed on
+                       * the tone and not on the index, so a row that ever carries the tones in a
+                       * different order still hatches the right one.
                        */}
-                      {colour.seat % 2 === 1 && (
+                      {(outcomeMode ? segment.tone === 'unclassified' : colour.seat % 2 === 1) && (
                         <path
                           d={spanPath(x, y, segWidth, band.bandwidth(), 4, {
                             leading: index === 0,
@@ -386,17 +467,28 @@ export function ShareChart({
                         />
                       )}
 
-                      {segment.shortLabel !== undefined && segWidth >= LABEL_MIN_WIDTH && (
-                        <text
-                          className="chart-span-label"
-                          x={x + segWidth / 2}
-                          y={y + band.bandwidth() / 2}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                        >
-                          {segment.shortLabel}
-                        </text>
-                      )}
+                      {/*
+                       * **No text is ever drawn on an outcome tone, and that is measured rather
+                       * than tasteful** (V-38). The ramp sweeps from a mid-lightness entity colour
+                       * to the plot surface, so it passes through every lightness on the way and
+                       * neither ink clears 4.5:1 across all 44 fills: `--ink-inverse` bottoms out
+                       * at 3.40:1 and `--ink-primary` at 4.23:1. Enforced here rather than left to
+                       * the caller, because a caller who passes a `shortLabel` is not doing
+                       * anything unreasonable — the rule belongs to the encoding.
+                       */}
+                      {!outcomeMode &&
+                        segment.shortLabel !== undefined &&
+                        segWidth >= LABEL_MIN_WIDTH && (
+                          <text
+                            className="chart-span-label"
+                            x={x + segWidth / 2}
+                            y={y + band.bandwidth() / 2}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                          >
+                            {segment.shortLabel}
+                          </text>
+                        )}
 
                       {/* §6.5.1 — ≥24px hit target on the cross-axis regardless of mark size. */}
                       <rect
@@ -448,5 +540,71 @@ export function ShareChart({
         </div>
       </div>
     </ChartFrame>
+  );
+}
+
+/**
+ * **The outcome legend** — §6.3a rule 4, and the reason the bar needs no text on it.
+ *
+ * Four keys in ramp order, drawn with the **same CSS rules the bars use** rather than a second set
+ * of background declarations: each key is a 16×10 `.chart-span` in its own tiny `<svg>`, so a
+ * change to a mix ratio moves the legend and the marks together and cannot move only one.
+ *
+ * `--series` is `--ink-secondary`, so the keys show the *shape* of the ramp — strongest to
+ * faintest to hatched — in a neutral rather than claiming any driver's colour. Every row on the
+ * chart applies the same ramp to its own colour, so what the reader has to learn is the order, and
+ * the order is what a neutral ramp teaches. Painting the keys in the first driver's colour would
+ * teach the order and imply the legend was about him.
+ */
+function OutcomeLegend({ labels }: { labels: Readonly<Record<OutcomeTone, string>> }) {
+  const hatchId = useId().replace(/:/g, '');
+  return (
+    <ul className="chart-legend chart-tone-legend">
+      {OUTCOME_TONES.map((tone) => (
+        <li className="chart-legend-item" key={tone}>
+          <svg
+            className="chart-tone-key"
+            width={16}
+            height={10}
+            aria-hidden="true"
+            focusable="false"
+          >
+            {tone === 'unclassified' && (
+              <defs>
+                <pattern
+                  id={hatchId}
+                  width="6"
+                  height="6"
+                  patternTransform="rotate(45)"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <line
+                    className="chart-hatch-line"
+                    data-weight="strong"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="6"
+                  />
+                  <line
+                    className="chart-hatch-line"
+                    data-weight="strong"
+                    x1="3"
+                    y1="0"
+                    x2="3"
+                    y2="6"
+                  />
+                </pattern>
+              </defs>
+            )}
+            <rect className="chart-span" data-tone={tone} width={16} height={10} rx={2} />
+            {tone === 'unclassified' && (
+              <rect width={16} height={10} rx={2} fill={`url(#${hatchId})`} />
+            )}
+          </svg>
+          <span>{labels[tone]}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

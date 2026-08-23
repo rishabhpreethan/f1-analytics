@@ -265,3 +265,34 @@ describe('the z-index scale (§5.2a)', () => {
     expect(value('--z-content')).toBeGreaterThan(value('--z-atmosphere'));
   });
 });
+
+describe('§6.3a — the outcome ramp is two numbers, and they are gated elsewhere', () => {
+  const mix = (name: string) =>
+    Number(new RegExp(`--tone-mix-${name}:\\s*(\\d+)%`).exec(TOKENS)?.[1] ?? '-1');
+
+  it('declares both steps as a percentage of the entity colour', () => {
+    expect(mix('podium')).toBeGreaterThan(0);
+    expect(mix('classified')).toBeGreaterThan(0);
+  });
+
+  it('descends — a podium must keep more colour than an ordinary finish', () => {
+    /*
+     * The ramp is ORDINAL, and its order is the encoding. Inverting these two would leave a chart
+     * that still renders, still passes V-38's separation floors, and says the opposite of what the
+     * legend says. Nothing visual would look broken.
+     */
+    expect(mix('podium')).toBeGreaterThan(mix('classified'));
+    expect(mix('podium')).toBeLessThan(100);
+  });
+
+  it('pins the two figures V-38 was run against', () => {
+    /*
+     * 60 and 30 are not round numbers chosen for tidiness: at 55/22 the faintest step measured
+     * 1.16:1 against the plot surface and failed the 1.2 floor, and at 62/38 the podium-to-finished
+     * step fell to ΔE 7.85 against a floor of 8. The pair below is the measured compromise, and a
+     * change to either without re-running `npm run validate:palette` invalidates §9.2.9.
+     */
+    expect(mix('podium')).toBe(60);
+    expect(mix('classified')).toBe(30);
+  });
+});

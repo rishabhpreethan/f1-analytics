@@ -24,4 +24,5 @@ export {
 } from './ScatterChart';
 export { SpanChart, type Span, type SpanChartProps, type SpanRow } from './SpanChart';
 export { COMPARISON_CAP } from './ladder';
-export type { BarDatum, PlotState, SeriesInput, SeriesPoint } from './types';
+export { OUTCOME_TONES } from './types';
+export type { BarDatum, OutcomeTone, PlotState, SeriesInput, SeriesPoint } from './types';

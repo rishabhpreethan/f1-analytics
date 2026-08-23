@@ -1629,6 +1629,83 @@ what legitimately re-mounts a chart. **`src/components/charts/charts.motion.test
 motion enabled and counts timelines**; a chart test suite that never creates a tween is not testing
 the charts' motion.
 
+### 6.3a Outcome tones — an ordinal ramp **inside** one entity's colour _(added 2026-08-23)_
+
+Every encoding in §6.3 answers *which entity is this*. This one answers *how good was this*, and
+the two must not be built the same way.
+
+**The case that forced it.** The result mix — of a driver's starts, how many were wins, podiums,
+ordinary finishes, and not classified — is a composition whose parts are **outcomes, not entities**.
+`ShareChart` coloured a row's segments with `assignEntityColours`, which is right for a team's
+intra-team points split and says something false here: four colours on one row reads as four
+drivers. Four *neutral* greys would be worse, because the row would stop being anybody's.
+
+**The ramp.** Four ordinal steps, applied to whatever plotting token the row already carries. Mixed
+in OkLab over `--surface-sunken` — **the plot area**, so each step fades toward the background it
+is actually drawn on and the ramp is theme-correct with no second set of values.
+
+| Step | Meaning | Fill | Token |
+|---|---|---|---|
+| 1 `win` | the best available result | the plot token, unmixed | — (it is `.chart-span`'s base rule) |
+| 2 `podium` | a podium that is not a win | `color-mix(in oklab, <plot> 60%, --surface-sunken)` | `--tone-mix-podium` |
+| 3 `classified` | a finish that is not a podium | `color-mix(… 30% …)` | `--tone-mix-classified` |
+| 4 `unclassified` | no result at all | `--surface-raised` + a 45° `--border-strong` hatch | — |
+
+**Step 4 carries no entity colour, and that is the design rather than a shortcut.** The absence of
+colour *is* the meaning. A tinted fourth step would say "a weak finish"; what happened is that there
+was no finish. Rung 4's hatch (§6.4) carries it, stepped up from `--border-subtle` to
+`--border-strong` because on `--surface-raised` the hatch is the only thing separating the segment
+from the panel — 1.24:1 against 1.90:1, gated at 1.2 (V-38 G-38d).
+
+#### Why this is not the shade pair returning
+
+§6.4a deleted the two-shade teammate pair on the same day this ramp was added, and both spend
+**lightness**. The difference is what they spend it *on*:
+
+| | The shade pair (deleted) | The outcome ramp |
+|---|---|---|
+| What the steps mean | two **identities** — two people | one **order** — better to worse |
+| Identity across the steps | changes | **constant**: one row, one entity, one hue |
+| What the reader must learn | that two colours are one team | that stronger is better, left to right |
+| Ceiling | 2 in light mode, measured (§9.2.3 V-27) | 4, because the steps are ordered and adjacent |
+
+Lightness is the wrong channel for identity and the right one for order. That is the whole of it,
+and it is why one of these was deleted and the other added in the same change.
+
+#### The five rules
+
+1. **The mode is read from the data, never passed as a flag.** A segment carries `tone`; a chart is
+   in outcome mode only when **every segment of every row** carries one. A partially-toned chart
+   falls back to entity colour rather than mixing two encodings on one axis.
+2. **The order is fixed and the same on every row** — strongest to weakest, left to right, always.
+   That is what lets a reader compare two rows at a boundary instead of decoding two palettes.
+3. **A legend is mandatory and it is drawn in a neutral** (`--series: --ink-secondary`), because
+   every row applies the same ramp to its own hue: what has to be learned is the order, and a
+   legend in the first driver's colour would teach the order while implying it was about him.
+4. ⚠ **No text is ever drawn inside a toned segment.** Measured, not tasteful: the ramp sweeps from
+   a mid-lightness entity colour to the surface, so it passes through every lightness on the way and
+   **neither ink clears the 4.5:1 text floor across all 44 fills** — `--ink-inverse` bottoms out at
+   3.40:1 and `--ink-primary` at 4.23:1 (V-38). The counts go in the tooltip, the legend and the
+   table view. `ShareChart` enforces this and ignores a `shortLabel` in outcome mode, because a
+   caller passing one is not doing anything unreasonable; the rule belongs to the encoding.
+5. **Any change to either mix ratio re-runs `npm run validate:palette`.** The two numbers are the
+   encoding. 55/22 was the first proposal and it **failed**: the faintest step measured 1.16:1
+   against the plot surface. 62/38 failed the other way, at ΔE 7.85 between steps 2 and 3. 60/30 is
+   the measured compromise, not a preference.
+
+#### The CVD residual, stated
+
+Worst adjacent-step separation under the CVD models is **ΔE 3.65** (ramp #10, light), against the
+palette's categorical floor of 8. It is **reported and not gated**, which is the same posture §3.4.2
+takes toward the one timing-colour residual, and for the same reason: the mitigation is structural
+rather than hopeful.
+
+What carries the encoding when the tones do not: the segments are separated by a **drawn 2px gap of
+the plot surface**, so every boundary is visible whatever the fills do; the **order is fixed**; the
+legend names the four in that order; and the table view carries every figure as text. A reader who
+cannot see the difference between step 2 and step 3 can still read the bar — which is not true of a
+categorical palette, and is why the floor that applies to one does not apply to the other.
+
 ### 6.4 Runtime collision detection and the differentiator ladder
 
 Given the entities the user selected, compute pairwise perceptual distance on **the colours actually
@@ -4776,6 +4853,50 @@ The old denominator was inflated by pairs no two entities could ever have been g
 silently stops reporting a check reads identically to one whose check passed. The tombstone names
 what was measured, where the figures live (§9.2.3 V-27, G-27d's Sauber attribution) and why the
 gate is gone rather than failing.
+
+
+#### 9.2.9 V-38 — the outcome ramp, 2026-08-23
+
+A **new gate**, added with §6.3a and run by `npm run validate:palette` (or on its own,
+`node scripts/validate-palette.mjs tones`). It measures what the browser will actually compute: the
+same OkLab mix CSS `color-mix(in oklab, …)` performs, over all **22 plotting tokens × 2 themes = 44
+ramps**.
+
+| Gate | What it holds | Floor | Worst measured | |
+|---|---|---|---|---|
+| **G-38a** | step 1 → 2, normal ΔE | 8 | **13.17** — RB light `#5D87ED` → `#95B3F3` | ✅ |
+| **G-38b** | step 2 → 3, normal ΔE | 8 | **10.11** — Alpine light `#7DB9E3` → `#B7D5ED` | ✅ |
+| **G-38c** | step 3 → 4, normal ΔE | 8 | **10.24** — Red Bull dark `#1A2940` → `#1A1C20` | ✅ |
+| **G-38d** | the step-4 hatch against its own fill | 1.2:1 | **1.90:1** — `--border-strong` on light `--surface-raised` | ✅ |
+| **G-38e** | step 3 against the plot surface under it | 1.2:1 | **1.27:1** — ramp #6 dark `#3A1535` on `#08090C` | ✅ |
+| — | worst adjacent step under CVD | reported | **3.65** — ramp #10 light | see §6.3a |
+| — | `--ink-inverse` on step 1, if it carried text | reported | **3.40:1** — McLaren light `#DD6B02` | see below |
+| — | `--ink-primary` on steps 2–4, if they did | reported | **4.23:1** — ramp #10 dark podium `#906E6A` | see below |
+
+**Why the separation floor is 8 and not 15.** ΔE 15 is this system's **categorical** floor: two
+colours a reader must tell apart with nothing else to go on. These four steps are ordinal, adjacent,
+separated by a drawn 2px gap, in a fixed left-to-right order, under a legend that names them in that
+order. 8 is the floor the palette already uses for "separable when something else is helping", which
+is exactly the situation. Below it two steps read as one block.
+
+**The two reported ink figures are the reason §6.3a rule 4 exists** — no text on a tone, ever. They
+also contain a **correction to a claim already in the tree**: `charts.css` states that
+`--ink-inverse` "clears 4.5:1 against every plotting token". It does not. McLaren's light plotting
+variant is **3.40:1**, and it is the only one of the 22 that fails. So `.chart-span-label` — the
+in-segment code on the team page's intra-team split (§6.6.3) — is below the text floor on one fill
+today.
+
+**Recorded rather than fixed, deliberately.** The fix is a `paint-order: stroke` halo in the surface
+colour, which changes how a shipped page looks, and nothing in this environment can verify that
+(CR-006 removed the visual gate; jsdom composites nothing). Fixing it blind inside a change about
+something else is how a second defect gets introduced next to a first. **Open, and it belongs to
+whoever next touches §6.6.3.**
+
+**Two ratios were rejected by measurement before 60/30 was chosen**, and both are recorded because
+the failures are the argument for the numbers: at **55/22** the faintest step measured **1.16:1**
+against the plot surface (G-38e, floor 1.2) — an ordinary-finish segment reading as a hole in its
+own bar; at **62/38** step 2 → 3 fell to **ΔE 7.85** (G-38b, floor 8). The ramp is bounded on both
+sides, and 60/30 sits between them with margin at each end.
 
 
 ## 10. Theming mechanics

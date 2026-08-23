@@ -2122,6 +2122,170 @@ function map() {
 }
 if (mode === 'map' || mode === 'all') map();
 
+/* ================================================================ V-38  OUTCOME TONES
+ * `DESIGN_SYSTEM.md` §6.3a — the four-step ordinal ramp inside ONE entity's colour, built for the
+ * result-mix bar (§6.6.6.14). Every step is a `color-mix(in oklab, <plot> N%, --surface-sunken)`
+ * resolved by the browser, so what is measured here is the same arithmetic the renderer does.
+ *
+ * **Why this is not the shade pair coming back** (§6.4a deleted that on the same day): the pair
+ * spent lightness on IDENTITY — two shades meant two people, and a reader had to learn that two
+ * colours were one team. These steps spend lightness on an ORDER inside one row that is already
+ * one entity, which is the job lightness is actually good at and the one channel every dichromat
+ * keeps in full. Identity is constant across the row; the reader is never asked to tell two
+ * entities apart by shade.
+ */
+const TONE_MIX = { win: 1, podium: 0.6, classified: 0.3 };
+
+/** `--border-strong`, the hatch stroke that carries step 4. Both themes, from `tokens.css`. */
+const BORDER_STRONG = { light: '#B9BCC3', dark: '#4F535A' };
+
+/** Mix two hexes in OkLab at `t` of the first — the arithmetic behind CSS `color-mix(in oklab)`. */
+function mixOklab(hexA, hexB, t) {
+  const A = oklch(hexA);
+  const B = oklch(hexB);
+  const ab = (o) => [o.C * Math.cos((o.h * Math.PI) / 180), o.C * Math.sin((o.h * Math.PI) / 180)];
+  const [a1, b1] = ab(A);
+  const [a2, b2] = ab(B);
+  const L = A.L * t + B.L * (1 - t);
+  const a = a1 * t + a2 * (1 - t);
+  const b = b1 * t + b2 * (1 - t);
+  let h = (Math.atan2(b, a) * 180) / Math.PI;
+  if (h < 0) h += 360;
+  return lch2hex(L, Math.hypot(a, b), h).hex;
+}
+
+function tones() {
+  console.log(
+    '\n=== V-38  OUTCOME TONES (§6.3a) — four ordinal steps inside one entity colour, over the\n' +
+      '           plot surface, for all 22 plotting tokens in both themes ===',
+  );
+  let failures = 0;
+  const F = (ok) => {
+    if (!ok) failures += 1;
+    return ok ? 'PASS' : 'FAIL';
+  };
+
+  /* The 22 tokens the palette actually emits, built exactly as `emitEntityData` builds them. */
+  const { entries } = selectRamp();
+  const tokens = [];
+  for (const [team, hex] of Object.entries(BRAND)) {
+    if (oklch(hex).C < 0.05) continue;
+    tokens.push({
+      name: `--team-${team}-plot`,
+      light: brandChartVariant('light', hex).hex,
+      dark: brandChartVariant('dark', hex).hex,
+    });
+  }
+  entries.forEach((e, i) => {
+    tokens.push({ name: `--ramp-${i + 1}-plot`, light: e.light, dark: e.dark });
+  });
+
+  const worst = {};
+  const keep = (slot, value, what) => {
+    if (worst[slot] === undefined || value < worst[slot].v) worst[slot] = { v: value, what };
+  };
+
+  for (const theme of ['light', 'dark']) {
+    const S = SURF[theme];
+    /* Step 4 carries NO entity colour: the absence of colour is the meaning of "no result". It is
+     * the raised panel over the sunken plot, plus rung 4's hatch — texture, never a hue (§6.3). */
+    const unclassified = S.raised;
+    keep(
+      'hatch',
+      contrast(BORDER_STRONG[theme], unclassified),
+      `${theme} border-strong ${BORDER_STRONG[theme]} on raised ${unclassified}`,
+    );
+    for (const token of tokens) {
+      const t1 = token[theme];
+      const t2 = mixOklab(t1, S.sunken, TONE_MIX.podium);
+      const t3 = mixOklab(t1, S.sunken, TONE_MIX.classified);
+      const where = `${token.name} ${theme}`;
+      keep('step12', dE(t1, t2), `${where} ${t1} -> ${t2}`);
+      keep('step23', dE(t2, t3), `${where} ${t2} -> ${t3}`);
+      keep('step34', dE(t3, unclassified), `${where} ${t3} -> ${unclassified}`);
+      keep('cvd', Math.min(minCVD(t1, t2), minCVD(t2, t3)), where);
+      keep('inkWin', contrast(S.inkInverse, t1), `${where} ink-inverse on the win step ${t1}`);
+      for (const [tone, fill] of [
+        ['podium', t2],
+        ['classified', t3],
+        ['unclassified', unclassified],
+      ]) {
+        keep('inkRest', contrast(S.inkPrimary, fill), `${where} ${tone}: ink-primary on ${fill}`);
+      }
+      /* The faintest coloured step must still read as a FILL against the plot area it sits on, or
+       * a driver's ordinary finishes become a hole in his own bar rather than a segment of it. */
+      keep('onSurface', contrast(t3, S.sunken), `${where} finished ${t3} on plot ${S.sunken}`);
+    }
+  }
+
+  const row = (label, slot, floor, unit = '') =>
+    console.log(
+      `  ${label.padEnd(48)} ${n(worst[slot].v).padStart(6)}${unit} (floor ${String(floor)}) ${F(worst[slot].v >= floor)}\n` +
+        `           worst: ${worst[slot].what}`,
+    );
+  const report = (label, slot, unit = '') =>
+    console.log(
+      `  ${label.padEnd(48)} ${n(worst[slot].v).padStart(6)}${unit} REPORTED\n` +
+        `           worst: ${worst[slot].what}`,
+    );
+
+  console.log(
+    `  Mixes: podium ${String(TONE_MIX.podium * 100)}% of the plot token, finished ` +
+      `${String(TONE_MIX.classified * 100)}%, both over --surface-sunken (the plot area).\n` +
+      `  Step 4 is --surface-raised plus a 45-degree --border-strong hatch: no entity colour at all.\n` +
+      `  ${String(tokens.length)} tokens x 2 themes = ${String(tokens.length * 2)} ramps.\n`,
+  );
+
+  /*
+   * **Floor 8, not 15, and the reason is the encoding's job.** dE 15 is this system's CATEGORICAL
+   * floor: two colours a reader has to tell apart with nothing else to go on. These four steps are
+   * ordinal, adjacent, share a drawn 2px gap, and appear in a FIXED left-to-right order under a
+   * legend that names them. 8 is the floor this palette already uses for "separable when something
+   * else is helping", which is exactly the situation. Below it two steps read as one block.
+   */
+  row('G-38a  step 1 -> 2 (won -> podium), normal dE', 'step12', 8);
+  row('G-38b  step 2 -> 3 (podium -> finished), normal dE', 'step23', 8);
+  row('G-38c  step 3 -> 4 (finished -> unclassified), dE', 'step34', 8);
+  row('G-38d  the step-4 hatch against its own fill', 'hatch', 1.2, ':1');
+  row('G-38e  step 3 against the plot surface under it', 'onSurface', 1.2, ':1');
+
+  /*
+   * **CVD is reported, not gated, and the mitigation is structural** — the same posture §3.4.2
+   * takes with the one residual it cannot remove. A lightness ramp is the best available choice for
+   * a dichromat and it is still not a categorical separation: ramp #10's hue is one the CVD models
+   * collapse hardest.
+   *
+   * What carries the encoding when the tones do not: the segments are separated by a **drawn 2px
+   * gap of the plot surface**, so the boundary is visible whatever the fills do; the **order is
+   * fixed** — won, podium, finished, unclassified, left to right, on every row, always; the legend
+   * names the four in that order; and the table view carries every figure. A reader who cannot see
+   * the difference between step 2 and step 3 can still read the bar. That is why this is a residual
+   * and not a defect — but it is a residual, and it is printed rather than buried.
+   */
+  report('  ---  worst adjacent step under CVD (see the note)', 'cvd');
+
+  /*
+   * **This is why no number is ever drawn inside an outcome-tone segment.** Neither ink clears
+   * 4.5:1 across all 44 fills, and no third ink can: the ramp deliberately sweeps from a
+   * mid-lightness entity colour to the surface, so it passes through every lightness on the way.
+   * The counts go in the legend, the tooltip and the table view instead (§6.3a rule 4).
+   *
+   * The first figure is also a **correction to a claim already in the tree**: `charts.css` says
+   * `--ink-inverse` "clears 4.5:1 against every plotting token". Measured today it does not —
+   * McLaren's light plotting variant is 3.40:1 — so `.chart-span-label` on the team page's share
+   * chart (§6.6.3) is below the text floor on at least one fill. Recorded here rather than fixed
+   * blind: it is a shipped surface nothing in this change touches, and the fix (a
+   * `paint-order: stroke` halo in the surface colour) changes how that page looks.
+   */
+  report('  ---  ink-inverse on step 1, if it ever carried text', 'inkWin', ':1');
+  report('  ---  ink-primary on steps 2-4, if they ever did', 'inkRest', ':1');
+
+  console.log(`\n  ${failures === 0 ? 'V-38 PASS' : `V-38 FAIL — ${String(failures)} check(s)`}\n`);
+  if (failures > 0) process.exitCode = 1;
+  return failures;
+}
+if (mode === 'tones' || mode === 'all') tones();
+
 if (mode === 'calibrate' || mode === 'all') calibration();
 if (mode === 'mono' || mode === 'all') mono();
 if (mode === 'catramp' || mode === 'all') catramp();
