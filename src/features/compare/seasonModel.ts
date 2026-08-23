@@ -271,3 +271,114 @@ export function racedRounds(lens: CompareSeasonLens): number {
 export function nameFrom(identity: CompareIdentity | undefined, ref: string): string {
   return identity === undefined ? ref : `${identity.forename} ${identity.surname}`;
 }
+
+/* ------------------------------------------------------------------- the finishing strip */
+
+/** One round for one driver. Three states, and they are three different facts. */
+export interface FinishCell {
+  round: number;
+  /** The Grand Prix's name, for the mark's own tooltip and for the table. */
+  name: string;
+  /** The classified finishing position, or null when there was none. */
+  finish: number | null;
+  /** `false` when he did not start this round at all — which is not the same as not finishing. */
+  started: boolean;
+  /** Where the mark sits along the season, 0–1. Computed here because jsdom measures nothing. */
+  x: number;
+  /** Where it sits down the position axis, 0–1. Null when there is no position to place. */
+  y: number | null;
+}
+
+export interface FinishRow {
+  ref: string;
+  name: string;
+  cells: FinishCell[];
+  /** Rounds started with no classification — the lane below the axis. */
+  unclassified: number;
+  /** Rounds of the season he did not start. */
+  missed: number;
+}
+
+export interface FinishStrip {
+  rows: FinishRow[];
+  /** The deepest position the axis runs to. Never shallower than `FINISH_AXIS_FLOOR`. */
+  deepest: number;
+  /** The podium line's offset down the axis, 0–1. */
+  podium: number;
+  first: number;
+  last: number;
+}
+
+/**
+ * The axis never runs shallower than this, however well the selection finished.
+ *
+ * A strip of four front-runners whose worst result is fourth would otherwise spread P1 to P4 over
+ * the whole height and draw a one-place difference as the width of the chart. Ten is a round number
+ * and carries **no claim about points** — the points-paying positions have changed many times and
+ * this axis is not about them.
+ */
+export const FINISH_AXIS_FLOOR = 10;
+
+/**
+ * **Where each driver finished, round by round.** `DESIGN_SYSTEM.md` §6.6.6.14 D.
+ *
+ * The points chart above it answers *who was winning the championship*; this answers *what his
+ * Sundays actually looked like*, which is a different question and the one a scatter of results
+ * answers better than any cumulative line can.
+ *
+ * ⚠ **Three states per round, not two.** `finish === null` means "no classified position", and the
+ * payload uses it for two different situations: he started and was not classified, and he was not
+ * there at all. `teamAt[i]` separates them — it is null exactly where the driver did not start —
+ * and the distinction is drawn: a start with no classification is a ring in the lane below the
+ * axis, and a round he missed has no mark at all. Collapsing them would put a driver who was not
+ * in the sport that weekend into the retirement lane.
+ */
+export function finishStrip(
+  lens: CompareSeasonLens,
+  principals: readonly string[],
+  nameOf: (ref: string) => string,
+): FinishStrip {
+  const rounds = lens.rounds;
+  const span = Math.max(1, rounds.length - 1);
+
+  const entrants = principals
+    .map((ref) => lens.entrants.find((candidate) => candidate.ref === ref))
+    .filter((entrant): entrant is SeasonEntrant => entrant !== undefined && entrant.entered);
+
+  let deepest = FINISH_AXIS_FLOOR;
+  for (const entrant of entrants) {
+    for (const finish of entrant.finish) {
+      if (finish !== null && finish > deepest) deepest = finish;
+    }
+  }
+  /* Guarded against a one-position axis: `(finish - 1) / (deepest - 1)` divides by zero at 1. */
+  const depth = Math.max(1, deepest - 1);
+
+  const rows = entrants.map((entrant) => {
+    let unclassified = 0;
+    let missed = 0;
+    const cells = rounds.map((round, index) => {
+      const finish = entrant.finish[index] ?? null;
+      const started = (entrant.teamAt[index] ?? null) !== null;
+      if (started && finish === null) unclassified += 1;
+      if (!started) missed += 1;
+      return {
+        round: round.number,
+        name: round.name,
+        finish,
+        started,
+        x: index / span,
+        y: finish === null ? null : Math.min(1, (finish - 1) / depth),
+      };
+    });
+    return { ref: entrant.ref, name: nameOf(entrant.ref), cells, unclassified, missed };
+  });
+
+  return {
+    rows,
+    deepest,
+    podium: Math.min(1, 2 / depth),
+    first: rounds[0]?.number ?? 1,
+    last: rounds.at(-1)?.number ?? 1,
+  };
+}

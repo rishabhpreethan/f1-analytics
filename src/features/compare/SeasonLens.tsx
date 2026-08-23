@@ -1,9 +1,11 @@
 import { useId } from 'react';
 import { LineChart, type SeriesInput } from '@/components/charts';
+import { FinishStrip } from './FinishStrip';
 import type { CompareIdentity, CompareSeasonLens } from './types';
 import {
   absentFrom,
   nameFrom,
+  plotTeamFor,
   racedRounds,
   seasonPairs,
   seatBreaks,
@@ -287,6 +289,21 @@ function SeasonPlots({
         xTitle="Round"
         yTitle="Points ahead of the other seat"
         zeroBaseline
+      />
+
+      {/*
+       * §6.6.6.14 D. Third and last, because it answers the smallest question of the three: the
+       * points chart is the title fight, the gap chart is the car, and this is the Sundays. A
+       * reader who stops after two has not missed the argument.
+       */}
+      <FinishStrip
+        lens={lens}
+        nameOf={nameOf}
+        principals={principals}
+        teamFor={(ref) => {
+          const entrant = lens.entrants.find((candidate) => candidate.ref === ref);
+          return entrant === undefined ? ref : (plotTeamFor(entrant) ?? ref);
+        }}
       />
     </>
   );

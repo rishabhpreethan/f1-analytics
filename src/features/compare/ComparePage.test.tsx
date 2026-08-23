@@ -19,6 +19,7 @@ vi.hoisted(() => {
   });
 });
 
+import { STRIP_DOT_ATTR } from '@/lib/motion/chart';
 import { GAIN_BAR_ATTR, TIER_BAR_ATTR } from '@/lib/motion/scroll';
 import { ComparePage } from './ComparePage';
 import { COMPARE_FIXTURE } from './fixture';
@@ -185,7 +186,7 @@ describe('the rate bars are actually wired to a mount motion', () => {
    * claimed existed but nothing implemented", shipped a second time.
    *
    * The selector is now an exported constant consumed by both the hook and the markup, so the pair
-   * cannot drift. This asserts the markup half; the hook half is `usePopulationMount`'s own test.
+   * cannot drift. This asserts the markup half; the hook half is `src/lib/motion/scroll.test.tsx`.
    * **Whether the growth looks right is untested by construction** — jsdom composites nothing.
    */
   it('gives every bar the exact attribute the hook queries', () => {
@@ -599,5 +600,62 @@ describe('places gained from the grid (§6.6.6.14 C)', () => {
   it('counts the races it could not measure rather than folding them in as no movement', () => {
     render_();
     expect(screen.getByText(/no place change to measure/)).toBeTruthy();
+  });
+});
+
+describe('the finishing strip (§6.6.6.14 D)', () => {
+  it('is on the season lens, under the two points charts', () => {
+    const { container } = render_();
+    /* Career lens first: the strip is a season instrument and must not be on the career page. */
+    expect(container.querySelectorAll('.strip-row')).toHaveLength(0);
+  });
+
+  it('draws a dot per classified finish and a ring per start without one', async () => {
+    const user = userEvent.setup();
+    const { container } = render_();
+    await openSeasonLens(user);
+
+    const dots = container.querySelectorAll('.strip-dot');
+    const rings = container.querySelectorAll('.strip-miss');
+    expect(dots.length).toBeGreaterThan(0);
+    expect(rings.length).toBeGreaterThan(0);
+    /*
+     * The two carry the same motion attribute and different classes, which is the encoding: form,
+     * never colour (§6.3). A reader with no colour vision still sees a filled dot against a ring.
+     */
+    for (const mark of [...dots, ...rings]) {
+      expect(mark.getAttribute('data-motion')).toBe(STRIP_DOT_ATTR);
+    }
+  });
+
+  it('places every mark by percentage, so the geometry is readable off the element', async () => {
+    // jsdom computes no box. The percentages `finishStrip` sets are the only part of a position
+    // any test can reach, which is why the model decides them and the browser is not asked.
+    const user = userEvent.setup();
+    const { container } = render_();
+    await openSeasonLens(user);
+    for (const dot of container.querySelectorAll('.strip-dot')) {
+      const style = dot.getAttribute('style') ?? '';
+      expect(style).toMatch(/--x:\s*[\d.]+%/);
+      expect(style).toMatch(/--y:\s*[\d.]+%/);
+    }
+  });
+
+  it('gives every round a row in the table view, including the ones with no result', async () => {
+    /*
+     * §6.5.5, and it does more work here than on most charts: the marks carry no text at all, so
+     * the table is the only place a finishing position appears as a number. `NC` for a start with
+     * no classification and an em dash for a round not started — the same three states the marks
+     * draw, in the same order.
+     */
+    const user = userEvent.setup();
+    const { container } = render_();
+    await openSeasonLens(user);
+    const table = [...container.querySelectorAll('table.chart-table')].find((node) =>
+      node.querySelector('caption')?.textContent?.includes('Finishing position at each round'),
+    );
+    expect(table).toBeDefined();
+    expect(table?.querySelectorAll('tbody tr')).toHaveLength(22);
+    expect(table?.textContent).toContain('NC');
   });
 });

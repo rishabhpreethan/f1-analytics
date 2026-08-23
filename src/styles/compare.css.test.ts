@@ -275,6 +275,8 @@ describe('colour and tokens', () => {
       '--rate-extent',
       '--size-gain-split',
       '--gain-extent',
+      '--x',
+      '--y',
       '--balance-a',
       '--balance-b',
       '--balance-a-share',
@@ -402,5 +404,46 @@ describe('the diverging bar — the axis is in the middle, and it is drawn (§6.
     // `--axis-inset`, so a zero line sits at the same x as the chain's 1950 and the era strip's
     // first column — the one geometric idea the page is built on.
     expect(body('.gain-row')).toContain('var(--axis-inset)');
+  });
+});
+
+describe('the finishing strip — three states, and only one of them is a position (§6.6.6.14 D)', () => {
+  it('places a dot from the two custom properties the model computes', () => {
+    const dot = body('.strip-dot');
+    expect(dot).toContain('left: var(--x)');
+    expect(dot).toContain('top: var(--y)');
+  });
+
+  it('centres a mark with margins and not a transform, because GSAP owns the transform', () => {
+    /*
+     * G-33 tweens `scale` on this element. A base `translate(-50%, -50%)` would be a transform the
+     * tween has to parse and preserve, and a mark that ended up half a dot out of position is
+     * exactly the class of defect no test here can see. Negative margins are layout and cannot
+     * collide with it.
+     */
+    expect(body('.strip-dot')).not.toMatch(/transform:/);
+    expect(body('.strip-dot')).toMatch(/margin:\s*calc\(var\(--size-mark-marker\) \/ -2\)/);
+  });
+
+  it('separates a retirement from a finish by FORM, never by colour', () => {
+    // A filled dot against a hollow ring survives any colour vision (§6.3); a red dot would not,
+    // and red is a status colour besides.
+    expect(body('.strip-dot')).toContain('background-color: var(--series)');
+    const miss = body('.strip-miss');
+    expect(miss).toContain('box-shadow: inset');
+    expect(miss).not.toContain('background-color');
+  });
+
+  it('puts the retirement lane below the axis rather than at the bottom of it', () => {
+    // "No result" is not a position, and drawing it as the last one says he came last.
+    expect(body('.strip-out')).toContain('border-top');
+  });
+
+  it('gives an 8px mark a hit target it does not have on its own', () => {
+    expect(body('.strip-dot::after,\n  .strip-miss::after')).toContain('inset: -8px');
+  });
+
+  it('insets the field by half a mark, so a first or last round is not clipped', () => {
+    expect(body('.strip-field')).toContain('margin-inline: 4px');
   });
 });

@@ -1168,7 +1168,7 @@ The audit that follows from rule 2: on `/`, `HeroSection` correctly has no G-15 
 correctly has one. `CapabilityGrid` sits at the fold boundary and is left as it is, because its
 content is static — there is no query and therefore no skeleton, so rule 1 cannot bite it.
 
-#### 4.6.2 Chart motion — G-27 … G-32 _(specified 2026-08-07; G-32 added 2026-08-23)_
+#### 4.6.2 Chart motion — G-27 … G-33 _(specified 2026-08-07; G-32 and G-33 added 2026-08-23)_
 
 This replaced a one-line forward reference that said chart entry was *"axis-anchored growth for bars,
 left-to-right `strokeDasharray` draw for lines"* and deferred the rest. The dasharray half of that
@@ -1183,6 +1183,16 @@ sentence has been **withdrawn** — see G-28.
 | **G-31** | **Population board — the ladder and the decade columns** | `gsap.timeline` + `gsap.from` with `stagger`, Eases | index-page mount, once per dataset | one timeline. Ladder bars `scaleX: 0 → 1`, `transformOrigin: 'left'`; decade columns `scaleY: 0 → 1`, `transformOrigin: 'bottom'`, overlapped at `-=0.2` so the board reads as one gesture rather than two lists queueing. Both `dur.chart` / `ease.mech`, `stagger.bar` through `staggerAmount`. **Each origin is that mark's own axis** — §6.1 — and they differ from `useAxisAnchoredBars`' `'right'` deliberately: a coverage window is anchored at *now* and grows into the past, while a population count is anchored at zero. **No `ScrollTrigger`**, for G-23's reason: the board is the first thing under the masthead, so a trigger would make the trigger load-bearing for the content being visible at all. Deps identify the **dataset**, never the selection — clicking a rung filters the list and must not re-grow the chart being read (G-29) | **not created.** Authored `from` (MR-2), so every bar rests at its full, correct extent. The CSS hover and pressed transitions on the same elements are separately removed by a `prefers-reduced-motion` block in `entity-index.css` — the hook has no say over those |
 
 | **G-32** | **The lineage chain walks itself back through the archive** | `gsap.timeline` + `gsap.from` with `stagger`, Eases | compare-page mount, once per chain | one timeline, three tracks. Link capsules `scaleX: 0 → 1`, `transformOrigin: 'right'`, `dur.chart` / `ease.mech`, `stagger.bar` through `staggerAmount`; connector **drops** `scaleY: 0 → 1` from `'top'` and connector **runs** `scaleX: 0 → 1` from `'right'`, both `dur.fast` / `ease.enter`, both **offset by half a stagger step** so each handoff lands between two capsules rather than all three tracks firing in lockstep. **`'right'` is the direction of travel, not a preference**: the chain reads from the present into the past, and a capsule growing left-to-right would run against the direction its connector arrives from — G-27's "the origin is the axis, never the mark's own centre" applied to a mark whose axis is time. **No `ScrollTrigger`** (§4.6.1 rule 2): the chain is often the first thing under the verdict band, so a trigger would make the trigger load-bearing for the content being visible. Deps identify the **chain**, never the hovered row (G-29) | **not created.** Authored `from` (MR-2), so every capsule, drop and run rests at its full, correct extent — the chain is simply *drawn* rather than walked, which is a legitimate still image rather than a broken one. The CSS hover transitions on the same surface are separately removed by a `prefers-reduced-motion` block in `compare.css`, which the hook has no say over |
+
+| **G-33** | **The finishing strip's dots arrive in race order** | `gsap.from` + `stagger`, Eases | season-lens mount, once per season | each dot `scale: 0 → 1` **about its own centre**, `dur.fast` / `ease.enter`, `stagger.bar` through `staggerAmount`, from `'start'` — so the season plays out in the order it was raced. **Neither G-27 nor G-28 fits, and the reason is the test for whether a new ID is warranted at all:** G-27 grows a mark from an axis and needs a mark with an *extent*, which a dot has none of — scaling one along an axis would invent a length the datum does not have. G-28 wipes a clip rect across a plot, which is right for a continuous mark whose shape is the reading and wrong for a scatter, where it would say the marks are one object. Scaling about its own centre is admissible **because it encodes nothing**: a dot's size is not a value and its position never moves. `dur.fast` rather than `dur.chart` because twenty-two marks at 400ms each would still be landing after the eye had read the row. Centring is done with **negative margins, never a base `translate`** — GSAP owns `transform` here and a base transform is one more thing the tween has to parse and preserve | **not created.** Authored `from` (MR-2), so every dot is at full size in the DOM from frame one |
+
+> **G-27's anchor is the axis, and a diverging bar's axis is zero** _(added 2026-08-23, §6.6.6.14 C)_.
+> `usePopulationMount` now resolves `transformOrigin` **per target** from the mark's own
+> `data-origin`: `'left'` for a bar pointing forward from zero, `'right'` for one pointing back. This
+> is not a new motion and does not get an ID — it is G-27's own rule applied where the axis is not the
+> left edge. A fixed `'left'` would animate every negative bar sliding *across* the line it is
+> measured from, which is the moving-start defect §6.6.3 forbids a composition segment for the same
+> reason. `src/lib/motion/scroll.test.tsx` asserts the resolver, including its fallback.
 
 **Why not `DrawSVG`, and why not `strokeDashoffset`.** `DrawSVG` is 9.7 KB gzipped and is not
 installed (§4.1). `strokeDashoffset` would need `getTotalLength()` per path and reveals at constant
@@ -3818,6 +3828,46 @@ That is not a special case: *axis-anchored* is what G-27 says, and the left edge
 axis happens to be on a magnitude bar. Here the axis is zero, so a backward bar grows from its right
 edge — a fixed `'left'` would animate every negative bar sliding across the line it is measured
 from, which is the moving-start defect §6.6.3 forbids a composition segment for the same reason.
+
+###### D — The finishing strip, in the season lens
+
+*Job*: **distribution over a sequence** — not change over time, which the points chart above already
+answers. *Form*: a dot strip, one row per driver, **explicitly not a line**: a line between two race
+results claims something continuous happened in between and nothing did. *Marks*: an 8px dot per
+classified finish; a hollow `--border-strong` ring in the lane **below** the axis for a start with no
+classification; **nothing at all** for a round he did not start. *Interaction*: each mark carries its
+round, its Grand Prix and its result. *Colour*: the car's plot token; the vertical position is the
+measure and colour carries identity only. *Accessibility*: the name is on the row, so identity never
+depends on telling two colours apart — which matters, because two team-mates take one car's colour
+and this form has no dash channel.
+
+**Why it earns a place beside two line charts.** The points chart is the title fight and the gap
+chart is the car. Neither can show that a season was three wins and a lot of nothing rather than
+fifteen quiet fourths, because a cumulative total smooths exactly that away.
+
+⚠ **Three states per round, not two.** `SeasonEntrant.finish` is null for both *started and not
+classified* and *was not there*, and `teamAt` is the only thing that separates them — it is null
+exactly where the driver did not start. Drawing both the same would put a driver who was out of the
+sport that weekend into the retirement lane, which is a claim about him rather than about the
+calendar.
+
+**A retirement is not a position, so it is not on the position axis.** The ring sits under the axis
+line, not at the bottom of it: the bottom of the axis is last place, and a car that stopped on lap
+three did not come last, it came nowhere.
+
+**The axis never runs shallower than P10.** Four front-runners whose worst result is fourth would
+otherwise spread P1–P4 over the full height and draw a one-place difference as the height of the
+chart. Ten is a round number and **carries no claim about points** — the points-paying positions
+have changed many times and this axis is not about them.
+
+**Every offset is a percentage computed in `seasonModel.finishStrip`.** Not a convenience: jsdom
+measures nothing, so a geometry the browser computes is a geometry no test can reach. Computed in
+the model, `--x` and `--y` are readable off the element and every position is asserted.
+
+**Motion is G-33**, and the table view is load-bearing rather than a courtesy — the marks carry no
+text at all, so the table is the only place a finishing position appears as a number. `NC` for a
+start with no classification, an em dash for a round not started: the same three states, in the same
+order.
 
 ##### 6.6.6.13 Four defects found on the live page, and what each one teaches _(2026-08-23)_
 

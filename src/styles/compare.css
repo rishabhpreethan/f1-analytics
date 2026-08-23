@@ -1307,6 +1307,122 @@
     line-height: var(--text-xs--line-height);
   }
 
+  /* ============================================================== the finishing strip (§6.6.6.14 D)
+   *
+   * Inside a `ChartFrame`'s plot area, so the panel, the states, the table toggle and the caption
+   * are the kit's and only the marks are here. Every offset is a percentage set by
+   * `seasonModel.finishStrip`, which is what makes the geometry testable at all: jsdom measures
+   * nothing, but it can read `--x` and `--y` off the element.
+   */
+  .strip {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    height: 100%;
+    padding: calc(var(--spacing) * 3) calc(var(--spacing) * 4);
+  }
+
+  .strip-rows {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 2);
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .strip-row {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Rung 1, and the strongest form of it: the name is *on* the row, so identity never depends on
+   * telling two colours apart — which matters here because two team-mates take one car's colour. */
+  .strip-name {
+    margin: 0;
+    color: var(--ink-secondary);
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+  }
+
+  .strip-field {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    /* Half a dot at each end, so a round 1 or a final-round mark is not cut by the plot's edge. */
+    margin-inline: 4px;
+  }
+
+  .strip-podium {
+    position: absolute;
+    right: 0;
+    left: 0;
+    top: var(--y);
+    height: 1px;
+    background-color: var(--border-subtle);
+  }
+
+  .strip-dot {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--size-mark-marker);
+    height: var(--size-mark-marker);
+    /* Negative margins rather than a translate: GSAP owns `transform` on this element for G-33,
+     * and a base transform it has to parse and preserve is a hazard the layout does not need. */
+    margin: calc(var(--size-mark-marker) / -2) 0 0 calc(var(--size-mark-marker) / -2);
+    border-radius: var(--radius-full);
+    background-color: var(--series);
+  }
+
+  /* §6.5.1 — a hit target larger than the mark. An 8px dot is not one. */
+  .strip-dot::after,
+  .strip-miss::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+
+  /* The lane below the axis. A start with no classification is not a position, so it is not drawn
+   * on the position axis at all — putting it at the bottom would say he came last. */
+  .strip-out {
+    position: relative;
+    height: 12px;
+    margin-inline: 4px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  /* Form, not colour: a ring against a filled dot survives any colour vision (§6.3). */
+  .strip-miss {
+    position: absolute;
+    left: var(--x);
+    top: 50%;
+    width: var(--size-mark-marker);
+    height: var(--size-mark-marker);
+    margin: calc(var(--size-mark-marker) / -2) 0 0 calc(var(--size-mark-marker) / -2);
+    border-radius: var(--radius-full);
+    box-shadow: inset 0 0 0 var(--size-mark-ring) var(--border-strong);
+  }
+
+  .strip-axis {
+    display: flex;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 2);
+    margin: 0;
+    color: var(--ink-tertiary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+  }
+
+  .strip-depth {
+    text-align: center;
+  }
+
   /* ============================================================== places gained (§6.6.6.14 C)
    *
    * The rate board's anatomy with one difference that changes everything about the arithmetic:
