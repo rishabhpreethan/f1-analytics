@@ -15,8 +15,8 @@ _Nothing in flight._
 
 | # | Task | Status | Pushed |
 |---|---|---|---|
-| 11 | F7 compare — up to 4 entities across eras | todo | — |
-| 12 | F8 records — cross-era leaderboards, normalised | todo | — |
+| 12 | Compare — the plain-language charts: result mix as a 100% stacked bar, career-relative arc, places gained, finishing-position strip. Specified with figures in `DESIGN_SYSTEM.md` §6.6.6.12; held back on the CSS ceiling | doing | — |
+| 16 | F8 records — cross-era leaderboards, normalised | todo | — |
 | 13 | Deferred from F4/F5/F6 (P1/P2): DR-6..9 driver team-history/circuit-form/reliability/pace, CN-5..7 team reliability/pit-crew/qualifying-pace, CI-4..6 circuit overtaking-index/pole-conversion/typical-strategy | todo | — |
 
 ## Waiting on Rishabh
@@ -51,3 +51,4 @@ _Nothing in flight._
 | 10 | F4/F5/F6 — driver, team and circuit pages (P0 scope). `CareerRibbon` shared across all three; the season/race pages now link driver and team names to them. **1699 tests** | ✅ 2026-08-08 · `main` (`2df6295`) |
 | 14 | Driver/team/circuit index pages — the `/drivers`, `/teams`, `/circuits` list views the sidebar nav needed but never had; F4/F5/F6 built only the individual profile pages. Lists all entities including 63 drivers/9 teams/1 circuit with no race, marked honestly rather than hidden. **1878 tests** | ✅ 2026-08-08 · `main` (`f2a64a8`) |
 | 15 | Index pages redesigned — the payloads now carry rankable career figures, and each page opens with a `PopulationBoard`: an achievement ladder whose rungs are filters, beside the decade collapse (313 drivers in the 1950s → 40 in the 2020s). `/circuits` gets a coastline atlas. Championship counts gated structurally — the naive query says 66, the answer is 35. **1997 tests** | ✅ 2026-08-23 · `main` (`d7a3e1b`) |
+| 11 | F7 compare — a computed verdict decides what evidence is admissible; the teammate chain where a direct comparison would be a lie; a season lens round by round with the teammate as a dashed shadow of the same colour. Routes code-split, initial JS 225.76 → 162.35 KB. `npm audit` clean. **2366 tests** | ✅ 2026-08-23 · `main` (`cfbbcde`) |
