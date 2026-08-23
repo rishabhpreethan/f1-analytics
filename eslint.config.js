@@ -137,7 +137,9 @@ export default tseslint.config(
     },
   },
 
-  // Repo tooling in `scripts/` is zero-dependency ESM run by Node directly (ARCHITECTURE §9).
+  // Repo tooling in `scripts/` is ESM run by Node directly (ARCHITECTURE §9). The three gates
+  // are zero-dependency; `generate-world-land.mjs` is not — it imports two devDependencies
+  // (§10 #35), which is why the globals below are Node's and the rule set stays untyped.
   //
   // Before this block existed, **nothing in `scripts/` was linted at all**: every config
   // object above declares an explicit `files` pattern, and flat config applies no rules to a
