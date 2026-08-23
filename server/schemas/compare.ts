@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { referenceParamSchema } from './entity';
+import { gridVsFinishSchema, referenceParamSchema } from './entity';
 import { seasonYearSchema } from './meta';
 import { championshipPointsSchema, entityRefSchema, roundNumberSchema } from './season';
 
@@ -120,6 +120,41 @@ export const compareEntitySchema = z.strictObject({
     classifiedFinishes: z.number().int().nonnegative(),
     championships: z.number().int().nonnegative(),
   }),
+  /**
+   * **Places made up from the grid, over the career** — the second metric on this lens that
+   * spans 1950–2026, and the only *race-craft* one that does.
+   *
+   * It works across the whole archive because `session_entry.grid` is populated on all 1,173
+   * races and non-NULL on all 26,093 race rows, which qualifying classifications are not:
+   * trap 23's window opens in 1994 and is holed until 2003, so Senna reads 3 races with a
+   * qualifying position and **161 with a grid slot**. That asymmetry is the reason this field
+   * exists rather than a qualifying-delta one.
+   *
+   * ================================================================ what the denominator is
+   *
+   * `racesCounted` is races with a grid slot **and a classified finish** — not starts. The
+   * three `excluded` counters say where the rest went and sum with it to the driver's races,
+   * so a surface can caption the figure instead of asserting it: Verstappen's **+1.22 over
+   * 210** and Fangio's **+0.49 over 41** are not the same strength of claim, and the payload
+   * has to make that sayable.
+   *
+   * ============================================================== the mean is not the whole
+   *
+   * `meanPositionsGained` is the diverging value a bar wants, and `gained` / `lost` / `held`
+   * are published beside it because **they can point the other way**: over the archive, at 20
+   * or more counted races, Fangio (14/18/9 with a mean of −0.05 on the head-to-head reading)
+   * and Clark (18/16/16, −0.14) are the two careers where the sign of the mean and the sign
+   * of the count disagree. A long negative tail from a puncture or a stop-go is real and
+   * belongs in the mean; a reader who would have counted races deserves the count too.
+   *
+   * `meanPositionsGained` is **null for 155 of the 818 drivers with a race** — never
+   * classified in one they started from the grid — so a bar drawn on it needs an empty state
+   * rather than a zero. A zero here means "finished exactly where they started, on average".
+   *
+   * Identical in shape and in arithmetic to `GET /api/drivers/:reference`'s `gridVsFinish`,
+   * from the same builder, and asserted equal on four careers in `queries/compare.test.ts`.
+   */
+  gridVsFinish: gridVsFinishSchema,
   /**
    * The career teammate record — **the one fine-grained metric that spans 1950–2026**, because it
    * is normalised by machinery rather than by era.

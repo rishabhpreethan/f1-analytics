@@ -67,8 +67,12 @@ describe('collapseRaces — trap 17, one entry per driver per race', () => {
     );
     expect(races).toHaveLength(1);
     expect(races[0]?.position).toBe(3);
-    expect(races[0]?.classifiedPosition).toBe(3);
+    expect(races[0]?.bestClassifiedPosition).toBe(3);
+    expect(races[0]?.bestGridPosition).toBe(4);
+    /* The outcome row's grid, which is the reading `gridVsFinish` uses. Same value here
+     * because the outcome row is also the better-gridded one; 1951 R4 is where they part. */
     expect(races[0]?.gridPosition).toBe(4);
+    expect(races[0]?.positionsGained).toBe(1);
   });
 
   it('takes the best classified finish, not the best position, when only the later row counted', () => {
@@ -84,17 +88,49 @@ describe('collapseRaces — trap 17, one entry per driver per race', () => {
     );
     expect(races[0]?.position).toBe(2);
     expect(races[0]?.isClassified).toBe(false);
-    expect(races[0]?.classifiedPosition).toBe(8);
+    expect(races[0]?.bestClassifiedPosition).toBe(8);
   });
 
   it('reports no classified position when the driver was never classified', () => {
     const races = racesOf([raceRow({ isClassified: 0, status: 10 })], 'a');
-    expect(races[0]?.classifiedPosition).toBeNull();
+    expect(races[0]?.bestClassifiedPosition).toBeNull();
   });
 
   it('excludes a pit-lane start from the grid slot (trap 9)', () => {
-    expect(racesOf([raceRow({ grid: 0 })], 'a')[0]?.gridPosition).toBeNull();
-    expect(racesOf([raceRow({ grid: null })], 'a')[0]?.gridPosition).toBeNull();
+    expect(racesOf([raceRow({ grid: 0 })], 'a')[0]?.bestGridPosition).toBeNull();
+    expect(racesOf([raceRow({ grid: null })], 'a')[0]?.bestGridPosition).toBeNull();
+  });
+
+  /**
+   * **The two readings, on the race that forces them apart** — 1951 R4, the French Grand Prix
+   * at Reims. Fangio started his own car from pole, retired it, took over Fagioli's car which
+   * had started 7th, and won; both rows are classified, which is why this is trap 16 as well
+   * as trap 17. `best…` is the pole, because that is what a grid head-to-head is asking. The
+   * unprefixed fields are the outcome row, because that is what the driver profile publishes
+   * and the two endpoints must agree.
+   */
+  it('separates the outcome row from the best row when a driver shared a drive', () => {
+    const races = racesOf(
+      [
+        raceRow({ position: 1, grid: 7, isClassified: 1, status: 0 }),
+        raceRow({ position: 11, grid: 1, isClassified: 1, status: 1 }),
+      ],
+      'a',
+    );
+    expect(races[0]?.bestGridPosition).toBe(1);
+    expect(races[0]?.bestClassifiedPosition).toBe(1);
+    expect(races[0]?.gridPosition).toBe(7);
+    expect(races[0]?.positionsGained).toBe(6);
+  });
+
+  /**
+   * Trap 27 reaching this module: a retirement carries a real `position`, so the per-race
+   * place change has to be gated on `isClassified` or it measures a retirement order.
+   */
+  it('publishes no place change for a race that ended unclassified', () => {
+    const races = racesOf([raceRow({ position: 17, grid: 4, isClassified: 0, status: 11 })], 'a');
+    expect(races[0]?.position).toBe(17);
+    expect(races[0]?.positionsGained).toBeNull();
   });
 
   it('keeps every team of a race the driver was entered by twice', () => {
@@ -461,8 +497,54 @@ describe.skipIf(!hasDatabase)('the career lens against the live database', () =>
       expect(entity?.totals.championships).toBe(profile?.totals.championships);
       expect(entity?.firstSeason).toBe(profile?.career.firstSeason);
       expect(entity?.lastSeason).toBe(profile?.career.lastSeason);
+      /*
+       * The whole object, not field by field. `gridVsFinish` is the profile's builder called
+       * on this module's collapse, and `toEqual` on the object is the assertion that says so:
+       * a field added to one endpoint and not the other fails here rather than reaching two
+       * pages with two answers.
+       */
+      expect(entity?.gridVsFinish).toEqual(profile?.gridVsFinish);
     },
   );
+
+  /**
+   * The figures the diverging bar is drawn from, against the record.
+   *
+   * Verstappen **+1.22 over 210** of 243 races and Fangio **+0.49 over 41** of 51 are the two
+   * ends of what this metric has to survive: a modern career with near-complete data, and a
+   * 1950s one with shared drives in it. The mean alone would say they are 1.2 places apart;
+   * the denominators are what make the two claims comparable at all.
+   */
+  it.each([
+    ['max_verstappen', 210, 1.2238, 100, 41, 69],
+    ['hamilton', 358, 0.7626, 157, 88, 113],
+    ['senna', 108, -0.2963, 32, 33, 43],
+    ['fangio', 41, 0.4878, 18, 7, 16],
+  ])('publishes %s grid-to-finish with its denominator', (ref, counted, mean, up, down, held) => {
+    const summary = readCompare([ref])?.entities[0]?.gridVsFinish;
+    expect(summary?.racesCounted).toBe(counted);
+    expect(summary?.meanPositionsGained).toBeCloseTo(mean, 4);
+    expect(summary?.gained).toBe(up);
+    expect(summary?.lost).toBe(down);
+    expect(summary?.held).toBe(held);
+    expect((summary?.gained ?? 0) + (summary?.lost ?? 0) + (summary?.held ?? 0)).toBe(counted);
+  });
+
+  /**
+   * **The empty state, on a real driver.** 155 of the 818 drivers with a race were never
+   * classified in one they started from the grid, and the picker offers all of them — Alex
+   * Soler-Roig entered 6 and finished none. A bar drawn on `meanPositionsGained` has to render
+   * that as "no measurement", never as a zero-length bar at the origin, which would read as
+   * "started and finished level every time".
+   */
+  it('measures nothing for a career with no classified finish, and says so with a null', () => {
+    const summary = readCompare(['roig'])?.entities[0]?.gridVsFinish;
+    expect(summary?.racesCounted).toBe(0);
+    expect(summary?.meanPositionsGained).toBeNull();
+    expect(summary?.bestGain).toBeNull();
+    expect(summary?.worstLoss).toBeNull();
+    expect(summary?.excluded.unclassified).toBe(6);
+  });
 
   /** Checked against the record before anything was drawn (`DESIGN_SYSTEM.md` §6.6.6). */
   it('reproduces the head-to-heads the surface was designed against', () => {

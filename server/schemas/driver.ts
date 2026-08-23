@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { entityRoundRefSchema, qualifyingSessionSchema } from './entity';
+import { entityRoundRefSchema, gridVsFinishSchema, qualifyingSessionSchema } from './entity';
 import { gridStatusSchema, raceOutcomeSchema } from './race';
 import { isoDateSchema, seasonYearSchema } from './meta';
 import {
@@ -334,67 +334,8 @@ export const driverRaceSchema = z.strictObject({
 
 /* -------------------------------------------------------------------------- aggregates */
 
-/**
- * DR-4's career figure, with **its own exclusions counted**.
- *
- * A mean over "the races where the metric applies" is only honest if the reader can see
- * how many races that was and why the others left. `excluded` is not diagnostics — it is
- * the caption: **53 of Senna's 161 races ended without a classified finish**, so a mean
- * position change computed over the remaining 108 is a different claim from one over 161.
- *
- * ⚠ **That sentence was false in the code until 2026-08-23** — the mean *was* over 161,
- * and `excluded.unclassified` read 0 for every driver in the archive, because the
- * exclusion was tested with `position === null` on a column that is never null (trap 27).
- * Senna's figure moved from **−4.99** to **−0.30** when it was fixed. Nothing about the
- * shape changed; the shape was right and the arithmetic behind it was not.
- *
- * **Shared with `GET /api/compare`'s career lens**, which publishes this object per
- * selected driver from the same builder — `buildGridVsFinish` in `queries/drivers.ts`,
- * whose parameter is the narrow `GridVsFinishRace` rather than a `DriverRace` precisely so
- * two endpoints can feed it. `queries/compare.test.ts` asserts the two agree on four
- * careers, exactly as it already does for `totals`.
- */
-export const gridVsFinishSchema = z.strictObject({
-  /** Races the metric applies to: a grid slot and a **classified** finish. */
-  racesCounted: z.number().int().nonnegative(),
-  /**
-   * Mean of `positionsGained` over the counted races. Null when there are none — which is
-   * not rare: **155 of the 818 drivers with a race** were never classified in one they
-   * started from a grid slot, so any surface drawing this needs an empty state.
-   */
-  meanPositionsGained: z.number().nullable(),
-  /** The single best gain and worst loss, as signed place counts. */
-  bestGain: z.number().int().nullable(),
-  worstLoss: z.number().int().nullable(),
-  /**
-   * The same races split by sign, so `gained + lost + held === racesCounted`.
-   *
-   * **Published beside the mean because the two can disagree**, and the disagreement is the
-   * honest part: Fangio gained places in 14 races and lost them in 9, and his mean is
-   * **−0.05** — a handful of large losses against many small gains. Clark is the other case
-   * in the archive at 20 or more counted races (18 / 16 / 16 with a mean of −0.14). A bar
-   * drawn on the mean alone puts both of them on the wrong side of zero for a reader who
-   * would have counted races.
-   */
-  gained: z.number().int().nonnegative(),
-  lost: z.number().int().nonnegative(),
-  held: z.number().int().nonnegative(),
-  excluded: z.strictObject({
-    /**
-     * `is_classified = 0` — the largest group, and the one the retirement tail lives in.
-     * 32 of Verstappen's 243 races, 53 of Senna's 161.
-     */
-    unclassified: z.number().int().nonnegative(),
-    /** `grid = 0`, a pit-lane start (trap 9). 267 race entries in the archive. */
-    pitLaneStarts: z.number().int().nonnegative(),
-    /**
-     * Classified, not a pit-lane start, and still unmeasurable — `grid` is NULL. **Zero on
-     * the present data**, where `grid` is non-NULL on all 26,093 race rows; the case exists
-     * so a refresh that introduces one cannot fold it silently into a neighbour.
-     */
-    unknownGrid: z.number().int().nonnegative(),
-  }),
-});
+/* `gridVsFinishSchema` lives in `./entity` — it is no longer only the driver profile's.
+ * Re-exported below as the `GridVsFinish` type so existing consumers are unaffected. */
 
 /**
  * DR-5's career figure. `qualifyingPosition - position`, positive when places were gained
@@ -438,6 +379,6 @@ export type DriverCareerSpan = z.infer<typeof driverCareerSpanSchema>;
 export type DriverTotals = z.infer<typeof driverTotalsSchema>;
 export type DriverSeason = z.infer<typeof driverSeasonSchema>;
 export type DriverRace = z.infer<typeof driverRaceSchema>;
-export type GridVsFinish = z.infer<typeof gridVsFinishSchema>;
+export type { GridVsFinish } from './entity';
 export type QualifyingVsRace = z.infer<typeof qualifyingVsRaceSchema>;
 export type Driver = z.infer<typeof driverSchema>;
