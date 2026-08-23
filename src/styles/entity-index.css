@@ -775,8 +775,9 @@
    * thing under it is the data*.
    *
    * `--size-era-track` is declared here, not in `tokens.css`, for `--size-index-rail`'s reason:
-   * it is the one dimension in this block that steps at a breakpoint, and the bar and its track
-   * must agree on it or the tallest column overflows its own well.
+   * it is the one dimension in this block that steps at a breakpoint. It is the decade track's
+   * **floor**, not its height — the track grows to fill the board's second column (see
+   * `.era-bars`), and this is the height it holds when there is nothing to grow into.
    */
   .pop-board {
     --size-era-track: 84px;
@@ -985,12 +986,30 @@
 
   /* ---------------------------------------------------------------- the decade columns */
 
+  /*
+   * **The chart fills its half of the board, and that is a layout fix rather than a taste one.**
+   *
+   * Measured at 1440×900: the ladder ran the column's full 517px while the decade block stopped at
+   * 264px, leaving **253px — 49% of the column — empty**. A two-column grid stretches its tracks to
+   * the taller row, so the board rendered as a tall panel with a tall hole in it. `/circuits` never
+   * showed it, because the atlas fills its column, and that is exactly the shape of the fix:
+   * **the mark grows to the space, the space is not left around the mark.**
+   *
+   * So `.era-bars` grows, `.era-track` grows inside each column, and `--size-era-track` becomes the
+   * **floor** rather than the height — the value that holds when the ladder beside it is short. The
+   * caption stays pinned under the bars, level with the ladder's own.
+   *
+   * `align-items: stretch`, not `end`: the columns now share the row's height and the bar inside
+   * each is what is bottom-anchored, which is where the baseline was always meant to be.
+   */
   .era-bars {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(0, 1fr);
     gap: calc(var(--spacing) * 1);
-    align-items: end;
+    align-items: stretch;
+    flex: 1 1 auto;
+    min-height: var(--size-era-track);
   }
 
   .era-col {
@@ -1035,10 +1054,22 @@
     transition: color var(--dur-instant) var(--ease-enter);
   }
 
+  /*
+   * **`height` *and* `flex`, and dropping the `height` would be the subtle way to break this.**
+   *
+   * `.era-bar` is absolutely positioned with `height: var(--era-extent)` — a **percentage**, which
+   * resolves against this element's containing block. With `flex: 1 1 auto` alone, `flex-basis`
+   * resolves from a `height` of `auto`, and a percentage against an `auto`-height ancestor is the
+   * one corner of flexbox where engines have historically disagreed. Keeping the explicit `height`
+   * makes the basis definite at every width — the track is 104px when there is nothing to grow
+   * into, and `flex-grow` takes it the rest of the way when there is. Same rendered result, no
+   * indefinite-height question anywhere in the chain.
+   */
   .era-track {
     position: relative;
     display: block;
     height: var(--size-era-track);
+    flex: 1 1 auto;
     border-radius: var(--radius-xs);
     background-color: var(--surface-raised);
     overflow: hidden;

@@ -370,6 +370,36 @@ describe('the population board — §6.6.5.1', () => {
     expect(partial).toMatch(/repeating-linear-gradient/);
   });
 
+  /**
+   * ⚠ **Measured at 1440×900 and then fixed: the board's second column ran 517px and its content
+   * stopped at 264 — 253px, 49% of the column, empty.** A two-column grid stretches to the taller
+   * row, so the board rendered as a tall panel with a tall hole in it. The mark has to grow to the
+   * space; the space must not be left around the mark. `/circuits` never showed it because the
+   * atlas fills its column, which is what pointed at the fix.
+   *
+   * These four declarations are the whole of it, and every one is deletable-looking. Without the
+   * `flex` pair the chart snaps back to 104px and the hole returns; without `align-items: stretch`
+   * the columns sit at their content height inside a stretched row and the hole returns under
+   * them; without the `min-height` pair the track collapses to nothing when the ladder is short.
+   */
+  it('grows the decade chart into its column instead of leaving the board half empty', () => {
+    const bars = bodies(CSS, '.era-bars')[0] ?? '';
+    expect(bars).toMatch(/flex:\s*1 1 auto/);
+    expect(bars).toMatch(/align-items:\s*stretch/);
+    expect(bars).toMatch(/min-height:\s*var\(--size-era-track\)/);
+
+    const track = bodies(CSS, '.era-track')[0] ?? '';
+    expect(track).toMatch(/flex:\s*1 1 auto/);
+    /*
+     * And the `height` **stays**, which looks like the bug and is the fix. `.era-bar` is absolutely
+     * positioned at a percentage height, and a percentage against an `auto`-height ancestor is the
+     * one corner of flexbox engines have historically disagreed on. The explicit height makes the
+     * flex basis definite; `flex-grow` does the filling. Removing it as "dead" would leave the
+     * layout correct in the browser someone tested and the bars missing in another.
+     */
+    expect(track).toMatch(/height:\s*var\(--size-era-track\)/);
+  });
+
   /** A disabled rung stays readable — §3.5.2 forbids fading a control whose reason must be read. */
   it('keeps a rung nobody is in fully opaque', () => {
     expect(bodies(CSS, '.tier-row:disabled')[0] ?? '').toMatch(/opacity:\s*1/);

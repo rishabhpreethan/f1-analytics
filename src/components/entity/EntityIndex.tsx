@@ -233,11 +233,7 @@ export function EntityIndex({
 
       <IndexConsole
         label={`Search ${noun}`}
-        placeholder={
-          kind === 'circuit'
-            ? 'Search a circuit, a country or a city'
-            : `Search a name, a code or a nationality`
-        }
+        placeholder={SEARCH_PLACEHOLDER[kind]}
         query={query}
         onQueryChange={setQuery}
         sorts={sorts}
@@ -278,11 +274,7 @@ export function EntityIndex({
             {filtering ? (
               <>
                 <p className="t-base text-ink-primary">{`No ${nounSingular} matches “${query.trim()}”.`}</p>
-                <p className="t-sm text-ink-tertiary">
-                  {kind === 'circuit'
-                    ? 'Search matches a circuit name, a city, a country or the reference in the URL.'
-                    : 'Search matches a name, a three-letter code, a nationality or the reference in the URL.'}
-                </p>
+                <p className="t-sm text-ink-tertiary">{SEARCH_HELP[kind]}</p>
               </>
             ) : (
               <>
@@ -356,6 +348,28 @@ export function EntityIndex({
 }
 
 const EMPTY: readonly IndexItem[] = [];
+
+/**
+ * **A team has no three-letter code, and the copy said it did.** The placeholder and the
+ * empty-search help were branched `circuit` / everything-else, so `/teams` invited a reader to
+ * search by "a code" — a driver concept the sport does not apply to constructors, and a promise the
+ * haystack cannot keep (`teamItems` builds it from name, nationality, country code and the slug).
+ * Caught in Rishabh's capture.
+ *
+ * One record keyed by kind rather than a nested ternary, because that is what stopped the third
+ * case from being written the first time.
+ */
+const SEARCH_PLACEHOLDER: Record<EntityIndexProps['kind'], string> = {
+  driver: 'Search a name, a code or a nationality',
+  team: 'Search a team or a nationality',
+  circuit: 'Search a circuit, a country or a city',
+};
+
+const SEARCH_HELP: Record<EntityIndexProps['kind'], string> = {
+  driver: 'Search matches a name, a three-letter code, a nationality or the reference in the URL.',
+  team: 'Search matches a team name, a nationality or the reference in the URL.',
+  circuit: 'Search matches a circuit name, a city, a country or the reference in the URL.',
+};
 
 /**
  * The chips for whatever the board currently has selected.

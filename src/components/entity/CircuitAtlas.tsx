@@ -25,12 +25,22 @@ import type { CircuitListItem } from '@schemas/directory';
  * what is in it. The summary sentence carries the whole reading.
  *
  * **Two pip classes, and the difference is not colour alone.** A venue on the current calendar is
- * `--accent-mark` at r=3.2 with a surface ring; a retired one is `--ink-tertiary` at r=2 and
- * translucent. Size, opacity and hue all move together (§3.4.2), and the ladder beside it states
- * both counts in words.
+ * `--accent-mark` at r=3.2 with a surface ring; one that is not is `--ink-tertiary` at r=2 and
+ * translucent. Size, opacity and hue all move together (§3.4.2), and the legend states both counts
+ * in words.
  *
- * **Drawn in one pass, retired first.** SVG has no z-index, so paint order *is* stacking: the 22
- * current venues are appended last so that Monza's pip is never hidden under a venue that closed in
+ * ⚠ **The legend says `not on it`, never `no longer used`, and that is a correction.** A map is a
+ * **two-way** split — a venue is on the current calendar or it is not — while the ladder 200px to
+ * its left is a **three-way** one: `On the 2026 calendar 22 · Last used in 2025 3 · No longer used
+ * 53`. The first build of this legend reused the ladder's own phrase for its complement, so one
+ * board carried *"No longer used"* twice with **53** and **56** beside it. Caught in Rishabh's
+ * capture. It is the same defect the circuit masthead had — a three-way split printed as a two-way
+ * one — and the same fix: a complement is worded as a complement, and it closes against the count
+ * above it (`22 + 56 = 78`).
+ *
+ * **Drawn in one pass, the off-calendar pips first.** SVG has no z-index, so paint order *is*
+ * stacking: the 22
+ * current venues are appended last, so Monza's pip is never hidden under a venue that closed in
  * 1958. That is the one thing about this component that is easy to get wrong and invisible in a
  * test.
  */
@@ -62,7 +72,8 @@ export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
     latest !== null && circuit.lastScheduledYear !== null && circuit.lastScheduledYear >= latest;
 
   const current = placed.filter(isCurrent);
-  const retired = placed.filter((circuit) => !isCurrent(circuit));
+  /* `off`, not `retired`: `retired` is the ladder's third rung and means something narrower. */
+  const off = placed.filter((circuit) => !isCurrent(circuit));
 
   /*
    * Counted, never written. `placed.length` rather than `circuits.length` because a venue with no
@@ -72,7 +83,7 @@ export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
   const summary =
     latest === null
       ? `${String(placed.length)} Formula 1 venues, plotted by latitude and longitude.`
-      : `${String(placed.length)} Formula 1 venues, plotted by latitude and longitude: ${String(current.length)} on the ${String(latest)} calendar, ${String(retired.length)} no longer used.`;
+      : `${String(placed.length)} Formula 1 venues, plotted by latitude and longitude: ${String(current.length)} on the ${String(latest)} calendar, ${String(off.length)} not on it.`;
 
   return (
     <div className="atlas">
@@ -114,7 +125,7 @@ export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
          * to read past.
          */}
 
-        {retired.map((circuit) => (
+        {off.map((circuit) => (
           <circle
             key={circuit.ref}
             className="atlas-pip"
@@ -150,8 +161,8 @@ export function CircuitAtlas({ circuits, latest }: CircuitAtlasProps) {
         </span>
         <span className="atlas-key-item">
           <span className="atlas-key-pip" data-current="false" aria-hidden="true" />
-          No longer used
-          <b className="t-mono">{retired.length}</b>
+          Not on it
+          <b className="t-mono">{off.length}</b>
         </span>
       </p>
     </div>

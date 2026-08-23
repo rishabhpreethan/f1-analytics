@@ -591,6 +591,13 @@ describe('search', () => {
     expect(screen.getByRole('link', { name: /Lewis Hamilton/ })).toBeTruthy();
   });
 
+  it('still offers the code on the driver page, where the sport does use one', () => {
+    renderDrivers();
+    expect(
+      screen.getByRole('searchbox', { name: 'Search drivers' }).getAttribute('placeholder'),
+    ).toBe('Search a name, a code or a nationality');
+  });
+
   it('shows the clear control only when there is something to clear', async () => {
     const user = userEvent.setup();
     renderDrivers();
@@ -674,6 +681,26 @@ describe('teams are the same surface, with a sharper pyramid', () => {
       </MemoryRouter>,
     );
   }
+
+  /**
+   * A team has no three-letter code — that is a driver concept — and the copy claimed it did on
+   * both the placeholder and the empty-search help. Caught in Rishabh's capture.
+   */
+  it('never offers to search a team by a code, because a team has none', () => {
+    renderTeams();
+    const field = screen.getByRole('searchbox', { name: 'Search teams' });
+    expect(field.getAttribute('placeholder')).toBe('Search a team or a nationality');
+    expect(field.getAttribute('placeholder')).not.toContain('code');
+  });
+
+  it('keeps the code out of the empty-search help as well', async () => {
+    const user = userEvent.setup();
+    renderTeams();
+    await user.type(screen.getByRole('searchbox', { name: 'Search teams' }), 'zzz');
+    expect(
+      screen.getByText('Search matches a team name, a nationality or the reference in the URL.'),
+    ).toBeTruthy();
+  });
 
   it('renders under the heading the dock links with, and links to a profile', () => {
     renderTeams();
@@ -776,9 +803,34 @@ describe('circuits are the same surface, with a map instead of a decade chart', 
     renderCircuits(CIRCUITS);
     expect(
       screen.getByRole('img', {
-        name: '4 Formula 1 venues, plotted by latitude and longitude: 2 on the 2026 calendar, 2 no longer used.',
+        name: '4 Formula 1 venues, plotted by latitude and longitude: 2 on the 2026 calendar, 2 not on it.',
       }),
     ).toBeTruthy();
+  });
+
+  /**
+   * ⚠ **The board carried one phrase with two numbers.** The ladder's third rung reads
+   * `No longer used 53` and the legend 200px to its right read `No longer used 56`. A map is a
+   * two-way split and the ladder is a three-way one, so the legend's complement needs its own
+   * words — the same defect, and the same fix, as the circuit masthead's two counts.
+   */
+  it('never repeats the ladder’s own phrase against a different number', () => {
+    renderCircuits(CIRCUITS);
+    // `No longer used` may appear twice — the ladder rung and the group header it produces — but
+    // both are the same three-way category carrying the same count. What must not happen is the
+    // legend borrowing it for its *complement*, which is a different set and a different number.
+    const key = screen.getByText('Not on it').closest('p');
+    expect(key?.textContent).not.toContain('No longer used');
+    for (const node of screen.getAllByText('No longer used')) {
+      expect(node.closest('p')).not.toBe(key);
+    }
+  });
+
+  it('closes the legend’s two counts against the venue total', () => {
+    renderCircuits(CIRCUITS);
+    const key = screen.getByText('Not on it').closest('p');
+    const counts = [...(key?.querySelectorAll('b') ?? [])].map((node) => Number(node.textContent));
+    expect(counts.reduce((total, count) => total + count, 0)).toBe(CIRCUITS.length);
   });
 
   it('never turns the map into 78 tab stops in front of the list', () => {
