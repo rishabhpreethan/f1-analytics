@@ -196,6 +196,22 @@ export function Info(props: IconProps) {
   );
 }
 
+/**
+ * The photograph-credits control (§7.18.1). A camera is the one glyph a reader resolves to
+ * "this is about the picture" without a label — and it never travels without one anyway
+ * (§2.5): the control beside it always reads `Photograph credits`.
+ *
+ * Lucide's `camera` geometry, redrawn on this file's own 24×24 / 1.5px conventions.
+ */
+export function Camera(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14.5 4h-5L8 6.5H4.5A1.5 1.5 0 0 0 3 8v10a1.5 1.5 0 0 0 1.5 1.5h15A1.5 1.5 0 0 0 21 18V8a1.5 1.5 0 0 0-1.5-1.5H16Z" />
+      <circle cx="12" cy="12.5" r="3.5" />
+    </Icon>
+  );
+}
+
 export function Database(props: IconProps) {
   return (
     <Icon {...props}>

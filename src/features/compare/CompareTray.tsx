@@ -4,6 +4,8 @@ import { LegendKey } from '@/components/charts/MarkerGlyph';
 import { COMPARISON_CAP } from '@/components/charts/ladder';
 import { EntityPortrait } from '@/components/entity/EntityPortrait';
 import { X } from '@/components/ui/icons';
+import { CreditsTrigger } from '@/features/credits/CreditsTrigger';
+import { photographFor } from '@/features/credits/imagery';
 import { cssVar, identityToken } from '@/lib/entityColor';
 import { EntityPicker } from './EntityPicker';
 import { winShare } from './model';
@@ -70,6 +72,13 @@ export function CompareTray({ bays, channels, candidates, onRemove, onAdd }: Com
    */
   const channelOf = new Map(channels.map((channel) => [channel.reference, channel]));
 
+  /* Whether any bay is showing a face — the condition on the credits control below. */
+  const photographed = bays.some(
+    (bay) =>
+      photographFor(bay.kind === 'ready' ? bay.entity.identity.ref : bay.candidate.ref) !==
+      undefined,
+  );
+
   return (
     <section className="tray" aria-label="Selected drivers">
       <ol className="tray-bays" id={BAYS_ID}>
@@ -97,6 +106,13 @@ export function CompareTray({ bays, channels, candidates, onRemove, onAdd }: Com
       </ol>
 
       <EntityPicker baysId={BAYS_ID} candidates={candidates} filled={bays.length} onAdd={onAdd} />
+
+      {/*
+       * §7.18.1 — attribution, from where the photographs are. **Rendered only when a bay is
+       * actually showing one**: a credits control on a tray of four monograms points at nothing,
+       * and the footer's copy of it is always there for the reader who wants the whole record.
+       */}
+      {photographed && <CreditsTrigger className="tray-credits t-xs" />}
     </section>
   );
 }

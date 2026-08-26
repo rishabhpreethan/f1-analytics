@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render as renderBare, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { assignLadder } from '@/components/charts/ladder';
+import { CreditsProvider } from '@/features/credits/CreditsProvider';
 import { assignEntityColours } from '@/lib/entityColor';
 import { CompareTray, type TrayBay } from './CompareTray';
 import { COMPARE_FIXTURE } from './fixture';
@@ -16,6 +17,16 @@ import { COMPARE_DIRECTORY } from './lensFixture';
  * why it needs asserting at this level. The bug it guards is silent: `ReadyBay` returns `null` when
  * its channel is missing, so a mis-indexed bay does not throw, it **vanishes**.
  */
+
+/**
+ * **The credits provider wraps every render here** (§7.18.1). `CompareTray` gained a
+ * `Photograph credits` control, and `useCredits` throws without a provider rather than quietly
+ * doing nothing — a credit button that looks operable and is not would be a licence breach that
+ * renders as a working page. `AppShell` supplies it in the running app; a test that renders a
+ * fragment of a page has to supply it too.
+ */
+const render = (ui: Parameters<typeof renderBare>[0]) =>
+  renderBare(ui, { wrapper: CreditsProvider });
 
 afterEach(cleanup);
 

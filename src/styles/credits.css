@@ -1,0 +1,227 @@
+/*
+ * THE PHOTOGRAPH CREDITS — `DESIGN_SYSTEM.md` §7.18.
+ *
+ * Attribution is a legal obligation, so this surface exists whether or not it is designed. It is
+ * designed because a bare list of links would be beneath the rest of the product — and it is
+ * **short** because almost everything it needs already exists: `.stat-strip` and its tiles carry
+ * the three figures, the whole `.ruler` family carries the licence ladder, and `.link`, `.btn-icon`,
+ * `.season-eyebrow` and the `.t-*` utilities carry the rest.
+ *
+ * Only the panel's own geometry and the plate are new. CSS is the binding budget (25 KB, 83.4% used
+ * before this file), and reuse here is a design decision as much as a budget one: a modal that
+ * shared nothing with the rest of the product would look like a second product.
+ */
+
+@layer components {
+  /* ============================================================== the dialog */
+
+  /*
+   * `.credits-scrim` is added to `.dock-scrim`'s rule in `index.css` rather than re-declared —
+   * one scrim, one z-index, one colour. §5.2a reserves `--z-overlay` for exactly this.
+   */
+
+  /*
+   * Centred and bounded, with the plate list scrolling **inside** the panel. `100dvh` and not
+   * `100vh`: on a mobile browser with a retracting toolbar, `vh` is the *largest* viewport, so the
+   * panel's own close button would sit under the chrome at the moment it is opened.
+   */
+  .credits-panel {
+    position: fixed;
+    z-index: var(--z-overlay);
+    top: var(--size-dock-inset);
+    right: var(--size-dock-inset);
+    bottom: var(--size-dock-inset);
+    left: var(--size-dock-inset);
+    display: flex;
+    flex-direction: column;
+    max-width: 56rem;
+    margin-inline: auto;
+    border: 1px solid var(--elev-2-border);
+    border-radius: var(--radius-2xl);
+    background-color: var(--surface-overlay);
+    box-shadow: var(--elev-2-shadow);
+    overflow: hidden;
+  }
+
+  .credits-head {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 3);
+    padding: calc(var(--spacing) * 5);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .credits-head-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(var(--spacing) * 4);
+  }
+
+  .credits-heading {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-md);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-md--font-weight);
+    letter-spacing: var(--text-display-md--letter-spacing);
+    line-height: var(--text-display-md--line-height);
+  }
+
+  .credits-lead {
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /*
+   * `overscroll-behavior: contain` stops the scroll chaining to the page behind once this list
+   * reaches its end — the cheapest correct answer to "the page must not move under an open modal",
+   * and one declaration rather than a body-scroll lock with its own restore bug.
+   */
+  .credits-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 8);
+    padding: calc(var(--spacing) * 5);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* ============================================================== the shape of the set */
+
+  /* `.stat-strip` is authored for the landing hero's four tiles; three of them want three columns
+   * and no hero's top margin. Everything else about it — the rule, the figures, the labels — is
+   * inherited unchanged. */
+  .credits-figures {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: calc(var(--spacing) * 4);
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .credits-subhead {
+    margin: 0 0 calc(var(--spacing) * 3);
+    color: var(--ink-tertiary);
+    font-size: var(--text-2xs);
+    font-weight: var(--text-2xs--font-weight);
+    letter-spacing: var(--text-2xs--letter-spacing);
+    line-height: var(--text-2xs--line-height);
+    text-transform: uppercase;
+  }
+
+  /*
+   * The coverage ruler separates an available span from an unavailable one with a 2px surface gap
+   * on the fill's leading edge. Here there is nothing to the left of the bar, so that gap would
+   * make every bar 2px short of the count it encodes — §6.3b, a mark's length is the datum.
+   */
+  .credits-ladder .ruler-fill {
+    border-left: 0;
+  }
+
+  /* ============================================================== the plates */
+
+  .credits-plates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(var(--spacing) * 4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 48rem) {
+    .credits-plates {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .credits-plate {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing) * 1);
+    min-width: 0;
+  }
+
+  /*
+   * §7.17.3 — **`contain`, not `cover`.** This is the one place in the product where the photograph
+   * is the subject rather than an identity mark, so it is shown whole, as the photographer framed
+   * it. 3/4 is the mean of the set (0.64–0.84 w/h), so the letterboxing is slight in both
+   * directions and no frame is cropped at all.
+   */
+  .credits-frame {
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 4;
+    margin-bottom: calc(var(--spacing) * 2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sunken);
+    overflow: hidden;
+  }
+
+  .credits-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* The plate's headline is the **photographer**, not the driver: this surface is about the people
+   * who took the pictures, and the licences ask for exactly that name. */
+  .credits-artist {
+    margin: 0;
+    color: var(--ink-primary);
+    font-family: var(--font-display);
+    font-size: var(--text-display-xs);
+    font-stretch: var(--font-stretch-display);
+    font-weight: var(--text-display-xs--font-weight);
+    line-height: var(--text-display-xs--line-height);
+    overflow-wrap: anywhere;
+  }
+
+  .credits-driver {
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  /* The Commons title — when and where the photograph was taken (§7.17.4). Clamped rather than
+   * truncated with an ellipsis at one line: several titles carry the event name at the end, which
+   * is the part that resolves a driver photographed in a former team's kit. */
+  .credits-caption {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    margin: calc(var(--spacing) * 1) 0 0;
+    overflow: hidden;
+  }
+
+  .credits-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--spacing) * 3);
+    margin: calc(var(--spacing) * 2) 0 0;
+  }
+
+  .credits-foot {
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  /* ============================================================== the trigger */
+
+  .credits-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    color: var(--ink-tertiary);
+    cursor: pointer;
+    transition: color var(--dur-instant) var(--ease-move);
+  }
+
+  .credits-trigger:hover {
+    color: var(--ink-primary);
+  }
+}

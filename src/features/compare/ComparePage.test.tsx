@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render as renderBare, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,6 +21,7 @@ vi.hoisted(() => {
 
 import { STRIP_DOT_ATTR } from '@/lib/motion/chart';
 import { GAIN_BAR_ATTR, TIER_BAR_ATTR } from '@/lib/motion/scroll';
+import { CreditsProvider } from '@/features/credits/CreditsProvider';
 import { ComparePage } from './ComparePage';
 import { COMPARE_FIXTURE } from './fixture';
 import { COMPARE_DIRECTORY, SEASON_LENS_FIXTURE } from './lensFixture';
@@ -38,6 +39,16 @@ import { COMPARE_DIRECTORY, SEASON_LENS_FIXTURE } from './lensFixture';
  * never met is never offered a head-to-head at all, that the chain always carries its refusal
  * note, and that no career total appears anywhere on the page.
  */
+
+/**
+ * **The credits provider wraps every render here** (§7.18.1). `CompareTray` gained a
+ * `Photograph credits` control, and `useCredits` throws without a provider rather than quietly
+ * doing nothing — a credit button that looks operable and is not would be a licence breach that
+ * renders as a working page. `AppShell` supplies it in the running app; a test that renders a
+ * fragment of a page has to supply it too.
+ */
+const render = (ui: Parameters<typeof renderBare>[0]) =>
+  renderBare(ui, { wrapper: CreditsProvider });
 
 afterEach(cleanup);
 
