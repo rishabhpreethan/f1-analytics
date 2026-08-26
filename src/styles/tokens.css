@@ -521,6 +521,23 @@
   --size-portrait: 72px; /* `EntityPortrait`, ≥768 */
   --size-portrait-sm: 56px; /* `EntityPortrait`, <768 */
 
+  /* ---- the photograph layer (§7.17). Two values that are **measured constraints on the whole
+   * set of sources**, not per-component styling, which is why they are tokens: a call site that
+   * re-decided either of them would reframe one driver differently from the other twenty-one.
+   *
+   * `--portrait-crop` — every source is portrait-orientation, aspect 0.64–0.84 w/h, so any shape
+   * wider than that crops the height. CSS's default `center center` decapitates the wider
+   * framings; `top center` held all 22 on a contact sheet. **Set-wide, never tuned per image** —
+   * there are 22 now and there will be more later, and a per-image value is one nobody maintains
+   * and no test can check.
+   *
+   * `--portrait-band-aspect` — a ratio and not a height, because `cover` scales a portrait source
+   * to the box *width*: a fixed pixel height would show 27% of the frame in a 319px bay and 40% in
+   * a 219px one, which is one photograph framed two ways on one page. 16/9 shows a constant
+   * 36–47% of every source (mean ≈41%) at every width. */
+  --portrait-crop: top center;
+  --portrait-band-aspect: 16 / 9;
+
   /* ---- the entity indexes (§6.6.4, §7.12, §7.13). px for the same reason as the block above:
    * these are named dimensions rather than spacing, and `--size-index-row*` in particular is fed
    * to `contain-intrinsic-size`, where the figure is a *placeholder for a measured height* — a

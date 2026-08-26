@@ -100,3 +100,64 @@ describe('§7.16 — the pending bay says what it has and refuses what it does n
     expect(screen.getByRole('button', { name: /Remove Ayrton Senna/ })).toBeTruthy();
   });
 });
+
+/**
+ * **The mixed state — §7.17.1.** `/compare?e=hamilton,verstappen,senna,fangio` is one photograph
+ * and three monograms, and that is the shipping case rather than a degraded one: 22 of 881 drivers
+ * have a photograph and 859 never will.
+ *
+ * jsdom loads no images and lays nothing out, so **whether it looks right is Rishabh's to see.**
+ * What is asserted here is the structural claim underneath it: every bay gets the same shape,
+ * whichever fill it takes.
+ */
+describe('§7.17 — a bay with a face and a bay with letters are the same bay', () => {
+  const mixedBays: TrayBay[] = [
+    { kind: 'ready', entity: entity('hamilton') },
+    { kind: 'ready', entity: entity('rosberg') },
+    { kind: 'ready', entity: entity('max_verstappen') },
+    { kind: 'ready', entity: entity('fangio') },
+  ];
+
+  it('gives every bay a portrait band, photographed or not', () => {
+    renderTray(mixedBays);
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    const bands = tray.querySelectorAll(".portrait[data-shape='band']");
+    expect(bands).toHaveLength(4);
+  });
+
+  it('fills two of the four with a photograph and the rest with a monogram', () => {
+    /*
+     * Hamilton and Max Verstappen are in the manifest; Rosberg and Fangio are not, and never will
+     * be. If this ratio ever becomes 4 of 4 or 0 of 4, somebody has started composing paths from
+     * references again.
+     */
+    renderTray(mixedBays);
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    expect(tray.querySelectorAll(".portrait[data-filled='photo']")).toHaveLength(2);
+    expect(tray.querySelectorAll(".portrait[data-filled='mark']")).toHaveLength(2);
+    expect(tray.querySelectorAll('img.portrait-photo')).toHaveLength(2);
+  });
+
+  it('lazy-loads every tray photograph — the tray is not the LCP element', () => {
+    renderTray(mixedBays);
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    for (const img of tray.querySelectorAll('img.portrait-photo')) {
+      expect(img.getAttribute('loading')).toBe('lazy');
+      expect(img.getAttribute('sizes')).toContain('vw');
+    }
+  });
+
+  it('keeps the identity bar beside the photograph rather than over it', () => {
+    // The bay's own 3px bar and the portrait's are contiguous, so the edge runs the whole card.
+    renderTray(mixedBays);
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    expect(tray.querySelectorAll('.tray-identity')).toHaveLength(4);
+    expect(tray.querySelectorAll('.tray-row')).toHaveLength(4);
+  });
+
+  it('gives a pending bay the band too, so a bay does not change shape when its record lands', () => {
+    renderTray([{ kind: 'pending', candidate: candidate('senna') }]);
+    const tray = screen.getByRole('region', { name: 'Selected drivers' });
+    expect(tray.querySelectorAll(".portrait[data-shape='band']")).toHaveLength(1);
+  });
+});

@@ -130,15 +130,60 @@
     }
   }
 
+  /*
+   * §7.17.1 — **the band is the same shape at a different size, not a second component.** Full
+   * bay width, and its height is an `aspect-ratio` rather than a length **on purpose**: `cover`
+   * scales a portrait source to the box width, so a fixed pixel height would show 27% of the frame
+   * in a 319px bay and 40% in a 219px one — one photograph framed two ways on one page. 16:9 shows
+   * a constant 36–47% of every source (mean ≈41%), which makes the framing a property of the set.
+   *
+   * The attribute selector out-specifies the plain `.portrait` rules above **and** the one inside
+   * the 48rem media query, so it needs no ordering to hold.
+   */
+  .portrait[data-shape='band'] {
+    display: flex;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--portrait-band-aspect);
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: 0;
+  }
+
   /* The 3px identity bar — the only place the entity's colour appears in this component, and it is
-   * beside a name, which is the one role §3.3a.1 permits a brand colour. */
+   * beside a name, which is the one role §3.3a.1 permits a brand colour.
+   *
+   * `z-index: 1` because the photograph is a real child and would otherwise paint over a pseudo
+   * element that is generated before it. §7.17.4: the bar is a **label beside a face** — it stays
+   * 3px and never becomes a tint, a ring or a frame, because several of these photographs show the
+   * right driver in the wrong team's kit and a coloured frame would assert otherwise. */
   .portrait::before {
     content: '';
     position: absolute;
+    z-index: 1;
     inset-block: 0;
     inset-inline-start: 0;
     width: 3px;
     background: var(--identity, var(--border-strong));
+  }
+
+  /*
+   * §7.17.2 — **`top center` is measured, not chosen.** Every source is portrait-orientation,
+   * aspect 0.64–0.84 w/h, so any shape wider than that crops the height, and `center center`
+   * decapitates the wider framings; `top center` held all 22 on a contact sheet. It is a **set-wide
+   * constant**, never tuned per image: there are 22 now and more later, and a per-image value is
+   * one nobody maintains and no test can check.
+   *
+   * Absolute rather than a sized child, so the container's own box is the only thing that decides
+   * the geometry — there is no intrinsic size to reserve and therefore no layout shift.
+   */
+  .portrait-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--portrait-crop);
   }
 
   /*
@@ -154,6 +199,17 @@
     font-stretch: 82%;
     font-weight: 700;
     letter-spacing: 0.02em;
+  }
+
+  /*
+   * In a band the monogram scales with the shape. `--ink-primary` at display-lg is **deliberately
+   * committed**: three monograms beside one photograph have to read as a design decision, and a
+   * mark set in `--ink-tertiary` would read as the absence of a photograph instead (§7.17.1).
+   */
+  .portrait[data-shape='band'] .portrait-mark {
+    font-size: var(--text-display-lg);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
   }
 
   /* ============================================================ §7.9 the career ribbon */

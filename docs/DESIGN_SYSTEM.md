@@ -1058,7 +1058,7 @@ Three rules follow:
 - **Anything at all inside a chart's plot area** other than the chart's own marks. The atmosphere is
   attenuated behind content (§7.7.5) precisely so this holds.
 
-### 4.6 Named motions — G-0 … G-32
+### 4.6 Named motions — G-0 … G-34
 
 Every entry names its GSAP documentation reference, its trigger, target, property, duration, ease
 **by GSAP name**, stagger, and its reduced-motion behaviour. **`reduce: not created` means the tween
@@ -1115,6 +1115,7 @@ The old `M-1 … M-11` identifiers are **retired**. Any code comment or spec cit
 | **G-24** | Shared element card → profile _(defined here, first used F4; `Flip` is NOT installed in F0)_ | `Flip.from` / `Flip.getState` | route change between a card and its profile page | `const state = Flip.getState(targets)` before the route commits, then `Flip.from(state, { duration: dur.slow, ease: "power2.inOut", absolute: true, scale: true })`. Still the highest-value animation in this product | **not created.** The card and the profile render independently |
 | **G-25** | **Card perspective tilt** | `gsap.quickTo` (docs: *3D transforms*, `rotationX`/`rotationY`) | `pointermove` on a `CapabilityCard`, `(pointer: fine)` only | two `quickTo` setters drive `rotationY` and `rotationX` toward the pointer at `m.pointer`, clamped to **±`gesture.tilt` (4°)** by normalising the pointer's offset within the element to ±1; plus `scale → gesture.lift` (1.015) at `dur.fast` / `ease.enter`. `transformPerspective: 900` is set **on the element**, not as a CSS `perspective` on the grid — a shared vanishing point would skew a card at the edge of a three-column grid instead of tilting it. On `pointerleave` everything settles together at `dur.slow` / `ease.arrive`, the long deceleration §4.3 calls weight transfer; a card that snapped flat would undo the physicality the tilt buys. The arithmetic is the pure exported `tiltAngles`, unit-tested including the clamp, the sign of each axis and the degenerate zero-size rect | **not created.** No tween object and no inline transform ever exists, so — unlike the retired CSS lift — this needs no `transform: none` override. Toggling the OS preference mid-hover reverts the context and clears the inline transform with it |
 | **G-26** | **Card traced brackets** | CSS `transition` on `clip-path` | `:hover` / `:focus-visible` on a `CapabilityCard` | two boxes inset 8px, each carrying only two borders in `--accent-mark` at `--size-rule` (2px), revealed by `clip-path: inset(0 100% 100% 0) → inset(0)` and `inset(100% 0 0 100%) → inset(0)` over `dur.slow` / `ease.enter` — so the pair closes on the card from **opposite corners**, like a viewfinder's crop marks. **CSS rather than a stroked SVG perimeter, for three reasons:** `pathLength` on an SVG *basic shape* is SVG 2 with uneven support and a `<path>` in a stretched `viewBox` would distort its own corner radii; `clip-path` is a paint operation, so it triggers no layout and needs no element per edge; and `:focus-visible` is a browser heuristic with no reliable DOM event pair, so a GSAP draw could never fire for the keyboard user the clause exists for | **stopped by chokepoint 1**, which leaves the brackets arriving instantly on hover — a **state change**, which is exactly what G-7's reduced column asks for. Their resting `clip-path` is the undrawn one, and that is the legitimate MR-2 exception a decorative mark carries: they hold no content, the same reason `.header-hairline-accent` rests at `scaleX(0)` |
+| **G-34** | **Photograph credits panel** | `gsap.timeline`, via `useDisclosure` | the credit control in a masthead, the tray or the footer | **G-5 applied to a second surface, not a new gesture.** Scrim `opacity 0→1`, `dur.fast`, `ease.enter`; panel `y: dist.sheet (24) → 0` + `opacity 0→1`, `dur.slow`, `ease.arrive`; the three head blocks — figures, ladder, first plate row — `opacity 0→1, y: dist.step (8) → 0`, `dur.fast`, `stagger.row`. Close reverses at `dur.base`, `ease.exit`. **The plates are not staggered individually**: 22 at 24ms is 528ms and G-23's `stagger.cap` exists for exactly this, but a legal document arriving in 22 pieces is theatre over an obligation — the list is one block | scrim and panel `opacity` only, `dur.fast`, **no `y`, no stagger**; and `useDisclosure` never builds the exit timeline under `reduce`, so the panel unmounts the instant it is closed |
 
 #### 4.6.1 Motion by component — the table that was missing
 
@@ -4604,6 +4605,12 @@ mistaken for one.
 **When an asset arrives** (R1/R2, Rishabh's) the `<img>` replaces the mark and keeps the box, the
 radius and the identity bar, so nothing around it moves.
 
+✅ **The assets arrived for 22 drivers on 2026-08-26, and the sentence above held.** The photograph
+layer is **§7.17**; the box, the radius, the border and the identity bar are unchanged, and the
+component gained one shape (`band`) and one fill (the `<img>`) and nothing else. The claim that the
+placeholder is the shipping form is no longer a position — **859 of 881 drivers will never have a
+photograph**, so the monogram is what most of this product renders, permanently.
+
 ### 7.11 `CircuitLocator` — coordinates, drawn _(added 2026-08-08)_
 
 The answer to CI-1's "map" that does not need a map (§6.6.2.7). One inline SVG, `viewBox="0 0 360 180"`,
@@ -4781,6 +4788,195 @@ with it (§6.6.6.13 defect 2).
 **⚠ Untested by construction**: whether the result list is legible over the tray, whether the active
 row is visibly distinct, whether the field's focus underline animates, and whether the list overflows
 at 390px.
+
+
+### 7.17 The photograph layer — `EntityPortrait`'s second fill _(added 2026-08-26)_
+
+**22 of 881 drivers have a photograph. The mixed state is the normal case, not an edge case**, and
+every decision below is made against that fact rather than against the 22.
+
+The photographs are free-licensed Wikimedia Commons files, sourced and licence-verified by hand
+outside this document, downloaded and converted by `scripts/fetch-imagery.mjs` to
+`public/assets/drivers/<ref>-320.webp` and `-640.webp`, with `src/features/credits/imagery.json` as
+the manifest. **The manifest is the only source of an image URL in this product** — nothing composes
+a path from a reference, because a composed path for one of the other 859 is a 404 per row.
+
+#### 7.17.1 One component, two shapes, two fills
+
+`EntityPortrait` renders a **shape** and fills it with either a photograph or the monogram. Both
+fills are drawn on identical geometry, and that is the whole answer to "does the mixed state read as
+broken":
+
+| | `box` (default) | `band` |
+|---|---|---|
+| Where | profile masthead, index rows | a compare tray bay |
+| Geometry | 56×56 <768, 72×72 ≥768 | full bay width, `aspect-ratio: 16 / 9` |
+| Ground | `--surface-sunken` | `--surface-sunken` |
+| Identity | 3px `--identity` bar, leading edge, **over** the photograph | same |
+| Radius | `--radius-lg` | none — it is full-bleed inside the bay's own radius |
+| Photograph fill | `<img>` absolutely filling the shape, `object-fit: cover` | same |
+| Monogram fill | the code, or two surname letters, `--display-xs`, `--ink-primary` | same mark at `--display-lg`, `--ink-primary` |
+
+**Nothing about the shape changes when the fill does.** A bay with a face and a bay with `SE` are
+the same rectangle with the same border, the same identity bar and the same ground. The reader is
+never told that one of them is missing something, because in this product it is not — a monogram is
+the shipping form (§7.6, §7.10).
+
+#### 7.17.2 `object-position` is `top center`, set-wide, and it is measured rather than chosen
+
+Every source is portrait-orientation, aspect **0.64 – 0.84** (w/h) across the 22, mean ≈ 0.73. In
+any shape wider than that, `cover` crops the height, and **`center center` decapitates the wider
+framings** — verified on a contact sheet of all 22 before this was written. `top center` held all
+22 at a 150px-tall crop.
+
+This is a **set-wide constraint, not a per-image tuning**, and deliberately so: there are 22 now and
+there will be more later, and a per-image `object-position` is a value nobody will maintain and
+nobody can test.
+
+**The `band` therefore shows a constant fraction of every source, not a constant number of pixels.**
+`aspect-ratio: 16 / 9` on the shape means the visible slice is `0.5625 ÷ (h/w)` of the source
+height — **36 % (tallest source) to 47 % (shortest), ≈ 41 % typical**. A fixed pixel height would
+have shown 27 % of the frame in a 319px bay and 40 % in a 219px one, which is the same photograph
+framed two ways on one page. The aspect ratio is what makes the framing a property of the *set*.
+
+#### 7.17.3 `cover` for an identity mark, `contain` for the subject
+
+One rule, and it decides every `object-fit` in the product:
+
+- **Where the photograph stands for a name** — a portrait, a bay, a row — it is an identity mark and
+  it is cropped to the shape the layout needs. `object-fit: cover`.
+- **Where the photograph is the subject** — the credits plates, §7.18 — it is shown as the
+  photographer framed it, whole, letterboxed on `--surface-sunken`. `object-fit: contain`.
+
+The sources are deliberately **never cropped on disk**: a build-time crop has to guess where a face
+is, and `object-fit` is the instrument that does not have to guess at all.
+
+#### 7.17.4 The identity bar stays at 3px and never becomes a frame
+
+Several photographs show the right driver **in the wrong team's kit** — Sainz in Ferrari red while
+he races for Williams in 2026; Hamilton in a Downing Street portrait in neither team's colours.
+They are the right people at the wrong moment, and the alternative is no photograph.
+
+So the identity bar is a **label beside a face, never a claim about it**:
+
+- It stays at exactly **3px**, §3.3a.4's first permitted identity form, and it is the same mark the
+  monogram fill carries — which is the coherence argument in §7.17.1 and the reason it cannot be
+  dropped for photographed drivers only.
+- It **never** becomes a tint, a wash, a ring or a coloured frame around a photograph. Any of those
+  asserts that the photograph *is* of that team, and for several of the 22 that assertion is false.
+- **When and where each photograph was taken is disclosed in §7.18**, where every plate carries the
+  Commons title — *"Alex Albon at the Melbourne Walk during the 2026 Australian Grand Prix"*. That is
+  where a reader resolves a Ferrari cap beside a Williams bar, and it is a fact rather than a hedge.
+
+#### 7.17.5 Nothing is ever set over a photograph
+
+The backgrounds are paddock, garage, podium and press pen — busy, varied, and with no consistent
+edge. **No text, no chip, no control and no gradient scrim is placed over a photograph anywhere in
+this product**, because there is no composite whose contrast could be measured once and relied on
+for the set. Every caption sits outside the shape, on a known surface, at a §9.2-measured pair.
+
+#### 7.17.6 Loading, resolution and the 859
+
+| | |
+|---|---|
+| Candidates | `srcSet="…-320.webp 320w, …-640.webp 640w"`, with `sizes` per shape: `72px` for `box`, `(min-width: 64rem) 320px, (min-width: 48rem) 46vw, 92vw` for `band` |
+| 2× | falls out of `srcSet` — a 72px box at DPR 2 needs 144w and takes the 320; a 300px band at DPR 2 needs 600w and takes the 640 |
+| Below the fold | `loading="lazy"` `decoding="async"` — index rows and tray bays |
+| The LCP candidate | the driver profile masthead only: `loading="eager"`, `fetchPriority="high"`, no lazy attribute. It is likely the largest element on that page and lazy-loading it would be a self-inflicted LCP regression |
+| The other 859 | **no `<img>` is rendered at all.** The manifest is consulted first, so there is no request, no 404 and no broken-image glyph — 859 rows on `/drivers` would otherwise be 859 failed requests |
+| A file that goes missing anyway | `onError` on the `<img>` swaps the component back to the monogram fill in place. The manifest and the disk can disagree; the placeholder is what that disagreement resolves to, never a broken-image icon |
+
+#### 7.17.7 Weight
+
+The images are `public/assets/**` and are **not** in the JS bundle — they are 1.4 MB on disk across
+44 files and cost nothing against the 250 KB initial-JS budget. The **manifest** is JS, so it is
+kept out of the initial chunk: it is imported only by `EntityPortrait` and by §7.18's panel, both of
+which are reachable only from lazy route chunks and a lazily-imported dialog. Figures are recorded
+in §11 from `npm run build`'s `check:budget` table, never from gzipping a file alone.
+
+### 7.18 `PhotographCredits` — attribution as a designed surface _(added 2026-08-26)_
+
+**This is a legal obligation before it is a design problem.** CC BY and CC BY-SA require the author,
+the licence and a link to the source to travel with the work; CC0 requires none of it and is
+credited anyway. The repository is public, so a photograph that ships without attribution is a
+licence breach, not an untidy detail.
+
+It is **not a route.** Routing is not design's to change, and a modal surface is the better answer
+anyway: attribution has to be reachable *from where the photograph is*, not from a page you have to
+know exists.
+
+#### 7.18.1 Three entry points, each from where an image appears
+
+| Where | Control | Opens |
+|---|---|---|
+| **Driver profile masthead** | the credit line itself — `Photograph Yu Chu Chin · CC BY-SA 4.0` — is the button | the panel, scrolled and focused to **that driver's plate** |
+| **Compare tray** | `Photograph credits` beside the picker, rendered only when a bay is showing a photograph | the panel at the top |
+| **Footer, every page** | `Photograph credits` | the panel at the top |
+
+The masthead line is the important one: **the photographer's name is visible text beside the
+photograph**, which is what CC BY actually asks for. The panel is the full record — the licence deed
+and the Commons page as real links — and it is one click away and also globally reachable, which is
+the "reasonable manner" the licences permit.
+
+#### 7.18.2 The panel is a population, and it draws its shape
+
+A bare list of links would be beneath the rest of this product. The panel opens the way an index
+page does — with the shape of the thing it is listing (§7.14's argument, applied to 22 photographs):
+
+1. **Masthead** — eyebrow `Attribution`, `h2` **The photographs**, and a lead in real copy:
+   > *"Twenty-two of the 881 drivers in this archive have a photograph here. Each one is used under
+   > a free licence that asks for the photographer, the licence and a link back — so those travel
+   > with the picture, on this page. The other 859 drivers carry a monogram, and always will."*
+
+2. **The figures** — `.stat-strip` reused verbatim, three tiles in tabular mono:
+   **22** photographs · **14** photographers · **6** licences.
+
+3. **The licence ladder** — `.ruler` reused verbatim: one row per licence, `label | track | figure`,
+   the fill's extent proportional to the count, the licence name linking to its deed.
+   `CC BY-SA 4.0` 15 · `CC BY-SA 2.0` 2 · `CC BY 2.0` 2 · `CC BY 4.0` 1 · `CC0` 1 · `OGL 3` 1.
+   **The one override the ladder needs is `border-left: 0` on the fill** — the coverage ruler's 2px
+   surface gap separates two adjacent spans, and here there is nothing to its left, so it would make
+   every bar 2px short of the count it encodes (§6.3b's rule: a mark's length is the datum).
+
+4. **The plates** — one per photograph, ordered by driver surname. Each carries the photograph
+   `object-fit: contain` at `aspect-ratio: 3 / 4` on `--surface-sunken` (§7.17.3 — this is the one
+   place the frame is shown whole), the driver's name, the **photographer at `--display-xs`** as the
+   plate's headline, the licence as a link to its deed, `Source` as a link to the Commons file page,
+   and the Commons **title** in `--text-2xs` `--ink-tertiary`, which is what discloses when and where
+   the photograph was taken (§7.17.4).
+
+**Reuse is the reason this fits.** `.stat-strip`, `.stat-tile`, `.stat-figure`, `.stat-label`,
+`.ruler*`, `.chip`, `.link` and the `.t-*` utilities are all existing classes; CSS is the binding
+budget at 82.9 % of 25 KB, and the ladder in particular is genuinely the same mark — a labelled
+proportion of a whole with its figure — rather than a shape borrowed to save bytes.
+
+#### 7.18.3 Dialog mechanics
+
+| | |
+|---|---|
+| Structure | a `--scrim` at `--z-overlay` plus a panel at `--z-overlay`, `role="dialog"`, `aria-modal="true"`, `aria-labelledby` the `h2`. The same anatomy as `DockSheet` (§7.8), because a second modal convention in one product is a defect |
+| Geometry | centred, `max-width: 56rem`, `max-height: calc(100dvh - 2 × --size-dock-inset)`, the plate list scrolling **inside** the panel so the page behind never scrolls under it |
+| Focus | moves to the panel's close button on open, is trapped by `Tab`/`Shift+Tab`, `Esc` closes, and focus returns **synchronously** to the trigger — never waiting for an exit tween (`useDisclosure`'s rule) |
+| Deep entry | opening from a masthead scrolls that plate into view and moves focus to it, so a keyboard reader arrives at the credit they asked for rather than at the top of 22 |
+| Outside click | closes. The scrim is the click target |
+| Motion | **G-34** |
+| Reduced motion | scrim and panel fade only, `dur.fast`, no travel, no stagger — and the panel unmounts immediately on close (`useDisclosure` never builds an exit timeline under `reduce`) |
+
+#### 7.18.4 Copy, verbatim
+
+| Where | String |
+|---|---|
+| Footer / tray control | `Photograph credits` |
+| Masthead credit line | `Photograph {artist} · {licence}` |
+| Masthead credit accessible name | `Photograph of {name} by {artist}, {licence}. Open photograph credits.` |
+| Panel eyebrow | `Attribution` |
+| Panel title | `The photographs` |
+| Panel lead | see §7.18.2 item 1 |
+| Figure labels | `Photographs` · `Photographers` · `Licences` |
+| Ladder heading | `Under which licence` |
+| Plate links | `Source` (to the Commons file page) |
+| Panel close | `Close` |
+| Panel footnote | `One photograph is public-domain dedicated under CC0, which asks for nothing. It is credited here anyway. Anything wrong on this page is ours to fix — the record is in src/features/credits/imagery.json.` |
 
 
 ## 8. Accessibility — binding
