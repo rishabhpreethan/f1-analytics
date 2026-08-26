@@ -83,6 +83,15 @@
     display: flex;
     flex-direction: column;
     gap: calc(var(--spacing) * 8);
+    /*
+     * ⚠ **`min-height: 0`, and it is load-bearing.** A flex item's `min-height` defaults to `auto`,
+     * which is its *content* size — so without this the scroll box refuses to shrink below 22
+     * plates, overflows a panel whose height is fixed by its `top`/`bottom` insets, and is then
+     * clipped by that panel's `overflow: hidden`. The symptom is a modal that shows the first
+     * screen of credits and cannot be scrolled to the rest, with no error anywhere. jsdom computes
+     * no box, so nothing in the suite can see it.
+     */
+    min-height: 0;
     padding: calc(var(--spacing) * 5);
     overflow-y: auto;
     overscroll-behavior: contain;
