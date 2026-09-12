@@ -10,8 +10,9 @@ A Formula 1 analytics web application for enthusiasts — driver/team/race/circu
 comparison across seasons and eras as its centre of gravity. React 19 + TypeScript + Vite, Hono API,
 SQLite read-only, GSAP animation, accurate F1 team colours and timing conventions.
 
-**Everything is merged and pushed to `main`** — F0 through the driver/team/circuit index redesign.
-**1997 tests.** No live feature branch. The bundle is at **90.3%** of its 250 KB budget.
+**Everything is merged and pushed to `main`** — F0 through F7 compare, the plain-language charts and
+the imagery layer. **2573 tests.** Initial JS is at **68.1%** of its 250 KB budget; **render-blocking
+CSS is the binding one at 86.1% of 25 KB.**
 
 ---
 
@@ -173,49 +174,49 @@ not see**, and never report a visual behaviour as working on the strength of a p
 
 ## 8. Where we are right now
 
-*Last updated 2026-08-23. Correct this whenever it drifts — a stale "next action" here has already
-misled an agent once.*
+*Last updated 2026-09-12. Correct this whenever it drifts — a stale "next action" here has already
+misled an agent once, and this section has since gone stale twice more.*
 
-- **`main` holds everything.** F0 through the index redesign are merged and pushed; `d7a3e1b` is the
-  most recent. There is no unpushed work and no live feature branch. `feat/foundation` is historical.
-- **1997 tests / 87 files**, typecheck / lint / `format:check` / `validate:palette` / build all clean.
-- **Bundle 225.76 KB gzipped / 250 (90.3%) — in the WARN band**, which warns from 85%. It was 161.86 KB
-  at F0. **Code-splitting is the next structural task and should land before F7**, which is the largest
-  remaining feature; discovering the ceiling mid-F7 is the failure mode to avoid.
-- **GSAP replaced `framer-motion`.** Importing `framer-motion` is a **defect**. Measured, gzipped:
-  core+ScrollTrigger+SplitText **47.7 KB** vs `framer-motion`'s **40.8 KB** — so **+6.9 KB**. The
-  earlier "the bundle goes down" claim came from a web search and was **wrong**; the swap was kept on
-  headroom that no longer exists, not on size.
+- **`main` holds everything through F7 and the comparison charts.** The imagery layer is the only
+  live branch. `feat/foundation` is historical.
+- **2573 tests / 108 files**, typecheck / lint / `format:check` / `validate:palette` / build clean.
+- **Initial JS 170.20 KB / 250 (68.1%)** — the twelve routes are lazy chunks, which took it from
+  225.76 KB. **Render-blocking CSS 21.52 KB / 25 (86.1%) is now the binding budget**, with 3.47 KB
+  left. Size an asset by building with it and reading `check:budget`, **never** by gzipping the
+  candidate alone — that understates marginal cost by ~19%.
+- `npm audit` → **0 vulnerabilities.** The `nanoid` advisory is cleared.
+- **GSAP replaced `framer-motion`.** Importing `framer-motion` is a **defect**.
 - **`/` is the landing page; the season hub is `/seasons`**, no redirect either way.
 - **The accent is monochrome** — the pole of the neutral scale, `#08090C` light / `#FFFFFF` dark.
-  Rishabh's call, 2026-08-06: *"no purple accent, i want the accent to be a color of white/black."*
-  The whole hue-350 magenta ramp is deleted from the product; the derivation survives in
-  `DESIGN_SYSTEM.md` §9 V-10…V-17 for the record only. Purple, green and yellow remain **reserved
-  timing semantics** and can never be the accent.
+  Rishabh's call, 2026-08-06. Purple, green and yellow remain **reserved timing semantics**.
+- **Colour identifies the car; a dash identifies the seat.** The teammate shade pair is withdrawn and
+  collision escalation moves to marker shape (`DESIGN_SYSTEM.md` §6.4a).
 
 ### ➡️ Open work
 
-Nothing is rejected and outstanding. The three faults Rishabh found in the F0 shell — the background,
-the dock rail and the coverage chip — are all fixed and pushed, as is the index-page redesign he
-rejected on 2026-08-22.
-
-1. **Code-splitting, before F7.** See the budget line above. The routes are already separate; nothing
-   is lazy yet.
-2. **A pre-existing `npm audit` high advisory** — `nanoid` via `vite → postcss`, build-time only, not
-   in `dist/`, present on `main` before any recent work. It needs its own isolated commit so it can be
-   verified independently; do not bundle it into a feature.
-3. **The European pip cluster on `/circuits`** is a blob of overlapping marks at 517 px. Pre-existing
-   and unchanged by the coastline. The only real fix is a different mark or a zoom — a new design, not
-   a defect.
-4. **`scripts/generate-world-land.mjs` was written by the `developer` and then edited by the
-   `designer`** when rasterising caught three defects in its output. Green everywhere, but it crossed
-   an ownership line and is worth knowing about.
+1. **`docs/DATABASE.md` §7 holds 27 traps.** Never trust a count quoted outside that table.
+2. **CR-004 is half-solved and must not be marked done.** Each colliding pair has exactly one team
+   mark — Haas but not Cadillac, Alpine but not RB. Ferrari, Cadillac, Aston Martin and Racing Bulls
+   have no free logo; those four are above the threshold of originality or too new.
+3. **The European pip cluster on `/circuits`** is a blob of overlapping marks at 517 px. Pre-existing.
+   The only real fix is a different mark or a zoom — a new design, not a defect.
+4. **Two files have crossed an ownership line** and are worth knowing about:
+   `scripts/generate-world-land.mjs` (developer's, edited by the designer) and
+   `src/features/compare/useCompare.ts` (developer's, a `keepPreviousData` fix by the designer).
+5. **Decide the CSS ceiling before F8**, not during it. 3.47 KB of headroom is thin for a feature.
 
 ### Assets — Rishabh's, never fabricate
 
-R1 driver images · R2 team logos · R3 app icons. **Never generate, fabricate or hotlink images.** None
-blocks current work: no driver, team or race imagery renders yet, and a typographic favicon placeholder
-ships meanwhile.
+**R1 and R2 are largely done, sourced from Wikimedia Commons under free licences** — 22 driver
+portraits, 11 car photographs, 7 team marks. `scripts/fetch-imagery.mjs` regenerates them and the
+credits manifest together; `scripts/imagery-sources.json` records the exact file chosen per entity.
+
+**R3 app icons is still outstanding** — no `apple-touch-icon`, no manifest; a typographic favicon ships.
+
+**Never generate, fabricate or hotlink an image.** Every file comes from the manifest, and every one
+carries its photographer, licence and source into the credits surface — CC BY and CC BY-SA require it,
+and the repo is public. **Public domain for copyright is not freedom from trademark:** a team mark
+stays beside the name of the team it belongs to.
 
 ### Historical decisions
 
