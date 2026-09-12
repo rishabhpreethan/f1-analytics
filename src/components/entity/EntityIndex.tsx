@@ -577,11 +577,27 @@ function IndexRow({
       >
         {item.markKind !== null && (
           <span className="index-mark">
+            {/*
+             * §7.17 — the photograph layer, wired for drivers only and **lazy**. 22 of 881 have
+             * one, so 859 rows here render the monogram: the same box, the same border, the same
+             * identity bar, the same ground. Nothing in the row says a monogram is a photograph
+             * that failed to arrive.
+             *
+             * `reference` is passed only for a driver. A team's `ref` is a real key in the *car*
+             * and *mark* sets (§7.19) and handing it to a driver lookup would be a namespace
+             * collision waiting for a team called `hamilton`; `photographFor` is keyed
+             * `driver:<ref>` precisely so that cannot resolve.
+             *
+             * There is **no credit line in a row**, and that is structural rather than an
+             * omission: the row is a `Link`, and a button inside an anchor is invalid markup. The
+             * footer's global control (§7.18.1) is what covers the index pages.
+             */}
             <EntityPortrait
               teamReference={item.identityRef}
               code={item.code}
               name={item.title}
               kind={item.markKind}
+              reference={item.markKind === 'driver' ? item.ref : null}
             />
           </span>
         )}

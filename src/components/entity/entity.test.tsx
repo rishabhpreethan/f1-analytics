@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -298,6 +298,178 @@ describe('EntityPortrait — §7.10, the permanent placeholder', () => {
       <EntityPortrait teamReference={null} code={null} name="Jack Brabham" kind="driver" />,
     );
     expect(container.querySelector('.portrait')?.getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
+/**
+ * **The photograph layer — §7.17.** 22 of 881 drivers have one, so every assertion here is written
+ * against the *mixed* case rather than against the 22.
+ *
+ * jsdom loads no images, performs no layout and no compositing, so **nothing below sees a
+ * photograph**: not the crop, not the aspect ratio, not whether a face survives `object-fit`. What
+ * it can decide is which fill was chosen, what the browser was told to fetch, and whether the two
+ * fills are the same shape — which is the whole of the mixed-state claim.
+ */
+describe('EntityPortrait — the photograph, §7.17', () => {
+  it('renders a photograph for a driver who has one', () => {
+    const { container } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+      />,
+    );
+    const img = container.querySelector('img.portrait-photo');
+    expect(img?.getAttribute('src')).toBe('/assets/drivers/hamilton-320.webp');
+    expect(container.querySelector('.portrait')?.getAttribute('data-filled')).toBe('photo');
+  });
+
+  it('offers both widths, so a 2× box resolves to the 640 without a second element', () => {
+    const { container } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+      />,
+    );
+    const img = container.querySelector('img.portrait-photo');
+    expect(img?.getAttribute('srcset')).toBe(
+      '/assets/drivers/hamilton-320.webp 320w, /assets/drivers/hamilton-640.webp 640w',
+    );
+    expect(img?.getAttribute('sizes')).toBe('72px');
+  });
+
+  it('renders NO img at all for the 859 — never a request that 404s', () => {
+    /*
+     * The manifest is consulted before anything is rendered, and a path is never composed from a
+     * reference. 859 composed paths on `/drivers` would be 859 failed requests in one paint, and
+     * the browser's own broken-image glyph in every row.
+     */
+    const { container } = render(
+      <EntityPortrait
+        teamReference="mclaren"
+        code={null}
+        name="Ayrton Senna"
+        kind="driver"
+        reference="senna"
+      />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    expect(screen.getByText('SE')).toBeTruthy();
+    expect(container.querySelector('.portrait')?.getAttribute('data-filled')).toBe('mark');
+  });
+
+  it('renders no img for a team, which has no photographs and passes no reference', () => {
+    const { container } = render(
+      <EntityPortrait teamReference="ferrari" code={null} name="Scuderia Ferrari" kind="team" />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('gives both fills the SAME shape — the whole of the mixed-state claim', () => {
+    /*
+     * `/compare?e=hamilton,senna` is two photographs' worth of layout with one photograph in it. If
+     * the fills carried different geometry, the monogram bay would read as a bay that failed to
+     * load. They differ in `data-filled` and in nothing else.
+     */
+    const { container: photographed } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+        shape="band"
+      />,
+    );
+    const { container: monogrammed } = render(
+      <EntityPortrait
+        teamReference="mclaren"
+        code={null}
+        name="Ayrton Senna"
+        kind="driver"
+        reference="senna"
+        shape="band"
+      />,
+    );
+    const shapeOf = (root: HTMLElement) => {
+      const node = root.querySelector('.portrait');
+      return {
+        className: node?.getAttribute('class'),
+        shape: node?.getAttribute('data-shape'),
+        kind: node?.getAttribute('data-kind'),
+      };
+    };
+    expect(shapeOf(photographed)).toEqual(shapeOf(monogrammed));
+    expect(shapeOf(photographed).shape).toBe('band');
+  });
+
+  it('lazy-loads by default and eagerly only where the portrait is the LCP candidate', () => {
+    const { container: lazy } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+      />,
+    );
+    expect(lazy.querySelector('img')?.getAttribute('loading')).toBe('lazy');
+    expect(lazy.querySelector('img')?.getAttribute('fetchpriority')).toBe('auto');
+
+    const { container: eager } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+        priority
+      />,
+    );
+    expect(eager.querySelector('img')?.getAttribute('loading')).toBe('eager');
+    expect(eager.querySelector('img')?.getAttribute('fetchpriority')).toBe('high');
+  });
+
+  it('falls back to the monogram when a file that IS in the manifest fails to load', () => {
+    /*
+     * The manifest and the disk can disagree. What a reader must never get is the browser's
+     * broken-image glyph, which reads as a fault in the page rather than as an absent photograph.
+     */
+    const { container } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+      />,
+    );
+    const img = container.querySelector('img.portrait-photo');
+    if (img === null) throw new Error('expected a photograph to render first');
+    fireEvent.error(img);
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.portrait-mark')?.textContent).toBe('HAM');
+  });
+
+  it('stays out of the accessibility tree, photograph and all', () => {
+    const { container } = render(
+      <EntityPortrait
+        teamReference="mercedes"
+        code="HAM"
+        name="Lewis Hamilton"
+        kind="driver"
+        reference="hamilton"
+      />,
+    );
+    expect(container.querySelector('.portrait')?.getAttribute('aria-hidden')).toBe('true');
+    // An empty `alt` inside an `aria-hidden` container, not a described photograph: the name is
+    // beside it, and attribution is §7.18's surface with its own accessible name.
+    expect(container.querySelector('img')?.getAttribute('alt')).toBe('');
   });
 });
 

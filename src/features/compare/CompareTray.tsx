@@ -2,7 +2,10 @@ import type { CSSProperties } from 'react';
 import type { SeriesChannels } from '@/components/charts/ladder';
 import { LegendKey } from '@/components/charts/MarkerGlyph';
 import { COMPARISON_CAP } from '@/components/charts/ladder';
+import { EntityPortrait } from '@/components/entity/EntityPortrait';
 import { X } from '@/components/ui/icons';
+import { CreditsTrigger } from '@/features/credits/CreditsTrigger';
+import { photographFor } from '@/features/credits/imagery';
 import { cssVar, identityToken } from '@/lib/entityColor';
 import { EntityPicker } from './EntityPicker';
 import { winShare } from './model';
@@ -69,6 +72,13 @@ export function CompareTray({ bays, channels, candidates, onRemove, onAdd }: Com
    */
   const channelOf = new Map(channels.map((channel) => [channel.reference, channel]));
 
+  /* Whether any bay is showing a face — the condition on the credits control below. */
+  const photographed = bays.some(
+    (bay) =>
+      photographFor(bay.kind === 'ready' ? bay.entity.identity.ref : bay.candidate.ref) !==
+      undefined,
+  );
+
   return (
     <section className="tray" aria-label="Selected drivers">
       <ol className="tray-bays" id={BAYS_ID}>
@@ -96,6 +106,13 @@ export function CompareTray({ bays, channels, candidates, onRemove, onAdd }: Com
       </ol>
 
       <EntityPicker baysId={BAYS_ID} candidates={candidates} filled={bays.length} onAdd={onAdd} />
+
+      {/*
+       * §7.18.1 — attribution, from where the photographs are. **Rendered only when a bay is
+       * actually showing one**: a credits control on a tray of four monograms points at nothing,
+       * and the footer's copy of it is always there for the reader who wants the whole record.
+       */}
+      {photographed && <CreditsTrigger className="tray-credits t-xs" />}
     </section>
   );
 }
@@ -121,30 +138,40 @@ function ReadyBay({
         } as CSSProperties
       }
     >
-      <span className="tray-identity" aria-hidden="true" />
-      <div className="tray-body">
-        <p className="tray-forename">{entity.identity.forename}</p>
-        <p className="tray-surname">{entity.identity.surname}</p>
-        <p className="tray-span">
-          {entity.firstSeason}–{entity.lastSeason}
-          <span className="tray-dot" aria-hidden="true">
-            ·
+      <EntityPortrait
+        teamReference={entity.colorTeamRef}
+        code={entity.identity.code}
+        name={`${entity.identity.forename} ${entity.identity.surname}`}
+        kind="driver"
+        reference={entity.identity.ref}
+        shape="band"
+      />
+      <div className="tray-row">
+        <span className="tray-identity" aria-hidden="true" />
+        <div className="tray-body">
+          <p className="tray-forename">{entity.identity.forename}</p>
+          <p className="tray-surname">{entity.identity.surname}</p>
+          <p className="tray-span">
+            {entity.firstSeason}–{entity.lastSeason}
+            <span className="tray-dot" aria-hidden="true">
+              ·
+            </span>
+            {entity.seasonsEntered} seasons
+          </p>
+          <p className="tray-metric">
+            <span className="tray-metric-figure">
+              {share === null ? '—' : `${String(Math.round(share * 100))}%`}
+            </span>
+            <span className="tray-metric-label">
+              ahead of a teammate
+              <br />
+              {entity.teammates.race.a + entity.teammates.race.b} same-car races
+            </span>
+          </p>
+          <span className="tray-key">
+            <LegendKey shape={channel.marker} dash={channel.dash} token={channel.plot} />
           </span>
-          {entity.seasonsEntered} seasons
-        </p>
-        <p className="tray-metric">
-          <span className="tray-metric-figure">
-            {share === null ? '—' : `${String(Math.round(share * 100))}%`}
-          </span>
-          <span className="tray-metric-label">
-            ahead of a teammate
-            <br />
-            {entity.teammates.race.a + entity.teammates.race.b} same-car races
-          </span>
-        </p>
-        <span className="tray-key">
-          <LegendKey shape={channel.marker} dash={channel.dash} token={channel.plot} />
-        </span>
+        </div>
       </div>
       <RemoveButton identity={entity.identity} onRemove={onRemove} />
     </li>
@@ -176,31 +203,41 @@ function PendingBay({
           : ({ '--identity': cssVar(identityToken(candidate.colorTeamRef)) } as CSSProperties)
       }
     >
-      <span className="tray-identity" aria-hidden="true" />
-      <div className="tray-body">
-        <p className="tray-forename">{candidate.forename}</p>
-        <p className="tray-surname">{candidate.surname}</p>
-        {candidate.firstSeason !== undefined && candidate.lastSeason !== undefined && (
-          <p className="tray-span">
-            {candidate.firstSeason}–{candidate.lastSeason}
-            {candidate.races !== undefined && (
-              <>
-                <span className="tray-dot" aria-hidden="true">
-                  ·
-                </span>
-                {candidate.races} races
-              </>
-            )}
+      <EntityPortrait
+        teamReference={candidate.colorTeamRef ?? null}
+        code={candidate.code}
+        name={`${candidate.forename} ${candidate.surname}`}
+        kind="driver"
+        reference={candidate.ref}
+        shape="band"
+      />
+      <div className="tray-row">
+        <span className="tray-identity" aria-hidden="true" />
+        <div className="tray-body">
+          <p className="tray-forename">{candidate.forename}</p>
+          <p className="tray-surname">{candidate.surname}</p>
+          {candidate.firstSeason !== undefined && candidate.lastSeason !== undefined && (
+            <p className="tray-span">
+              {candidate.firstSeason}–{candidate.lastSeason}
+              {candidate.races !== undefined && (
+                <>
+                  <span className="tray-dot" aria-hidden="true">
+                    ·
+                  </span>
+                  {candidate.races} races
+                </>
+              )}
+            </p>
+          )}
+          <p className="tray-metric">
+            <span className="tray-metric-figure">—</span>
+            <span className="tray-metric-label">
+              record loading
+              <br />
+              not yet published by the API
+            </span>
           </p>
-        )}
-        <p className="tray-metric">
-          <span className="tray-metric-figure">—</span>
-          <span className="tray-metric-label">
-            record loading
-            <br />
-            not yet published by the API
-          </span>
-        </p>
+        </div>
       </div>
       <RemoveButton identity={candidate} onRemove={onRemove} />
     </li>

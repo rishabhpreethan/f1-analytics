@@ -2,6 +2,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { CreditsProvider } from '@/features/credits/CreditsProvider';
+import { carFor, logoFor } from '@/features/credits/imagery';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -110,14 +112,110 @@ function renderPage(over: Partial<Parameters<typeof TeamPage>[0]> = {}) {
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
-        <TeamPage team={TEAM} pending={false} error={null} onRetry={() => undefined} {...over} />
-      </MemoryRouter>
+      <CreditsProvider>
+        <MemoryRouter>
+          <TeamPage team={TEAM} pending={false} error={null} onRetry={() => undefined} {...over} />
+        </MemoryRouter>
+      </CreditsProvider>
     </QueryClientProvider>,
   );
 }
 
 afterEach(cleanup);
+
+describe('the team imagery layer — §7.19, built 2026-09-12', () => {
+  /*
+   * ⚠ **jsdom loads no images and lays nothing out.** Nothing below sees the car: not whether it is
+   * centred in its plate, not whether the white mark plate reads as a badge or as a hole on the
+   * dark theme, not whether the two-column masthead balances at 1024. Those are Rishabh's to look
+   * at. What is decidable here is the shape of the markup, the request behaviour, and the
+   * attribution — and attribution is a legal question rather than a visual one.
+   *
+   * The fixture team is **Ferrari, which has a car and no mark** — a prancing horse is above the
+   * threshold of originality and no free file exists. That is the common case of the seven-of-eleven
+   * gap, so it is the one the default harness exercises.
+   */
+  const withRef = (ref: string, name: string) => ({
+    ...TEAM,
+    team: { ...TEAM.team, ref, name },
+  });
+
+  it('renders the car for a team that has one, lazily — the h1 is this page’s LCP candidate', () => {
+    renderPage();
+    const car = document.querySelector('.portrait[data-shape="plate"] img');
+    expect(car?.getAttribute('src')).toBe('/assets/teams/ferrari-car-320.webp');
+    expect(car?.getAttribute('loading')).toBe('lazy');
+    // `alt=""`: the team's name is the `h1` beside it, and what a reader cannot get from the
+    // picture — whose car, at which event — is the caption underneath, in text.
+    expect(car?.getAttribute('alt')).toBe('');
+  });
+
+  it('discloses whose car it is, because the Ferrari plate is Hamilton’s', () => {
+    /*
+     * §7.17.4's rule carried over to the cars. A number 44 on the Ferrari page is a fact a reader
+     * is owed rather than left to infer, and the event dates the livery.
+     */
+    renderPage();
+    const car = carFor('ferrari');
+    if (car === undefined) throw new Error('the fixture team left the manifest');
+    expect(screen.getByText(car.title)).toBeTruthy();
+    expect(car.title).toContain('Hamilton');
+  });
+
+  it('credits the photographer in visible text — CC BY-SA 4.0 asks for exactly that', () => {
+    renderPage();
+    const credit = screen.getByRole('button', { name: /Open the imagery credits/ });
+    expect(credit.textContent).toContain('Lukas Raich');
+    expect(credit.textContent).toContain('CC BY-SA 4.0');
+  });
+
+  it('renders no mark for a team that has none, and does not fall back to anything', () => {
+    renderPage();
+    expect(logoFor('ferrari')).toBeUndefined();
+    expect(document.querySelector('.mark-plate')).toBeNull();
+  });
+
+  it('renders a mark beside the car where both exist, each with its own credit control', () => {
+    /*
+     * **One control per image, not per surface.** Williams' mark is CC BY-SA 4.0 in its own right,
+     * so a single line crediting only the car would leave the other uncredited beside it.
+     */
+    renderPage({ team: withRef('mclaren', 'McLaren') });
+    const mark = document.querySelector('.mark-plate img');
+    expect(mark?.getAttribute('src')).toBe('/assets/teams/mclaren.svg');
+    expect(mark?.getAttribute('alt')).toBe('');
+    expect(mark?.getAttribute('aria-hidden')).toBe('true');
+    // A mark ships as one file — a srcSet naming it twice would be a false claim about the asset.
+    expect(mark?.hasAttribute('srcset')).toBe(false);
+
+    const credits = screen.getAllByRole('button', { name: /Open the imagery credits/ });
+    expect(credits).toHaveLength(2);
+  });
+
+  it('leaves the masthead in one column for the 203 teams with no imagery at all', () => {
+    /*
+     * ⚠ **The defect this exists to prevent, and one no rendering test can see.** A component that
+     * returns `null` still arrives at its parent as a real element, so passing it unconditionally
+     * would set the two-column attribute for all 214 teams and squeeze the name into `1fr` of
+     * `1fr + 26rem` beside an empty column on 203 of them. jsdom lays nothing out; the predicate
+     * that keeps the attribute off is what this asserts.
+     */
+    renderPage({ team: withRef('lotus', 'Team Lotus') });
+    const head = document.querySelector('.entity-masthead-head');
+    expect(head?.hasAttribute('data-aside')).toBe(false);
+    expect(document.querySelector('.team-imagery')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Open the imagery credits/ })).toBeNull();
+    // And the page is otherwise complete: the imagery is enrichment, never the shipping form.
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Team Lotus');
+  });
+
+  it('marks the head as two-column exactly when there is a second column', () => {
+    renderPage();
+    expect(document.querySelector('.entity-masthead-head')?.getAttribute('data-aside')).toBe(
+      'true',
+    );
+  });
+});
 
 describe('mergeYears — a gap in a spell is real and must survive', () => {
   it('merges consecutive years into one run', () => {

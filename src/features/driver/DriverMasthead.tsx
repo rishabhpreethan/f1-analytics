@@ -1,6 +1,8 @@
 import type { Driver } from '@schemas/driver';
 import { CareerRibbon } from '@/components/entity/CareerRibbon';
 import { EntityMasthead, type MastheadFact } from '@/components/entity/EntityMasthead';
+import { CreditLine } from '@/features/credits/CreditLine';
+import { photographFor } from '@/features/credits/imagery';
 import { driverRibbon } from './presenters';
 
 /**
@@ -10,6 +12,12 @@ import { driverRibbon } from './presenters';
  * death anywhere, so an age computed against today would confidently report Fangio at 114. The
  * payload publishes `ageAtFirstRace` and `ageAtLastRace` instead — two figures derived from dates
  * the data holds, correct forever and carrying no clock — and the meta line reads them.
+ *
+ * **The photograph layer is wired here and only here at full priority** (§7.17.6). This portrait is
+ * likely the largest element on the page and therefore the LCP candidate, so it loads eagerly; the
+ * index rows and the compare tray bays are below the fold and stay lazy. 22 of 881 drivers have a
+ * photograph, so for 859 of these pages the portrait is the monogram — the same shape, the same
+ * border, the same identity bar — and the credit line below simply does not render.
  *
  * **A driver with no code gets no badge.** `abbreviation` is null for 774 of 881, so an empty or
  * `—` badge would be the common case and would state a fact about our source rather than about the
@@ -69,6 +77,7 @@ export function DriverMasthead({ driver, pending }: DriverMastheadProps) {
   }
 
   const ribbon = driver === null ? [] : driverRibbon(driver.seasons);
+  const photograph = photographFor(driver?.driver.ref);
 
   return (
     <EntityMasthead
@@ -78,6 +87,9 @@ export function DriverMasthead({ driver, pending }: DriverMastheadProps) {
       code={driver?.driver.code ?? null}
       teamReference={driver?.races.at(-1)?.teamRef ?? null}
       portrait="driver"
+      reference={driver?.driver.ref ?? null}
+      priority
+      credit={<CreditLine images={[photograph]} />}
       facts={facts}
       pending={pending}
     >

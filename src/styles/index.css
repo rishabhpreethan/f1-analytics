@@ -30,6 +30,10 @@
  * index is the front door to a profile, not a second surface. */
 @import './entity-index.css';
 @import './compare.css';
+/* The photograph credits (§7.18). After `compare.css` because it reuses `index.css`'s `.stat-strip`,
+ * `.ruler`, `.link` and `.btn-icon` and adds only the dialog's own geometry — attribution is a
+ * surface of this product, not a second one. */
+@import './credits.css';
 
 /*
  * Tailwind v4 needs an explicit custom variant for an attribute-driven theme, so
@@ -831,7 +835,8 @@
   }
 
   /* ------------------------------------------------------- the overflow sheet, <1024 (G-5) */
-  .dock-scrim {
+  .dock-scrim,
+  .credits-scrim {
     position: fixed;
     inset: 0;
     z-index: var(--z-overlay);

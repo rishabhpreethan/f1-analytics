@@ -39,6 +39,33 @@
     gap: calc(var(--spacing) * 6);
   }
 
+  /*
+   * §7.19.3 — **the masthead's second column, and it only exists when there is something to put in
+   * it.** 11 of 214 teams have a car and 7 have a mark; for the other 203 this attribute is absent
+   * and the head is the plain block it has always been. Nothing about the single-column case
+   * announces a gap, which is the whole argument for the imagery being an *optional layer* rather
+   * than a slot with a placeholder (§7.19.2).
+   *
+   * The column is `1fr | 26rem` at ≥1024 and stacked below it, and the breakpoint is the car's
+   * doing rather than a habit: a 2:1 plate beside the name at 768 would leave `Aston Martin` about
+   * 140px to set `--display-lg` in, and stacked on a phone it would push the career ribbon half a
+   * viewport down. `align-items: center` rather than `end`, because the text column's height is a
+   * function of how many facts a team has and a bottom-aligned photograph would sit at a different
+   * height on every page.
+   */
+  @media (min-width: 64rem) {
+    .entity-masthead-head[data-aside='true'] {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+      align-items: center;
+      gap: calc(var(--spacing) * 10);
+    }
+
+    .entity-masthead-head[data-aside='true'] .team-imagery {
+      margin-top: 0;
+    }
+  }
+
   .entity-headline {
     display: flex;
     align-items: center;
@@ -130,15 +157,60 @@
     }
   }
 
+  /*
+   * §7.17.1 — **the band is the same shape at a different size, not a second component.** Full
+   * bay width, and its height is an `aspect-ratio` rather than a length **on purpose**: `cover`
+   * scales a portrait source to the box width, so a fixed pixel height would show 27% of the frame
+   * in a 319px bay and 40% in a 219px one — one photograph framed two ways on one page. 16:9 shows
+   * a constant 36–47% of every source (mean ≈41%), which makes the framing a property of the set.
+   *
+   * The attribute selector out-specifies the plain `.portrait` rules above **and** the one inside
+   * the 48rem media query, so it needs no ordering to hold.
+   */
+  .portrait[data-shape='band'] {
+    display: flex;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--portrait-band-aspect);
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: 0;
+  }
+
   /* The 3px identity bar — the only place the entity's colour appears in this component, and it is
-   * beside a name, which is the one role §3.3a.1 permits a brand colour. */
+   * beside a name, which is the one role §3.3a.1 permits a brand colour.
+   *
+   * `z-index: 1` because the photograph is a real child and would otherwise paint over a pseudo
+   * element that is generated before it. §7.17.4: the bar is a **label beside a face** — it stays
+   * 3px and never becomes a tint, a ring or a frame, because several of these photographs show the
+   * right driver in the wrong team's kit and a coloured frame would assert otherwise. */
   .portrait::before {
     content: '';
     position: absolute;
+    z-index: 1;
     inset-block: 0;
     inset-inline-start: 0;
     width: 3px;
     background: var(--identity, var(--border-strong));
+  }
+
+  /*
+   * §7.17.2 — **`top center` is measured, not chosen.** Every source is portrait-orientation,
+   * aspect 0.64–0.84 w/h, so any shape wider than that crops the height, and `center center`
+   * decapitates the wider framings; `top center` held all 22 on a contact sheet. It is a **set-wide
+   * constant**, never tuned per image: there are 22 now and more later, and a per-image value is
+   * one nobody maintains and no test can check.
+   *
+   * Absolute rather than a sized child, so the container's own box is the only thing that decides
+   * the geometry — there is no intrinsic size to reserve and therefore no layout shift.
+   */
+  .portrait-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: var(--portrait-crop);
   }
 
   /*
@@ -154,6 +226,110 @@
     font-stretch: 82%;
     font-weight: 700;
     letter-spacing: 0.02em;
+  }
+
+  /*
+   * In a band the monogram scales with the shape. `--ink-primary` at display-lg is **deliberately
+   * committed**: three monograms beside one photograph have to read as a design decision, and a
+   * mark set in `--ink-tertiary` would read as the absence of a photograph instead (§7.17.1).
+   */
+  .portrait[data-shape='band'] .portrait-mark {
+    font-size: var(--text-display-lg);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+    line-height: var(--text-display-lg--line-height);
+  }
+
+  /* ============================================================ §7.19 the team imagery */
+
+  /*
+   * The mark, the car, the car's caption and the credit, as one stack. `max-width` so the car does
+   * not go full-bleed on a tablet, where the column has not yet split.
+   */
+  .team-imagery {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+    max-width: 32rem;
+    margin-top: calc(var(--spacing) * 6);
+  }
+
+  /*
+   * §7.19.4 — **a fixed white ground, identical in both themes, and it is not a styling choice.**
+   * All six mark SVGs use fixed fills rather than `currentColor` (grepped) and several are solid
+   * black, so on `--surface-sunken` in dark mode they would be invisible; the seventh is a PNG with
+   * colour-type 2 and no `tRNS` chunk, i.e. an opaque white rectangle with no alpha, which this
+   * ground absorbs. Recolouring is unavailable: `invert()` turns Haas's red cyan and Ferrari's
+   * yellow blue, and altering a trademark is not ours to do.
+   *
+   * The plate **shrink-wraps** its mark rather than boxing it, and the size is set on the height.
+   * The seven run from 0.91:1 to 14.3:1, so a fixed square would draw the Williams wordmark at 4px
+   * tall; a definite 28px height with a 160px width cap lets the tall ones fill the height and the
+   * wide ones the width, and all seven land between 25 and 160px wide.
+   */
+  .mark-plate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    padding-inline: calc(var(--spacing) * 3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--mark-plate);
+  }
+
+  /*
+   * ⛔ **`flex: none`, and it is the whole reason this rule renders anything at all.** `PLAN.md`
+   * already records this fault from the dock rail — *a glyph is never a flexible box* — and this is
+   * the same mechanism on a different element, caught in Rishabh's capture of `/teams/mclaren`:
+   * the mark was a **26×48 white sliver with nothing in it**, the plate's own padding around a box
+   * computed at 0×0.
+   *
+   * **Two of the six SVGs — `haas.svg` and `mclaren.svg` — carry a `viewBox` and no `width`/
+   * `height` attributes**, so they have an intrinsic *ratio* and no intrinsic *dimensions*. A
+   * replaced element with no intrinsic size has a **min-content contribution of zero**, and
+   * `min-width: auto` plus the default `flex-shrink: 1` then let it collapse to nothing inside a
+   * shrink-to-fit plate that has no width to give it. The other four declare `width`/`height` and
+   * would have survived — which is the worst version of this bug, because it looks like *"some
+   * logos work"* rather than like a rule being wrong.
+   *
+   * **The sizing is also made independent of intrinsic dimensions**, rather than only unblocked.
+   * `height` is a definite 28px and `width` is `auto`, so the used width is `28 × ratio` — and
+   * every one of the seven has a ratio, from a `viewBox` or from being a raster. `max-height` was
+   * the wrong control: it constrains a size that first has to exist.
+   *
+   * `object-fit: contain` is what catches Williams, whose `width`/`height` attributes (300×25,
+   * ratio 12) disagree with its own `viewBox` (ratio 14.26). The box resolves to 160×28 after the
+   * width cap and the mark is drawn 160×11.2 inside it rather than stretched to fill.
+   */
+  .mark-plate img {
+    flex: none;
+    width: auto;
+    height: 28px;
+    max-width: 160px;
+    object-fit: contain;
+  }
+
+  /*
+   * §7.19.5 — **the car, as `.portrait`'s third shape.** Same border, same radius, same ground,
+   * same 3px identity bar; only the aspect and the crop anchor differ, which is the same "one
+   * shape, several fills" argument §7.17.1 makes for the band. A separate plate component would be
+   * a second convention for the same object.
+   *
+   * `--car-aspect` is `2 / 1` because **every source file is exactly 2:1**, so `cover` crops
+   * nothing and all eleven are framed identically — the property that makes a row of them
+   * comparable. `--car-crop` overrides the portrait layer's `top center`: a side-on car is centred
+   * in its frame, and a top anchor would cut the tyres off.
+   */
+  .portrait[data-shape='plate'] {
+    display: flex;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--car-aspect);
+  }
+
+  .portrait[data-shape='plate'] .portrait-photo {
+    object-position: var(--car-crop);
   }
 
   /* ============================================================ §7.9 the career ribbon */

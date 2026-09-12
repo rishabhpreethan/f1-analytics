@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
+import { CreditsProvider } from '@/features/credits/CreditsProvider';
+import { photographFor } from '@/features/credits/imagery';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -199,26 +202,105 @@ const DRIVER: Driver = {
  * `DataUnavailableState` reaches for a query client to offer its retry, so the provider is part of
  * the harness rather than of the page. Retries are off: a failing query that retries three times
  * turns a state assertion into a timing one.
+ *
+ * **`CreditsProvider` is part of the harness for the same reason**, since §7.17's photograph layer
+ * was wired into this masthead: a driver who has a photograph gets a credit line beside it, and
+ * `useCredits` **throws** without a provider rather than returning a no-op. That guard is
+ * deliberate — a credit control that silently does nothing is a licence breach that looks like a
+ * working page — so the harness supplies what the shell supplies, instead of the component being
+ * softened to survive being rendered alone.
  */
 function renderPage(over: Partial<Parameters<typeof DriverPage>[0]> = {}) {
   return render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
-        <DriverPage
-          driver={DRIVER}
-          pending={false}
-          error={null}
-          onRetry={() => undefined}
-          {...over}
-        />
-      </MemoryRouter>
+      <CreditsProvider>
+        <MemoryRouter>
+          <DriverPage
+            driver={DRIVER}
+            pending={false}
+            error={null}
+            onRetry={() => undefined}
+            {...over}
+          />
+        </MemoryRouter>
+      </CreditsProvider>
     </QueryClientProvider>,
   );
 }
 
 afterEach(cleanup);
+
+describe('the photograph layer on the masthead — §7.17, §7.18.1', () => {
+  /*
+   * ⚠ **jsdom loads no images and lays nothing out.** Nothing here sees the portrait: not its
+   * crop, not whether a face survives `object-fit: cover` at 72px, not whether the credit line
+   * sits clear of the name. What is asserted is the markup a browser needs in order to get those
+   * right, and the legal obligation, which is not a visual question at all.
+   */
+  const photographed = {
+    ...DRIVER,
+    driver: { ...DRIVER.driver, ref: 'hamilton', forename: 'Lewis', surname: 'Hamilton' },
+  };
+
+  it('renders no img at all for a driver with no photograph — the 859 case', () => {
+    // Not a broken image and not a composed path: 859 composed paths on an index page would be 859
+    // failed requests in one paint (§7.17.6). `mika_hakkinen` is not in the manifest.
+    renderPage();
+    expect(document.querySelector('.portrait img')).toBeNull();
+    expect(document.querySelector('.portrait')?.getAttribute('data-filled')).toBe('mark');
+  });
+
+  it('renders no credit line where there is no image to credit', () => {
+    renderPage();
+    expect(screen.queryByRole('button', { name: /Open the imagery credits/ })).toBeNull();
+  });
+
+  it('loads the photographed masthead eagerly, because it is the page’s LCP candidate', () => {
+    /*
+     * §7.17.6 — the driver profile is the **one** place the portrait is not lazy. Lazy-loading the
+     * largest element on the page is a self-inflicted LCP regression, and it is invisible in every
+     * other kind of test.
+     */
+    renderPage({ driver: photographed });
+    const image = document.querySelector('.portrait img');
+    expect(image?.getAttribute('loading')).toBe('eager');
+    expect(image?.getAttribute('fetchpriority')).toBe('high');
+    expect(image?.getAttribute('srcset')).toContain('320w');
+    // `alt=""`: the name is the `h1` directly beside it, so a described portrait reads the same
+    // fact twice (§7.17.1).
+    expect(image?.getAttribute('alt')).toBe('');
+  });
+
+  it('puts the photographer’s name in visible text beside the photograph', () => {
+    /*
+     * **This is the CC BY obligation itself**, not a nicety: the licence asks for the author to
+     * travel with the work, and a name reachable only from a panel a reader has to know about is
+     * not that. The panel is the full record and is one click from here.
+     */
+    renderPage({ driver: photographed });
+    const credit = screen.getByRole('button', { name: /Open the imagery credits/ });
+    const photograph = photographFor('hamilton');
+    if (photograph === undefined) throw new Error('the fixture driver left the manifest');
+    expect(credit.textContent).toContain(photograph.artist);
+    expect(credit.textContent).toContain(photograph.licence);
+  });
+
+  it('opens the credits panel at that driver’s own plate, not at the top of forty', async () => {
+    /*
+     * jsdom implements no scrolling and therefore does not define `scrollIntoView` at all — the
+     * panel's deep-entry effect calls it unguarded, which is correct for every real browser. Stub
+     * it rather than guard the product against a jsdom gap.
+     */
+    Element.prototype.scrollIntoView = vi.fn();
+    const user = userEvent.setup();
+    renderPage({ driver: photographed });
+    await user.click(screen.getByRole('button', { name: /Open the imagery credits/ }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('#credit-driver-hamilton')).not.toBeNull();
+  });
+});
 
 describe('the masthead — DR-1', () => {
   it('sets the name as the page’s one h1', () => {

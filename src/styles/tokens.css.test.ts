@@ -296,3 +296,45 @@ describe('§6.3a — the outcome ramp is two numbers, and they are gated elsewhe
     expect(mix('classified')).toBe(30);
   });
 });
+
+/**
+ * **The photograph layer's two set-wide constants — §7.17.2.**
+ *
+ * They are tokens rather than declarations at a call site because each is a measured property of
+ * *the whole set of source photographs*, not styling: a component that re-decided either would
+ * frame one driver differently from the other twenty-one.
+ *
+ * ⚠ **Named limitation.** These assert that the tokens exist and hold the measured values. They
+ * cannot assert that `.portrait-photo` still *reads* them: `entity-page.css` is not in
+ * `vite.config.ts`'s `test.css.include`, so `?raw` resolves it to the empty string, and a client
+ * test reaching the filesystem is the wrong fix (see `index.css.test.ts`'s note). Adding
+ * `/entity-page\.css/` to that array is a one-line change in a file this round did not own, and it
+ * is reported as such — with it, the rule bodies become assertable.
+ */
+describe('§7.17.2 — the crop is a token, because it is a property of the set', () => {
+  const value = (token: string) => {
+    const match = new RegExp(`${token}:\\s*([^;]+);`).exec(TOKENS);
+    return match?.[1]?.trim();
+  };
+
+  it('anchors every crop at the top, which is measured rather than chosen', () => {
+    /*
+     * Every source is portrait-orientation (aspect 0.64–0.84 w/h), so any shape wider than that
+     * crops the height. CSS's default — `center center`, which is also what you get by writing
+     * nothing — decapitates the wider framings. Verified against a contact sheet of all 22.
+     */
+    expect(value('--portrait-crop')).toBe('top center');
+    expect(value('--portrait-crop')).not.toContain('center center');
+  });
+
+  it('sizes the band by ratio and never by length', () => {
+    /*
+     * `cover` scales a portrait source to the box *width*, so a pixel height shows a different
+     * fraction of the frame at every bay width — one photograph framed two ways on one page. A
+     * ratio shows a constant 36–47% of every source at every width.
+     */
+    const aspect = value('--portrait-band-aspect');
+    expect(aspect).toBe('16 / 9');
+    expect(aspect).not.toMatch(/px|rem|%/);
+  });
+});

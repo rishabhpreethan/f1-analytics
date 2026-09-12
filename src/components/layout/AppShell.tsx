@@ -5,6 +5,8 @@ import { CommandDock } from '@/components/layout/CommandDock';
 import { Header } from '@/components/layout/Header';
 import { BACKDROP_ATTRIBUTE, backdropAttributeFor } from '@/components/layout/backdrop';
 import { NAV_ITEMS } from '@/components/layout/navItems';
+import { CreditsProvider } from '@/features/credits/CreditsProvider';
+import { CreditsTrigger } from '@/features/credits/CreditsTrigger';
 import { useHeaderHairline } from '@/lib/motion/scroll';
 import { shellMount } from '@/lib/motion/surfaces';
 import { useMotion } from '@/lib/motion/useMotion';
@@ -64,45 +66,54 @@ export function AppShell({ children, footerNote }: AppShellProps) {
   return (
     // `isolation: isolate` on the shell root, so the grain's `mix-blend-mode` cannot reach
     // past the shell into the page's own root stacking context.
-    <div className="shell-root flex min-h-screen flex-col">
-      <AtmosphereField />
+    <CreditsProvider>
+      <div className="shell-root flex min-h-screen flex-col">
+        <AtmosphereField />
 
-      <a href="#main" className="skip-link t-sm">
-        Skip to main content
-      </a>
+        <a href="#main" className="skip-link t-sm">
+          Skip to main content
+        </a>
 
-      <header ref={headerScope} className="shell-header sticky top-0">
-        <Header />
+        <header ref={headerScope} className="shell-header sticky top-0">
+          <Header />
+
+          {/*
+           * G-13. Two elements rather than a border on the header itself: the hairline fades in and
+           * the 96px accent segment grows `scaleX 0→1` from the left, and a border cannot do the
+           * second. `data-scrolled` on `<html>` shows the hairline without either tween, which is
+           * what a reduced-motion user gets at the same threshold.
+           */}
+          <div ref={hairlineScope} className="header-hairline" aria-hidden="true">
+            <span className="header-hairline-line" data-motion="hairline" />
+            <span className="header-hairline-accent" data-motion="hairline-accent" />
+          </div>
+        </header>
 
         {/*
-         * G-13. Two elements rather than a border on the header itself: the hairline fades in and
-         * the 96px accent segment grows `scaleX 0→1` from the left, and a border cannot do the
-         * second. `data-scrolled` on `<html>` shows the hairline without either tween, which is
-         * what a reduced-motion user gets at the same threshold.
+         * DOM order is `header` → `nav` → `main` → `footer`, whatever the dock's visual position
+         * (§10). Focus order follows DOM order, so this is what puts the destinations before the
+         * page content for a keyboard user at both widths — and it is why the dock is a sibling
+         * of `main` rather than a child of the header.
          */}
-        <div ref={hairlineScope} className="header-hairline" aria-hidden="true">
-          <span className="header-hairline-line" data-motion="hairline" />
-          <span className="header-hairline-accent" data-motion="hairline-accent" />
-        </div>
-      </header>
+        <CommandDock items={NAV_ITEMS} />
 
-      {/*
-       * DOM order is `header` → `nav` → `main` → `footer`, whatever the dock's visual position
-       * (§10). Focus order follows DOM order, so this is what puts the destinations before the
-       * page content for a keyboard user at both widths — and it is why the dock is a sibling
-       * of `main` rather than a child of the header.
-       */}
-      <CommandDock items={NAV_ITEMS} />
+        <main id="main" className="shell-main flex-1">
+          {children}
+        </main>
 
-      <main id="main" className="shell-main flex-1">
-        {children}
-      </main>
-
-      <footer className="shell-footer">
-        <div className="shell-container t-xs text-ink-tertiary px-4 py-6 md:px-6 xl:px-8">
-          {footerNote}
-        </div>
-      </footer>
-    </div>
+        {/*
+         * §7.18.1 — the always-available entry point to the photograph credits. The footer is not
+         * the *primary* one (a reader who sees a photograph gets a control beside it), but it is the
+         * one that exists on every page, including the index pages where a per-image control cannot
+         * go: an index row is a `Link`, and a button inside a link is invalid markup.
+         */}
+        <footer className="shell-footer">
+          <div className="shell-container t-xs text-ink-tertiary flex flex-wrap items-center justify-between gap-3 px-4 py-6 md:px-6 xl:px-8">
+            <span>{footerNote}</span>
+            <CreditsTrigger className="t-xs" />
+          </div>
+        </footer>
+      </div>
+    </CreditsProvider>
   );
 }

@@ -521,6 +521,41 @@
   --size-portrait: 72px; /* `EntityPortrait`, ≥768 */
   --size-portrait-sm: 56px; /* `EntityPortrait`, <768 */
 
+  /* ---- the photograph layer (§7.17). Two values that are **measured constraints on the whole
+   * set of sources**, not per-component styling, which is why they are tokens: a call site that
+   * re-decided either of them would reframe one driver differently from the other twenty-one.
+   *
+   * `--portrait-crop` — every source is portrait-orientation, aspect 0.64–0.84 w/h, so any shape
+   * wider than that crops the height. CSS's default `center center` decapitates the wider
+   * framings; `top center` held all 22 on a contact sheet. **Set-wide, never tuned per image** —
+   * there are 22 now and there will be more later, and a per-image value is one nobody maintains
+   * and no test can check.
+   *
+   * `--portrait-band-aspect` — a ratio and not a height, because `cover` scales a portrait source
+   * to the box *width*: a fixed pixel height would show 27% of the frame in a 319px bay and 40% in
+   * a 219px one, which is one photograph framed two ways on one page. 16/9 shows a constant
+   * 36–47% of every source (mean ≈41%) at every width. */
+  --portrait-crop: top center;
+  --portrait-band-aspect: 16 / 9;
+
+  /* ---- the team imagery layer (§7.19). Both are measured properties of the sets, not styling.
+   *
+   * `--car-aspect` — every one of the 11 car files is **exactly 2:1** (320x160 / 640x320; two are
+   * 320x161, a 0.6% difference). So a 2/1 shape shows the whole car with no meaningful crop, and
+   * `--car-crop` is `center` rather than the portrait layer's `top center`: a car is centred in its
+   * frame and anchoring a side-on profile to the top of the box would cut the tyres off.
+   *
+   * `--mark-plate` — a **fixed white ground for third-party marks, identical in both themes.** All
+   * six mark SVGs use fixed fills rather than `currentColor` (grepped, 2026-09-12) and several are
+   * solid black, so on the dark theme they would be invisible; the seventh, Red Bull's, is a PNG
+   * with colour-type 2 and no `tRNS` chunk, i.e. an opaque white background with no alpha at all.
+   * A white plate answers both at once — the dark marks get the ground they were drawn for, and
+   * Red Bull's own white rectangle disappears into it. **Recolouring is not an option**: a CSS
+   * `invert()` would turn Haas's red cyan and Ferrari's yellow blue, which alters a trademark. */
+  --car-aspect: 2 / 1;
+  --car-crop: center;
+  --mark-plate: #ffffff;
+
   /* ---- the entity indexes (§6.6.4, §7.12, §7.13). px for the same reason as the block above:
    * these are named dimensions rather than spacing, and `--size-index-row*` in particular is fed
    * to `contain-intrinsic-size`, where the figure is a *placeholder for a measured height* — a
