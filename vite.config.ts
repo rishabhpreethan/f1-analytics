@@ -166,6 +166,7 @@ export default defineConfig({
         /index\.css/,
         /entity\.css/,
         /entity-page\.css/,
+        /credits\.css/,
         /compare\.css/,
         /charts\.css/,
       ],

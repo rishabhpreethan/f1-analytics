@@ -105,6 +105,18 @@ async function download(entry, attempt = 0) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+/**
+ * Commons returns `Artist` as HTML. Stripping the tags concatenates nested text,
+ * so a field marked up as `<span>Unknown author</span>Unknown author` comes back
+ * as "Unknown author Unknown author" — which then renders verbatim on a credits
+ * plate. Collapse an exact self-repetition rather than trusting the source string.
+ */
+const undouble = (name) => {
+  if (!name) return name;
+  const half = name.slice(0, Math.floor(name.length / 2)).trim();
+  return half.length > 3 && name.trim() === `${half} ${half}` ? half : name.trim();
+};
+
 const sources = JSON.parse(readFileSync(SOURCES, 'utf8'));
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
 if (!existsSync(TEAM_DIR)) mkdirSync(TEAM_DIR, { recursive: true });
@@ -167,7 +179,7 @@ for (const entry of sources.logos ?? []) {
     kind: 'logo',
     src: { logo: `/assets/teams/${name}` },
     title: entry.title.replace(/^File:/, ''),
-    artist: entry.artist,
+    artist: undouble(entry.artist),
     licence: entry.licence,
     licenceUrl: entry.licenceUrl,
     sourceUrl: entry.descriptionUrl,
@@ -210,7 +222,7 @@ for (const entry of sources.cars ?? []) {
     kind: 'car',
     src: emitted,
     title: entry.title.replace(/^File:/, ''),
-    artist: entry.artist,
+    artist: undouble(entry.artist),
     licence: entry.licence,
     licenceUrl: entry.licenceUrl,
     sourceUrl: entry.descriptionUrl,
@@ -261,7 +273,7 @@ for (const entry of sources.drivers) {
     ref: entry.ref,
     src: emitted,
     title: entry.title.replace(/^File:/, ''),
-    artist: entry.artist,
+    artist: undouble(entry.artist),
     licence: entry.licence,
     licenceUrl: entry.licenceUrl,
     sourceUrl: entry.descriptionUrl,
