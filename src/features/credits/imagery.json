@@ -264,5 +264,236 @@
       "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
       "sourceUrl": "https://commons.wikimedia.org/wiki/File:2025_Japan_GP_-_Aston_Martin_-_Lance_Stroll_-_Fanzone_Stage_(cropped).jpg"
     }
+  ],
+  "cars": [
+    {
+      "ref": "alpine",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/alpine-car-320.webp",
+        "640": "/assets/teams/alpine-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 10 Gasly (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._10_Gasly_(3).jpg"
+    },
+    {
+      "ref": "aston_martin",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/aston_martin-car-320.webp",
+        "640": "/assets/teams/aston_martin-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 14 Alonso (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._14_Alonso_(3).jpg"
+    },
+    {
+      "ref": "audi",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/audi-car-320.webp",
+        "640": "/assets/teams/audi-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 27 Hülkenberg (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._27_H%C3%BClkenberg_(3).jpg"
+    },
+    {
+      "ref": "cadillac",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/cadillac-car-320.webp",
+        "640": "/assets/teams/cadillac-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 11 Perez (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._11_Perez_(3).jpg"
+    },
+    {
+      "ref": "ferrari",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/ferrari-car-320.webp",
+        "640": "/assets/teams/ferrari-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 44 Hamilton (1).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._44_Hamilton_(1).jpg"
+    },
+    {
+      "ref": "haas",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/haas-car-320.webp",
+        "640": "/assets/teams/haas-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 31 Ocon (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._31_Ocon_(3).jpg"
+    },
+    {
+      "ref": "mclaren",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/mclaren-car-320.webp",
+        "640": "/assets/teams/mclaren-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 1 Norris (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._1_Norris_(3).jpg"
+    },
+    {
+      "ref": "mercedes",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/mercedes-car-320.webp",
+        "640": "/assets/teams/mercedes-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 12 Antonelli (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._12_Antonelli_(3).jpg"
+    },
+    {
+      "ref": "rb",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/rb-car-320.webp",
+        "640": "/assets/teams/rb-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 41 Lindblad (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._41_Lindblad_(3).jpg"
+    },
+    {
+      "ref": "red_bull",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/red_bull-car-320.webp",
+        "640": "/assets/teams/red_bull-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 3 Verstappen (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._3_Verstappen_(3).jpg"
+    },
+    {
+      "ref": "williams",
+      "kind": "car",
+      "src": {
+        "320": "/assets/teams/williams-car-320.webp",
+        "640": "/assets/teams/williams-car-640.webp"
+      },
+      "title": "FIA F1 Austria 2026 Nr. 23 Albon (3).jpg",
+      "artist": "Lukas Raich",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FIA_F1_Austria_2026_Nr._23_Albon_(3).jpg"
+    }
+  ],
+  "logos": [
+    {
+      "ref": "alpine",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/alpine.svg"
+      },
+      "title": "Alpine F1 Team Logo.svg",
+      "artist": "Alpine F1 Team",
+      "licence": "Public domain",
+      "licenceUrl": null,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Alpine_F1_Team_Logo.svg"
+    },
+    {
+      "ref": "audi",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/audi.svg"
+      },
+      "title": "Audi-Logo 2016.svg",
+      "artist": "Strichpunkt / KMS Team",
+      "licence": "Public domain",
+      "licenceUrl": null,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Audi-Logo_2016.svg"
+    },
+    {
+      "ref": "haas",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/haas.svg"
+      },
+      "title": "TGR Haas F1 Team Logo (2026).svg",
+      "artist": "Haas F1 Team",
+      "licence": "Public domain",
+      "licenceUrl": null,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:TGR_Haas_F1_Team_Logo_(2026).svg"
+    },
+    {
+      "ref": "mclaren",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/mclaren.svg"
+      },
+      "title": "McLaren Speedmark.svg",
+      "artist": "Ved havet",
+      "licence": "Public domain",
+      "licenceUrl": null,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:McLaren_Speedmark.svg"
+    },
+    {
+      "ref": "mercedes",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/mercedes.svg"
+      },
+      "title": "Mercedes-AMG Petronas F1 Team logo (2026).svg",
+      "artist": "Mercedes-AMG Petronas F1 Team",
+      "licence": "Public domain",
+      "licenceUrl": null,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mercedes-AMG_Petronas_F1_Team_logo_(2026).svg"
+    },
+    {
+      "ref": "red_bull",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/red_bull-160.webp"
+      },
+      "title": "Red Bull Racing logo ita.png",
+      "artist": "Unknown author Unknown author",
+      "licence": "Public domain",
+      "licenceUrl": null,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Red_Bull_Racing_logo_ita.png"
+    },
+    {
+      "ref": "williams",
+      "kind": "logo",
+      "src": {
+        "logo": "/assets/teams/williams.svg"
+      },
+      "title": "Williams Racing 2022 logo.svg",
+      "artist": "Williams Racing",
+      "licence": "CC BY-SA 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Williams_Racing_2022_logo.svg"
+    }
   ]
 }
