@@ -4,11 +4,13 @@ import { ShareChart, SpanChart } from '@/components/charts';
 import { CareerRibbon } from '@/components/entity/CareerRibbon';
 import { EntityMasthead, type MastheadFact } from '@/components/entity/EntityMasthead';
 import { StatTiles } from '@/components/entity/StatTiles';
+import { TeamImagery } from '@/components/entity/TeamImagery';
 import { DataUnavailableState } from '@/components/ui/DataUnavailableState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { StateCard } from '@/components/ui/StateCard';
 import { Trophy } from '@/components/ui/icons';
+import { hasTeamImagery } from '@/features/credits/imagery';
 import { adjustmentNote } from '@/features/season/presenters';
 import { teamLineupRows, teamRibbon, teamSplitRows, teamTiles } from './presenters';
 
@@ -19,6 +21,11 @@ import { teamLineupRows, teamRibbon, teamSplitRows, teamTiles } from './presente
  * twice: **CN-4** is *which driver carried the team* (composition, a share chart) and **CN-3** is
  * *who drove and when* (sequence, a span chart). Neither is a magnitude, which is why neither is a
  * bar.
+ *
+ * **The imagery layer is a second column of the masthead and only for the teams that have one**
+ * (§7.19). 11 of 214 teams have a car and 7 have a mark; the other 203 get exactly the single-column
+ * masthead that shipped before, because nothing on this page depends on a picture and a placeholder
+ * would announce a gap on 95% of these pages in order to decorate 5%.
  *
  * **No lineage is claimed anywhere on this page.** `base_team` holds 0 rows (trap 5), so
  * Minardi → Toro Rosso → AlphaTauri → RB does not resolve, and presenting successive identities as
@@ -82,6 +89,16 @@ export function TeamPage({ team, pending, error, onRetry }: TeamPageProps) {
         portrait="team"
         facts={facts}
         pending={pending}
+        /*
+         * ⚠ The predicate, not the component. A component that returns `null` is still a real
+         * element, so passing it unconditionally would put the masthead into its two-column layout
+         * for all 214 teams and leave 203 names squeezed beside an empty column.
+         */
+        aside={
+          hasTeamImagery(team?.team.ref) ? (
+            <TeamImagery reference={team?.team.ref ?? null} />
+          ) : undefined
+        }
       >
         {(pending || ribbon.length > 0) && (
           <CareerRibbon

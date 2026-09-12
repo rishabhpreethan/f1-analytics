@@ -271,6 +271,24 @@ export function logoFor(ref: string | null | undefined): CreditedImage | undefin
   return lookup('logo', ref);
 }
 
+/**
+ * Whether a team has **any** imagery — the question the team masthead has to answer *before* it
+ * lays out, rather than after.
+ *
+ * ⚠ A React component that returns `null` still arrives at its parent as a perfectly real element,
+ * so `aside={<TeamImagery …/>}` would put the masthead into its two-column layout for all 214 teams
+ * and squeeze the name into `1fr` of `1fr + 26rem` beside an empty column on 203 of them. jsdom
+ * lays nothing out, so no rendering test in this repository could see that — the predicate is what
+ * makes it impossible rather than merely untested.
+ *
+ * It lives here rather than beside the component for the reason `CreditsContext` is separate from
+ * `CreditsProvider`: a module that exports both a component and a plain function loses fast
+ * refresh (`react-refresh/only-export-components`).
+ */
+export function hasTeamImagery(ref: string | null | undefined): boolean {
+  return carFor(ref) !== undefined || logoFor(ref) !== undefined;
+}
+
 export interface LicenceTally {
   licence: string;
   /** `null` for public domain — the ladder renders it as text, not as a dead link (§7.19.4). */

@@ -39,6 +39,33 @@
     gap: calc(var(--spacing) * 6);
   }
 
+  /*
+   * §7.19.3 — **the masthead's second column, and it only exists when there is something to put in
+   * it.** 11 of 214 teams have a car and 7 have a mark; for the other 203 this attribute is absent
+   * and the head is the plain block it has always been. Nothing about the single-column case
+   * announces a gap, which is the whole argument for the imagery being an *optional layer* rather
+   * than a slot with a placeholder (§7.19.2).
+   *
+   * The column is `1fr | 26rem` at ≥1024 and stacked below it, and the breakpoint is the car's
+   * doing rather than a habit: a 2:1 plate beside the name at 768 would leave `Aston Martin` about
+   * 140px to set `--display-lg` in, and stacked on a phone it would push the career ribbon half a
+   * viewport down. `align-items: center` rather than `end`, because the text column's height is a
+   * function of how many facts a team has and a bottom-aligned photograph would sit at a different
+   * height on every page.
+   */
+  @media (min-width: 64rem) {
+    .entity-masthead-head[data-aside='true'] {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+      align-items: center;
+      gap: calc(var(--spacing) * 10);
+    }
+
+    .entity-masthead-head[data-aside='true'] .team-imagery {
+      margin-top: 0;
+    }
+  }
+
   .entity-headline {
     display: flex;
     align-items: center;
@@ -210,6 +237,76 @@
     font-size: var(--text-display-lg);
     letter-spacing: var(--text-display-lg--letter-spacing);
     line-height: var(--text-display-lg--line-height);
+  }
+
+  /* ============================================================ §7.19 the team imagery */
+
+  /*
+   * The mark, the car, the car's caption and the credit, as one stack. `max-width` so the car does
+   * not go full-bleed on a tablet, where the column has not yet split.
+   */
+  .team-imagery {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--spacing) * 2);
+    max-width: 32rem;
+    margin-top: calc(var(--spacing) * 6);
+  }
+
+  /*
+   * §7.19.4 — **a fixed white ground, identical in both themes, and it is not a styling choice.**
+   * All six mark SVGs use fixed fills rather than `currentColor` (grepped) and several are solid
+   * black, so on `--surface-sunken` in dark mode they would be invisible; the seventh is a PNG with
+   * colour-type 2 and no `tRNS` chunk, i.e. an opaque white rectangle with no alpha, which this
+   * ground absorbs. Recolouring is unavailable: `invert()` turns Haas's red cyan and Ferrari's
+   * yellow blue, and altering a trademark is not ours to do.
+   *
+   * The plate **shrink-wraps** its mark rather than boxing it, and the cap is on height. The seven
+   * run from 0.91:1 to 14.3:1, so a fixed box would draw the Williams wordmark at 4px tall; a 28px
+   * height cap with a 160px width cap lets the tall ones fill the height and the wide ones the
+   * width, and all seven land between 25 and 160px wide. A replaced element honours both maxima
+   * while preserving its intrinsic ratio, which is what makes one rule cover the range.
+   */
+  .mark-plate {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    padding-inline: calc(var(--spacing) * 3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background-color: var(--mark-plate);
+  }
+
+  .mark-plate img {
+    width: auto;
+    height: auto;
+    max-width: 160px;
+    max-height: 28px;
+    object-fit: contain;
+  }
+
+  /*
+   * §7.19.5 — **the car, as `.portrait`'s third shape.** Same border, same radius, same ground,
+   * same 3px identity bar; only the aspect and the crop anchor differ, which is the same "one
+   * shape, several fills" argument §7.17.1 makes for the band. A separate plate component would be
+   * a second convention for the same object.
+   *
+   * `--car-aspect` is `2 / 1` because **every source file is exactly 2:1**, so `cover` crops
+   * nothing and all eleven are framed identically — the property that makes a row of them
+   * comparable. `--car-crop` overrides the portrait layer's `top center`: a side-on car is centred
+   * in its frame, and a top anchor would cut the tyres off.
+   */
+  .portrait[data-shape='plate'] {
+    display: flex;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--car-aspect);
+  }
+
+  .portrait[data-shape='plate'] .portrait-photo {
+    object-position: var(--car-crop);
   }
 
   /* ============================================================ §7.9 the career ribbon */

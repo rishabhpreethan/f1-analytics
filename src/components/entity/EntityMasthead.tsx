@@ -60,6 +60,17 @@ export interface EntityMastheadProps {
    * photograph.
    */
   credit?: ReactNode;
+  /**
+   * A second column for the masthead's head — §7.19.3's team imagery, and nothing else so far.
+   *
+   * It is a **column at ≥1024 and a block underneath at every width below it**, which is the only
+   * geometry that works for a 2:1 photograph: stacked, a car plate would push the career ribbon a
+   * full half-width down the page on a phone; side by side on a phone, the name would have ~140px
+   * to set `Aston Martin` at display-lg in. Omit it and the head is exactly the single column it
+   * has always been — 203 of 214 teams are in that case, and nothing about the layout announces
+   * it (§7.19.2).
+   */
+  aside?: ReactNode;
   facts: readonly MastheadFact[];
   /** The page's own moment — the career ribbon, or the circuit locator. */
   children?: ReactNode;
@@ -78,6 +89,7 @@ export function EntityMasthead({
   reference = null,
   priority = false,
   credit,
+  aside,
   facts,
   children,
   action,
@@ -90,65 +102,69 @@ export function EntityMasthead({
 
   return (
     <section className="entity-masthead" aria-labelledby={titleId} style={identity}>
-      <div className="entity-masthead-head">
-        <p className="season-eyebrow">
-          <span className="accent-rule" aria-hidden="true" />
-          {eyebrow}
-        </p>
+      <div className="entity-masthead-head" data-aside={aside === undefined ? undefined : 'true'}>
+        <div className="entity-masthead-text">
+          <p className="season-eyebrow">
+            <span className="accent-rule" aria-hidden="true" />
+            {eyebrow}
+          </p>
 
-        <div className="entity-headline mt-3">
-          {action}
-          {portrait !== undefined && name !== null && (
-            <EntityPortrait
-              teamReference={teamReference}
-              code={code ?? null}
-              name={name}
-              kind={portrait}
-              reference={reference}
-              priority={priority}
-            />
+          <div className="entity-headline mt-3">
+            {action}
+            {portrait !== undefined && name !== null && (
+              <EntityPortrait
+                teamReference={teamReference}
+                code={code ?? null}
+                name={name}
+                kind={portrait}
+                reference={reference}
+                priority={priority}
+              />
+            )}
+
+            <div className="entity-name-group">
+              {name === null ? (
+                <h1 id={titleId} className="entity-name" aria-busy="true">
+                  <LoadingState announce={false} className="skeleton-entity-name" />
+                </h1>
+              ) : (
+                <h1 id={titleId} className="entity-name">
+                  {name}
+                </h1>
+              )}
+
+              {/*
+               * The code sits beside the name rather than inside it, so a screen reader reads the
+               * heading as the name and meets the code as a separate token — `VER` announced inside
+               * an `h1` reads as three letters mid-sentence.
+               */}
+              {code !== null && code !== undefined && code !== '' && (
+                <span className="entity-code t-mono">{code}</span>
+              )}
+            </div>
+          </div>
+
+          {pending ? (
+            <p className="entity-meta mt-2" aria-hidden="true">
+              <LoadingState announce={false} className="skeleton-title-detail" />
+            </p>
+          ) : (
+            facts.length > 0 && (
+              <p className="entity-meta t-sm text-ink-secondary mt-2">
+                {facts.map((fact) => (
+                  <span key={fact.label} className={fact.mono === true ? 't-mono' : undefined}>
+                    <span className="sr-only">{`${fact.label}: `}</span>
+                    {fact.value}
+                  </span>
+                ))}
+              </p>
+            )
           )}
 
-          <div className="entity-name-group">
-            {name === null ? (
-              <h1 id={titleId} className="entity-name" aria-busy="true">
-                <LoadingState announce={false} className="skeleton-entity-name" />
-              </h1>
-            ) : (
-              <h1 id={titleId} className="entity-name">
-                {name}
-              </h1>
-            )}
-
-            {/*
-             * The code sits beside the name rather than inside it, so a screen reader reads the
-             * heading as the name and meets the code as a separate token — `VER` announced inside
-             * an `h1` reads as three letters mid-sentence.
-             */}
-            {code !== null && code !== undefined && code !== '' && (
-              <span className="entity-code t-mono">{code}</span>
-            )}
-          </div>
+          {!pending && credit}
         </div>
 
-        {pending ? (
-          <p className="entity-meta mt-2" aria-hidden="true">
-            <LoadingState announce={false} className="skeleton-title-detail" />
-          </p>
-        ) : (
-          facts.length > 0 && (
-            <p className="entity-meta t-sm text-ink-secondary mt-2">
-              {facts.map((fact) => (
-                <span key={fact.label} className={fact.mono === true ? 't-mono' : undefined}>
-                  <span className="sr-only">{`${fact.label}: `}</span>
-                  {fact.value}
-                </span>
-              ))}
-            </p>
-          )
-        )}
-
-        {!pending && credit}
+        {!pending && aside}
       </div>
 
       {children}
