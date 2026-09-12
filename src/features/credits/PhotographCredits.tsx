@@ -1,23 +1,32 @@
 import { useEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { X } from '@/components/ui/icons';
-import { LICENCE_TALLY, PHOTOGRAPHER_COUNT, PHOTOGRAPHS, driverName } from './imagery';
+import {
+  ALL_IMAGES,
+  CARS,
+  CONTRIBUTOR_COUNT,
+  LICENCE_TALLY,
+  LOGOS,
+  PHOTOGRAPHS,
+  type CreditedImage,
+  type ImageKind,
+} from './imagery';
 
 /**
- * **The panel** — `DESIGN_SYSTEM.md` §7.18.2.
+ * **The panel** — `DESIGN_SYSTEM.md` §7.18.2, extended to three sets by §7.19.5.
  *
  * A bare list of links would discharge the licence and be beneath the rest of this product. So the
  * panel opens the way an index page does — with the **shape** of the thing it is listing (§7.14's
- * argument, applied to 22 photographs): three figures, a licence ladder, then the plates.
+ * argument, applied to 40 images): three figures, a licence ladder, then the plates, in three
+ * sections.
  *
- * **Almost every class here already existed.** `.stat-strip`, `.stat-tile`, `.stat-figure`,
- * `.stat-label`, the whole `.ruler` family, `.chip`, `.link`, `.btn-icon`, `.season-eyebrow` and
- * the `.t-*` utilities are all reused. CSS is the binding budget at 83.4% of 25 KB — and the ladder
- * in particular is genuinely the same mark the coverage ruler is, *a labelled proportion of a whole
- * with its figure beside it*, rather than a shape borrowed to save bytes.
+ * **Cars are the reason this had to be extended before anything rendered one.** All 11 are
+ * CC BY-SA 4.0, which requires the author, the licence and a link back to travel with the work.
+ * A car on a team page whose credit was unreachable would be a licence breach, not an untidy
+ * detail, and the reader that fed this surface read `manifest.drivers` alone.
  *
- * **`object-fit: contain`, not `cover`** (§7.17.3). This is the one place the photograph is the
- * subject rather than an identity mark, so it is shown whole, as the photographer framed it,
- * letterboxed on `--surface-sunken`. Everywhere else it is cropped to the shape the layout needs.
+ * **`object-fit: contain`, not `cover`** (§7.17.3). This is the one place the image is the subject
+ * rather than an identity mark, so it is shown whole, as it was framed. Everywhere else it is
+ * cropped to the shape the layout needs.
  *
  * **The Commons title is not decoration.** It is the disclosure of when and where each photograph
  * was taken — *"Alex Albon at the Melbourne Walk during the 2026 Australian Grand Prix"* — which is
@@ -29,15 +38,13 @@ import { LICENCE_TALLY, PHOTOGRAPHER_COUNT, PHOTOGRAPHS, driverName } from './im
 const TITLE_ID = 'credits-title';
 const LADDER_ID = 'credits-ladder';
 
-const plateId = (reference: string) => `credit-${reference}`;
-
 export interface PhotographCreditsProps {
-  /** A `driver.reference` to land on, or `null` for the top of the panel. */
-  focusReference: string | null;
+  /** A `CreditedImage.plateId` to land on, or `null` for the top of the panel. */
+  focusPlate: string | null;
   onClose: () => void;
 }
 
-export function PhotographCredits({ focusReference, onClose }: PhotographCreditsProps) {
+export function PhotographCredits({ focusPlate, onClose }: PhotographCreditsProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -48,8 +55,8 @@ export function PhotographCredits({ focusReference, onClose }: PhotographCredits
      * there is no single destination in it, and the one thing a reader always wants to be able to
      * do is leave.
      */
-    if (focusReference !== null) {
-      const plate = panelRef.current?.querySelector<HTMLElement>(`#${plateId(focusReference)}`);
+    if (focusPlate !== null) {
+      const plate = panelRef.current?.querySelector<HTMLElement>(`#${focusPlate}`);
       if (plate !== null && plate !== undefined) {
         plate.scrollIntoView({ block: 'center' });
         plate.focus();
@@ -57,7 +64,7 @@ export function PhotographCredits({ focusReference, onClose }: PhotographCredits
       }
     }
     closeRef.current?.focus();
-  }, [focusReference]);
+  }, [focusPlate]);
 
   /** Traps Tab inside the panel and closes on `Esc` — `DockSheet`'s handler, same product, same rules. */
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -109,21 +116,27 @@ export function PhotographCredits({ focusReference, onClose }: PhotographCredits
           </div>
 
           <h2 id={TITLE_ID} className="credits-heading">
-            The photographs
+            The imagery
           </h2>
 
+          {/*
+           * **Every figure here is read from the manifest, never written into the copy.** A
+           * hardcoded *twenty-two* is wrong the first time an image is added, and wrong quietly —
+           * and `credits.test.tsx` asserts each against the manifest rather than against a literal.
+           */}
           <p className="credits-lead t-sm text-ink-secondary">
-            {PHOTOGRAPHS.length} drivers in this archive have a photograph. Every one of them is
-            used under a free licence that asks for the photographer, the licence and a link back —
-            so those travel with the picture, here. Everyone else carries a monogram, and that is
-            the shipping form rather than a gap.
+            {ALL_IMAGES.length} images ship with this archive — {PHOTOGRAPHS.length} driver
+            portraits, {CARS.length} cars and {LOGOS.length} team marks. Every one is free-licensed
+            or in the public domain, and the licences that ask for a photographer, a licence and a
+            link back get all three, here. The other 859 drivers and 203 teams carry a monogram, and
+            that is the shipping form rather than a gap.
           </p>
         </div>
 
         <div className="credits-scroll">
           <div className="stat-strip credits-figures" data-motion="sheet-row">
-            <Figure value={PHOTOGRAPHS.length} label="Photographs" />
-            <Figure value={PHOTOGRAPHER_COUNT} label="Photographers" />
+            <Figure value={ALL_IMAGES.length} label="Images" />
+            <Figure value={CONTRIBUTOR_COUNT} label="Contributors" />
             <Figure value={LICENCE_TALLY.length} label="Licences" />
           </div>
 
@@ -142,14 +155,7 @@ export function PhotographCredits({ focusReference, onClose }: PhotographCredits
             <div className="ruler credits-ladder">
               {LICENCE_TALLY.map((tally) => (
                 <div className="ruler-row" key={tally.licence}>
-                  <a
-                    className="link t-sm"
-                    href={tally.licenceUrl}
-                    rel="noreferrer noopener license"
-                    target="_blank"
-                  >
-                    {tally.licence}
-                  </a>
+                  <Licence licence={tally.licence} licenceUrl={tally.licenceUrl} />
                   <span className="ruler-track">
                     <span
                       className="ruler-fill"
@@ -167,66 +173,120 @@ export function PhotographCredits({ focusReference, onClose }: PhotographCredits
             </div>
           </section>
 
-          <ul className="credits-plates" data-motion="sheet-row">
-            {PHOTOGRAPHS.map((photograph) => (
-              <li
-                className="credits-plate"
-                id={plateId(photograph.ref)}
-                key={photograph.ref}
-                tabIndex={-1}
-              >
-                <span className="credits-frame">
-                  <img
-                    className="credits-image"
-                    src={photograph.src320}
-                    srcSet={`${photograph.src320} 320w, ${photograph.src640} 640w`}
-                    sizes="(min-width: 48rem) 220px, 44vw"
-                    alt={`${driverName(photograph.ref)}, photographed by ${photograph.artist}`}
-                    decoding="async"
-                    loading="lazy"
-                  />
-                </span>
-
-                <p className="credits-driver t-2xs text-ink-tertiary">
-                  {driverName(photograph.ref)}
-                </p>
-                <p className="credits-artist">{photograph.artist}</p>
-                <p className="credits-caption t-2xs text-ink-tertiary">{photograph.title}</p>
-
-                <p className="credits-links t-xs">
-                  <a
-                    className="link"
-                    href={photograph.licenceUrl}
-                    rel="noreferrer noopener license"
-                    target="_blank"
-                  >
-                    {photograph.licence}
-                  </a>
-                  <a
-                    className="link"
-                    href={photograph.sourceUrl}
-                    rel="noreferrer noopener"
-                    target="_blank"
-                  >
-                    Source
-                    <span className="sr-only">
-                      {' '}
-                      for the photograph of {driverName(photograph.ref)}
-                    </span>
-                  </a>
-                </p>
-              </li>
-            ))}
-          </ul>
+          <PlateSet
+            heading={`${String(PHOTOGRAPHS.length)} driver portraits`}
+            images={PHOTOGRAPHS}
+          />
+          <PlateSet heading={`${String(CARS.length)} cars`} images={CARS} />
+          <PlateSet heading={`${String(LOGOS.length)} team marks`} images={LOGOS} />
 
           <p className="credits-foot t-xs text-ink-tertiary" data-motion="sheet-row">
-            One photograph is public-domain dedicated under CC0, which asks for nothing. It is
-            credited here anyway. Anything wrong on this page is ours to fix — the record is in{' '}
-            <span className="t-mono">src/features/credits/imagery.json</span>.
+            Public-domain files ask for nothing at all. They are credited here anyway, because where
+            a picture came from is worth more than the minimum a licence demands. A team mark is the
+            property of the team it belongs to, is shown only beside that team’s name, and is never
+            this product’s own branding. Anything wrong on this page is ours to fix — the record is
+            in <span className="t-mono">src/features/credits/imagery.json</span>.
           </p>
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * One section of plates. Three of them, and they differ **only** in the `data-kind` on the list —
+ * which is what picks the frame's aspect and, for a mark, its ground (§7.19.4). The plate itself is
+ * one component with one anatomy, for the same reason `EntityPortrait` is one shape with two fills:
+ * three plate designs in one panel would read as three sources.
+ */
+function PlateSet({ heading, images }: { heading: string; images: readonly CreditedImage[] }) {
+  if (images.length === 0) return null;
+  const headingId = `credits-set-${images[0]?.kind ?? 'none'}`;
+  return (
+    <section aria-labelledby={headingId} data-motion="sheet-row">
+      <h3 id={headingId} className="credits-subhead">
+        {heading}
+      </h3>
+      <ul className="credits-plates" data-kind={images[0]?.kind}>
+        {images.map((image) => (
+          <Plate image={image} key={image.plateId} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * What the browser is told each plate's rendered box will be, so it can pick a candidate before
+ * layout. The panel is `max-width: 56rem` with 20px of padding, so a 3-up driver column is ~276px
+ * and a 2-up car column ~420px — the car's `sizes` therefore has to be its own value, or an 840px
+ * device-pixel car would be drawn from the 320w file. A mark ships as one file and gets neither
+ * `srcSet` nor `sizes`.
+ */
+const PLATE_SIZES: Record<ImageKind, string | undefined> = {
+  driver: '(min-width: 48rem) 280px, 44vw',
+  car: '(min-width: 48rem) 420px, 88vw',
+  logo: undefined,
+};
+
+function Plate({ image }: { image: CreditedImage }) {
+  /*
+   * Four of the seven marks record the team itself as the rights holder, so the subject line and
+   * the artist line would print the same string twice. Suppressed rather than restyled: a plate
+   * that says "Alpine F1 Team / Alpine F1 Team" reads as a rendering fault.
+   */
+  const showSubject = image.subject !== image.artist;
+
+  return (
+    <li className="credits-plate" id={image.plateId} tabIndex={-1}>
+      <span className="credits-frame">
+        <img
+          className="credits-image"
+          src={image.src}
+          srcSet={image.srcSet ?? undefined}
+          sizes={PLATE_SIZES[image.kind]}
+          alt={
+            image.kind === 'logo'
+              ? `${image.subject} team mark`
+              : `${image.subject}, photographed by ${image.artist}`
+          }
+          decoding="async"
+          loading="lazy"
+        />
+      </span>
+
+      {showSubject && <p className="credits-driver t-2xs text-ink-tertiary">{image.subject}</p>}
+      <p className="credits-artist">{image.artist}</p>
+      <p className="credits-caption t-2xs text-ink-tertiary">{image.title}</p>
+
+      <p className="credits-links t-xs">
+        <Licence licence={image.licence} licenceUrl={image.licenceUrl} />
+        <a className="link" href={image.sourceUrl} rel="noreferrer noopener" target="_blank">
+          Source
+          <span className="sr-only"> for the image of {image.subject}</span>
+        </a>
+      </p>
+    </li>
+  );
+}
+
+/**
+ * The licence, as a link to its deed where one exists and as **text** where one does not.
+ *
+ * §7.19.4 — public domain has no deed, so Commons publishes no URL for it, and six of the seven
+ * marks are in that case. `<a href={null}>` renders an anchor with no `href`: not focusable, not
+ * announced as a link, and indistinguishable from a link that is simply broken. The text form is
+ * the accurate one, and *"Public domain"* is a complete statement on its own in a way that
+ * *"CC BY-SA 4.0"* is not.
+ */
+function Licence({ licence, licenceUrl }: { licence: string; licenceUrl: string | null }) {
+  if (licenceUrl === null) {
+    return <span className="t-sm text-ink-secondary">{licence}</span>;
+  }
+  return (
+    <a className="link t-sm" href={licenceUrl} rel="noreferrer noopener license" target="_blank">
+      {licence}
+    </a>
   );
 }
 

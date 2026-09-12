@@ -9,11 +9,15 @@ import { createContext, use } from 'react';
  */
 export interface CreditsApi {
   /**
-   * Opens the panel. Passing a `driver.reference` scrolls that plate into view and moves focus to
-   * it, so a reader who clicked a credit line arrives at the credit they asked for rather than at
-   * the top of a list of 22.
+   * Opens the panel. Passing a `CreditedImage.plateId` scrolls that plate into view and moves focus
+   * to it, so a reader who clicked a credit line arrives at the credit they asked for rather than
+   * at the top of a list of 40.
+   *
+   * **A plate id, not a bare reference, since the cars and marks arrived.** `ferrari` names a car
+   * *and* a team mark, and a reference is only unique within its own set; two plates sharing one id
+   * is a deep link that lands on whichever happened to render first.
    */
-  open: (reference?: string | null) => void;
+  open: (plateId?: string | null) => void;
 }
 
 export const CreditsContext = createContext<CreditsApi | null>(null);

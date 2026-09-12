@@ -121,8 +121,8 @@ export function EntityPortrait({
       {showPhotograph ? (
         <img
           className="portrait-photo"
-          src={photograph.src320}
-          srcSet={`${photograph.src320} 320w, ${photograph.src640} 640w`}
+          src={photograph.src}
+          srcSet={photograph.srcSet ?? undefined}
           sizes={SIZES[shape]}
           alt=""
           decoding="async"

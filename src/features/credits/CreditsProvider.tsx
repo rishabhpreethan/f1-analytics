@@ -34,7 +34,7 @@ import { PhotographCredits } from './PhotographCredits';
  */
 
 export function CreditsProvider({ children }: { children: ReactNode }) {
-  /** Which plate to land on, or `null` for the top of the panel. */
+  /** Which plate id to land on, or `null` for the top of the panel. */
   const [target, setTarget] = useState<string | null>(null);
   /**
    * Where focus goes back to. Captured at open time from `document.activeElement`, because the
@@ -49,10 +49,10 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
   });
 
   const openPanel = useCallback(
-    (reference?: string | null) => {
+    (plateId?: string | null) => {
       opener.current =
         document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setTarget(reference ?? null);
+      setTarget(plateId ?? null);
       open();
     },
     [open],
@@ -74,7 +74,7 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
         // `contents`, so the scope wrapper introduces no box of its own between the scrim and the
         // panel and their `position: fixed` still resolves against the viewport.
         <div ref={scope} className="contents">
-          <PhotographCredits focusReference={target} onClose={closePanel} />
+          <PhotographCredits focusPlate={target} onClose={closePanel} />
         </div>
       )}
     </CreditsContext>

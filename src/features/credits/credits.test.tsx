@@ -33,13 +33,23 @@ vi.hoisted(() => {
 
 import { CreditsProvider } from './CreditsProvider';
 import { CreditsTrigger } from './CreditsTrigger';
-import { LICENCE_TALLY, PHOTOGRAPHER_COUNT, PHOTOGRAPHS, driverName } from './imagery';
+import {
+  ALL_IMAGES,
+  CARS,
+  CONTRIBUTOR_COUNT,
+  LICENCE_TALLY,
+  LOGOS,
+  PHOTOGRAPHS,
+  driverName,
+} from './imagery';
 
 /**
  * **`PhotographCredits` — §7.18.** Most of what is asserted here is a **licence obligation** rather
  * than a design preference, and that is the reason this file is thorough where a decorative panel
  * would not be: CC BY and CC BY-SA require the author, the licence and a link to the source to
- * travel with the work, and this repository is public.
+ * travel with the work, and this repository is public. **All 11 cars are CC BY-SA 4.0**, the most
+ * demanding licence in the set, and they arrived after the reader that fed this surface was written
+ * — so the assertions below run over `ALL_IMAGES` rather than over the drivers.
  *
  * jsdom loads no images, performs no layout and no compositing, so **nothing here sees the panel**:
  * not whether it is centred, not whether the plates letterbox, not whether the ladder's bars are
@@ -85,7 +95,7 @@ describe('reaching it — §7.18.1', () => {
   it('is a modal dialog with a name, so a screen reader arrives somewhere identified', async () => {
     const { dialog } = await openPanel();
     expect(dialog.getAttribute('aria-modal')).toBe('true');
-    expect(within(dialog).getByRole('heading', { name: 'The photographs' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'The imagery' })).toBeTruthy();
   });
 
   it('closes on Escape, on the close button and on the scrim', async () => {
@@ -110,32 +120,64 @@ describe('reaching it — §7.18.1', () => {
   });
 });
 
-describe('the obligation — every photograph carries its three facts', () => {
-  it('names the photographer of every single photograph', async () => {
+describe('the obligation — every image carries its facts', () => {
+  it('names the contributor of every single image, in all three sets', async () => {
     const { dialog } = await openPanel();
-    for (const photograph of PHOTOGRAPHS) {
+    for (const image of ALL_IMAGES) {
       expect(
-        within(dialog).getAllByText(photograph.artist).length,
-        `${photograph.ref} is uncredited`,
+        within(dialog).getAllByText(image.artist).length,
+        `${image.plateId} is uncredited`,
       ).toBeGreaterThan(0);
     }
   });
 
-  it('links every photograph to its licence deed and to its source page', async () => {
+  it('shows every car — the set that made extending this surface mandatory', async () => {
+    /*
+     * A car rendered on a team page whose credit was unreachable is a **licence breach**, not an
+     * untidy detail. This is the tripwire for the reader regressing to `manifest.drivers`.
+     */
+    const { dialog } = await openPanel();
+    expect(CARS.length).toBeGreaterThan(0);
+    for (const car of CARS) {
+      expect(dialog.querySelector(`#${car.plateId}`), `${car.ref} has no plate`).not.toBeNull();
+    }
+    for (const mark of LOGOS) {
+      expect(dialog.querySelector(`#${mark.plateId}`), `${mark.ref} has no plate`).not.toBeNull();
+    }
+  });
+
+  it('links every image to its source page, and to its licence deed where one exists', async () => {
     /*
      * **The strongest assertion in this file.** A plate that lost either link would still render,
-     * still look designed, and would be a licence breach. Both are checked by `href`, per
-     * photograph, rather than by counting anchors — a count passes when 22 links all point at the
-     * same place.
+     * still look designed, and would be a licence breach. Both are checked by `href`, per image,
+     * rather than by counting anchors — a count passes when 40 links all point at the same place.
+     *
+     * The licence half is conditional because **public domain has no deed**: six of the seven marks
+     * carry `licenceUrl: null`, which is correct data. §7.19.4 renders those as text.
      */
     const { dialog } = await openPanel();
     const hrefs = new Set(
       [...dialog.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')),
     );
-    for (const photograph of PHOTOGRAPHS) {
-      expect(hrefs.has(photograph.sourceUrl), `${photograph.ref} has no source link`).toBe(true);
-      expect(hrefs.has(photograph.licenceUrl), `${photograph.ref} has no licence link`).toBe(true);
+    for (const image of ALL_IMAGES) {
+      expect(hrefs.has(image.sourceUrl), `${image.plateId} has no source link`).toBe(true);
+      if (image.licenceUrl !== null) {
+        expect(hrefs.has(image.licenceUrl), `${image.plateId} has no licence link`).toBe(true);
+      }
     }
+  });
+
+  it('renders a public-domain licence as text, never as an anchor pointing nowhere', async () => {
+    /*
+     * §7.19.4. `<a href={undefined}>` renders an anchor with no `href`: not focusable, not
+     * announced as a link, and visually identical to one that is simply broken. Asserting that
+     * *no* anchor in the panel lacks an `href` is the assertion that catches the regression,
+     * because it fails the moment a null URL is passed to the link branch.
+     */
+    const { dialog } = await openPanel();
+    expect(dialog.querySelectorAll('a:not([href])')).toHaveLength(0);
+    expect(LOGOS.some((mark) => mark.licenceUrl === null)).toBe(true);
+    expect(within(dialog).getAllByText('Public domain').length).toBeGreaterThan(0);
   });
 
   it('opens every outbound link safely and marks the licence ones as such', async () => {
@@ -147,7 +189,7 @@ describe('the obligation — every photograph carries its three facts', () => {
     }
   });
 
-  it('states the licence of every photograph in words as well as in a link', async () => {
+  it('states every licence in words, whether or not it also has a link', async () => {
     const { dialog } = await openPanel();
     for (const tally of LICENCE_TALLY) {
       expect(within(dialog).getAllByText(tally.licence).length).toBeGreaterThan(0);
@@ -166,23 +208,39 @@ describe('the obligation — every photograph carries its three facts', () => {
     expect(within(dialog).getByText(albon.title)).toBeTruthy();
   });
 
-  it('describes each photograph for a reader who cannot see it', async () => {
-    // Unlike `EntityPortrait`, here the photograph IS the subject, so `alt` carries a real
-    // description rather than being empty beside a name (§7.17.1).
+  it('describes each image for a reader who cannot see it', async () => {
+    // Unlike `EntityPortrait`, here the image IS the subject, so `alt` carries a real description
+    // rather than being empty beside a name (§7.17.1). A mark is not a photograph and does not
+    // claim a photographer.
     const { dialog } = await openPanel();
     const images = dialog.querySelectorAll('img');
-    expect(images).toHaveLength(PHOTOGRAPHS.length);
+    expect(images).toHaveLength(ALL_IMAGES.length);
     for (const image of images) {
-      expect(image.getAttribute('alt')).toMatch(/, photographed by /);
+      expect(image.getAttribute('alt')).toMatch(/(, photographed by | team mark$)/);
+      expect(image.getAttribute('alt')).not.toBe('');
     }
   });
 
-  it('names the driver in every plate, never the slug', async () => {
+  it('gives a mark no srcSet, because it ships as one file', async () => {
+    // `"x 320w, x 640w"` naming one file twice is a false claim about the asset, and meaningless
+    // for the six that are SVG.
+    const { dialog } = await openPanel();
+    for (const mark of LOGOS) {
+      const plate = dialog.querySelector(`#${mark.plateId}`);
+      expect(plate?.querySelector('img')?.hasAttribute('srcset')).toBe(false);
+    }
+  });
+
+  it('names the driver or the team in every plate, never the slug', async () => {
     const { dialog } = await openPanel();
     for (const photograph of PHOTOGRAPHS) {
       const name = driverName(photograph.ref);
       expect(name).not.toBe(photograph.ref);
       expect(within(dialog).getAllByText(name).length).toBeGreaterThan(0);
+    }
+    for (const car of CARS) {
+      expect(car.subject).not.toBe(car.ref);
+      expect(within(dialog).getAllByText(car.subject).length).toBeGreaterThan(0);
     }
   });
 });
@@ -196,8 +254,8 @@ describe('the shape of the set — §7.18.2', () => {
     const { dialog } = await openPanel();
     const figures = [...dialog.querySelectorAll('.stat-figure')].map((n) => n.textContent);
     expect(figures).toEqual([
-      String(PHOTOGRAPHS.length),
-      String(PHOTOGRAPHER_COUNT),
+      String(ALL_IMAGES.length),
+      String(CONTRIBUTOR_COUNT),
       String(LICENCE_TALLY.length),
     ]);
   });
@@ -227,15 +285,32 @@ describe('the shape of the set — §7.18.2', () => {
     }
   });
 
-  it('orders the plates by surname, so the list reads like a list of people', async () => {
+  it('lists the three sets in order, each internally sorted, with unique plate ids', async () => {
     const { dialog } = await openPanel();
     const plates = [...dialog.querySelectorAll('.credits-plate')].map((n) => n.getAttribute('id'));
-    expect(plates).toEqual(PHOTOGRAPHS.map((p) => `credit-${p.ref}`));
+    expect(plates).toEqual(ALL_IMAGES.map((image) => image.plateId));
+    expect(new Set(plates).size).toBe(plates.length);
   });
 
-  it('credits the CC0 photograph too, which asks for nothing', async () => {
+  it('marks each plate list with the kind that decides its frame', async () => {
+    // The frame's aspect and, for a mark, its white ground hang off this attribute alone
+    // (§7.19.4, §7.19.5). jsdom applies no CSS here, so this asserts the hook, not the geometry.
     const { dialog } = await openPanel();
-    expect(within(dialog).getByText(/public-domain dedicated under CC0/)).toBeTruthy();
+    const kinds = [...dialog.querySelectorAll('.credits-plates')].map((n) =>
+      n.getAttribute('data-kind'),
+    );
+    expect(kinds).toEqual(['driver', 'car', 'logo']);
+  });
+
+  it('credits the public-domain files too, which ask for nothing', async () => {
+    const { dialog } = await openPanel();
+    expect(within(dialog).getByText(/Public-domain files ask for nothing at all/)).toBeTruthy();
+  });
+
+  it('states that a team mark belongs to its team and is not this product’s branding', async () => {
+    // Public domain for copyright is not freedom from trademark. The panel says so in words.
+    const { dialog } = await openPanel();
+    expect(within(dialog).getByText(/never\s+this product’s own branding/)).toBeTruthy();
   });
 });
 
@@ -257,7 +332,7 @@ describe('the guard', () => {
   it('throws rather than rendering a credit button that does nothing', () => {
     /*
      * A no-op default context would give a control that looks operable, opens nothing, and leaves
-     * 22 photographs unattributed on a public site. Loud is correct here.
+     * 40 images unattributed on a public site. Loud is correct here.
      */
     const noise = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(() => render(<CreditsTrigger />)).toThrow(/CreditsProvider/);

@@ -178,6 +178,49 @@
     object-fit: contain;
   }
 
+  /*
+   * §7.19.5 — **the car set, and the one place a row of them exists.** 2-up rather than the
+   * drivers' 3-up: the sources are 2:1, so a 3-up column in a 56rem panel would draw a 276px car
+   * at 138px tall, and the point of this set is that eleven cars photographed at one event from
+   * one angle are genuinely comparable. `aspect-ratio` matches the source exactly (every file is
+   * 320x160 or 640x320), so `contain` letterboxes essentially nothing.
+   */
+  .credits-plates[data-kind='car'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (min-width: 48rem) {
+    .credits-plates[data-kind='car'] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .credits-plates[data-kind='car'] .credits-frame {
+    aspect-ratio: var(--car-aspect);
+  }
+
+  /*
+   * §7.19.4 — **a mark sits on `--mark-plate`, a fixed white ground in both themes.** Every mark
+   * file carries fixed fills rather than `currentColor` and several are solid black, so on
+   * `--surface-sunken` in dark mode they would be invisible; Red Bull's is a PNG with no alpha
+   * channel at all, so it brings its own white rectangle. One white plate answers both.
+   *
+   * The image is inset rather than the frame padded, because `.credits-image` is absolutely
+   * positioned: `inset` with `width`/`height` auto is what actually resolves its box. 3/2 rather
+   * than the drivers' 3/4 because the marks run from 0.91:1 (Mercedes) to 14.3:1 (the Williams
+   * wordmark) and a landscape frame is the one that wastes least on both ends.
+   */
+  .credits-plates[data-kind='logo'] .credits-frame {
+    aspect-ratio: 3 / 2;
+    background-color: var(--mark-plate);
+  }
+
+  .credits-plates[data-kind='logo'] .credits-image {
+    inset: calc(var(--spacing) * 4);
+    width: auto;
+    height: auto;
+  }
+
   /* The plate's headline is the **photographer**, not the driver: this surface is about the people
    * who took the pictures, and the licences ask for exactly that name. */
   .credits-artist {
