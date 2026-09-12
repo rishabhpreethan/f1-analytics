@@ -567,6 +567,36 @@ describe('the front door — every row goes somewhere', () => {
   });
 });
 
+describe('the photograph layer in a row — §7.17, wired 2026-09-12', () => {
+  /*
+   * ⚠ jsdom loads no images and lays nothing out, so **nothing here sees a portrait**: not the
+   * crop, not whether a face survives `cover` at 56px, not whether a row of 859 monograms and 22
+   * photographs reads as deliberate. That last question is the one that mattered and Rishabh
+   * answered it in a browser on the compare tray. What is asserted below is the markup a browser
+   * needs, and the request behaviour, which is decidable here and expensive to get wrong.
+   */
+  it('renders a photograph for the 22 who have one', () => {
+    renderDrivers();
+    const row = screen.getByRole('link', { name: /Lewis Hamilton/ });
+    const image = row.querySelector('img');
+    expect(image?.getAttribute('src')).toBe('/assets/drivers/hamilton-320.webp');
+    // Below the fold, unlike the profile masthead — §7.17.6.
+    expect(image?.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('issues no request at all for the 859 who do not — not a 404, not a broken glyph', () => {
+    /*
+     * **The reason a path is never composed from a reference.** `/drivers` renders 881 rows; a
+     * composed path would be 859 failed requests in one paint, each drawing a broken-image icon.
+     * The manifest is consulted first, so there is simply no `<img>`.
+     */
+    renderDrivers();
+    const row = screen.getByRole('link', { name: /Alberto Ascari/ });
+    expect(row.querySelector('img')).toBeNull();
+    expect(row.querySelector('.portrait')?.getAttribute('data-filled')).toBe('mark');
+  });
+});
+
 describe('search', () => {
   it('finds an accented surname from an ASCII query', async () => {
     const user = userEvent.setup();
@@ -717,6 +747,23 @@ describe('teams are the same surface, with a sharper pyramid', () => {
       </MemoryRouter>,
     );
   }
+
+  it('never resolves a team reference against the driver photograph set', () => {
+    /*
+     * §7.17, §7.19.2. `ferrari` is a key in the *car* and *mark* sets and `haas` is a plausible
+     * driver slug; the manifest is keyed `kind:ref` exactly so one namespace cannot answer for
+     * another. A team row carries no image of any kind — the car and the mark are a team
+     * **profile** layer, not a row one, because a 2:1 car cropped into a 56px square is a piece of
+     * sidepod and a 14:1 wordmark in it is a 4px sliver. That arithmetic is why the rows were left
+     * alone rather than being given a mark for 7 of 214.
+     */
+    renderTeams();
+    const rows = document.querySelectorAll('.index-row');
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.querySelector('img')).toBeNull();
+    }
+  });
 
   /**
    * A team has no three-letter code — that is a driver concept — and the copy claimed it did on
