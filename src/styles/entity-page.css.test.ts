@@ -33,6 +33,24 @@ const guard = (css: string, name: string) => {
 const CSS = guard(ENTITY_PAGE_CSS, 'entity-page.css');
 const TOKENS = guard(TOKENS_CSS, 'tokens.css');
 
+/**
+ * Every simple rule in a stylesheet as `{ selector, body }`, comments already stripped.
+ *
+ * The pattern matches only blocks whose body contains no further braces, so an `@media` wrapper is
+ * skipped and the rules **inside** it are yielded — which is what the invariant below needs, since
+ * a collapsed mark inside a media query is exactly as broken as one outside it.
+ */
+function rules(css: string): { selector: string; body: string }[] {
+  const found: { selector: string; body: string }[] = [];
+  const pattern = /([^{}]+)\{([^{}]*)\}/g;
+  let match = pattern.exec(css);
+  while (match !== null) {
+    found.push({ selector: (match[1] ?? '').trim(), body: match[2] ?? '' });
+    match = pattern.exec(css);
+  }
+  return found;
+}
+
 /** The declarations of the first rule whose selector matches, comments already stripped. */
 function ruleBody(css: string, selector: string): string {
   const at = css.indexOf(selector);
@@ -85,6 +103,35 @@ describe('§7.19.5 — the car plate is `.portrait` at a third shape', () => {
   });
 });
 
+describe('⛔ a mark is never a flexible box — the fault this project has now had twice', () => {
+  /*
+   * **The first time was the dock rail**, recorded in `PLAN.md`: *an inline `<svg>` with a
+   * `viewBox` has a min-content size of 0, so it absorbs an entire flex deficit and paints
+   * nothing.* The second was `.mark-plate img`, caught in Rishabh's capture of `/teams/mclaren` —
+   * a **26×48 white sliver with nothing in it**, which is the plate's own padding around a box
+   * computed at 0×0.
+   *
+   * **Two of the six mark SVGs (`haas.svg`, `mclaren.svg`) declare a `viewBox` and no
+   * `width`/`height`**, so they have a ratio and no intrinsic dimensions; the other four declare
+   * both and would have rendered. That is the worst shape this bug can take — it looks like *some
+   * logos work* rather than like a rule being wrong — and it is the reason the assertion below is
+   * an invariant over the whole stylesheet rather than one check on one selector.
+   */
+  it('gives every auto-width image in this stylesheet an explicit `flex: none`', () => {
+    const flexible = rules(CSS).filter(
+      (rule) =>
+        /\bimg\b/.test(rule.selector) &&
+        /width:\s*auto/.test(rule.body) &&
+        !/flex:\s*none/.test(rule.body) &&
+        !/flex-shrink:\s*0/.test(rule.body),
+    );
+    expect(
+      flexible.map((rule) => rule.selector),
+      'an auto-width image with no `flex: none` collapses to 0 in any flex parent',
+    ).toEqual([]);
+  });
+});
+
 describe('§7.19.4 — the mark plate', () => {
   it('is a fixed ground, not a themed surface, because the marks are theme-blind', () => {
     /*
@@ -97,20 +144,25 @@ describe('§7.19.4 — the mark plate', () => {
     expect(body).not.toContain('var(--surface-');
   });
 
-  it('caps the mark on both axes and fixes it on neither', () => {
+  it('sizes the mark from a definite height, not from a max it has to have a size to be capped by', () => {
     /*
-     * The seven marks run 0.91:1 to **14.3:1**. A fixed box draws the Williams wordmark at ~4px
-     * tall. Two maxima with `auto` sizes let a replaced element honour both while keeping its
-     * intrinsic ratio, which is what makes one rule cover the whole range — and `width: 100%` or a
-     * fixed `height` would each break a different end of it.
+     * The seven run 0.91:1 to **14.3:1**, so a square would draw the Williams wordmark ~4px tall.
+     * The first draft used `max-height: 28px` with `height: auto`, and **a maximum constrains a
+     * size that first has to exist** — for the two SVGs with no intrinsic dimensions there was no
+     * size for it to constrain. A *definite* height plus `width: auto` resolves the width as
+     * `28 × ratio`, and every one of the seven has a ratio, from a `viewBox` or from being a
+     * raster. The width cap then catches the wordmarks.
      */
     const body = ruleBody(CSS, '.mark-plate img');
-    expect(body).toContain('max-width: 160px');
-    expect(body).toContain('max-height: 28px');
+    expect(body).toContain('flex: none');
+    expect(body).toContain('height: 28px');
     expect(body).toContain('width: auto');
-    expect(body).toContain('height: auto');
-    expect(body).not.toMatch(/(^|\s)width:\s*(100%|\d+px)/);
-    expect(body).not.toMatch(/(^|\s)height:\s*\d+px/);
+    expect(body).toContain('max-width: 160px');
+    // `contain`, because Williams' width/height attributes (ratio 12) disagree with its own
+    // viewBox (ratio 14.26): the mark is drawn inside the 160x28 box rather than stretched.
+    expect(body).toContain('object-fit: contain');
+    expect(body).not.toContain('max-height');
+    expect(body).not.toMatch(/height:\s*auto/);
   });
 });
 
