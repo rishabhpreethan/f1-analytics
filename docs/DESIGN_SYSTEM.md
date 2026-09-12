@@ -4835,12 +4835,11 @@ nobody can test. It is therefore a **token** — `--portrait-crop: top center` i
 asserted by `tokens.css.test.ts` — rather than a declaration at a call site, for the same reason
 `--size-tooltip` is: a value re-decided per component stops being a property of the set.
 
-⚠ **What that test can and cannot see.** It asserts the token's value. It cannot assert that
-`.portrait-photo` still *reads* it, because `entity-page.css` is not in `vite.config.ts`'s
-`test.css.include`, so a `?raw` import of it resolves to the empty string and every assertion
-against it would pass against nothing. Adding `/entity-page\.css/` to that array is a one-line
-change in a file the imagery round did not own, and it is **reported rather than made**; with it,
-the rule bodies become assertable in the way `compare.css.test.ts` asserts its own.
+✅ **Resolved 2026-09-12.** `/entity-page\.css/` is now in `vite.config.ts`'s `test.css.include`, so
+a `?raw` import of the file returns real CSS and the rule bodies are assertable. `entity-page.css.test.ts`
+exists and does exactly that — and it opens with a guard that **throws** if the import ever resolves
+to the empty string again, because `.not.toContain()` is vacuously true against `''` and that is
+how the earlier draft passed 14 of 16 assertions against nothing.
 
 **The `band` therefore shows a constant fraction of every source, not a constant number of pixels.**
 `aspect-ratio: 16 / 9` on the shape means the visible slice is `0.5625 ÷ (h/w)` of the source
@@ -4929,7 +4928,8 @@ know exists.
 |---|---|---|---|
 | **Footer, every page** | `Photograph credits` | the panel at the top | ✅ shipped |
 | **Compare tray** | `Photograph credits` beside the picker, rendered **only when a bay is showing a photograph** — a credits control over four monograms points at nothing | the panel at the top | ✅ shipped |
-| **Driver profile masthead** | the credit line itself — `Photograph Yu Chu Chin · CC BY-SA 4.0` — is the button | the panel, scrolled and focused to **that driver's plate** | ⏳ **held.** The panel already takes a reference and lands on that plate; only the masthead half is outstanding, and it is held with the rest of the per-surface rollout until the mixed state has been looked at |
+| **Driver profile masthead** | the credit line itself — `Photograph Yu Chu Chin · CC BY-SA 4.0` — is the button | the panel, scrolled and focused to **that driver's plate** | ✅ shipped 2026-09-12, once Rishabh's browser check confirmed the mixed state reads as deliberate |
+| **Team profile masthead** | one credit control **per image** — `Car Lukas Raich · CC BY-SA 4.0`, and a second for the mark where there is one | the panel, at that image's plate | ✅ shipped 2026-09-12 (§7.19.3) |
 
 The footer is not the *primary* entry point but it is the one that exists everywhere, **including the
 index pages, where a per-image control cannot go**: an index row is a `Link`, and a button inside a
@@ -4940,6 +4940,10 @@ The masthead line is the important one: **the photographer's name is visible tex
 photograph**, which is what CC BY actually asks for. The panel is the full record — the licence deed
 and the Commons page as real links — and it is one click away and also globally reachable, which is
 the "reasonable manner" the licences permit.
+
+⚠ **`open()` takes a plate id, not a reference, since 2026-09-12.** `ferrari` names a car *and* a
+mark, and a reference is unique only within its own set; two plates sharing one `id` is a deep link
+that lands on whichever rendered first. Every image publishes `plateId = credit-<kind>-<ref>`.
 
 #### 7.18.2 The panel is a population, and it draws its shape
 
@@ -5024,6 +5028,186 @@ What *is* verified: every photograph carries its photographer, both links, its l
 a real `alt`; the ladder's extents equal the counts; the plates are in surname order; focus enters,
 traps, escapes and returns; and the panel actually unmounts when an exit tween is built rather than
 only under `reduce`, which is the phase in which a modal gets stuck on screen forever.
+
+
+### 7.19 The team imagery layer — the car and the mark _(added 2026-09-12)_
+
+**11 of 214 teams have a car photograph. 7 have a mark. 203 have neither.** Every decision below is
+made against the 203, not against the 11 — the same posture §7.17 takes toward the 859 drivers with
+no portrait, and a different conclusion, for a reason §7.19.2 sets out.
+
+The files are Wikimedia Commons, sourced and licence-verified outside this document by the
+`developer`, converted by `scripts/fetch-imagery.mjs` into `public/assets/teams/`, and published by
+`src/features/credits/imagery.json`. The **manifest is the only source of an image URL**; nothing
+composes a path from a reference.
+
+| Set | Count | Form | Licence |
+|---|---|---|---|
+| Cars | **11 of 11 current teams** | `<ref>-car-320.webp` / `-640.webp`, **every file exactly 2:1** (320×160, 640×320; two are 320×161, a 0.6 % difference) | all **CC BY-SA 4.0**, all by Lukas Raich, all from `FIA F1 Austria 2026` |
+| Marks | **7 of 11** — Alpine, Audi, Haas, McLaren, Mercedes, Red Bull, Williams | six SVG at `<ref>.svg`, Red Bull `red_bull-160.webp` | six **public domain**, Williams **CC BY-SA 4.0** |
+
+**Ferrari, Cadillac, Aston Martin and Racing Bulls have no mark and are not going to get one.** A
+prancing horse, a crest and a winged badge are above the threshold of originality, and Racing Bulls
+has no free file at all. This is an availability fact, not a search failure, and `imagery.test.ts`
+asserts the gap so that a future round that closes it has to come back here.
+
+⚠ **This half-solves the collision problem and must not be recorded as solving it.** The two
+colliding pairs are Cadillac ↔ Haas (ΔE 3.8 normal vision) and RB ↔ Alpine (ΔE 3.3 deuteranopic).
+We hold **Haas and Alpine but not Cadillac or RB** — so each colliding pair has exactly one mark,
+which is the one configuration that cannot disambiguate anything.
+
+#### 7.19.1 The cars are a set; the portraits are a collection
+
+This is the difference that drives everything else. The 22 driver portraits come from 14
+photographers at different events with framings from 0.64 to 0.84 w/h — §7.17.2 had to find one
+crop anchor that survived all of them. The 11 cars are **one photographer, one event, one angle,
+one framing, one aspect ratio**. So:
+
+- the car plate is `aspect-ratio: 2 / 1`, which is the source's own ratio, and `object-fit: cover`
+  therefore crops **nothing**. Eleven cars in a row are framed identically because the files are;
+- `--car-crop` is **`center`**, not §7.17.2's `top center`. A side-on car is centred in its frame and
+  a top anchor cuts the tyres off. Both are tokens for the same reason: a value re-decided per call
+  site stops being a property of the set.
+
+#### 7.19.2 The layer has **no placeholder**, and that is the split from §7.17
+
+§7.17 ships a monogram for the 859 because the portrait slot is **structural** — every index row and
+every masthead has one, it is always filled, and the photograph is one of *two fills of one shape*.
+Nothing here is structural. **A team page is complete with no imagery at all** — it is precisely the
+page that shipped before this section existed.
+
+So the rule is: **present or absent, never a placeholder.** A 2:1 plate drawn empty for the other 203
+would announce a gap on 95 % of these pages in order to decorate 5 %, and a monogram at
+`--display-lg` in a letterbox reads as a photograph that failed to arrive, which is exactly what
+§7.17.1 spends its argument avoiding.
+
+The corollary is a layout rule with teeth: the masthead's second column is gated on a **predicate**,
+`hasTeamImagery(ref)`, evaluated by the caller. ⚠ A React component that returns `null` still
+arrives at its parent as a real element, so passing `<TeamImagery/>` unconditionally would put all
+214 mastheads into two columns and squeeze 203 names into `1fr` of `1fr + 26rem` beside an empty
+column. **jsdom lays nothing out and no rendering test here could see it.**
+
+#### 7.19.3 Where they sit — the masthead's second column
+
+| | |
+|---|---|
+| Structure | `.entity-masthead-head[data-aside='true']` → `.entity-masthead-text` ǀ `.team-imagery`. The attribute is absent for the 203 and the head is the plain block it has always been |
+| ≥1024 | `grid-template-columns: minmax(0, 1fr) minmax(0, 26rem)`, `align-items: center`, gap 40px |
+| <1024 | stacked; `.team-imagery` takes `margin-top: 24px` and `max-width: 32rem` so the car does not go full-bleed on a tablet |
+| Why 1024 | a 2:1 plate beside the name at 768 leaves `Aston Martin` ~140px to set `--display-lg` in; stacked on a phone an uncapped car pushes the career ribbon half a viewport down |
+| Why `center` and not `end` | the text column's height is a function of how many facts a team carries, so a bottom-aligned photograph would sit at a different height on every page |
+| The stack | mark plate → car plate → the car's Commons title → the credit line |
+| Nothing over either image | §7.17.5 holds unchanged. The caption and the credit are outside the shape, on a known surface |
+| Loading | both `lazy`. The team page's LCP candidate is the `h1`, not the car — unlike the driver masthead, where the portrait is the largest element and is the one `eager`/`fetchPriority=high` image in the product |
+
+**The Commons title is rendered, not hidden.** §7.17.4's disclosure rule carried across: the Ferrari
+plate is *Hamilton's* car and the Alpine one is *Gasly's*. A number 44 on the Ferrari page is a fact
+a reader is owed rather than left to infer, and the event dates the livery.
+
+#### 7.19.4 The mark plate — white in both themes, and it is measured
+
+Three findings, all from looking at the files rather than at the idea of them:
+
+1. **Every mark is theme-blind.** All six SVGs use **fixed fills, not `currentColor`** (grepped).
+   McLaren's speedmark is solid black, Audi's rings are black, the Mercedes star is dark. On the dark
+   theme they would be invisible.
+2. **Red Bull's has no alpha at all.** The source PNG is colour-type 2 with no `tRNS` chunk, so it
+   carries an opaque white rectangle. That is the source, not the conversion.
+3. **Recolouring is not available.** A CSS `invert()` in dark mode turns Haas's red cyan and
+   Ferrari's yellow blue. Altering a trademark is not ours to do.
+
+One ground answers all three: **`--mark-plate: #FFFFFF`, declared once, theme-independent.** The
+dark marks get the ground they were drawn for and Red Bull's own white rectangle disappears into it.
+⚠ `entity-page.css.test.ts` asserts the token is declared **exactly once** — a white rectangle on the
+dark theme looks like something to helpfully fix, and redeclaring it would blank six marks and put a
+grey box behind the seventh.
+
+**The mark is capped on both axes, never boxed.** The seven run from **0.91 : 1** (Mercedes) to
+**14.3 : 1** (the Williams wordmark). In a 56px square with `contain`, Williams draws 56 × 3.9 — a
+sliver. So: a 48px-tall plate that shrink-wraps its mark, with `max-width: 160px`,
+`max-height: 28px` and `width`/`height: auto`. A replaced element honours both maxima while keeping
+its intrinsic ratio, so one rule covers the range and all seven land between 25 and 160 px wide.
+
+**That arithmetic is also why there is no mark and no car in an index row.** A row's mark slot is a
+square; a 14 : 1 wordmark in it is a 4px sliver and a 2 : 1 car cropped into it is a piece of
+sidepod. The rows were left alone rather than given an exception.
+
+**Trademark, which copyright status does not settle.** Six marks are public domain *for copyright*.
+None is free of trademark. A mark therefore appears **only beside the name of the team it belongs
+to**, never as a generic badge, never in this product's own chrome, and never recoloured. The
+credits panel states this in words.
+
+#### 7.19.5 Attribution — the panel became three sets
+
+**The 11 cars are CC BY-SA 4.0, so this was blocking rather than tidy.** The reader behind §7.18's
+panel read `manifest.drivers` and nothing else; rendering a car with its credit unreachable is a
+licence breach. The panel now carries all three sets, and its figures are read from the manifest and
+never written into the copy:
+
+| | |
+|---|---|
+| Title | **The imagery** (was *The photographs*) |
+| Figures | **40** Images · **22** Contributors · **7** Licences |
+| `Contributors`, not `Photographers` | six marks credit a team rather than a person, and counting *McLaren* as a photographer would be a false statement on the one surface whose whole job is provenance |
+| Ladder | `CC BY-SA 4.0` 27 · `Public domain` 6 · `CC BY 2.0` 2 · `CC BY-SA 2.0` 2 · `CC BY 4.0` 1 · `CC0` 1 · `OGL 3` 1 |
+| Sections | `22 driver portraits` (3-up, frame 3/4) · `11 cars` (2-up ≥768, frame 2/1) · `7 team marks` (3-up, frame 3/2 on `--mark-plate`, image inset 16px) |
+| Why the cars are 2-up | a 3-up column in a 56rem panel draws a 276px car 138px tall. The point of this set is that eleven cars shot from one angle are genuinely **comparable**, and this is the one place in the product a row of them exists |
+| `alt` | `{subject}, photographed by {artist}` for a photograph; `{subject} team mark` for a mark, which is not a photograph and must not claim a photographer |
+| Plate ids | `credit-<kind>-<ref>`, unique across sets |
+
+**A mark gets no `srcSet`.** It ships as one file; `"x 320w, x 640w"` naming it twice tells the
+browser two candidates exist at two densities, which is a false claim about the asset and meaningless
+for the six that are vectors.
+
+#### 7.19.6 `licenceUrl` is nullable, and that is correct data
+
+**Public domain has no licence deed**, so Commons publishes no URL for it — six of the seven marks
+are in that case. The earlier doc comment on `imagery.ts` promised a URL on every entry; that
+promise was false the moment the marks arrived, and it has been corrected rather than worked around.
+
+A public-domain licence therefore renders **as text, not as a link**. `<a href={undefined}>` produces
+an anchor with no `href`: not focusable, not announced as a link, and visually identical to one that
+is simply broken. `credits.test.tsx` asserts that **no anchor in the panel lacks an `href`**, which
+is the assertion that fails the moment a null URL reaches the link branch. The implication that must
+stay true is asserted separately: a null URL only ever accompanies a public-domain claim, and
+anything else must be a real link — a `CC BY-SA 4.0` entry with a null URL is an unlinked
+attribution, i.e. a breach.
+
+#### 7.19.7 Copy, verbatim
+
+| Where | String |
+|---|---|
+| Panel title | `The imagery` |
+| Panel lead | `{n} images ship with this archive — {d} driver portraits, {c} cars and {l} team marks. Every one is free-licensed or in the public domain, and the licences that ask for a photographer, a licence and a link back get all three, here. The other 859 drivers and 203 teams carry a monogram, and that is the shipping form rather than a gap.` |
+| Figure labels | `Images` · `Contributors` · `Licences` |
+| Section headings | `{n} driver portraits` · `{n} cars` · `{n} team marks` |
+| Credit line, driver | `Photograph {artist} · {licence}` |
+| Credit line, car | `Car {artist} · {licence}` |
+| Credit line, mark | `Mark {artist} · {licence}` |
+| Credit accessible name | `{noun} of {subject} by {artist}, {licence}. Open the imagery credits.` |
+| Panel footnote | `Public-domain files ask for nothing at all. They are credited here anyway, because where a picture came from is worth more than the minimum a licence demands. A team mark is the property of the team it belongs to, is shown only beside that team's name, and is never this product's own branding. Anything wrong on this page is ours to fix — the record is in src/features/credits/imagery.json.` |
+
+#### 7.19.8 ⚠ Untested by construction
+
+jsdom loads no images, performs no layout and performs no compositing. **None of the following is
+verified and none of it may be reported as working:**
+
+- whether the car is centred in its plate, and whether `cover` at 2:1 against a 2:1 source really
+  crops nothing at the widths this actually renders at
+- whether a white `--mark-plate` on the dark theme reads as a brand badge or as a hole
+- whether the Williams wordmark is legible at 160 × 11, and whether a 48px plate that is 55px wide
+  for Alpine and 184px wide for Williams reads as one component
+- whether the two-column masthead balances at 1024, and whether `align-items: center` looks right
+  against a team with two facts and against one with four
+- whether eleven cars 2-up in the credits panel read as comparable
+- whether the car's Commons title wraps acceptably under a 416px plate
+
+What **is** verified: every image in all three sets carries its contributor, its source link, its
+licence in words, a real `alt` and a unique plate id; no anchor in the panel lacks an `href`; the
+ladder's extents equal the counts; the sets are ordered and sectioned; the masthead's two-column
+attribute is set exactly when there is a second column; the car plate is sized by a ratio and
+overrides the crop anchor; the mark is capped on both axes and grounded on a token that is declared
+once.
 
 
 ## 8. Accessibility — binding
@@ -5421,6 +5605,28 @@ own bar; at **62/38** step 2 → 3 fell to **ΔE 7.85** (G-38b, floor 8). The ra
 sides, and 60/30 sits between them with margin at each end.
 
 
+#### 9.2.10 `--mark-plate` — a colour that is deliberately outside the palette _(2026-09-12)_
+
+**`--mark-plate: #FFFFFF`, declared once, identical in both themes.** It is a ground for
+**third-party trademarks**, not a product colour, and it is recorded here rather than in §3 so that
+nobody later "completes" it with a dark-theme variant.
+
+- **It encodes nothing**, so no separation floor applies: it is never a series colour, never an
+  identity colour, never a status. Nothing is read *from* it; things are read *on* it.
+- **Nothing of ours is ever set on it.** Only a supplied mark sits there, and we do not control that
+  mark's colours — six of the seven marks use fixed fills and several are solid black, which is
+  exactly why the ground has to be white and cannot follow the theme (§7.19.4).
+- **The plate carries `1px var(--border-subtle)`**, which is what separates it from
+  `--surface-canvas` in light mode, where a white plate on a near-white page would otherwise have no
+  edge.
+- `npm run validate:palette` run 2026-09-12: **PASS — every gated floor cleared, both themes.**
+  Unchanged from the previous run, as expected: no token the validator gates was touched.
+
+⚠ **A dark-mode override of this token is a defect, not an improvement**, and
+`entity-page.css.test.ts` asserts the single declaration. Darkening it makes six marks invisible and
+puts a grey box behind Red Bull's alpha-less PNG.
+
+
 ## 10. Theming mechanics
 
 - Tokens are **CSS custom properties** on `:root`, overridden under `[data-theme="dark"]`, so
@@ -5479,3 +5685,4 @@ sides, and 60/30 sits between them with margin at each end.
 | 2026-08-23 | **The four simple charts, built — new §6.6.6.14, new §6.3a, new §9.2.8 and §9.2.9.** Rishabh: *"comparison which can be represented using simple charts that anyone can read and understand."* **(a) The budget was reclaimed before it was spent.** §9.2.7 had measured the retired shade-pair tokens at **0.61 KB gzipped**; §9.2.8 deleted them — 84 declarations, `shadePair()`, `SHADE_PAIR_TEAMS`, 42 of 64 `PLOT_TOKENS` with every `COLLISION_MASKS` entry regenerated (**87 of 231 pairs collide**, against 663 of 2016), and V-27 plus G-27a–e from the validator, replaced by a tombstone because *a validator that stops printing a number reads exactly like one whose check passed*. **20.77 → 20.16 KB**, the projected delta exactly. **(b) New §6.3a, the outcome ramp** — four ordinal steps inside ONE entity's colour, which is the opposite job to the shade pair deleted the same day: that spent lightness on *identity*, this spends it on an *order* inside a row that is already one entity. **New gate V-38** over all 22 plotting tokens × 2 themes chose the two mix ratios by measurement: **55/22 failed** at 1.16:1 against the plot surface and **62/38 failed** at ΔE 7.85 between steps 2 and 3; **60/30** clears both (13.17 / 10.11 / 10.24 against a floor of 8, and 1.27:1). Two residuals are **reported, not buried**: CVD bottoms out at ΔE 3.65, mitigated structurally by the drawn 2px gap, the fixed order, the legend and the table; and **no text may ever be drawn on a tone**, because neither ink clears 4.5:1 across all 44 fills. That second figure is a **correction to a claim already in the tree** — `charts.css` says `--ink-inverse` clears 4.5:1 against every plotting token and McLaren light is **3.40:1**, so `.chart-span-label` is below the text floor on the team page today; recorded and left open rather than fixed blind. **(c) Four charts.** *Result mix* — 100% stacked, and the only cross-era instrument here needing no normalisation argument, because the denominator is the driver's own starts; ⚠ §6.6.6.12's figures were raw and are corrected, Fangio **24/11/6/10 of 51** not 24/11/9/14 of 58 (**trap 17**), and the fourth band is *not classified*, not *retired* — Hamilton 34 against 32. *Career-relative arc* — x is the season of a career, so the axis is its own normaliser; every year emits a point and a missing one emits `null`, because `defined` joins straight through an absent entry and would draw a line across a sabbatical. *Places gained* — a diverging bar where §6.6.6.3 argued against one, because that was a head-to-head split and this is a signed quantity with a real zero; a null mean is a state and never a zero bar (155 of 818 drivers). *Finishing strip* — three states per round, not two, and a retirement is drawn **below** the axis because it is not a position. **(d) `types.ts` now imports `GridVsFinish` from `@schemas/entity`** instead of restating it, takes `championshipPositionIsFinal`, and `Ledger.tied`'s comment is corrected — it claimed grid-only ties and the schema measured **85** same-team race ties, all 1950s shared drives. **(e) New G-33**, and G-27's anchor is generalised: *axis-anchored* means zero on a diverging bar, resolved per target. **Measured cost: render-blocking CSS 20.77 → 20.72 KB / 25 (82.9%) — the four charts and the tone ramp cost 0.56 KB and the reclaim paid for all of it; initial JS 162.35 → 162.42 KB / 250 (65.0%).** Suite **2464 tests across 104 files, 3 consecutive green runs** — a figure that also contains the engineer's parallel work on the same branch, so it is not all this change's. **Untested by construction and listed in full in §6.6.6.14**: every position, whether four tones read as four steps, whether 22 dots resolve at 390px, and G-33 as a picture | designer |
 | 2026-08-23 | **New §6.3b — a minimum mark size is for a small value, never for a zero.** Measured on the live result mix: Jos Verstappen has **0 wins** and the win segment rendered a **1px** mark — the fill path is degenerate and paints nothing, but the hit rect floors its width at 1 for pointer safety, so the row carried a 1px hover target popping *"Won — 0 races — 0%"*. On a chart whose premise is *no axis, read the proportions*, a mark for a category the entity never entered is the one thing that cannot ship, and it reaches **702 of 818 drivers** on the win band alone. The audit found the same floor firing on a zero in **`.rate-bar`** (a rate of `0` is not `null`, so 0 of 51 wins drew 3px) and **`.tier-bar`** (an empty stratum — the row was already `disabled`, so the bar was the last part claiming otherwise), and cleared three: `.gain-bar` (`direction: 'held'` covers `mean === 0`), `.chain-link` and `.strip-dot`. **Two corollaries**: the rounded ends of a segmented row belong to the first and last **drawn** segment, or skipping a zero leader leaves the row square at one end and round at the other; and **a suppressed mark is never a suppressed fact** — the zero stays in the table, the figure and the accessible name, where it is text. **And the inverse**: the result mix has *no* minimum segment width, because on a shared track length is the encoding and a floor would overstate a small share at the expense of its neighbour. Also fixed the same family in the figure column: a mean of `1/358` printed `+0.00` beside a 3px bar, and now prints `+<0.01`. Coordinator's measurement also **closed four of the five open questions on the result mix** — the bands render at **75px**, not the ~10px assumed, the tones and the hatch read unambiguously, 390 is clean at zero overflow, and the neutral legend was confirmed correct and left alone | designer |
 | 2026-08-26 | **Driver photography, §7.17 and §7.18 — the mixed state is the design, and attribution is a surface.** 22 of 881 drivers have a free-licensed Wikimedia photograph; 859 never will, so **`EntityPortrait` is one shape with two fills** rather than an image component with a fallback: a bay with a face and a bay with `SE` are the same rectangle, border, ground and 3px identity bar, and only `data-filled` differs. **The manifest is the only source of an image URL** — no path is ever composed from a reference, because 859 composed paths on `/drivers` are 859 failed requests in one paint; a file that goes missing anyway is caught by `onError` and falls back to the monogram in place. Two set-wide constants became **tokens** because each is a measured property of the whole source set rather than styling: `--portrait-crop: top center` (every source is portrait-orientation at 0.64–0.84 w/h, and CSS's default `center center` decapitates the wider framings — verified on a contact sheet of all 22), and `--portrait-band-aspect: 16 / 9` (a *ratio*, because `cover` scales to the box width, so a pixel height would show 27% of the frame in a 319px bay and 40% in a 219px one — one photograph framed two ways on one page). **The identity bar stays 3px and never becomes a frame, a ring or a tint**: several photographs are the right driver in the wrong team's kit (Sainz in Ferrari red while racing for Williams), so a coloured surround would be a claim about the face rather than a label beside it — the Commons title in §7.18 is where that is disclosed as a fact. **Nothing is ever set over a photograph**, because the backgrounds are paddock, garage, podium and press pen and no composite's contrast could be measured once and relied on for the set. The compare bay became a **column**: at 1024 a bay is ~219px and a 32px condensed surname needs ~145 of them, so a leading strip would have wrapped every name to three lines — a band takes height, which the bay has. **§7.18 `PhotographCredits` is a modal, not a route** (routing is not design's to change, and a modal keeps the reader where the photograph is), opened from the footer everywhere and from the tray when a bay is showing a face; the masthead credit line is specified and **held** until the mixed state has been looked at. It opens the way an index page does, with the shape of what it lists — three figures, a licence ladder, then a plate per photograph carrying the photographer at display size, both links and the Commons title — and reuses `.stat-strip`, `.ruler`, `.link`, `.btn-icon` and `.season-eyebrow` verbatim, so only the dialog geometry and the plate are new. **`contain` here, `cover` everywhere else**: the one place the photograph is the subject rather than an identity mark. **New G-34 is G-5 applied to a second surface** — `sheetEnter` / `sheetExit` are imported as they are, so no new tween code exists in the product. **Measured: initial JS 162.42 → 166.73 KB / 250 (66.7%)** — the credits panel is deliberately *not* a lazy chunk, because a chunk that fails to load leaves attributed photographs on screen with the attribution unreachable; **render-blocking CSS 20.72 → 21.29 KB / 25 (85.1%)**, which warns and does not fail. Suite **2528 tests / 106 files**. **Untested by construction and listed in §7.18.5 and §7.17**: every crop as a picture, the panel's geometry at any width, the letterboxing, whether the entrance plays, and whether the band keeps a face at every bay width. One reported, not made: `entity-page.css` is absent from `vite.config.ts`'s `test.css.include`, so its rule bodies cannot be asserted — a one-line change in a file this round did not own | designer |
+| 2026-09-12 | **§7.19 the team imagery layer, and §7.18 extended to three sets.** 11 of 214 teams have a car and 7 a mark, so the layer is **present or absent and has no placeholder** — the split from §7.17, whose monogram exists because the portrait slot is *structural* and always filled. A 2:1 plate drawn empty for the other 203 would announce a gap on 95% of the pages to decorate 5%. ⚠ The corollary is a layout rule: the masthead's second column is gated on a **predicate**, because a component returning `null` is still a real element and passing it unconditionally would squeeze 203 names into `1fr` of `1fr + 26rem` beside an empty column — invisible to jsdom. **The cars are a set where the portraits are a collection**: one photographer, one event, one angle, and every file exactly 2:1, so `--car-aspect: 2 / 1` crops nothing and `--car-crop: center` replaces the portrait layer's `top center`, which would cut a side-on car's tyres off. **`--mark-plate: #FFFFFF` is declared once and is theme-independent**, and that is measured rather than styled: all six mark SVGs use fixed fills not `currentColor` and several are solid black (invisible on dark), Red Bull's PNG is colour-type 2 with no `tRNS` chunk so it carries its own opaque white rectangle, and `invert()` is unavailable because it turns Haas's red cyan — altering a trademark. Marks are capped on **both** axes (160×28, auto sizes) rather than boxed, because the seven run 0.91:1 to **14.3:1** and a square would draw the Williams wordmark 4px tall; the same arithmetic is why there is no mark and no car in an index row. **The credits reader was drivers-only and the 11 cars are CC BY-SA 4.0**, so extending it was blocking rather than tidy: the panel is now `The imagery` — **40** images, **22** contributors, **7** licences, three sections, `Contributors` because six marks credit a team and not a photographer. **`licenceUrl` is nullable** (public domain has no deed) and renders as text; a test asserts no anchor in the panel lacks an `href`. §7.17's held surfaces are **wired**: the driver masthead portrait is the product's one `eager`/`fetchPriority=high` image with a visible credit line beside it, and the driver index rows carry photographs lazily. **Measured: render-blocking CSS 21.29 → 21.53 KB / 25 (86.1%)**, initial JS 167.50 → 170.20 KB / 250 (68.1%). Suite **2565 tests / 107 files**; `npm run validate:palette` **PASS**, unchanged (§9.2.10). `entity-page.css.test.ts` is new and asserts rule bodies, which only became possible when `vite.config.ts`'s `test.css.include` gained the file — the item §7.17.2 reported and did not make; both of its headline assertions were proved to fail when what they assert is removed. **Untested by construction and listed in §7.19.8**: whether the car is centred in its plate, whether a white plate reads as a badge or a hole on the dark theme, whether the Williams wordmark is legible at 160×11, and whether the two-column masthead balances at 1024 | designer |
